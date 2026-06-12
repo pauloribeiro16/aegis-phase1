@@ -25,9 +25,12 @@ LangGraph state machine. Each subphase runs sequentially. No Neo4j, no eval.
 ## 2. Commands
 
 ```bash
-# Setup
-pip install -e ".[all]"
+# Setup (shared venv — all packages pre-installed)
+source ../shared-venv/bin/activate
 cp .env.example .env          # edit LLM settings
+
+# OR fresh install:
+# pip install -e ".[all]"
 
 # Test (file-scoped first)
 pytest tests/unit/workflow/phase1/test_validate_a.py -v
