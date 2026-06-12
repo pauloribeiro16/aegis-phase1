@@ -102,7 +102,7 @@ class CaseConfig(BaseModel):
     case: str
     name: str
     description: str = ""
-    neo4j: Neo4jConfig
+    neo4j: Neo4jConfig | None = None
     llm: LLMConfig
     embedding: EmbeddingConfig = Field(
         default_factory=lambda: EmbeddingConfig(
