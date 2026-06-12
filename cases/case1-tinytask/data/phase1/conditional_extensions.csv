@@ -1,0 +1,3 @@
+blockId,blockName,triggerCondition,questionIds,isActive,regulationId,case
+CB-001,GDPR-PersonalData,company processes personal data of EU residents,"Q001,Q002,Q003",true,GDPR,case1
+CB-002,CRA-DigitalProduct,company manufactures or distributes digital products with digital elements,"Q004,Q005,Q006",true,CRA,case1

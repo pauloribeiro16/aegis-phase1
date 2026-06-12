@@ -1,0 +1,3 @@
+interactionId,interactionType,regulation1Id,regulation2Id,conflictDescription,resolutionPrinciple,case
+RI-001,SYNERGY,GDPR,CRA,GDPR requires data protection by design; CRA requires security by design for digital products. Both address overlapping technical measures.,Unified security-by-design framework satisfying both GDPR Art. 25 and CRA Annex I requirements simultaneously,case1
+RI-002,TEMPORAL,GDPR,NIS2,GDPR 72-hour breach notification may conflict with NIS2 tiered notification (24h early warning + 72h initial + 1 month final). Different granularity levels.,"Apply the stricter timeline: 24-hour early warning per NIS2, with 72-hour detailed notification satisfying both GDPR Art. 33 and NIS2 Art. 23",case1

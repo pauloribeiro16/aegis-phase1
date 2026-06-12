@@ -1,0 +1,2 @@
+case,contextId,companyName,assessmentDate,industry,size,location,employeeCount,revenue,dataTypes,specialCategoryData,aiSystems,criticalInfrastructure,financialEntity,phase
+case1,TINYTASK-2024-001,TinyTask Lda.,2024-01-15,Technology,MICRO,Portugal,8,150000,Emails;Names;Passwords;Task content,NO,NO,NO,NO,P1

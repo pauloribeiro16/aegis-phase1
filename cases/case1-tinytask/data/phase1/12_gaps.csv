@@ -1,0 +1,5 @@
+case,phase,gapId,subDomain,regulation,clause,gapType,description,riskLevel,recommendedAction
+case1,phase1,GAP-001,D-09.4,GDPR,Art.30,NOT_ADDRESSED,No records of processing activities,HIGH,Create RoPA template
+case1,phase1,GAP-002,D-01,GDPR,Art.32,PARTIAL_COVERAGE,No formal security policy,MEDIUM,Document security controls
+case1,phase1,GAP-003,D-06.2,CRA,Art.18,NOT_ADDRESSED,No SBOM (Software Bill of Materials),HIGH,Implement SBOM tooling
+case1,phase1,GAP-004,D-02.3,CRA,Art.21,NOT_ADDRESSED,No vulnerability disclosure process,MEDIUM,Create security.txt + contact email

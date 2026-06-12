@@ -1,0 +1,5 @@
+case,phase,implicationId,subDomain,sourceRegulations,description,architecturalImpact,priority
+case1,phase1,SI-001,D-01,"GDPR, CRA",Dual encryption requirements,Single AES-256 standard satisfies both,HIGH
+case1,phase1,SI-002,D-06.2,CRA,SBOM requirement new for TinyTask,Need dependency scanning in CI/CD,HIGH
+case1,phase1,SI-003,D-05,GDPR,Data subject rights (erasure portability),User-facing export/delete functionality,MEDIUM
+case1,phase1,SI-004,D-02.3,CRA,Vulnerability disclosure process,security.txt + contact email,MEDIUM

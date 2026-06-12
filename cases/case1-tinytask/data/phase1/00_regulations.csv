@@ -1,0 +1,6 @@
+regulationId,name,fullName,type,effectiveDate,lastAmended,officialLink,primaryFocus,phase,case,shortName,jurisdiction
+GDPR,GDPR,General Data Protection Regulation 2016/679,DATA_PROTECTION,2018-05-25,2023-12-07,https://eur-lex.europa.eu/eli/reg/2016/679,Data protection and privacy,P1,case1,GDPR,EU
+CRA,CRA,Cyber Resilience Act (EU) 2022/2554,CYBER_SECURITY,2024-12-12,,https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52022PC2554,Digital product security,P1,case1,CRA,EU
+NIS2,NIS 2,Network and Information Systems Directive (EU) 2022/2555,CRITICAL_INFRA,2023-01-16,,https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52022PC2555,Critical infrastructure security,P1,case1,NIS2,EU
+DORA,DORA,Digital Operational Resilience Act,FINANCIAL,2025-01-17,,https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52023PC0464,Financial sector resilience,P1,case1,DORA,EU
+AIACT,AI Act,Artificial Intelligence Act,AI_REGULATION,2025-08-01,,https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52023PC0460,High-risk AI systems,P1,case1,AI Act,EU

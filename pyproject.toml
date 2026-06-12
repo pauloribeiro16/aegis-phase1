@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aegis-phase1"
+version = "0.1.0"
+description = "AEGIS-KG Phase 1 — Compliance Context Assessment Workflow"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [
+    { name = "Paulo Ribeiro", email = "pauloribeiro16@users.noreply.github.com" },
+]
+keywords = ["compliance", "regulation", "knowledge-graph", "langgraph", "GDPR", "AI-Act"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Legal Industry",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "langchain-ollama>=0.2.0",
+    "pydantic>=2.7.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pre-commit>=3.5.0",
+]
+tracing = [
+    "langfuse>=2.0.0",
+]
+all = ["aegis-phase1[dev,tracing]"]
+
+[project.urls]
+Homepage = "https://github.com/pauloribeiro16/aegis-phase1"
+Issues = "https://github.com/pauloribeiro16/aegis-phase1/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["aegis_phase1*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --tb=short"
+markers = [
+    "integration: requires running services",
+    "slow: long-running tests",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["archive", "__pycache__", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+no_implicit_optional = true

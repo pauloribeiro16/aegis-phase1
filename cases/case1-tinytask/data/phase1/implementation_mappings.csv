@@ -1,0 +1,4 @@
+mappingId,subDomainId,primaryFramework,frameworkReference,rationale,confidenceLevel,case
+IM-001,D-01,NIST CSF 2.0,PR.DS-1: Data-at-rest is protected,NIST CSF 2.0 PR.DS-1 maps to encryption at rest and transit requirements across GDPR and CRA,HIGH,case1
+IM-002,D-02,NIST CSF 2.0,ID.RA-1: Vulnerabilities are identified,NIST CSF 2.0 ID.RA-1 covers vulnerability identification and management per CRA Annex II,HIGH,case1
+IM-003,D-03,NIST CSF 2.0,PR.AA-1: Identities and credentials are managed,NIST CSF 2.0 PR.AA-1 aligns with GDPR Art. 32 and NIS2 Art. 20 access control requirements,MEDIUM,case1

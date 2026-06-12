@@ -1,0 +1,6 @@
+case,phase,goalId,goal,description,priority,relatedRegulations,successMetrics
+case1,phase1,BG-01,GDPR Compliance Baseline,Establish baseline GDPR compliance for all personal data processing activities,HIGH,GDPR,Zero audit findings; RoPA complete
+case1,phase1,BG-02,CRA Conformity,Achieve CRA conformity for Team Organizer SaaS product,HIGH,CRA,SBOM published; security.txt active
+case1,phase1,BG-03,Data Subject Rights,Enable data export and erasure for all users,MEDIUM,GDPR,User-facing export/delete features live
+case1,phase1,BG-04,Security by Design,Integrate security into development lifecycle,MEDIUM,"CRA, GDPR",SAST/DAST in CI/CD pipeline
+case1,phase1,BG-05,Supplier Due Diligence,Maintain SOC 2/ISO 27001 evidence from cloud providers,MEDIUM,"GDPR, CRA",Annual review completed

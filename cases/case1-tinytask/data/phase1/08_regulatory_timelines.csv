@@ -1,0 +1,33 @@
+case,regulationId,timelineType,deadline,unit,triggerCondition,source,phase
+case1,GDPR,breach_notification_authority,72,hours,Personal data breach awareness,Art. 33,P1
+case1,GDPR,breach_notification_subject,,without undue delay,High risk to rights and freedoms,Art. 34,P1
+case1,GDPR,dsar_response,30,days,Data subject access request received,Art. 15,P1
+case1,GDPR,erasure_completion,30,days,Erasure request acknowledged,Art. 17,P1
+case1,GDPR,dpo_designation,30,days,Scale/nature of processing triggers obligation,Art. 37,P1
+case1,GDPR,dpia_before_processing,,before processing,High-risk processing operations,Art. 35,P1
+case1,GDPR,record_retention,,as long as necessary,Purpose limitation principle,Art. 5(1)(e),P1
+case1,CRA,vulnerability_early_warning,24,hours,Actively exploited vulnerability identified,Art. 14(1),P1
+case1,CRA,vulnerability_notification,72,hours,Initial notification of exploited vuln,Art. 14(1),P1
+case1,CRA,vulnerability_triage,14,days,Vulnerability requiring action,Art. 14 + Annex I,P1
+case1,CRA,incident_notification_initial,24,hours,Severe security incident identified,Art. 14(3),P1
+case1,CRA,incident_notification_final,1,months,Final report on severe incident,Art. 14(3),P1
+case1,CRA,technical_documentation_retention,10,years,Product placed on market,Art. 13(2),P1
+case1,CRA,conformity_assessment_critical,,,Critical class products require notified body,Art. 42,P1
+case1,NIS2,early_warning,24,hours,Significant incident detected,Art. 23(2),P1
+case1,NIS2,incident_notification_initial,72,hours,Initial notification of significant incident,Art. 23(3),P1
+case1,NIS2,incident_notification_final,1,months,Detailed final report submitted,Art. 23(4),P1
+case1,NIS2,incident_classification,,before notification,Classify as significant incident,Art. 23(1),P1
+case1,NIS2,management_body_training,,periodic,Cybersecurity training for management,Art. 20(2),P1
+case1,DORA,initial_report,4,hours,Major ICT incident detected (RTS),Art. 19 / RTS,P1
+case1,DORA,intermediate_report,72,hours,Intermediate update on major incident,Art. 19 / RTS,P1
+case1,DORA,final_report,30,days,Detailed final report submitted,Art. 19 / RTS,P1
+case1,DORA, tlpt_frequency,36,months,Threat-led penetration test cycle,Art. 12(7),P1
+case1,DORA, ict_risk_framework,,annual,Management body approval of ICT risk framework,Art. 5,P1
+case1,DORA,concentration_risk_assessment,,annual,Critical ICT third-party concentration review,Art. 19(3),P1
+case1,AI_ACT,incident_reporting_standard,15,days,Serious incident from high-risk AI,Art. 73(1),P1
+case1,AI_ACT,incident_reporting_widespread,2,days,Widespread risk or systemic failure,Art. 73(1),P1
+case1,AI_ACT,incident_reporting_death,10,days,Death or damage to health,Art. 73(1),P1
+case1,AI_ACT,conformity_assessment,,before market placement,High-risk AI systems require assessment,Art. 43,P1
+case1,AI_ACT,registration,36,months before placement,High-risk AI in EU database,Art. 51,P1
+case1,AI_ACT,post_market_monitoring,,continuous,Post-market monitoring system active,Art. 72,P1
+case1,AI_ACT,quality_mgmt_system,,continuous,QMS for high-risk AI providers,Art. 17,P1

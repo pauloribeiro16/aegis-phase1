@@ -1,0 +1,2 @@
+case,phase,capabilityId,capability,currentState,targetState,gap,priority
+case1,phase1,CAP-01,Records of Processing Activities (RoPA),NONE,MATURE,HIGH,HIGH

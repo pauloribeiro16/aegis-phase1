@@ -1,0 +1,4 @@
+case,phase,rowId,regulation,domain,obligation,actorCapacity,supplier,evidenceRequired
+case1,phase1,SUP-001,GDPR,D-01,Infrastructure security,Processor,AWS (eu-west-1),SOC 2 Type II report
+case1,phase1,SUP-002,GDPR,D-01,Payment security,Processor,Stripe,PCI-DSS certification
+case1,phase1,SUP-003,CRA,D-01,Cloud security,Manufacturer,AWS/Firebase,Security documentation

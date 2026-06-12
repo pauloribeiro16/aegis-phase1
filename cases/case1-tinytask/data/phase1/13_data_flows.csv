@@ -1,0 +1,2 @@
+case,phase,flowId,dataType,source,destination,transferMethod,encryption,regulatoryConstraint
+case1,phase1,DF-01,Customer PII (name email),User registration,Database (EU region),HTTPS / REST API,TLS 1.3 in transit; AES-256 at rest,GDPR Art. 5 32

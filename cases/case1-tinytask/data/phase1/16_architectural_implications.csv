@@ -1,0 +1,2 @@
+case,phase,implicationId,description,sourceRegulation,impactArea,severity,mitigationApproach
+case1,phase1,AI-01,High cloud dependency on third-party infrastructure requires inherited security controls,"GDPR, CRA",Infrastructure,HIGH,Obtain SOC 2 / ISO 27001 evidence from cloud provider; include security clauses in contracts

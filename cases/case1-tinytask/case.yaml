@@ -1,0 +1,24 @@
+# aegis-phase1 case configuration
+case: "case1"
+name: "TinyTask SaaS"
+complexity: "standard"
+applicable_regulations:
+  - "GDPR"
+  - "CRA"
+  - "NIS2"
+  - "DORA"
+  - "AIACT"
+
+llm:
+  provider: "ollama"
+  base_url: "${OLLAMA_BASE_URL:-http://localhost:11434}"
+  model: "${OLLAMA_MODEL:-llama3.1:8b}"
+  temperature: 0.1
+  num_ctx: 8192
+  timeout: 120
+
+phases:
+  phase1:
+    data_path: "data/phase1"
+    templates_path: "templates/phase1"
+    output_path: "output/phase1"

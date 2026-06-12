@@ -1,0 +1,8 @@
+case,phase,stakeholderId,name,role,internal,organization,contact,responsibilities,influenceLevel,interestLevel,engagementStrategy
+case1,phase1,STK-CEO-01,CEO (implicit),CEO,TRUE,TinyTask Lda.,,Business strategy compliance accountability,HIGH,HIGH,Weekly briefings; direct involvement in compliance decisions
+case1,phase1,STK-CTO-01,CTO (implicit),CTO,TRUE,TinyTask Lda.,,Technical leadership security architecture,HIGH,HIGH,Technical reviews; architecture decisions
+case1,phase1,STK-DPO-01,DPO (implicit),DPO,TRUE,TinyTask Lda.,,Data protection oversight GDPR compliance,MEDIUM,HIGH,Quarterly reviews; incident coordination
+case1,phase1,STK-DEVP-01,Development Team,Development Team,TRUE,TinyTask Lda.,,Secure development implementation,MEDIUM,MEDIUM,Sprint reviews; implementation feedback
+case1,phase1,STK-CUSTOMER-01,B2B Customers,B2B Customers,FALSE,Client organizations,,Data controllers; recipient of breach notifications,LOW,HIGH,Annual review; contract updates
+case1,phase1,STK-STRIPE-01,Stripe,Payment Processor,FALSE,Stripe Technologies,compliance@stripe.com,Payment processing; PCI-DSS compliance,LOW,LOW,Ad-hoc coordination; compliance documentation
+case1,phase1,STK-AWS-01,AWS,Cloud Provider,FALSE,Amazon Web Services,,Cloud infrastructure; inherited security controls,LOW,LOW,Ad-hoc; annual security review

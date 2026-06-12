@@ -1,0 +1,4 @@
+entryId,analysisId,subDomainId,elaborationFactor,dominantRegulation,relationType,normativeIntensity,weightedScore,notes,case
+DEE-001,GDPR-CRA-001,D-01.1,0.85,GDPR,REINFORCING,HIGH,4.2,GDPR Art. 32 provides primary encryption obligations; CRA Annex I reinforces for digital products,case1
+DEE-002,GDPR-CRA-001,D-01.1,0.72,CRA,COMPLEMENTARY,MEDIUM,3.5,CRA extends encryption requirements to product lifecycle and manufacturer obligations,case1
+DEE-003,GDPR-NIS2-001,D-01.1,0.65,NIS2,OVERLAPPING,MEDIUM,3.1,"NIS2 Art. 21 requires encryption for essential entities, overlapping with GDPR Art. 32",case1
