@@ -58,7 +58,10 @@ class TestExtractFirstObject:
     def test_no_balanced_object(self):
         raw = 'unbalanced { not closed'
         result = RobustParser.parse(raw)
-        assert not result.ok
+        # New behavior: fallback always succeeds with minimal object
+        assert result.ok
+        assert result.strategy == "construct_minimal_object"
+        assert result.json.get("status") == "INSUFFICIENT_EVIDENCE"
 
     def test_braces_in_strings(self):
         # String contents may include braces; should not confuse the parser
@@ -73,6 +76,8 @@ class TestExtractFirstArray:
     def test_array_in_text(self):
         raw = 'Output: [{"a": 1}, {"b": 2}] end'
         result = RobustParser.parse(raw)
+        # Pre-check sees "[" and promotes extract_first_array to the front so
+        # we do not accidentally grab the inner {"a": 1} via extract_first_object.
         assert result.ok
         assert result.strategy == "extract_first_array"
         assert result.json == {"items": [{"a": 1}, {"b": 2}]}
@@ -98,8 +103,11 @@ class TestRepairCommonErrors:
 class TestFailureModes:
     def test_total_garbage(self):
         result = RobustParser.parse("this is not json at all")
-        assert not result.ok
-        assert result.error
+        # New behavior: fallback always succeeds
+        assert result.ok
+        assert result.strategy == "construct_minimal_object"
+        assert result.json.get("status") == "INSUFFICIENT_EVIDENCE"
+        # All 8 strategies were tried (including fallback)
         assert len(result.attempts) == len(RobustParser.STRATEGIES)
 
     def test_truncated_json(self):
@@ -110,10 +118,12 @@ class TestFailureModes:
 
     def test_attempts_recorded(self):
         result = RobustParser.parse("garbage")
-        assert not result.ok
+        # New behavior: fallback always succeeds, but all 8 strategies attempted
+        assert result.ok
         for attempt in result.attempts:
             assert "strategy" in attempt
             assert "ok" in attempt
-        # All strategies attempted
+        # All 8 strategies were tried
+        assert len(result.attempts) == len(RobustParser.STRATEGIES)
         strategies_tried = {a["strategy"] for a in result.attempts}
         assert strategies_tried == set(RobustParser.STRATEGIES)
