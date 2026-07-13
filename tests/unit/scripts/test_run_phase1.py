@@ -118,3 +118,97 @@ def test_main_loop_exit(monkeypatch):
     monkeypatch.setattr("scripts.run_phase1.beaupy.select", MagicMock(return_value="6) Exit"))
     # Should not hang
     run_phase1.main()
+
+
+# === Wizard tests (v1.2) ===
+def test_top_menu_returns_configure(monkeypatch):
+    """top_menu() returns 'configure' when user picks the Configure option."""
+    from scripts import run_phase1
+    monkeypatch.setattr(
+        "scripts.run_phase1.beaupy.select",
+        MagicMock(return_value="1) Configure    (walk through setup one step at a time)"),
+    )
+    assert run_phase1.top_menu() == "configure"
+
+
+def test_top_menu_returns_run(monkeypatch):
+    """top_menu() returns 'run' when user picks the Run option."""
+    from scripts import run_phase1
+    monkeypatch.setattr(
+        "scripts.run_phase1.beaupy.select",
+        MagicMock(return_value="2) Run          (execute with current settings)"),
+    )
+    assert run_phase1.top_menu() == "run"
+
+
+def test_top_menu_returns_exit(monkeypatch):
+    """top_menu() returns 'exit' when user picks the Exit option."""
+    from scripts import run_phase1
+    monkeypatch.setattr("scripts.run_phase1.beaupy.select", MagicMock(return_value="3) Exit"))
+    assert run_phase1.top_menu() == "exit"
+
+
+def test_configure_wizard_navigates_all_steps(tmp_path, monkeypatch):
+    """configure_wizard walks Case -> Mode -> Scope -> Confirm and saves CONFIG."""
+    from scripts import run_phase1
+    monkeypatch.setattr(run_phase1, "MENU_HISTORY", tmp_path / "menu.jsonl")
+    # Sequence of beaupy.select return values: one per wizard step.
+    choices = [
+        "Case 01 - TinyTask SaaS (2 regs: GDPR, CRA)",   # step_choose_case
+        "Mock (no Ollama, fast, uses fixtures in data/)",  # step_choose_mode
+        "Full Pipeline (1B + 1C Map + 1C Reduce)",         # step_choose_scope
+        "Save and return to menu",                         # step_confirm
+    ]
+    monkeypatch.setattr("scripts.run_phase1.beaupy.select", MagicMock(side_effect=choices))
+    run_phase1.configure_wizard()
+    assert "TinyTask" in run_phase1.CONFIG["case"]
+    assert "Mock" in run_phase1.CONFIG["mode"]
+    assert "Full Pipeline" in run_phase1.CONFIG["scope"]
+    assert tmp_path.joinpath("menu.jsonl").exists()
+    # History should contain configure_done event
+    history = tmp_path.joinpath("menu.jsonl").read_text()
+    assert "configure_done" in history
+
+
+def test_step_choose_case_no_back(monkeypatch):
+    """step_choose_case options do NOT include a Back choice (it's the first step)."""
+    from scripts import run_phase1
+    captured = {}
+
+    def fake_select(options, return_index=False):
+        captured["options"] = options
+        return options[0]
+
+    monkeypatch.setattr("scripts.run_phase1.beaupy.select", MagicMock(side_effect=fake_select))
+    action = run_phase1.step_choose_case()
+    assert action == "next"
+    assert "Back" not in " ".join(captured["options"])
+
+
+def test_step_choose_mode_back_returns_back(monkeypatch):
+    """step_choose_mode returns 'back' when the user picks the Back option."""
+    from scripts import run_phase1
+    monkeypatch.setattr("scripts.run_phase1.beaupy.select", MagicMock(return_value="Back"))
+    assert run_phase1.step_choose_mode() == "back"
+
+
+def test_step_choose_scope_single_llm_includes_llm_step(monkeypatch, tmp_path):
+    """When CONFIG['scope'] = 'Single LLM ...', _build_steps() includes the LLM step."""
+    from scripts import run_phase1
+    monkeypatch.setattr(run_phase1, "MENU_HISTORY", tmp_path / "menu.jsonl")
+    run_phase1.CONFIG["scope"] = "Single LLM (specify next)"
+    steps = run_phase1._build_steps()
+    labels = [label for label, _ in steps]
+    assert "LLM" in labels
+    assert "Confirm" in labels
+
+
+def test_step_choose_scope_other_skips_llm_step(monkeypatch, tmp_path):
+    """When CONFIG['scope'] != 'Single LLM', _build_steps() does NOT include the LLM step."""
+    from scripts import run_phase1
+    monkeypatch.setattr(run_phase1, "MENU_HISTORY", tmp_path / "menu.jsonl")
+    run_phase1.CONFIG["scope"] = "Full Pipeline (1B + 1C Map + 1C Reduce)"
+    steps = run_phase1._build_steps()
+    labels = [label for label, _ in steps]
+    assert "LLM" not in labels
+    assert "Confirm" in labels

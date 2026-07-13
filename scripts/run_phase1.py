@@ -1,9 +1,31 @@
 #!/usr/bin/env python3
-"""AEGIS Phase 1 v1.2 - Interactive beaupy menu for Phase1Executor runs."""
+"""AEGIS Phase 1 v1.2 - Interactive wizard menu for Phase1Executor runs.
+
+v1.2 redesign: replaces the original flat 6-option menu with a hub-and-spoke
+top-level menu plus a step-by-step configuration wizard. Each step shows
+ONE question at a time and offers a Back option to revisit the previous
+step. The Confirm step summarises the pending configuration before
+returning to the top menu (no auto-run).
+
+Top-level menu:
+    1) Configure   - launches the wizard
+    2) Run         - shows the current config and asks for confirmation
+    3) Exit
+
+Wizard steps (in order):
+    1. Case    - which AEGIS case to run
+    2. Mode    - Mock (fixture-backed) or Real (Ollama)
+    3. Scope   - which Phase 1 sub-pipeline to run
+    4. LLM     - (only when Scope = "Single LLM") which LLM spec
+    5. Confirm - review and either save the configuration or step back
+
+Legacy ``select_*`` functions are preserved so existing tests keep working.
+"""
 import json
 import re
 import subprocess
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,7 +42,7 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 MENU_HISTORY = LOGS_DIR / "menu_history.jsonl"
 
 
-# === Configuration state ===
+# === Configuration state (persists across wizard sessions until process exits) ===
 CONFIG = {
     "case": "Case 01 - TinyTask SaaS (2 regs: GDPR, CRA)",
     "mode": "Mock (no Ollama, fast)",
@@ -57,6 +79,7 @@ SCOPES = [
     "Run unit tests (pytest)",
 ]
 
+# Used by the legacy select_llm() function (kept for backward-compat tests).
 LLMS = [
     "P1B-LLM-01-INTERPRETATION",
     "P1B-LLM-02-RATIONALE",
@@ -66,6 +89,18 @@ LLMS = [
     "<- Back (cancel)",
 ]
 
+# Used by the wizard's step_choose_llm(). Keeps the wizard UI labels
+# consistent with the rest of the wizard ("Back" rather than "<- Back (cancel)").
+WIZARD_LLMS = [
+    "P1B-LLM-01-INTERPRETATION",
+    "P1B-LLM-02-RATIONALE",
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+    "P1C-LLM-02-COMPOUND-EVENT",
+    "P1C-LLM-03-STRATEGIC-SYNTHESIS",
+]
+
+BACK_LABEL = "Back"
+
 
 def log_history(event: str, data: dict) -> None:
     """Append a JSONL entry to menu_history.jsonl."""
@@ -74,20 +109,21 @@ def log_history(event: str, data: dict) -> None:
         f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
 
 
-def show_menu() -> None:
-    print("\n" + "=" * 60)
-    print(" AEGIS Phase 1 v1.2 - Interactive Menu (beaupy)")
-    print("=" * 60)
+def _print_current_config() -> None:
+    """Pretty-print the current CONFIG (used by Confirm step and Run prompt)."""
     print("\n  Current configuration:")
     print(f"    Case:   {CONFIG['case']}")
     print(f"    Mode:   {CONFIG['mode']}")
     print(f"    Scope:  {CONFIG['scope']}")
     print(f"    LLM:    {CONFIG['llm']}")
-    print("\n  Actions:")
 
 
+# === Legacy single-step selectors (kept for backward-compatible tests) ===
 def select_case() -> None:
+    """Prompt for a case and store it in CONFIG. No Back option."""
     choice = beaupy.select(options=list(CASES.keys()), return_index=False)
+    if not choice:
+        return
     CONFIG["case"] = choice
     log_history("select_case", {"case": choice})
     print(f"  -> Case set to: {choice}")
@@ -95,6 +131,8 @@ def select_case() -> None:
 
 def select_mode() -> None:
     choice = beaupy.select(options=MODES, return_index=False)
+    if not choice:
+        return
     CONFIG["mode"] = choice
     log_history("select_mode", {"mode": choice})
     print(f"  -> Mode set to: {choice}")
@@ -102,6 +140,8 @@ def select_mode() -> None:
 
 def select_scope() -> None:
     choice = beaupy.select(options=SCOPES, return_index=False)
+    if not choice:
+        return
     CONFIG["scope"] = choice
     log_history("select_scope", {"scope": choice})
     print(f"  -> Scope set to: {choice}")
@@ -109,13 +149,158 @@ def select_scope() -> None:
 
 def select_llm() -> None:
     choice = beaupy.select(options=LLMS, return_index=False)
-    if "Back" in choice:
+    if not choice or "Back" in choice:
         return
     CONFIG["llm"] = choice
     log_history("select_llm", {"llm": choice})
     print(f"  -> LLM set to: {choice}")
 
 
+# === Wizard step functions ===
+# Each step returns one of:
+#   "next"  - advance to the next step
+#   "back"  - go back to the previous step
+#   "done"  - wizard finished; return to the top menu (used by Confirm step)
+
+
+def _is_back(choice: str | None) -> bool:
+    """True when the user picked the Back option (or pressed Ctrl-C / Esc)."""
+    if not choice:
+        return True
+    return "Back" in choice
+
+
+def step_choose_case() -> str:
+    """First wizard step: pick a case. No Back option (nothing to go back to)."""
+    options = list(CASES.keys())
+    choice = beaupy.select(options=options, return_index=False)
+    if not choice:
+        # Treat Esc/Ctrl-C as "stay on this step" - the user can try again.
+        return "back"
+    CONFIG["case"] = choice
+    log_history("configure_step", {"step": "case", "value": choice})
+    return "next"
+
+
+def step_choose_mode() -> str:
+    """Second wizard step: pick Mock vs Real mode."""
+    options = [*MODES, BACK_LABEL]
+    choice = beaupy.select(options=options, return_index=False)
+    if _is_back(choice):
+        return "back"
+    CONFIG["mode"] = choice  # type: ignore[assignment]
+    log_history("configure_step", {"step": "mode", "value": choice})
+    return "next"
+
+
+def step_choose_scope() -> str:
+    """Third wizard step: pick the run scope. May trigger an LLM step later."""
+    options = [*SCOPES, BACK_LABEL]
+    choice = beaupy.select(options=options, return_index=False)
+    if _is_back(choice):
+        return "back"
+    CONFIG["scope"] = choice  # type: ignore[assignment]
+    log_history("configure_step", {"step": "scope", "value": choice})
+    # If the user is NOT running a single LLM, reset the LLM field to the default
+    # so the summary stays consistent (otherwise a stale LLM name would linger).
+    if "Single LLM" not in choice:
+        CONFIG["llm"] = "(All 5)"
+    return "next"
+
+
+def step_choose_llm() -> str:
+    """Wizard step shown only when Scope = "Single LLM". Pick a specific LLM spec."""
+    options = [*WIZARD_LLMS, BACK_LABEL]
+    choice = beaupy.select(options=options, return_index=False)
+    if _is_back(choice):
+        return "back"
+    CONFIG["llm"] = choice  # type: ignore[assignment]
+    log_history("configure_step", {"step": "llm", "value": choice})
+    return "next"
+
+
+def step_confirm() -> str:
+    """Final wizard step: review the pending configuration and either save or go back."""
+    _print_current_config()
+    options = ["Save and return to menu", "Back to Scope"]
+    choice = beaupy.select(options=options, return_index=False)
+    if _is_back(choice):
+        return "back"
+    log_history("configure_done", {"config": dict(CONFIG)})
+    print("\n  -> Configuration saved.")
+    return "done"
+
+
+# === Wizard loop ===
+def _build_steps() -> list[tuple[str, Callable[[], str]]]:
+    """Build the ordered step list, conditional on current CONFIG.
+
+    The LLM step only appears when Scope = "Single LLM". This function is
+    re-evaluated after every step so that switching scope mid-wizard inserts
+    or removes the LLM step on the fly.
+    """
+    steps: list[tuple[str, Callable[[], str]]] = [
+        ("Case", step_choose_case),
+        ("Mode", step_choose_mode),
+        ("Scope", step_choose_scope),
+    ]
+    if "Single LLM" in (CONFIG.get("scope") or ""):
+        steps.append(("LLM", step_choose_llm))
+    steps.append(("Confirm", step_confirm))
+    return steps
+
+
+def configure_wizard() -> None:
+    """Walk through the wizard steps with Back navigation.
+
+    The user starts at step 0 (Case) and advances one question at a time.
+    Choosing "Back" on any step decrements the index (clamped at 0).
+    The Confirm step returns "done" to exit the wizard cleanly.
+    """
+    idx = 0
+    while True:
+        steps = _build_steps()
+        if idx >= len(steps):
+            # All steps confirmed; exit wizard back to top menu.
+            return
+        if idx < 0:
+            idx = 0
+        label, step_fn = steps[idx]
+        action = step_fn()
+        if action == "next":
+            idx += 1
+        elif action == "back":
+            idx -= 1
+        elif action == "done":
+            return
+        else:  # pragma: no cover - defensive
+            return
+
+
+# === Top-level menu ===
+def top_menu() -> str:
+    """Show the hub-and-spoke top-level menu. Returns one of:
+    "configure" | "run" | "exit".
+    """
+    print("\n" + "=" * 60)
+    print("  AEGIS Phase 1 v1.2")
+    print("=" * 60)
+    options = [
+        "1) Configure    (walk through setup one step at a time)",
+        "2) Run          (execute with current settings)",
+        "3) Exit",
+    ]
+    choice = beaupy.select(options=options, return_index=False)
+    if not choice:
+        return "exit"
+    if "Configure" in choice:
+        return "configure"
+    if "Run" in choice:
+        return "run"
+    return "exit"
+
+
+# === Run dispatcher and helpers ===
 def run_unit_tests() -> None:
     print("\n  Running pytest on tests/unit/ ...")
     result = subprocess.run(
@@ -266,6 +451,7 @@ def run_single_llm() -> None:
 
 
 def run_action() -> None:
+    """Dispatch to the appropriate run function based on the current Scope."""
     scope = CONFIG["scope"]
     if "unit tests" in scope:
         run_unit_tests()
@@ -283,37 +469,23 @@ def run_action() -> None:
         print(f"  ! Unknown scope: {scope}")
 
 
-def main() -> None:
-    while True:
-        show_menu()
-        choice = beaupy.select(
-            options=[
-                "1) Select Case",
-                "2) Select LLM Mode (Mock / Real)",
-                "3) Select Scope",
-                "4) Select Specific LLM",
-                "5) Run with current configuration",
-                "6) Exit",
-            ],
-            return_index=False,
-        )
-        if "1)" in choice:
-            select_case()
-        elif "2)" in choice:
-            select_mode()
-        elif "3)" in choice:
-            select_scope()
-        elif "4)" in choice:
-            if "Single LLM" not in CONFIG["scope"]:
-                print("  ! Step 4 only valid if Scope = 'Single LLM'. Change scope first.")
-            else:
-                select_llm()
-        elif "5)" in choice:
-            run_action()
-        elif "6)" in choice:
-            log_history("exit", {})
-            print("\nGoodbye.")
-            break
+def run_action_prompt() -> None:
+    """Top-level "Run" action: show current config and ask for confirmation.
+
+    Pressing Enter (empty input) triggers ``run_action()``; any other input
+    (including Ctrl-C / EOF) cancels and returns to the top menu without
+    running anything.
+    """
+    _print_current_config()
+    print("\nPress Enter to run, or any other key to cancel...")
+    try:
+        key = input()
+    except (EOFError, KeyboardInterrupt):
+        key = "cancel"
+    if key == "":
+        run_action()
+    else:
+        print("  -> Cancelled.")
 
 
 # === Mock invoker for tests ===
@@ -348,7 +520,7 @@ class MockPhase1LLMInvoker:
         candidates: list[str] = []
         # 1) Descriptive naming used by data/fixtures/
         if lane_id:
-            candidates.append(f"case_{case_num}_{lane_id.lower().replace("-", "")}_{spec_slug}_response.json")
+            candidates.append(f"case_{case_num}_{lane_id.lower().replace('-', '')}_{spec_slug}_response.json")
         # 2) Strict canonical: {case_id}_{spec_id}.json
         candidates.append(f"{case_id}_{spec_id}.json")
         # 3) Strict canonical with lane_id: {case_id}_{lane_id}_{spec_id}.json
@@ -369,6 +541,20 @@ class MockPhase1LLMInvoker:
             "total_latency_ms": 10,
             "retry_count": 1,
         }
+
+
+def main() -> None:
+    """Top-level entry point: hub-and-spoke loop with Configure / Run / Exit."""
+    while True:
+        action = top_menu()
+        if action == "configure":
+            configure_wizard()
+        elif action == "run":
+            run_action_prompt()
+        elif action == "exit":
+            log_history("exit", {})
+            print("\nGoodbye.")
+            break
 
 
 if __name__ == "__main__":
