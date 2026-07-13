@@ -12,6 +12,7 @@ from aegis_phase1.models import RegulatoryClause
 from aegis_phase1.nodes._mock_data import is_mock_mode
 from aegis_phase1.parsers.json_utils import parse_json_response
 from aegis_phase1.prompts.subphase_b import CLAUSE_BATCH_ENRICHMENT_PROMPT
+from aegis_phase1.prompts_v2 import get_invoker
 from aegis_phase1.state import Phase1State
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,6 @@ _OBLIGATED_PARTIES = {
     "DEPLOYER",
 }
 _OBLIGATION_TYPES = {"CONTINUOUS", "PERIODIC", "TRIGGERED", "ONE_TIME"}
-
 
 def _coerce_normative_strength(value) -> str:
     """Coerce LLM output to a valid NormativeStrength enum value."""
@@ -55,7 +55,6 @@ def _coerce_normative_strength(value) -> str:
         if key in v:
             return val
     return "GUIDANCE"
-
 
 def _coerce_obligated_party(values) -> list[str]:
     """Coerce LLM output to a list of valid ObligatedPartyType values."""
@@ -87,7 +86,6 @@ def _coerce_obligated_party(values) -> list[str]:
                 break
     return list(dict.fromkeys(result))  # dedupe, preserve order
 
-
 def _coerce_obligation_type(value) -> str:
     """Coerce LLM output to a valid ObligationType enum value."""
     if not value:
@@ -111,7 +109,6 @@ def _coerce_obligation_type(value) -> str:
         if key in v:
             return val
     return "CONTINUOUS"
-
 
 def _validate_enriched_clause(item: dict, original: dict) -> dict:
     """Validate and coerce a single enriched clause from LLM output.
@@ -144,7 +141,6 @@ def _validate_enriched_clause(item: dict, original: dict) -> dict:
         with contextlib.suppress(TypeError, ValueError):
             result["normativeWeight"] = int(float(nw))
     return result
-
 
 def b02_load_clauses_batch(state: Phase1State) -> dict:
     """Batch-enrich ALL clauses of each applicable regulation in a SINGLE LLM call.
@@ -229,9 +225,9 @@ def b02_load_clauses_batch(state: Phase1State) -> dict:
             for c in clauses:
                 try:
                     rc = RegulatoryClause.model_validate(c)
-                    enriched = rc.model_dump(by_alias=True)
-                    enriched["regulationId"] = c.get("regulationId", reg_id)
-                    enriched_clauses.append(enriched)
+                    enriched_item = rc.model_dump(by_alias=True)
+                    enriched_item["regulationId"] = c.get("regulationId", reg_id)
+                    enriched_clauses.append(enriched_item)
                 except Exception:
                     enriched_clauses.append(c)
             continue
@@ -272,7 +268,7 @@ def b02_load_clauses_batch(state: Phase1State) -> dict:
             logger.info("[b02] Calling LLM for regulation %s...", reg_id)
             response = llm.invoke(messages)
             enrichment_count += 1
-            raw = response.content if hasattr(response, "content") else str(response)
+            raw = str(response.content) if hasattr(response, "content") else str(response)
             parsed = parse_json_response(raw)
 
             if isinstance(parsed, dict):
@@ -339,9 +335,9 @@ def b02_load_clauses_batch(state: Phase1State) -> dict:
                     merged["normativeWeight"] = 0
             try:
                 rc = RegulatoryClause.model_validate(merged)
-                enriched = rc.model_dump(by_alias=True)
-                enriched["regulationId"] = merged.get("regulationId", "")
-                enriched_clauses.append(enriched)
+                enriched_item = rc.model_dump(by_alias=True)
+                enriched_item["regulationId"] = merged.get("regulationId", "")
+                enriched_clauses.append(enriched_item)
             except Exception as e:
                 logger.warning("[b02] Could not validate clause %s: %s", cid, e)
                 enriched_clauses.append(merged)
@@ -353,4 +349,112 @@ def b02_load_clauses_batch(state: Phase1State) -> dict:
     return {
         "regulatory_clauses": enriched_clauses,
         "errors": errors,
+    }
+
+def b02_load_clauses_batch_v2(state: dict) -> dict:
+    """Phase 1B v1.2: invoke P1B-LLM-02-RATIONALE for each applicable regulation.
+
+    Consolidates per-regulation rationale, implications and gaps into a
+    single LLM call per regulation. Aggregates results across all
+    applicable regulations.
+
+    Args:
+        state: Current Phase 1 workflow state dict.
+
+    Returns:
+        Dict with aggregate and per-regulation synthesis outputs ready to
+        be merged into the LangGraph state.
+    """
+    invoker = get_invoker()
+
+    case_id = state.get("case_id", "unknown_case")
+    applicable = list(state.get("applicable_regulations", []))
+    company_facts = state.get("company_facts") or {}
+    classification = state.get("classification") or {"role": "Controller", "tier": "LOW"}
+
+    if not applicable:
+        return {
+            "b02_v2_status": "OK",
+            "b02_v2_per_reg_synthesis": {},
+            "b02_v2_aggregated_synthesis": {},
+            "b02_v2_total_latency_ms": 0.0,
+        }
+
+    regulations = state.get("regulations") or state.get("clauses") or {}
+
+    def _clauses_for(reg: str) -> list:
+        if isinstance(regulations, dict):
+            value = regulations.get(reg)
+            if isinstance(value, list):
+                return value
+            if isinstance(value, dict):
+                return [value]
+            return []
+        if isinstance(regulations, list):
+            matches = []
+            for row in regulations:
+                if isinstance(row, dict) and row.get("regulationId") == reg:
+                    matches.append(row)
+            return matches
+        return []
+
+    per_reg: dict[str, dict] = {}
+    aggregated_synthesis: dict[str, list] = {
+        "rationale": [],
+        "implications": [],
+        "gaps": [],
+    }
+    total_latency = 0.0
+    aggregate_status = "OK"
+
+    for reg in applicable:
+        clauses = _clauses_for(reg)
+        out = invoker.invoke(
+            "P1B-LLM-02-RATIONALE",
+            {
+                "case_id": case_id,
+                "lane_id": reg,
+                "applicable_regs": [reg],
+                "classification": classification,
+                "company_facts": company_facts,
+                "synthesis_inputs": {
+                    "clauses": clauses,
+                    "regulation": reg,
+                },
+                "layer0_subdomain_refs": state.get("layer0_subdomain_refs") or [],
+            },
+            max_retries=2,
+        )
+        per_reg[reg] = out
+        total_latency += float(out.get("total_latency_ms") or 0.0)
+        status = out.get("status")
+        if status != "OK":
+            aggregate_status = status
+
+        parsed = out.get("parsed_output") or {}
+        synthesis = parsed.get("synthesis") if isinstance(parsed, dict) else None
+        if isinstance(synthesis, dict):
+            rationale = synthesis.get("rationale")
+            if rationale:
+                aggregated_synthesis["rationale"].append(
+                    {"regulation": reg, "rationale": rationale}
+                )
+            implications = synthesis.get("implications") or []
+            if isinstance(implications, list):
+                for imp in implications:
+                    if isinstance(imp, dict):
+                        imp["regulation"] = reg
+                    aggregated_synthesis["implications"].append(imp)
+            gaps = synthesis.get("gaps") or []
+            if isinstance(gaps, list):
+                for gap in gaps:
+                    if isinstance(gap, dict):
+                        gap["regulation"] = reg
+                    aggregated_synthesis["gaps"].append(gap)
+
+    return {
+        "b02_v2_status": aggregate_status,
+        "b02_v2_per_reg_synthesis": per_reg,
+        "b02_v2_aggregated_synthesis": aggregated_synthesis,
+        "b02_v2_total_latency_ms": total_latency,
     }

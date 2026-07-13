@@ -20,6 +20,50 @@ START → parse_inputs → subphase_a → subphase_b → subphase_c → END
 
 LangGraph state machine. Each subphase runs sequentially. No Neo4j, no eval.
 
+### 1.1 Phase 1 v1.2 LLM Architecture (PROMPTS library integration)
+
+**5 canonical LLMs** (down from 8 in legacy) defined in `00_METHODOLOGY/PROMPTS/`:
+
+| LLM ID | Invocation | Stage | Replaces (legacy) |
+|---|---|---|---|
+| `P1B-LLM-01-INTERPRETATION` | `per_regulation` | Phase 1B | LLM-A |
+| `P1B-LLM-02-RATIONALE` | `per_regulation` | Phase 1B | LLM-B/C/D (merged) |
+| `P1C-LLM-01-OVERLAP-CLASSIFICATION` | `per_domain_lane` | Phase 1C Map | LLM-E |
+| `P1C-LLM-02-COMPOUND-EVENT` | `global_reduce` | Phase 1C Reduce (2nd) | LLM-F |
+| `P1C-LLM-03-STRATEGIC-SYNTHESIS` | `global_reduce` | Phase 1C Reduce (1st) | LLM-G |
+
+**Removed (out of Phase 1 scope):** LLM-H (gap aggregation + remediation → Phase 2/3).
+
+**Public API** (`src/aegis_phase1/prompts_v2/`):
+
+```python
+from aegis_phase1.prompts_v2 import (
+    PromptLoader,           # Load PROMPTS/*.md + extract YAML frontmatter
+    CatalogLoader,          # Load YAML catalogs (tipo2, tipo3, ...) + eval predicates
+    Phase1LLMInvoker,       # Single LLM call: prompt → invoke → parse → validate
+    Phase1Validator,        # JSON Schema + Layer 0 citation + no-reclass check
+    JSONLLogger,            # Structured logging (JSONL + stdout summary)
+    RobustParser,           # Multi-strategy JSON parser (handles gemma4:e2b issues)
+    LLM_SPECS,              # Registry of 5 Phase 1 LLMs
+)
+
+loader = PromptLoader()  # defaults to ../Methodology-main/00_METHODOLOGY/PROMPTS
+invoker = Phase1LLMInvoker(loader, ...)
+result = invoker.invoke("P1B-LLM-01-INTERPRETATION", inputs, max_retries=2)
+# result = {"status": "OK"|"INSUFFICIENT_EVIDENCE"|"FAILED_AFTER_RETRIES", ...}
+```
+
+**Logging (per implementation contract):**
+
+- `logs/phase1/llm-calls.jsonl` — every LLM call (full I/O, validation result, latency, tokens)
+- `logs/phase1/format-errors.jsonl` — parse failures (gemma4:e2b format issues)
+- `logs/phase1/errors.log` — Python errors
+- `logs/phase1/performance.csv` — latency + token metrics
+
+All logs are gitignored (see `.gitignore`).
+
+**Required Ollama model:** `gemma4:e2b` (set in `.env` via `OLLAMA_MODEL`). The invoker uses Ollama's `format` parameter to constrain output to a JSON Schema; the `RobustParser` falls back to 5 strategies (json_strict, extract_markdown_block, extract_first_object, extract_first_array, repair_common_errors) when the model produces non-conforming output.
+
 ---
 
 ## 2. Commands
@@ -37,6 +81,9 @@ pytest tests/unit/workflow/phase1/test_validate_a.py -v
 pytest tests/unit/nodes/ -v
 pytest tests/unit/ -v          # full unit suite
 pytest tests/ -v --skip-slow   # skip marked slow
+
+# Phase 1 v1.2 smoke test (requires Ollama running with gemma4:e2b)
+PYTHONPATH=src pytest tests/unit/prompts_v2/test_smoke_e2e.py -v
 
 # Lint & typecheck
 ruff check src/ tests/
@@ -78,7 +125,20 @@ src/aegis_phase1/          # Main package
 └── env.py                 # .env loader
 ```
 
-`cases/case1-tinytask/` — 22 CSVs, 4 templates, context docs.
+```
+cases/case1-tinytask/
+├── case.yaml                      # Case config (env vars expanded at load)
+├── context/                       # Input context docs (00_Taxonomy, 01_Company, 02_Regulatory, 03_Design, ontology)
+├── data/phase1/                   # 22 CSV files (regulations, clauses, domains, etc.)
+├── templates/phase1/              # OUTPUT templates with [placeholders] to fill
+│   ├── 04_Company_Context_Assessment.md
+│   ├── 05_Regulatory_Applicability.md
+│   ├── 06_Clause_Mapping_Matrix.md
+│   └── 07_Structured_Compliance_Matrix.md
+└── output/phase1/                 # Filled output (written by produce_documents)
+```
+
+**Reference (filled) documents** — `/home/epmq-cyber/Área de Trabalho/projects/Methodology-main/02_CASES/Case_01_TinyTask_SaaS/01_PHASE1_CONTEXT/` contains the expected filled output for comparison. Templates use `[snake_case_placeholders]`; reference docs have real TinyTask data.
 
 ---
 
@@ -133,3 +193,6 @@ Skills are loaded via `skill({ name: "skill-name" })`.
 - **case.yaml** lives in `cases/<case>/case.yaml`, loaded by `config.case_loader`
 - **Tracing:** opt-in Langfuse via `llm/tracing.py` — disabled by default
 - **Mock LLM:** set `MOCK_LLM=true` in `.env` to skip real API calls
+- **Templates** are in `cases/<case>/templates/phase1/` with `[snake_case_placeholders]`
+- **Reference output** at `Methodology-main/02_CASES/Case_01_TinyTask_SaaS/01_PHASE1_CONTEXT/`
+- **`.env` location:** `src/.env` (not project root) — loaded by `aegis_phase1/env.py`

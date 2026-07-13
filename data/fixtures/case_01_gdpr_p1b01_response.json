@@ -1,0 +1,33 @@
+{
+  "status": "OK",
+  "parsed_output": {
+    "interpretations": [
+      {
+        "entry_id": "TIPO2-GDPR-RTS-DEADLINES",
+        "applicable": false,
+        "activation_rationale": "Not applicable to SaaS company (no RTS)",
+        "layer0_refs": [
+          "SubDomains/D-04_Incident-Response/D-04.3.md §1 CRDA"
+        ],
+        "company_fact_refs": [
+          "DOC04:SEC-04"
+        ]
+      }
+    ],
+    "derogations": [
+      {
+        "entry_id": "TIPO3-GDPR-HOUSEHOLD",
+        "activation_verdict": "NOT_ACTIVATED",
+        "activation_rationale": "Company is not a household processor",
+        "layer0_refs": [
+          "SubDomains/D-09_Governance-Documentation/D-09.1.md §2 HSO"
+        ],
+        "company_fact_refs": [
+          "DOC04:SEC-04"
+        ]
+      }
+    ]
+  },
+  "total_latency_ms": 150,
+  "retry_count": 1
+}

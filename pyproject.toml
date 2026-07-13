@@ -23,12 +23,14 @@ classifiers = [
 ]
 
 dependencies = [
+    "beaupy>=1.4.0",
     "langgraph>=0.2.0",
     "langchain-core>=0.3.0",
     "langchain-ollama>=0.2.0",
     "pydantic>=2.7.0",
     "pyyaml>=6.0",
     "python-dotenv>=1.0.0",
+    "jsonschema>=4.0.0",
 ]
 
 [project.optional-dependencies]

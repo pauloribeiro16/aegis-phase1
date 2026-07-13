@@ -8,6 +8,7 @@ from aegis_phase1.llm.base import create_llm_client
 from aegis_phase1.models import DomainElaborationEntry
 from aegis_phase1.nodes._mock_data import is_mock_mode, mock_domain_elaboration_entries
 from aegis_phase1.prompts.subphase_c import DOMAIN_ELABORATION_PROMPT
+from aegis_phase1.prompts_v2 import get_invoker
 from aegis_phase1.state import Phase1State
 
 logger = logging.getLogger(__name__)
@@ -139,4 +140,67 @@ def c02_domain_elaboration(state: Phase1State) -> dict:
     return {
         "domain_elaboration_entries": entries,
         "errors": errors,
+    }
+
+
+def c02_domain_elaboration_v2(state: dict) -> dict:
+    """Phase 1C v1.2: invoke P1C-LLM-02-COMPOUND-EVENT (global_reduce, runs 2nd).
+
+    Performs cross-domain compound event identification. Consumes the
+    outputs of the per-domain lanes (P1C-LLM-01) and the strategic
+    synthesis (P1C-LLM-03) as inputs.
+
+    Args:
+        state: Current Phase 1 workflow state dict. May lack the upstream
+            lane outputs and strategic synthesis during incremental wiring;
+            in that case the function still drives the invoker and the
+            LLM is responsible for handling missing context.
+
+    Returns:
+        Dict with positive/negative event lists and timing metadata.
+    """
+    invoker = get_invoker()
+
+    case_id = state.get("case_id", "unknown_case")
+    applicable = list(state.get("applicable_regulations", []))
+    aggregated_activations = state.get("aggregated_activations") or []
+    c03_strategic_synthesis = state.get("c03_strategic_synthesis") or {}
+
+    event_templates: list | dict | str = []
+    try:
+        from aegis_phase1.prompts_v2 import get_prompts_root
+
+        prompts_root = get_prompts_root()
+        catalog_path = prompts_root / "catalogs" / "event_templates.yaml"
+        if catalog_path.exists():
+            import yaml
+
+            with open(catalog_path, encoding="utf-8") as f:
+                event_templates = yaml.safe_load(f) or []
+    except Exception:
+        event_templates = []
+
+    out = invoker.invoke(
+        "P1C-LLM-02-COMPOUND-EVENT",
+        {
+            "case_id": case_id,
+            "lane_id": "global",
+            "applicable_regs": applicable,
+            "aggregated_activations": aggregated_activations,
+            "c03_strategic_synthesis": c03_strategic_synthesis,
+            "event_templates": event_templates,
+        },
+        max_retries=2,
+    )
+
+    parsed = out.get("parsed_output") or {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+
+    return {
+        "c02_v2_status": out.get("status"),
+        "c02_v2_positive_events": parsed.get("positive_events", []) or [],
+        "c02_v2_negative_events": parsed.get("negative_events", []) or [],
+        "c02_v2_parsed_output": parsed,
+        "c02_v2_total_latency_ms": out.get("total_latency_ms"),
     }

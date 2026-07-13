@@ -115,3 +115,63 @@ def c01_complementarity(state: Phase1State) -> dict:
         "complementarity_analyses": analyses,
         "errors": errors,
     }
+
+
+def c01_complementarity_v2(state: dict) -> dict:
+    """Phase 1C v1.2: invoke P1C-LLM-01-OVERLAP-CLASSIFICATION per domain lane.
+
+    Uses the Phase1Executor (Map/Reduce orchestrator) to run the per-domain
+    LLM lane for each of the 10 sub-domain lanes (D-01..D-10). Each lane
+    receives the case context (company facts, applicable regulations,
+    coverage entries, complementarity CSV data) and produces a
+    sub_domain_activations list.
+
+    Returned fields:
+      - c01_v2_status: aggregate status across all 10 lanes (OK / MIXED / FAILED)
+      - c01_v2_lane_outputs: list of 10 lane dicts
+        (one per D-XX; each with status, latency, retry_count, activations)
+      - c01_v2_total_latency_ms: sum of per-lane latencies
+    """
+    from aegis_phase1.prompts_v2 import get_invoker, invoker_to_executor
+
+    invoker = get_invoker()
+    executor = invoker_to_executor(invoker)
+
+    case_id = state.get("case_id", "unknown_case")
+    applicable = list(state.get("applicable_regulations", []))
+    company_facts = state.get("company_facts", {})
+    coverage_entries = state.get("domain_coverage_entries", [])
+    raw_data = state.get("complementarity_analyses_data", [])
+    classification = state.get("classification") or {"role": "Controller", "tier": "LOW"}
+
+    lane_outputs = executor.run_phase_1c_map(
+        case_id=case_id,
+        applicable_regs=applicable,
+        company_facts=company_facts,
+        coverage_entries=coverage_entries,
+        complementarity_data=raw_data,
+        classification=classification,
+    )
+
+    statuses = [lane.get("status") for lane in lane_outputs]
+    total_latency = sum(float(lane.get("latency_ms") or 0.0) for lane in lane_outputs)
+
+    error_statuses = {
+        "FAILED_AFTER_RETRIES",
+        "FAILED",
+        "PARSE_ERROR",
+        "SCHEMA_ERROR",
+        "PYTHON_ERROR",
+    }
+    if all(s == "OK" for s in statuses):
+        aggregate_status = "OK"
+    elif all(s in error_statuses for s in statuses):
+        aggregate_status = "FAILED"
+    else:
+        aggregate_status = "MIXED"
+
+    return {
+        "c01_v2_status": aggregate_status,
+        "c01_v2_lane_outputs": lane_outputs,
+        "c01_v2_total_latency_ms": total_latency,
+    }

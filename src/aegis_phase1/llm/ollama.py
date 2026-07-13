@@ -5,18 +5,19 @@ When callbacks are passed via LangGraph, the Langfuse CallbackHandler
 automatically captures: model name, prompts, responses, token usage, latency.
 """
 
+import os
 import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
-from aegis_phase1.llm.base import BaseLLMClient
 from aegis_phase1.config.defaults import (
     DEFAULT_LLM_MODEL,
     DEFAULT_LLM_NUM_CTX,
     DEFAULT_LLM_TIMEOUT,
     OLLAMA_BASE_URL,
 )
+from aegis_phase1.llm.base import BaseLLMClient
 from aegis_phase1.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -42,6 +43,9 @@ class OllamaClient(BaseLLMClient):
         self._config = config
         self._model_config = model_config
 
+        self._langfuse_handlers: list = []
+        self._setup_langfuse()
+
         # keep_alive: how long model stays in VRAM (default 5min = 300s)
         # Ollama accepts: int (seconds) or str ("30m", "1h")
         self.keep_alive = config.get("keep_alive", 300)
@@ -50,9 +54,31 @@ class OllamaClient(BaseLLMClient):
             model=self.model,
             base_url=self.base_url,
             temperature=0.1,
-            timeout=self.timeout,
             num_ctx=self.num_ctx,
+            client_kwargs={"timeout": self.timeout},
         )
+
+    def _setup_langfuse(self) -> None:
+        """Auto-attach Langfuse CallbackHandler if enabled via env vars."""
+        if os.environ.get("LANGFUSE_ENABLED", "").lower() not in ("true", "1", "yes"):
+            return
+        try:
+            from langfuse.langchain import CallbackHandler  # type: ignore[import-untyped]
+
+            pk = os.environ.get("LANGFUSE_PUBLIC_KEY", "")
+            sk = os.environ.get("LANGFUSE_SECRET_KEY", "")
+            host = os.environ.get(
+                "LANGFUSE_BASE_URL", "https://cloud.langfuse.com"
+            )
+            if pk and sk:
+                self._langfuse_handlers = [CallbackHandler()]
+                logger.info(
+                    "[ollama] Langfuse auto-attached host=%s model=%s",
+                    host,
+                    self.model,
+                )
+        except ImportError:
+            logger.debug("[ollama] langfuse not installed, skipping auto-attach")
 
     def generate(
         self,
@@ -63,6 +89,7 @@ class OllamaClient(BaseLLMClient):
         num_predict: int | None = None,
         stop: list | None = None,
         config: dict | None = None,
+        format: dict | str | None = None,
     ) -> dict:
         """Generate text using Ollama via ChatOllama.
 
@@ -77,6 +104,10 @@ class OllamaClient(BaseLLMClient):
                 When passed from a LangGraph node, the Langfuse CallbackHandler
                 automatically creates a nested GENERATION observation with
                 real prompts, output, and token usage.
+            format: Optional output format constraint. Pass a dict (JSON Schema)
+                or a string ("json" for plain JSON, or ""/None to disable).
+                Used by Ollama's structured-output feature to constrain the
+                response format.
 
         Returns:
             dict with keys: raw, latency_ms, tokens, error
@@ -98,7 +129,7 @@ class OllamaClient(BaseLLMClient):
         )
 
         # Build messages for ChatOllama
-        messages = []
+        messages: list[SystemMessage | HumanMessage] = []
         if system:
             # Append anti-numbering instruction to existing system prompt
             system = (
@@ -123,6 +154,9 @@ class OllamaClient(BaseLLMClient):
             self._llm.num_predict = num_predict
         if stop:
             self._llm.stop = stop
+        if format is not None:
+            # Ollama accepts dict (JSON Schema) or string ("json") as format
+            self._llm.format = format
 
         start = time.time()
         try:
@@ -134,7 +168,7 @@ class OllamaClient(BaseLLMClient):
             invoke_kwargs = {}
             if self.keep_alive is not None:
                 invoke_kwargs["keep_alive"] = self.keep_alive
-            response = self._llm.invoke(messages, config=config, **invoke_kwargs)
+            response = self._llm.invoke(messages, config=config, **invoke_kwargs)  # type: ignore[arg-type]
             elapsed = (time.time() - start) * 1000
 
             content = response.content if hasattr(response, "content") else str(response)

@@ -1,0 +1,34 @@
+{
+  "status": "OK",
+  "parsed_output": {
+    "sub_domain_activations": [
+      {
+        "sub_domain_id": "D-01.1",
+        "applicable": true,
+        "scope_overlap": "Y",
+        "applicable_regulations": [
+          "GDPR",
+          "CRA"
+        ],
+        "verified_relationship_per_pair": [
+          {
+            "reg_pair": [
+              "GDPR",
+              "CRA"
+            ],
+            "layer0_relationship": "CONDITIONAL",
+            "company_scope_verdict": "OVERLAP_CONFIRMED",
+            "layer0_refs": [
+              "SubDomains/D-01_Data-Protection/D-01.1.md §1 CRDA"
+            ]
+          }
+        ],
+        "layer0_refs": [
+          "SubDomains/D-01_Data-Protection/D-01.1.md"
+        ]
+      }
+    ]
+  },
+  "total_latency_ms": 200,
+  "retry_count": 1
+}
