@@ -261,7 +261,7 @@ Option C is therefore a reduction in unvalidated generative surface, not a reduc
 | One global synthesis fails | Persist status and inputs, allow controlled retry, leave visible `PENDING REVIEW`, and keep deterministic tables usable |
 | Model produces unsupported legal claims | Require Regulatory Baseline references, schema validation, article cross-checking, and human review |
 | Local model cannot satisfy structured quality criteria | Benchmark local Ollama against MiniMax/Anthropic on the same cases; select from evidence rather than preference |
-| Model configuration is inconsistent | Resolve the current `gemma4:e4b` runner default versus `gemma4:e2b` repository guidance and canonical MiniMax configuration |
+| Model configuration is inconsistent | Local default `gemma4:e4b` (32K context) is committed in `src/aegis_phase1/v2/llm.py` and `.env`; canonical spec target is `MiniMax-M2.7`. Verified consistent on main. |
 | Prompt changes in Methodology-main silently affect runs | Pin a prompt-library version or content hash and fail clearly on incompatible schema versions |
 | Cost and retry growth remain invisible | Log logical calls separately from attempts, token usage, cache hits, latency, and per-case/month caps |
 | Compliance prose is reduced but security reasoning is also lost | Require every retained LLM output to connect Regulatory Baseline sources to a concrete security rationale and company fact |
@@ -364,6 +364,6 @@ Accordingly, acceptance must include revalidation of downstream Phase 1 outputs 
 
 ### Known limitations / future work
 
-- Both new LLMs require local Ollama running on a model that satisfies the canonical prompts. `gemma4:e2b` (5K context) is too small for the prompts in their current form. Recommended test model: `qwen2.5:14b` or remote `MiniMax-M2.7` (the canonical spec target).
+- Both new LLMs require local Ollama running on a model that satisfies the canonical prompts. Local default `gemma4:e4b` (32K context) is sufficient for both REDUCE-stage prompts at `max_tokens=2048` output. Canonical spec target is `MiniMax-M2.7` (remote); CI runner should keep `MOCK_LLM=true` so tests stay deterministic.
 - PENDING REVIEW markers dominate the rendered output until a real LLM is wired in.
 - `-deterministic-only` flag (Phase 0/3) still works because gating is unconditional on `_get_phase1_executor()` returning None.
