@@ -21,8 +21,9 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Project
-output/
+# Project (anchor to top-level only)
+/output/
+/cases/*/output/
 *.tar.gz
 .eggs/
 
@@ -34,4 +35,4 @@ htmlcov/
 # Phase 1 v1.2 LLM logs (per contract: JSONL + errors + perf + format-errors)
 logs/
 work/
-v2/
+/v2/
