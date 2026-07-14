@@ -15,9 +15,12 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from aegis_phase1.v2.state import V2State
+
+if TYPE_CHECKING:
+    from aegis_phase1.prompts_v2.phase1_executor import Phase1Executor
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +36,15 @@ class Phase1Orchestrator:
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
         self.llm_invoker = llm_invoker
+        self._skip_reduce_llms = False
         self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
+
+    def set_skip_reduce_llms(self, skip: bool) -> None:
+        """Toggle skipping of reduce-stage LLM calls. Default: False.
+
+        Set to True via the ``--skip-reduce-llms`` CLI flag.
+        """
+        self._skip_reduce_llms = bool(skip)
 
     def load(
         self,
@@ -305,8 +316,111 @@ class Phase1Orchestrator:
             "merged": merged,
             "conflicts": resolved,
             "profile": profile_data,
+            "synthesis": None,
+            "compound_events": None,
         }
         self.state["current_stage"] = "REDUCED"
+
+        executor = self._get_phase1_executor()
+        if executor is not None:
+            try:
+                logger.info(
+                    "REDUCE-LLM: running P1C-LLM-03 then P1C-LLM-02 "
+                    "via Phase1Executor"
+                )
+
+                lane_outputs = [
+                    {
+                        "lane_id": lane_id,
+                        "sub_domain_activations": (
+                            lane_result.get("subdomains") or []
+                            if isinstance(lane_result, dict)
+                            else []
+                        ),
+                    }
+                    for lane_id, lane_result in (
+                        self.state.get("domain_results") or {}
+                    ).items()
+                ]
+                aggregated_activations = [
+                    activation
+                    for lane_output in lane_outputs
+                    for activation in lane_output["sub_domain_activations"]
+                    if isinstance(activation, dict)
+                ]
+
+                raw_company_context = self.state.get("company_context")
+                if isinstance(raw_company_context, dict):
+                    company_context = dict(raw_company_context)
+                elif raw_company_context is not None:
+                    company_context = raw_company_context.model_dump()
+                else:
+                    company_context = {}
+
+                applicable_regs = [
+                    str(reg)
+                    for reg in company_context.get("applicable_regs", [])
+                    if reg
+                ]
+                if not applicable_regs:
+                    applicability = company_context.get("applicable_regulations", [])
+                    if isinstance(applicability, list):
+                        applicable_regs = [
+                            str(reg.get("abbreviation"))
+                            for reg in applicability
+                            if isinstance(reg, dict)
+                            and reg.get("applicable", False)
+                            and reg.get("abbreviation")
+                        ]
+
+                case_id = Path(self.state.get("case_path") or "case").name
+                run_result = executor.run_phase_1c_reduce(
+                    case_id=case_id,
+                    lane_outputs=lane_outputs,
+                    sync_result={
+                        "conflicts": self.state["aggregated_data"].get(
+                            "conflicts", []
+                        )
+                        or []
+                    },
+                    track_b_profile=self.state["aggregated_data"].get("profile", {}),
+                    applicable_regs=applicable_regs,
+                    company_facts=company_context,
+                    layer0_subdomain_refs=list(
+                        (self.state.get("subdomains") or {}).keys()
+                    ),
+                )
+
+                if isinstance(run_result, dict):
+                    synthesis = run_result.get(
+                        "P1C-LLM-03-STRATEGIC-SYNTHESIS",
+                        run_result.get("P1C-LLM-03"),
+                    )
+                    compound_events = run_result.get(
+                        "P1C-LLM-02-COMPOUND-EVENT",
+                        run_result.get("P1C-LLM-02"),
+                    )
+                    self.state["aggregated_data"]["synthesis"] = synthesis
+                    self.state["aggregated_data"]["compound_events"] = compound_events
+                    logger.info(
+                        "REDUCE-LLM complete: activations=%d, synthesis=%s, "
+                        "compound_events=%s, status=%s",
+                        len(aggregated_activations),
+                        "OK" if synthesis else "MISSING",
+                        "OK" if compound_events else "MISSING",
+                        run_result.get("status", "?"),
+                    )
+                else:
+                    logger.warning(
+                        "REDUCE-LLM: unexpected return type %s",
+                        type(run_result).__name__,
+                    )
+            except Exception as exc:
+                logger.warning("REDUCE-LLM failed (continuing): %s", exc)
+                self.state["errors"].append(f"reduce_llm: {exc}")
+                self.state["current_stage"] = "REDUCE_INDETERMINATE"
+        else:
+            logger.info("REDUCE-LLM skipped: deterministic-only or mock mode")
 
         elapsed = time.time() - start
         logger.info(
@@ -316,6 +430,50 @@ class Phase1Orchestrator:
         )
         self._persist_state()
         return self.state
+
+    def _get_phase1_executor(self) -> "Phase1Executor | None":
+        """Lazy-initialize the canonical five-LLM Phase1Executor.
+
+        Returns None when no LLM invoker is configured, mock mode is active,
+        or reduce-stage LLM calls were explicitly disabled.
+        """
+        import os
+
+        if self.llm_invoker is None:
+            logger.info("REDUCE-LLM skipped: no llm_invoker configured")
+            return None
+
+        if self._skip_reduce_llms:
+            logger.info("REDUCE-LLM skipped: --skip-reduce-llms flag set")
+            return None
+
+        if os.environ.get("MOCK_LLM", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            logger.info("REDUCE-LLM skipped: MOCK_LLM env var set")
+            return None
+
+        cached = getattr(self, "_phase1_executor_cached", None)
+        if cached is not None:
+            return cast("Phase1Executor", cached)
+
+        try:
+            from aegis_phase1.prompts_v2.factory import get_invoker
+            from aegis_phase1.prompts_v2.phase1_executor import invoker_to_executor
+
+            p1_invoker = get_invoker(
+                model=os.environ.get("OLLAMA_MODEL", "gemma4:e4b"),
+            )
+            executor = invoker_to_executor(p1_invoker)
+            self._phase1_executor_cached = executor
+            logger.info("REDUCE-LLM Phase1Executor instantiated (real LLM mode)")
+            return executor
+        except Exception as exc:
+            logger.warning("Failed to instantiate Phase1Executor: %s", exc)
+            return None
 
     def generate_deterministic_docs(self, output_dir: str = "output/phase1") -> V2State:
         """Stage 3a: Generate 100% deterministic docs (no MAP/REDUCE required).

@@ -113,6 +113,14 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--skip-reduce-llms",
+        action="store_true",
+        help=(
+            "Skip the 2 REDUCE-stage LLM calls (P1C-LLM-03 + P1C-LLM-02). "
+            "Use for fast iteration or when running with --mock-llm."
+        ),
+    )
+    parser.add_argument(
         "--mock-llm",
         action="store_true",
         help="Use MockInvoker (equivalent to MOCK_LLM=true)",
@@ -176,6 +184,8 @@ def main() -> None:
 
     llm_invoker = build_llm_invoker(model=args.model)
     orch = Phase1Orchestrator(llm_invoker=llm_invoker)
+    if args.skip_reduce_llms:
+        orch.set_skip_reduce_llms(True)
 
     if args.run_all:
         logger.info("Non-interactive mode — running all stages")
