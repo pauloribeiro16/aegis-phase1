@@ -326,3 +326,44 @@ Accordingly, acceptance must include revalidation of downstream Phase 1 outputs 
 - [ ] Human decision on model-selection gate (Q5)
 - [ ] Propagation plan approved for all affected documents and downstream consumers
 - [ ] Updated contracts created only after decisions are recorded
+
+---
+
+## Update — Implementation Status (2026-07-14)
+
+**Contract AEGIS-P1-CORR-002** implemented a **hybrid Option B / Option C** that is closer to Option C but with the canonical two REDUCE LLMs retained. The user explicitly chose Option B during a follow-up planning session rather than Option C's pure recommendation.
+
+### What was implemented in CORR-002
+
+| What | Where | Calls per case |
+|---|---|---|
+| 10 per-domain `adapted_objective` (MAP) | `DomainProcessor.process()` | 10 |
+| 5 optional narrative renderers (04a, 04b, 04c, 04d) — **kept as mandatory with PENDING REVIEW** (Phase 4) | `doc_04*.py` via `_narrative.render_mandatory_narrative()` | 8 (1 + 10 + 1 + 2) |
+| Deterministic Doc 05 / 07 / 07b strategic narrative slots — **kept mandatory** | `doc_05.py`, `doc_07.py`, `doc_07b.py` | 3 |
+| **NEW: `P1C-LLM-03 STRATEGIC-SYNTHESIS`** (REDUCE, runs 1st) | `phase1_executor.run_phase_1c_reduce()` → Doc 07 §6.2 | 1 (global) |
+| **NEW: `P1C-LLM-02 COMPOUND-EVENT`** (REDUCE, runs 2nd) | `phase1_executor.run_phase_1c_reduce()` → Doc 07 §5.2 | 1 (global) |
+
+**Total LLM calls per case after CORR-002:** 10 (MAP) + 8 (narratives) + 3 (Doc 05/07/07b) + 1 (LLM-03) + 1 (LLM-02) = **~23 LLM calls**
+
+### What differs from original Option C recommendation
+
+| Aspect | Option C (was) | Option B implemented (now) |
+|---|---|---|
+| Compound events | Kept deterministic / catalog-driven | **LLM-02 added** (cross-domain event detection) |
+| Total LLM calls | 11 | ~23 (more, due to mandatory narratives + LLM-02) |
+| REDUCE LLMs | Just LLM-03 | LLM-03 + LLM-02 |
+
+### Implementation evidence
+
+- Branch: `feature/aegis-p1-corr-002` (1 branch per contract, per CORR-001 Branch Policy)
+- Commits on branch (logical groupings):
+  - `[EXECUTOR] Phase A: Wire Phase1Executor into Phase1Orchestrator.reduce()`
+  - `[EXECUTOR] Phases B+C+D: Doc 07 §5.2/§6.2 from LLM outputs + gate + tests`
+- Tests added: 14 (4 integration + 10 doc_07 rendering)
+- Gate criteria added: 2 (rows 7 and 8 in Doc 07 §8)
+
+### Known limitations / future work
+
+- Both new LLMs require local Ollama running on a model that satisfies the canonical prompts. `gemma4:e2b` (5K context) is too small for the prompts in their current form. Recommended test model: `qwen2.5:14b` or remote `MiniMax-M2.7` (the canonical spec target).
+- PENDING REVIEW markers dominate the rendered output until a real LLM is wired in.
+- `-deterministic-only` flag (Phase 0/3) still works because gating is unconditional on `_get_phase1_executor()` returning None.
