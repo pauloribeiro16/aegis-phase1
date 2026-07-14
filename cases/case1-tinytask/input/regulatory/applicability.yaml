@@ -1,0 +1,17 @@
+# Regulatory Applicability summary
+applicable_regulations:
+  - GDPR
+  - CRA
+non_applicable_regulations:
+  - NIS2
+  - DORA
+  - AI_Act
+applicability_rationale:
+  GDPR: processes_personal_data = true
+  CRA: places_digital_products_eu = true
+  NIS2: below_threshold
+  DORA: not_financial_entity
+  AI_Act: no_high_risk_ai_system
+clause_count:
+  GDPR: 28
+  CRA: 26

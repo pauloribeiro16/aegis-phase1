@@ -145,9 +145,7 @@ def sanitize_markdown(content: str) -> str:
         if re.match(r"^[\s]*[a-z]\).*\[:", stripped):
             return True
         # Bare SI-XX or similar identifiers on their own line (not in a table)
-        if re.match(r"^[A-Z]{2}-\d+$", stripped):
-            return True
-        return False
+        return bool(re.match(r"^[A-Z]{2}-\d+$", stripped))
 
     lines = result.splitlines()
     cleaned_lines = [ln for ln in lines if not _is_structured_data_line(ln)]
@@ -225,9 +223,9 @@ class DocumentProducer:
 
         rc = run_config if run_config is not None else self.run_config
 
-        accumulated_bodies = []
-        accumulated_full = []
-        toc_headers = []
+        accumulated_bodies: list[str] = []
+        accumulated_full: list[tuple[str, str]] = []
+        toc_headers: list[str] = []
 
         for i, section in enumerate(sections):
             toc_block = (
@@ -346,7 +344,7 @@ FILLED SECTION BODY:"""
         )
         if result.get("error"):
             return section.body
-        filled = result.get("raw", "").strip()
+        filled = str(result.get("raw", "")).strip()
         if filled and section.header:
             header_text = section.header.strip()
             if filled.startswith(header_text):

@@ -30,7 +30,6 @@ def c04_obligation_shells(state: Phase1State) -> dict:
         Dict with 'regulatory_obligations' list to be merged into state.
     """
     strategic = state.get("strategic_implications", [])
-    clauses = state.get("regulatory_clauses", [])
     coverage = state.get("domain_coverage_entries", [])
 
     obligations: list[dict] = []
@@ -54,7 +53,6 @@ def c04_obligation_shells(state: Phase1State) -> dict:
         obligations.append(ob.model_dump(by_alias=True))
 
     # Also create shells from uncovered subdomains in coverage entries
-    covered_sds = {c.get("subDomainId", "") for c in coverage}
     for ce in coverage:
         sd_id = ce.get("subDomainId", "")
         if sd_id and sd_id not in {o.get("targetSubDomain", "") for o in obligations}:

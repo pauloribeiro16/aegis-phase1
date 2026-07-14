@@ -1,0 +1,32 @@
+# System Inventory (SYS-01..SYS-05)
+systems:
+  - id: SYS-01
+    name: Main SaaS Application
+    type: web_application
+    stack: [python, django, react]
+    hosting: AWS eu-west-1
+    criticality: HIGH
+  - id: SYS-02
+    name: Identity Service
+    type: identity_provider
+    stack: [Auth0]
+    hosting: Auth0 (managed)
+    criticality: HIGH
+  - id: SYS-03
+    name: Cloud Infrastructure
+    type: infrastructure
+    stack: [AWS]
+    hosting: AWS eu-west-1
+    criticality: HIGH
+  - id: SYS-04
+    name: Key Management Service
+    type: kms
+    stack: [AWS KMS]
+    hosting: AWS
+    criticality: HIGH
+  - id: SYS-05
+    name: Monitoring & Logging
+    type: observability
+    stack: [Datadog]
+    hosting: Datadog (managed)
+    criticality: MEDIUM

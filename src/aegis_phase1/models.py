@@ -2,7 +2,7 @@
 
 import logging
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 # ─── Enumerations ────────────────────────────────────────────────────
 
 
-class NormativeStrength(str, Enum):
+class NormativeStrength(StrEnum):
     MANDATORY_UNCONDITIONAL = "MANDATORY_UNCONDITIONAL"
     MANDATORY_CONDITIONAL = "MANDATORY_CONDITIONAL"
     GUIDANCE = "GUIDANCE"
 
 
-class ObligatedPartyType(str, Enum):
+class ObligatedPartyType(StrEnum):
     CONTROLLER = "CONTROLLER"
     PROCESSOR = "PROCESSOR"
     MANUFACTURER = "MANUFACTURER"
@@ -31,47 +31,47 @@ class ObligatedPartyType(str, Enum):
     DEPLOYER = "DEPLOYER"
 
 
-class ObligationType(str, Enum):
+class ObligationType(StrEnum):
     CONTINUOUS = "CONTINUOUS"
     PERIODIC = "PERIODIC"
     TRIGGERED = "TRIGGERED"
     ONE_TIME = "ONE_TIME"
 
 
-class CoverageLevel(str, Enum):
+class CoverageLevel(StrEnum):
     SUBSTANTIVE = "SUBSTANTIVE"
     PARTIAL = "PARTIAL"
     NOT_ADDRESSED = "NOT_ADDRESSED"
 
 
-class GranularityLevel(str, Enum):
+class GranularityLevel(StrEnum):
     ARTICLE = "ARTICLE"
     PARAGRAPH = "PARAGRAPH"
     SUB_PARAGRAPH = "SUB_PARAGRAPH"
     ATOMIC = "ATOMIC"
 
 
-class RelationType(str, Enum):
+class RelationType(StrEnum):
     OVERLAP = "OVERLAP"
     CUMULATIVE_REINFORCEMENT = "CUMULATIVE_REINFORCEMENT"
     CONFLICT = "CONFLICT"
     GAP = "GAP"
 
 
-class ComplexityTier(str, Enum):
+class ComplexityTier(StrEnum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
 
 
-class InteractionType(str, Enum):
+class InteractionType(StrEnum):
     TEMPORAL_CONFLICT = "TEMPORAL_CONFLICT"
     REQUIREMENT_CONFLICT = "REQUIREMENT_CONFLICT"
     TRIGGER_MISMATCH = "TRIGGER_MISMATCH"
     NEGATIVE_ANALYSIS = "NEGATIVE_ANALYSIS"
 
 
-class OverlapType(str, Enum):
+class OverlapType(StrEnum):
     SYNERGISTIC = "SYNERGISTIC"
     STRUCTURAL_TENSION = "STRUCTURAL_TENSION"
     CONTEXTUAL_TENSION = "CONTEXTUAL_TENSION"
@@ -477,7 +477,9 @@ class ContextAssessment(BaseModel):
 
     stakeholders: list[Stakeholder] = Field(default_factory=list)
     business_goals: list[BusinessGoal] = Field(default_factory=list)
-    company_context: CompanyContext = Field(default_factory=CompanyContext)
+    company_context: CompanyContext = Field(
+        default_factory=lambda: CompanyContext.model_construct()
+    )
     regulatory_flags: dict[str, bool] = Field(default_factory=dict)
     architectural_implications: list[dict] = Field(default_factory=list)
     compliance_capability: list[dict] = Field(default_factory=list)

@@ -33,3 +33,5 @@ htmlcov/
 
 # Phase 1 v1.2 LLM logs (per contract: JSONL + errors + perf + format-errors)
 logs/
+work/
+v2/

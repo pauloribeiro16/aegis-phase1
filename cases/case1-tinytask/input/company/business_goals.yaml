@@ -1,0 +1,17 @@
+# Business Goals (BG-01..BG-05)
+goals:
+  - id: BG-01
+    description: GDPR-compliant data processing
+    priority: HIGH
+  - id: BG-02
+    description: CRA-conformant product
+    priority: HIGH
+  - id: BG-03
+    description: Customer trust through security transparency
+    priority: MEDIUM
+  - id: BG-04
+    description: Operational efficiency via managed services
+    priority: MEDIUM
+  - id: BG-05
+    description: EU market expansion readiness
+    priority: LOW

@@ -1,13 +1,12 @@
 """Verify Pydantic models instantiate correctly."""
+
 from aegis_phase1.models import (
     ComplementarityAnalysis,
     ComplementarityEntry,
     DomainElaborationEntry,
     NormativeStrength,
-    ObligatedPartyType,
     ObligationType,
     RegulatoryClause,
-    RelationType,
     StrategicImplication,
 )
 

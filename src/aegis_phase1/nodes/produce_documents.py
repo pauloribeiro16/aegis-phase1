@@ -17,8 +17,8 @@ from enum import Enum
 from pathlib import Path
 
 from aegis_phase1.logging_config import get_logger
-from aegis_phase1.state import Phase1State
 from aegis_phase1.shared.document_producer import PHASE1_TEMPLATES
+from aegis_phase1.state import Phase1State
 
 logger = get_logger(__name__)
 
@@ -115,11 +115,15 @@ def _fill_deterministic(template: str, data: dict) -> str:
     result = _re.sub(r"\[([a-zA-Z][a-zA-Z0-9_]*)\]", r"\1", result)
     result = _re.sub(r"\[([a-z][a-z ]*[a-z])\]", r"\1", result)
 
+    # Fill date placeholders with today's date
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    result = result.replace("YYYY-MM-DD", today_str)
+
     return result
 
 
 def _json_safe(value):
-    """Recursively convert non-JSON-serializable values (enum, date, set) to strings."""
+    """Recursively convert non-YAML/JSON-serializable values (enum, date, set) to strings."""
     if value is None:
         return None
     if isinstance(value, Enum):
@@ -129,10 +133,10 @@ def _json_safe(value):
     if isinstance(value, int | float | bool):
         return value
     if isinstance(value, dict):
-        return {k: _json_safe(v) for k, v in value.items()}
+        return {str(k) if isinstance(k, Enum) else k if isinstance(k, str) else str(k): _json_safe(v) for k, v in value.items()}
     if isinstance(value, list | tuple):
         return [_json_safe(v) for v in value]
-    if isinstance(value, set):
+    if isinstance(value, set | frozenset):
         return list(value)
     if hasattr(value, "value"):
         return str(value.value)
@@ -349,14 +353,14 @@ def _build_complementarity_analysis(state: Phase1State) -> dict:
     analyses = state.get("complementarity_analyses", [])
     overlaps = []
     tensions = []
-    compound_events = []
+    compound_events: list[dict] = []
 
     for a in analyses:
         shared_scope = _get_attr(a, "sharedScope", "") or _get_attr(a, "shared_scope", "")
         if shared_scope:
             overlaps.append(
                 {
-                    "regulation_pair": f"{_get_attr(a, 'regulationId1', '')} / {_get_attr(a, 'regulationId2', '')}",
+                    "regulation_pair": f"{_get_attr(a, 'regulation1Id', '')} / {_get_attr(a, 'regulation2Id', '')}",
                     "shared_scope": shared_scope,
                     "structural_connectedness": _get_attr(a, "structuralConnectedness", ""),
                 }
@@ -579,8 +583,8 @@ def _build_clause_stats_placeholders(
 
     for i in (0, 1):
         reg_full = reg_names[i] if i < len(reg_names) else "N/A"
-        data[f"reg_{i+1}"] = reg_full
-        data[f"reg_{i+1}_count"] = str(len(by_reg.get(reg_full, [])))
+        data[f"reg_{i + 1}"] = reg_full
+        data[f"reg_{i + 1}_count"] = str(len(by_reg.get(reg_full, [])))
 
     if "NIS2" not in reg_names:
         for k in (
@@ -774,7 +778,7 @@ def _build_coverage_section_placeholders(
     data["not_addressed_count"] = str(len(not_addressed_sds))
     data["non_applicable_regs"] = "N/A"
 
-    first_sd = next(iter(coverage_matrix.values()), {})
+    first_sd: dict = next(iter(coverage_matrix.values()), {})
     data["sd_1_id"] = first_sd.get("subdomain_id", "D-01.1")
     data["sd_1_name"] = first_sd.get("subdomain_name", "")
     data["sd_1_reg_1"] = "Yes" if len(first_sd.get("reg_ids", [])) > 0 else ""
@@ -784,7 +788,7 @@ def _build_coverage_section_placeholders(
     data["additional_subdomains"] = (
         ""
         if len(coverage_matrix) <= 1
-        else f"(+{len(coverage_matrix)-1} more sub-domains in full matrix)"
+        else f"(+{len(coverage_matrix) - 1} more sub-domains in full matrix)"
     )
 
     return data
@@ -804,10 +808,10 @@ def _build_interaction_placeholders(interactions: list) -> dict:
             _get_attr(first, "interactionType", "") or _get_attr(first, "type", "") or "SYNERGY"
         )
         data["ri_reg1"] = (
-            _get_attr(first, "regulationId1", "") or _get_attr(first, "regulation1", "") or "N/A"
+            _get_attr(first, "regulation1Id", "") or _get_attr(first, "regulation1", "") or "N/A"
         )
         data["ri_reg2"] = (
-            _get_attr(first, "regulationId2", "") or _get_attr(first, "regulation2", "") or "N/A"
+            _get_attr(first, "regulation2Id", "") or _get_attr(first, "regulation2", "") or "N/A"
         )
         data["ri_description"] = _get_attr(first, "description", "") or "Overlap identified"
         data["ri_resolution"] = _get_attr(first, "resolutionPrinciple", "") or "Harmonization"
@@ -843,7 +847,7 @@ def _build_gap_placeholders(gaps: list, coverage_matrix: dict, applicable_regs: 
     """Build gap placeholders for Doc 05 and 07."""
     data: dict[str, str] = {}
     risk_count = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
-    risk_sds = {"HIGH": [], "MEDIUM": [], "LOW": []}
+    risk_sds: dict[str, list] = {"HIGH": [], "MEDIUM": [], "LOW": []}
 
     if not gaps and coverage_matrix:
         for sd_id, sd_data in coverage_matrix.items():
@@ -873,6 +877,18 @@ def _build_gap_placeholders(gaps: list, coverage_matrix: dict, applicable_regs: 
         rl = data["gap_1_risk"]
         risk_count[rl] = risk_count.get(rl, 0) + 1
         risk_sds[rl].append(data["gap_1_subdomain"])
+    else:
+        data.update(
+            {
+                "gap_1_subdomain": "N/A",
+                "gap_1_regulation": "N/A",
+                "gap_1_clause": "N/A",
+                "gap_1_description": "No gaps identified",
+                "gap_1_risk": "N/A",
+                "gap_1_type": "N/A",
+                "gap_1_action": "N/A",
+            }
+        )
 
     for g in gaps[1:]:
         rl = g.get("risk_level", "MEDIUM")
@@ -890,7 +906,7 @@ def _build_gap_placeholders(gaps: list, coverage_matrix: dict, applicable_regs: 
     for i, g in enumerate(gaps or []):
         if i < 1:
             continue
-        gid = g.get("gap_id", "") or g.get("gapId", "") or f"GAP-{i+1:03d}"
+        gid = g.get("gap_id", "") or g.get("gapId", "") or f"GAP-{i + 1:03d}"
         sd = g.get("sub_domain_id", "") or g.get("subDomainId", "") or ""
         reg = g.get("regulation", "") or g.get("regulationId", "") or ""
         clause = g.get("clause", "") or ""
@@ -898,7 +914,7 @@ def _build_gap_placeholders(gaps: list, coverage_matrix: dict, applicable_regs: 
         risk = g.get("risk_level", "MEDIUM") or g.get("riskLevel", "MEDIUM")
         action = g.get("recommended_action", "") or g.get("recommendedAction", "") or ""
         additional_gap_rows.append(
-            f"| {gid} | {sd} | {reg} | {clause} | {gtype} | {risk} | {action} |"
+            f"{gid} | {sd} | {reg} | {clause} | {gtype} | {risk} | {action}"
         )
     data["additional_gaps"] = "\n".join(additional_gap_rows) if additional_gap_rows else ""
     return data
@@ -963,16 +979,16 @@ def _build_strategic_implication_placeholders(implications: list) -> dict:
         siid = (
             _get_attr(impl, "implicationId", "")
             or _get_attr(impl, "implication_id", "")
-            or f"SI-{i+1:03d}"
+            or f"SI-{i + 1:03d}"
         )
         regs = _get_attr(impl, "sourceRegulations", "") or _get_attr(impl, "regulationId", "") or ""
         if isinstance(regs, list):
             regs = ", ".join(str(r) for r in regs)
+        sd = _get_attr(impl, "subDomainId", "") or _get_attr(impl, "sub_domain_id", "") or ""
         desc = _get_attr(impl, "description", "") or ""
         impact = _get_attr(impl, "architecturalImpact", "") or _get_attr(impl, "impact", "") or ""
         prio = _get_attr(impl, "priority", "") or "MEDIUM"
-        sd = _get_attr(impl, "subDomainId", "") or _get_attr(impl, "subdomainId", "") or ""
-        additional_si_rows.append(f"| {siid} | {sd} | {regs} | {desc} | {impact} | {prio} |")
+        additional_si_rows.append(f"{siid} | {sd} | {regs} | {desc} | {impact} | {prio}")
     data["additional_implications"] = "\n".join(additional_si_rows) if additional_si_rows else ""
     return data
 
@@ -985,16 +1001,21 @@ def _set_company_context_bool(ctx: dict, default: bool) -> str:
     return str(raw)
 
 
-def _summarize_intake(intake_md: str, layer: int, ctx: dict) -> str:
+def _summarize_intake(intake_md: str, layer: int, ctx: dict, company_name: str = "") -> str:
     """Extract a brief summary for each intake form layer."""
+    name = company_name or ctx.get("name", "N/A")
     if not intake_md:
         layers = [
-            f"Company: {ctx.get('name', 'N/A')}, Sector: {ctx.get('sector', 'N/A')}, Size: {ctx.get('size', 'N/A')}",
+            f"Company: {name}, Sector: {ctx.get('sector', 'N/A')}, Size: {ctx.get('size', 'N/A')}",
             "Regulatory decision tree completed",
             "Conditional blocks determined by company context",
         ]
         return layers[layer] if layer < len(layers) else "Completed"
-    return f"Layer {layer}: Responses documented in intake form."
+    lines = [ln.strip() for ln in intake_md.split("\n") if ln.strip()]
+    summary_lines = [ln for ln in lines if len(ln) > 20 and not ln.startswith("---")][:5]
+    if summary_lines:
+        return " ".join(summary_lines)[:300]
+    return f"Company: {name}, Sector: {ctx.get('sector', 'N/A')}, Size: {ctx.get('size', 'N/A')}"
 
 
 def _build_comprehensive_data(state: Phase1State) -> dict:
@@ -1373,17 +1394,23 @@ def _build_doc04_placeholders(
 
     internal_roles = {"ceo", "cto", "dpo", "dev", "development team"}
     additional_stakeholder_rows = []
+    idx = 0
     for s in stakeholders or []:
         name = (_get_attr(s, "name", "") or "").lower()
         role = (_get_attr(s, "role", "") or "").lower()
         combined = f"{name} {role}"
         if not any(kw in combined for kw in internal_roles):
-            sid = _get_attr(s, "stakeholderId", "") or _get_attr(s, "stakeholder_id", "") or ""
+            idx += 1
+            sid = (
+                _get_attr(s, "stakeholderId", "")
+                or _get_attr(s, "stakeholder_id", "")
+                or f"STK-EXT-{idx:02d}"
+            )
             sname = _get_attr(s, "name", "") or ""
             sorg = _get_attr(s, "organization", "") or ""
             sresp = _get_attr(s, "responsibilities", "") or ""
             additional_stakeholder_rows.append(
-                f"| {sid} | {sname} | External | {sorg} | — | {sresp} |"
+                f"{sid} | {sname} | External | {sorg} | — | {sresp}"
             )
     d["additional_stakeholders"] = (
         "\n".join(additional_stakeholder_rows) if additional_stakeholder_rows else ""
@@ -1421,7 +1448,7 @@ def _build_doc04_placeholders(
     for i, g in enumerate(business_goals or []):
         if i < 2:
             continue
-        gid = _get_attr(g, "goalId", "") or _get_attr(g, "goal_id", "") or f"BG-{i+1:02d}"
+        gid = _get_attr(g, "goalId", "") or _get_attr(g, "goal_id", "") or f"BG-{i + 1:02d}"
         desc = _get_attr(g, "description", "") or _get_attr(g, "goal_description", "") or ""
         prio = _get_attr(g, "priority", "MEDIUM")
         regs_raw = (
@@ -1433,7 +1460,7 @@ def _build_doc04_placeholders(
             regs_str = str(regs_raw)
         metrics = _get_attr(g, "successMetrics", "") or _get_attr(g, "success_metrics", "") or ""
         additional_goal_rows.append(
-            f"| {gid} | {desc.split('.')[0][:60] or gid} | {desc[:200] if desc else 'TBD'} | {prio} | {regs_str or 'N/A'} | {metrics or 'TBD'} |"
+            f"{gid} | {desc.split('.')[0][:60] or gid} | {desc[:200] if desc else 'TBD'} | {prio} | {regs_str or 'N/A'} | {metrics or 'TBD'}"
         )
     d["additional_goals"] = "\n".join(additional_goal_rows) if additional_goal_rows else ""
 
@@ -1456,9 +1483,9 @@ def _build_doc04_placeholders(
         }.get(short, "N/A")
 
     intake_md = state.get("intake_markdown", "")
-    d["intake_layer_0_summary"] = _summarize_intake(intake_md, 0, company_context)
-    d["intake_layer_1_summary"] = _summarize_intake(intake_md, 1, company_context)
-    d["intake_layer_2_summary"] = _summarize_intake(intake_md, 2, company_context)
+    d["intake_layer_0_summary"] = _summarize_intake(intake_md, 0, company_context, company_name)
+    d["intake_layer_1_summary"] = _summarize_intake(intake_md, 1, company_context, company_name)
+    d["intake_layer_2_summary"] = _summarize_intake(intake_md, 2, company_context, company_name)
 
     tier = state.get("complexity_tier", "MEDIUM")
     n_app = len(applicable_regulations)
@@ -1628,19 +1655,22 @@ def _write_filled_output(
     logger.info("[produce_docs] wrote canonical: %s (version=%d)", filled_name, next_version)
 
     if intermediate_data is not None:
-        intermediate_dir.mkdir(parents=True, exist_ok=True)
-        intermediate_data["_metadata"] = {
-            "generator": "aegis-kg produce_documents (deterministic)",
-            "generated_at": datetime.now().isoformat(),
-        }
-        intermediate_path = intermediate_dir / f"{stem}_v{next_version}.yaml"
-        import yaml
+        try:
+            intermediate_dir.mkdir(parents=True, exist_ok=True)
+            intermediate_data["_metadata"] = {
+                "generator": "aegis-kg produce_documents (deterministic)",
+                "generated_at": datetime.now().isoformat(),
+            }
+            intermediate_path = intermediate_dir / f"{stem}_v{next_version}.yaml"
+            import yaml
 
-        intermediate_path.write_text(
-            yaml.safe_dump(intermediate_data, allow_unicode=True, sort_keys=False),
-            encoding="utf-8",
-        )
-        logger.info("[produce_docs] wrote intermediate: %s", intermediate_path.name)
+            intermediate_path.write_text(
+                yaml.safe_dump(intermediate_data, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            logger.info("[produce_docs] wrote intermediate: %s", intermediate_path.name)
+        except Exception:
+            logger.warning("[produce_docs] YAML intermediate failed, skipping")
 
     return filled_name
 
@@ -1677,6 +1707,8 @@ def produce_documents(state: Phase1State) -> dict:
             template_content = template_path.read_text(encoding="utf-8")
             filled = _fill_deterministic(template_content, data)
 
+            filled = _re.sub(r"^\|\s*\|\s*$", "", filled, flags=_re.MULTILINE)
+
             intermediate_payload = _json_safe(
                 {
                     "company_context": state.get("company_context", {}),
@@ -1692,15 +1724,9 @@ def produce_documents(state: Phase1State) -> dict:
                 }
             )
 
-            try:
-                output = _write_filled_output(
-                    case_path, template_name, filled, intermediate_data=intermediate_payload
-                )
-            except Exception:
-                logger.warning("[produce_docs] YAML intermediate failed, writing without it")
-                output = _write_filled_output(
-                    case_path, template_name, filled, intermediate_data=None
-                )
+            output = _write_filled_output(
+                case_path, template_name, filled, intermediate_data=intermediate_payload
+            )
             filled_docs.append(output)
             logger.info("[produce_docs] Wrote %s", output)
         except Exception as e:

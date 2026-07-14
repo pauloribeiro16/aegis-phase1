@@ -1,4 +1,5 @@
 """Verify subphase prompt files have rationale/justification/resolution in output schemas."""
+
 from pathlib import Path
 
 PROMPTS_DIR = Path("src/aegis_phase1/prompts")

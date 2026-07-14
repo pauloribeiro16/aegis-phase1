@@ -1,0 +1,14 @@
+# Auth Systems
+auth_systems:
+  - id: AS-01
+    name: Auth0
+    purpose: customer_and_admin_identity
+    mfa_enforced: true
+  - id: AS-02
+    name: AWS_IAM
+    purpose: infrastructure_access
+    mfa_enforced: true
+  - id: AS-03
+    name: GitHub
+    purpose: source_code_access
+    mfa_enforced: true

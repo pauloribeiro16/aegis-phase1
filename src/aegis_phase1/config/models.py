@@ -1,4 +1,5 @@
 """Typed Pydantic models for configuration."""
+
 from pydantic import BaseModel, SecretStr
 
 from aegis_phase1.config.defaults import (

@@ -1,0 +1,40 @@
+# AEGIS Phase 1 — Company Classification (Case 01 — TinyTask SaaS)
+# This file is the canonical source for company facts.
+# The 01_Company_Context.md is auto-generated FROM this file.
+company:
+  name: TinyTask Lda.
+  legal_structure: Private Limited Company (Lda.)
+  sector: Technology/Software
+  jurisdiction: Portugal (EU)
+  employees: 8
+  revenue_eur: 2000000
+  scale: MICRO
+  security_fte: 0.85
+  criticality_level: non-critical
+tech_stack:
+  - AWS
+  - Firebase
+  - GitHub Actions
+applicable_regulations:
+  - id: REG-GDPR
+    abbreviation: GDPR
+    applicable: true
+    obligated_party: controller
+    reason: processes_personal_data = true
+  - id: REG-CRA
+    abbreviation: CRA
+    applicable: true
+    obligated_party: manufacturer
+    reason: places_digital_products_eu = true
+  - id: REG-NIS2
+    abbreviation: NIS2
+    applicable: false
+    reason: below_threshold (8 employees < 50)
+  - id: REG-DORA
+    abbreviation: DORA
+    applicable: false
+    reason: not_financial_entity
+  - id: REG-AI_Act
+    abbreviation: AI_Act
+    applicable: false
+    reason: no_high_risk_ai_system

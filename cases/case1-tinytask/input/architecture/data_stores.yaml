@@ -1,0 +1,23 @@
+# Data Stores (STORE-01..STORE-03)
+stores:
+  - id: STORE-01
+    name: Primary Database
+    type: postgres
+    location: AWS RDS eu-west-1
+    personal_data: true
+    encryption_at_rest: AES-256 (provider-managed)
+    retention_days: 2555
+  - id: STORE-02
+    name: Backup Storage
+    type: s3
+    location: AWS S3 eu-west-1
+    personal_data: true
+    encryption_at_rest: AES-256 (provider-managed)
+    retention_days: 90
+  - id: STORE-03
+    name: Application Logs
+    type: s3
+    location: AWS S3 eu-west-1
+    personal_data: false
+    encryption_at_rest: AES-256 (provider-managed)
+    retention_days: 30

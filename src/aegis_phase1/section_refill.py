@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 SECTION_HEADER_RE = re.compile(r"^(#{1,4})\s+(.+?)\s*$", re.MULTILINE)
 
 
-def _split_into_sections(text: str) -> list[tuple[int, str, str]]:
+def _split_into_sections(text: str) -> list[tuple[int, str, str, int, int]]:
     """Split text into (level, header, body) tuples with byte offsets.
 
     Returns list of (header_level, header_text, body_text).
@@ -55,7 +55,7 @@ def _split_into_sections(text: str) -> list[tuple[int, str, str]]:
         body_text = "\n".join(current_body).rstrip("\n")
         sections.append((current_level, current_header, body_text, header_start, len(text)))
 
-    return [(s[0], s[1], s[2], s[3], s[4]) for s in sections]
+    return list(sections)
 
 
 def find_section_range(text: str, section_name: str) -> tuple[int, int, int] | None:

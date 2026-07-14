@@ -5,6 +5,11 @@ Use create_llm_client(config) to instantiate the appropriate backend.
 """
 
 from abc import ABC, abstractmethod
+from typing import Any
+
+from aegis_phase1.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class BaseLLMClient(ABC):
@@ -20,7 +25,7 @@ class BaseLLMClient(ABC):
         num_predict: int | None = None,
         stop: list | None = None,
         config: dict | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Generate text from the LLM.
 
         Args:
@@ -62,9 +67,12 @@ def create_llm_client(config: dict | None = None) -> BaseLLMClient:
     provider = config.get("provider", "ollama")
 
     if provider == "llamacpp":
-        from aegis_phase1.llm.llamacpp import LlamaCppClient
+        try:
+            from aegis_phase1.llm.llamacpp import LlamaCppClient  # type: ignore[attr-defined]
 
-        return LlamaCppClient(config)
+            return LlamaCppClient(config)  # type: ignore[no-any-return]
+        except ImportError:
+            logger.warning("LlamaCppClient not available, falling back to Ollama")
 
     from aegis_phase1.llm.ollama import OllamaClient
 

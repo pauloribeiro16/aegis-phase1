@@ -1,6 +1,6 @@
-"""Tests for SubPhase A nodes (a02–a07)."""
-from pathlib import Path
+"""Tests for SubPhase A nodes (a02-a07)."""
 
+from pathlib import Path
 
 CASE1 = str(Path(__file__).parent.parent.parent.parent / "cases" / "case1-tinytask")
 
@@ -46,10 +46,12 @@ class TestA04ComplexityTier:
     def test_returns_dict_with_complexity_tier(self):
         from aegis_phase1.nodes.a04_complexity_tier import a04_complexity_tier
 
-        result = a04_complexity_tier({
-            "company_context": {},
-            "applicable_regulations": ["GDPR"],
-        })
+        result = a04_complexity_tier(
+            {
+                "company_context": {},
+                "applicable_regulations": ["GDPR"],
+            }
+        )
         assert isinstance(result, dict)
         assert "complexity_tier" in result
         assert result["complexity_tier"] in ("LOW", "MEDIUM", "HIGH")
@@ -57,19 +59,23 @@ class TestA04ComplexityTier:
     def test_medium_for_two_regulations(self):
         from aegis_phase1.nodes.a04_complexity_tier import a04_complexity_tier
 
-        result = a04_complexity_tier({
-            "company_context": {},
-            "applicable_regulations": ["GDPR", "CRA"],
-        })
+        result = a04_complexity_tier(
+            {
+                "company_context": {},
+                "applicable_regulations": ["GDPR", "CRA"],
+            }
+        )
         assert result["complexity_tier"] == "MEDIUM"
 
     def test_low_for_single_regulation(self):
         from aegis_phase1.nodes.a04_complexity_tier import a04_complexity_tier
 
-        result = a04_complexity_tier({
-            "company_context": {},
-            "applicable_regulations": ["GDPR"],
-        })
+        result = a04_complexity_tier(
+            {
+                "company_context": {},
+                "applicable_regulations": ["GDPR"],
+            }
+        )
         assert result["complexity_tier"] == "LOW"
 
 
@@ -77,11 +83,13 @@ class TestA05ConditionalExtensions:
     def test_returns_dict_with_conditional_extensions(self):
         from aegis_phase1.nodes.a05_conditional_extensions import a05_conditional_extensions
 
-        result = a05_conditional_extensions({
-            "conditional_extensions_data": [],
-            "company_context": {},
-            "applicable_regulations": ["GDPR"],
-        })
+        result = a05_conditional_extensions(
+            {
+                "conditional_extensions_data": [],
+                "company_context": {},
+                "applicable_regulations": ["GDPR"],
+            }
+        )
         assert isinstance(result, dict)
         assert "conditional_extensions" in result
         assert isinstance(result["conditional_extensions"], list)
@@ -91,10 +99,12 @@ class TestA06RegulatoryInteractions:
     def test_returns_dict_with_interactions(self):
         from aegis_phase1.nodes.a06_regulatory_interactions import a06_regulatory_interactions
 
-        result = a06_regulatory_interactions({
-            "company_context": {},
-            "applicable_regulations": ["GDPR", "CRA"],
-        })
+        result = a06_regulatory_interactions(
+            {
+                "company_context": {},
+                "applicable_regulations": ["GDPR", "CRA"],
+            }
+        )
         assert isinstance(result, dict)
         assert "regulatory_interactions" in result
         assert isinstance(result["regulatory_interactions"], list)
@@ -104,22 +114,26 @@ class TestA07ComplianceContext:
     def test_returns_dict_with_compliance_context(self):
         from aegis_phase1.nodes.a07_compliance_context import a07_compliance_context
 
-        result = a07_compliance_context({
-            "company_context": None,
-            "stakeholders": [],
-            "business_goals": [],
-            "applicable_regulations": ["GDPR"],
-        })
+        result = a07_compliance_context(
+            {
+                "company_context": None,
+                "stakeholders": [],
+                "business_goals": [],
+                "applicable_regulations": ["GDPR"],
+            }
+        )
         assert isinstance(result, dict)
         assert "compliance_context" in result
 
     def test_jurisdiction_defaults_to_eu(self):
         from aegis_phase1.nodes.a07_compliance_context import a07_compliance_context
 
-        result = a07_compliance_context({
-            "company_context": None,
-            "stakeholders": [],
-            "business_goals": [],
-            "applicable_regulations": ["GDPR"],
-        })
+        result = a07_compliance_context(
+            {
+                "company_context": None,
+                "stakeholders": [],
+                "business_goals": [],
+                "applicable_regulations": ["GDPR"],
+            }
+        )
         assert result["compliance_context"].get("jurisdictionId") == "EU"

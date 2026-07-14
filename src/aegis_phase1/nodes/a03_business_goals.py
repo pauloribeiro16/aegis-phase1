@@ -43,8 +43,8 @@ def a03_business_goals(state: Phase1State) -> dict:
     Returns:
         Dict with 'business_goals' list to be merged into state.
     """
-    case_path = state.get("case_path", "")
-    current_case = state.get("case", "case1")
+    case_path = str(state.get("case_path", ""))
+    current_case = str(state.get("case", "case1"))
     goals = _load_business_goals_from_csv(case_path, current_case)
     logger.info("[a03] Loaded %d business goals from 10_business_goals.csv", len(goals))
     return {

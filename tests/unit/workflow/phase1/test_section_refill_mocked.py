@@ -29,7 +29,7 @@ def test_find_section_range_found():
     text = "preamble\n\n## My Section\n\nSection body text\n\n## Other\n\nOther body"
     result = find_section_range(text, "My Section")
     assert result is not None
-    level, body_start, body_end = result
+    level, _body_start, _body_end = result
     assert level == 2
 
 

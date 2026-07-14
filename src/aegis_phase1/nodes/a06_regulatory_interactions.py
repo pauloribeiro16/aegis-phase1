@@ -27,7 +27,9 @@ def _parse_json_response(raw: str) -> dict | list:
     candidates = [m.group(0) for m in (obj_match, arr_match) if m]
     for candidate in candidates:
         try:
-            return json.loads(candidate)
+            result = json.loads(candidate)
+            if isinstance(result, (dict, list)):
+                return result
         except json.JSONDecodeError:
             continue
     return {}
@@ -129,7 +131,7 @@ def a06_regulatory_interactions(state: Phase1State) -> dict:
 
         if not result.get("error") and result.get("raw", "").strip():
             parsed = _parse_json_response(result["raw"])
-            items = []
+            items: list[dict] = []
             if isinstance(parsed, dict):
                 items = parsed.get("interactions") or parsed.get("items") or []
             elif isinstance(parsed, list):
