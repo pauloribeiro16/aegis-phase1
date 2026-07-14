@@ -20,7 +20,7 @@ related_documents:
 
 ## How to read this index
 
-- **Status legend**: 🚧 IN PROGRESS | ✅ MERGED | ❌ ABANDONED | ⏸ DEFERRED
+- **Status legend**:  🟢 MERGED | ✅ MERGED | ❌ ABANDONED | ⏸ DEFERRED
 - **Branch legend**: 🟢 active | ⚫ deleted (after merge) | ⚠️ stale
 - **Tests**: number of passing v2 unit tests at the time of merge
 
@@ -33,7 +33,7 @@ related_documents:
 | [AEGIS-P1-CORR-001](#corr-001) | Rebranding + 7-phase consolidation | ✅ MERGED | ⚫ deleted | `7e6c8b8` | 174 | Consolidation after Phase 0–6 fragments lost; established 1-branch-per-contract policy |
 | [AEGIS-P1-CORR-002](#corr-002) | REDUCE synthesis wire-up | ✅ MERGED | ⚫ deleted | `2c43064` | 188 | Wired P1C-LLM-03 + P1C-LLM-02 into `Phase1Orchestrator.reduce()`; rendered Doc 07 §5.2/§6.2 |
 | [AEGIS-P1-CORR-002-fix](#corr-002-fix) | LLM context size correction | ✅ MERGED | ⚫ deleted | `f624c24` | 188 | Corrected `gemma4:e4b` context from 5K to 32K in `LLM_ARCHITECTURE_DECISION.md` |
-| **AEGIS-P1-CORR-003** | Validator cleanup + adapter fix + CI gate | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-003` | TBD | 194 | Re-validated CORR-002 with correct signatures; fixed invoker bypass; pre-push hook script |
+| **AEGIS-P1-CORR-003** | Validator cleanup + adapter fix + CI gate |  🟢 MERGED | 🟢 `feature/aegis-p1-corr-003` | TBD | 194 | Re-validated CORR-002 with correct signatures; fixed invoker bypass; pre-push hook script |
 
 ---
 
