@@ -436,6 +436,14 @@ class Phase1Orchestrator:
 
         Returns None when no LLM invoker is configured, mock mode is active,
         or reduce-stage LLM calls were explicitly disabled.
+
+        CORR-003 (Phase A): The model is sourced from ``self.llm_invoker``
+        (when it exposes a ``.model`` attribute, as ``OllamaInvoker``
+        does) before falling back to the ``OLLAMA_MODEL`` env var. This
+        makes ``--model`` propagate consistently between MAP and REDUCE
+        stages. ``MOCK_LLM`` is honoured by the guard above; ``MockInvoker``
+        exposes no ``.model`` so REDUCE-LLM is unreachable for it anyway
+        (guarded above) but the fallback is defensive.
         """
         import os
 
@@ -460,16 +468,29 @@ class Phase1Orchestrator:
         if cached is not None:
             return cast("Phase1Executor", cached)
 
+        # CORR-003 Phase A: prefer the runner-configured llm_invoker's
+        # model so --model propagates to REDUCE LLMs.
+        configured_model = getattr(self.llm_invoker, "model", None)
+        if not isinstance(configured_model, str) or not configured_model:
+            configured_model = os.environ.get("OLLAMA_MODEL", "gemma4:e4b")
+            model_source = "env"
+        else:
+            model_source = "llm_invoker"
+
         try:
             from aegis_phase1.prompts_v2.factory import get_invoker
             from aegis_phase1.prompts_v2.phase1_executor import invoker_to_executor
 
-            p1_invoker = get_invoker(
-                model=os.environ.get("OLLAMA_MODEL", "gemma4:e4b"),
-            )
+            p1_invoker = get_invoker(model=configured_model)
             executor = invoker_to_executor(p1_invoker)
             self._phase1_executor_cached = executor
-            logger.info("REDUCE-LLM Phase1Executor instantiated (real LLM mode)")
+            logger.info(
+                "REDUCE-LLM Phase1Executor instantiated: model=%s (source=%s, "
+                "invoker_type=%s)",
+                configured_model,
+                model_source,
+                type(self.llm_invoker).__name__,
+            )
             return executor
         except Exception as exc:
             logger.warning("Failed to instantiate Phase1Executor: %s", exc)
