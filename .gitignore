@@ -21,8 +21,9 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Project
-output/
+# Project (anchor to top-level only)
+/output/
+/cases/*/output/
 *.tar.gz
 .eggs/
 
