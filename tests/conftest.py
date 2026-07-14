@@ -1,4 +1,5 @@
 """Shared test fixtures for phase1."""
+
 import os
 from pathlib import Path
 from typing import Any

@@ -57,7 +57,8 @@ from aegis_phase1.env import load_env
 
 load_env()
 
-_ENV_VAR_PATTERN = re.compile(r"\$\{(\w+)\}")
+# Match ${VAR} or ${VAR:-default}
+_ENV_VAR_PATTERN = re.compile(r"\$\{(\w+)(?::-([^}]*))?\}")
 
 
 @overload
@@ -77,14 +78,20 @@ def _expand_env_in_str(value: None) -> None: ...
 
 
 def _expand_env_in_str(value: str | dict | list | None) -> str | dict | list | None:
-    """Recursively expand ${VAR} patterns in strings, dicts, and lists."""
+    """Recursively expand ${VAR} or ${VAR:-default} patterns in strings, dicts, and lists."""
     if isinstance(value, str):
 
         def _replace(m):
             var_name = m.group(1)
+            default = m.group(2)  # None if no :-default in pattern
             if var_name == "NEO4J_PASSWORD":
                 return os.environ.get(var_name, "d3fendtest")
-            return os.environ.get(var_name, m.group(0))
+            env_val = os.environ.get(var_name)
+            if env_val is not None:
+                return env_val
+            if default is not None:
+                return default
+            return m.group(0)  # keep pattern unchanged
 
         return _ENV_VAR_PATTERN.sub(_replace, value)
     if isinstance(value, dict):

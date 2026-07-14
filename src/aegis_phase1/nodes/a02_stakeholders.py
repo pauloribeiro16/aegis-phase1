@@ -50,8 +50,8 @@ def a02_stakeholders(state: Phase1State) -> dict:
     Returns:
         Dict with 'stakeholders' list to be merged into state.
     """
-    case_path = state.get("case_path", "")
-    current_case = state.get("case", "case1")
+    case_path = str(state.get("case_path", ""))
+    current_case = str(state.get("case", "case1"))
     stakeholders = _load_stakeholders_from_csv(case_path, current_case)
     logger.info("[a02] Loaded %d stakeholders from 09_stakeholders.csv", len(stakeholders))
     return {

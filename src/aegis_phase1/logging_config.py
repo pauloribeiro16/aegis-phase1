@@ -54,10 +54,7 @@ def configure_logging(
     if _CONFIGURED and not force:
         return
 
-    if isinstance(level, str):
-        level_int = getattr(logging, level.upper(), logging.INFO)
-    else:
-        level_int = level
+    level_int = getattr(logging, level.upper(), logging.INFO) if isinstance(level, str) else level
 
     formatter = logging.Formatter(fmt=_DEFAULT_FORMAT, datefmt=_DEFAULT_DATEFMT)
 

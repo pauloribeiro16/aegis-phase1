@@ -31,7 +31,9 @@ def _parse_json_response(raw: str) -> dict | list:
     candidates = [m.group(0) for m in (obj_match, arr_match) if m]
     for candidate in candidates:
         try:
-            return json.loads(candidate)
+            result = json.loads(candidate)
+            if isinstance(result, (dict, list)):
+                return result
         except json.JSONDecodeError:
             continue
     return {}
@@ -127,7 +129,7 @@ def b03_map_clause_domain(state: Phase1State) -> dict:
                 HumanMessage(content=prompt),
             ]
             response = llm.invoke(messages)
-            raw = response.content if hasattr(response, "content") else str(response)
+            raw = str(response.content) if hasattr(response, "content") else str(response)
             parsed = _parse_json_response(raw)
 
             mappings: list[dict] = []

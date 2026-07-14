@@ -16,12 +16,12 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from aegis_phase1.logging_config import get_logger
 from aegis_phase1.doc_evaluator import (
     Issue,
     evaluate_filled_doc,
     group_issues_by_section,
 )
+from aegis_phase1.logging_config import get_logger
 from aegis_phase1.section_refill import refill_section
 
 logger = get_logger(__name__)
@@ -66,7 +66,7 @@ def _load_state(case_path: str) -> dict:
     state_path = Path(case_path) / ".phase1_state.json"
     if not state_path.exists():
         raise FileNotFoundError(f"No state file at {state_path}")
-    return json.loads(state_path.read_text(encoding="utf-8"))
+    return dict(json.loads(state_path.read_text(encoding="utf-8")))
 
 
 def _initial_fill(case_path: str, state: dict) -> dict[str, Path]:
@@ -111,7 +111,6 @@ def _initial_fill(case_path: str, state: dict) -> dict[str, Path]:
     }
 
     results: dict[str, Path] = {}
-    case_dir = Path(case_path)
 
     for template in PHASE1_TEMPLATES:
         template_path = resolve_template_path(case_path, template, phase=1)
@@ -123,7 +122,7 @@ def _initial_fill(case_path: str, state: dict) -> dict[str, Path]:
             content = producer.read_template(template)
             filled = producer.fill_template(content, base_data, phase=1)
 
-            output_name = producer.write_output(template, filled, version=1)
+            producer.write_output(template, filled, version=1)
             canonical_filled = resolve_output_path(
                 case_path,
                 template.replace(".md", "_filled.md"),
@@ -143,10 +142,7 @@ def _next_version_path(current_path: Path, next_version: int) -> Path:
     parent = current_path.parent
     stem = current_path.stem
     suffix = current_path.suffix
-    if "_filled" in stem:
-        base = stem.replace("_filled", "")
-    else:
-        base = stem
+    base = stem.replace("_filled", "") if "_filled" in stem else stem
     return parent / f"{base}_v{next_version}{suffix}"
 
 
@@ -161,7 +157,6 @@ def _evaluate_and_decide(
 
     Returns: (issues, should_continue)
     """
-    case_dir = Path(case_path)
     from aegis_phase1.shared.document_producer import resolve_template_path
 
     template_path = resolve_template_path(case_path, f"{template_name}.md", phase=1)
@@ -208,7 +203,6 @@ def _patch_issues(
 
     Returns: path to the new version
     """
-    case_dir = Path(case_path)
     from aegis_phase1.shared.document_producer import resolve_template_path
 
     template_path = resolve_template_path(case_path, f"{template_name}.md", phase=1)
@@ -265,8 +259,8 @@ def run_with_iteration(
     Returns:
         Dict of {doc_name: IterationResult}
     """
-    case_dir = Path(case_path)
-    if not case_dir.exists():
+    case_path_obj = Path(case_path)
+    if not case_path_obj.exists():
         raise FileNotFoundError(f"Case path not found: {case_path}")
 
     if docs_to_produce is None:
@@ -351,7 +345,7 @@ def run_with_iteration(
                     "run": run,
                     "action": "patched",
                     "issues_found": len(issues),
-                    "sections_patched": len(set(i.section for i in issues)),
+                    "sections_patched": len({i.section for i in issues}),
                     "new_path": str(new_path),
                 }
             )

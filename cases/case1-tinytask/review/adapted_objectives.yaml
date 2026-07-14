@@ -1,0 +1,10 @@
+# Human review entries for adapted_objective (per domain).
+# This file is auto-seeded after the MAP stage with one entry per domain
+# in status: PENDING. Edit the status / edited_text / notes values to
+# human-review the LLM-generated Adapted Objective (see AEGIS-P1-04b §3).
+#
+# Status values:
+#   PENDING   - not yet reviewed; rendered as [PENDING REVIEW] in the doc.
+#   APPROVED  - accept LLM proposal as-is.
+#   EDITED    - replace the proposal with the edited_text below.
+#   REJECTED  - flagged for regeneration; rendered as [RE-GENERATION REQUIRED].

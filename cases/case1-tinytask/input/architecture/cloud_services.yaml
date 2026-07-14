@@ -1,0 +1,22 @@
+# Cloud Services
+services:
+  - id: CS-01
+    provider: AWS
+    service_type: compute_storage_kms
+    dpa_status: signed
+    certifications: [SOC_2, ISO_27001]
+  - id: CS-02
+    provider: Firebase
+    service_type: authentication
+    dpa_status: signed
+    certifications: [SOC_2, ISO_27001]
+  - id: CS-03
+    provider: Stripe
+    service_type: payment_processing
+    dpa_status: signed
+    certifications: [PCI_DSS_L1, SOC_2]
+  - id: CS-04
+    provider: Datadog
+    service_type: monitoring
+    dpa_status: signed
+    certifications: [SOC_2, ISO_27001]

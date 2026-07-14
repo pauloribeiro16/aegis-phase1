@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def _run_subphase_a(state: Phase1State, config=None) -> dict:
     """Run SubPhase A as a compiled sub-graph."""
-    from aegis_phase1.subphase_a import build_subphase_a
+    from aegis_phase1.subphases.subphase_a import build_subphase_a
 
     configurable = config.get("configurable", {}) if config else {}
     skip_interrupt = configurable.get("skip_interrupt", True)
@@ -51,7 +51,7 @@ def _run_subphase_a(state: Phase1State, config=None) -> dict:
 
 def _run_subphase_b(state: Phase1State, config=None) -> dict:
     """Run SubPhase B as a compiled sub-graph."""
-    from aegis_phase1.subphase_b import build_subphase_b
+    from aegis_phase1.subphases.subphase_b import build_subphase_b
 
     configurable = config.get("configurable", {}) if config else {}
     skip_interrupt = configurable.get("skip_interrupt", True)
@@ -74,7 +74,7 @@ def _run_subphase_b(state: Phase1State, config=None) -> dict:
 
 def _run_subphase_c(state: Phase1State, config=None) -> dict:
     """Run SubPhase C as a compiled sub-graph."""
-    from aegis_phase1.subphase_c import build_subphase_c
+    from aegis_phase1.subphases.subphase_c import build_subphase_c
 
     configurable = config.get("configurable", {}) if config else {}
     skip_interrupt = configurable.get("skip_interrupt", True)
@@ -245,4 +245,4 @@ def run_phase1(
             logger.warning("[workflow] flush error", exc_info=True)
 
     logger.info("[workflow] Phase 1 complete. Keys: %s", list(result.keys())[:20])
-    return result
+    return dict(result)

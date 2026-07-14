@@ -1,0 +1,32 @@
+# Data Flows (FLOW-01..FLOW-05)
+flows:
+  - id: FLOW-01
+    name: Customer Registration
+    source: SYS-01
+    destination: STORE-01
+    data_types: [email, name, password]
+    encryption_in_transit: TLS 1.3
+  - id: FLOW-02
+    name: Customer Authentication
+    source: SYS-01
+    destination: SYS-02
+    data_types: [email, password]
+    encryption_in_transit: TLS 1.2+
+  - id: FLOW-03
+    name: Payment Processing
+    source: SYS-01
+    destination: Stripe
+    data_types: [payment_metadata]
+    encryption_in_transit: TLS 1.2+
+  - id: FLOW-04
+    name: Monitoring Telemetry
+    source: SYS-01
+    destination: SYS-05
+    data_types: [telemetry]
+    encryption_in_transit: TLS 1.2+
+  - id: FLOW-05
+    name: Backup Operations
+    source: STORE-01
+    destination: STORE-02
+    data_types: [full_dataset]
+    encryption_in_transit: TLS 1.2+

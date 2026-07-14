@@ -1,5 +1,4 @@
 """Tests for config/case_loader."""
-from pathlib import Path
 
 
 class TestLoadCaseYaml:
@@ -17,7 +16,7 @@ class TestLoadCaseYaml:
         config = load_case_config(case1_path)
         assert config.case == "case1"
         assert config.llm.provider == "ollama"
-        assert "${OLLAMA_MODEL" in config.llm.model  # not expanded without .env
+        assert config.llm.model == "gemma4:e4b"  # expanded from .env
 
     def test_returns_empty_dict_for_missing(self, tmp_path):
         from aegis_phase1.config.case_loader import load_case_yaml
@@ -26,9 +25,10 @@ class TestLoadCaseYaml:
         assert result == {}
 
     def test_raises_on_missing_with_typed(self, tmp_path):
+        import pytest
+
         from aegis_phase1.config.case_loader import load_case_config
 
-        import pytest
         with pytest.raises(FileNotFoundError):
             load_case_config(tmp_path / "nonexistent")
 

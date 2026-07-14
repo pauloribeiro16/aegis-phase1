@@ -1,4 +1,5 @@
 """Test utilities and state builders."""
+
 from typing import Any
 
 SAMPLE_STAKEHOLDER = {

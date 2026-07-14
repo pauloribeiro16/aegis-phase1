@@ -196,3 +196,70 @@ Skills are loaded via `skill({ name: "skill-name" })`.
 - **Templates** are in `cases/<case>/templates/phase1/` with `[snake_case_placeholders]`
 - **Reference output** at `Methodology-main/02_CASES/Case_01_TinyTask_SaaS/01_PHASE1_CONTEXT/`
 - **`.env` location:** `src/.env` (not project root) — loaded by `aegis_phase1/env.py`
+
+---
+
+## 10. Branch Policy (MANDATORY — 2026-07-14)
+
+> **Anti-pattern lesson learned.** Creating one branch per phase (e.g. `feature/phase0-*`, `feature/phase1-*`) caused catastrophic state fragmentation: committed files on one branch did not exist on the next, working-tree changes followed checkouts, and subagents produced code that imported non-existent modules. Validators reported false positives because pytest errors during collection were hidden in tail output.
+
+**Rule:** **1 branch per contract.** Phases are sequential **commits** on that branch, never separate branches.
+
+```bash
+# CORRECT (one branch per contract):
+git checkout main
+git checkout -b feature/aegis-p1-corr-001
+# all phases = commits on this branch
+
+# WRONG (anti-pattern — never do this):
+git checkout -b feature/phase0-rebranding      # NO
+git checkout -b feature/phase1-clause-ids     # NO
+```
+
+**Branch naming:** `feature/<contract-id>-<short-name>` (e.g. `feature/aegis-p1-corr-001`).
+
+**Subagent rule:** Subagents (Executor/Validator) receive the contract branch name as part of their prompt and MUST NOT create or switch branches. All work happens on the current branch.
+
+### 10.1 Pre-flight Check (REQUIRED before dispatching any subagent)
+
+Before dispatching an Executor or Validator subagent, the orchestrator MUST run:
+
+```bash
+# 1. Verify we're on the correct branch
+CURRENT_BRANCH=$(git branch --show-current)
+echo "Current branch: $CURRENT_BRANCH"
+
+# 2. Verify working tree is clean (or only new files)
+MODIFIED_COUNT=$(git status --short | wc -l)
+echo "Uncommitted files: $MODIFIED_COUNT"
+
+# 3. Verify critical modules are importable
+python -c "from aegis_phase1.v2.orchestrator import Phase1Orchestrator; print('orchestrator OK')"
+python -c "from aegis_phase1.v2.runner import main; print('runner OK')"
+python -c "from aegis_phase1.v2.llm import build_llm_invoker; print('llm OK')"
+
+# 4. Verify tests can be COLLECTED (not just executed)
+pytest tests/unit/v2/ --co -q 2>&1 | tail -5
+# Look for "ERROR" lines — if any, abort dispatch.
+```
+
+**If any check fails:** abort the subagent dispatch, fix the issue first. Do NOT proceed with stale or broken state.
+
+### 10.2 Validator Integrity Rule
+
+Validators MUST verify test COLLECTION (not just execution summary). The following is FORBIDDEN:
+
+```bash
+# WRONG — hides collection errors in tail output:
+pytest tests/unit/v2/ 2>&1 | tail -5
+
+# CORRECT — surfaces collection errors explicitly:
+pytest tests/unit/v2/ --co -q 2>&1 | grep -E "ERROR|ModuleNotFoundError"
+pytest tests/unit/v2/ -v 2>&1 | grep -E "ERROR|FAILED|ModuleNotFoundError"
+```
+
+A validator that reports "X tests passed" without confirming collection completeness has FAILED its duty.
+
+### 10.3 Historical reference
+
+The contract `AEGIS-P1-CORR-001` (2026-07-14) was the first contract executed under this policy, after the 7-branch fragmentation incident. See commit `1001a10` for the consolidated single-branch commit (Phases 0-6 as logical commit groups).

@@ -1,0 +1,23 @@
+# Stakeholders (SH-01..SH-07)
+stakeholders:
+  - id: SH-01
+    role: Chief Executive Officer (CEO)
+    responsibilities: [executive_sponsor, accountability]
+  - id: SH-02
+    role: Chief Technology Officer (CTO)
+    responsibilities: [engineering_lead, security_champion, incident_lead]
+  - id: SH-03
+    role: Data Protection Officer (DPO)
+    responsibilities: [gdpr_compliance, privacy_oversight]
+  - id: SH-04
+    role: Compliance Lead
+    responsibilities: [regulatory_compliance, documentation]
+  - id: SH-05
+    role: Engineering Team
+    responsibilities: [implementation, secure_development]
+  - id: SH-06
+    role: Customer Support
+    responsibilities: [user_data_handling]
+  - id: SH-07
+    role: External Auditor
+    responsibilities: [annual_review, certification]

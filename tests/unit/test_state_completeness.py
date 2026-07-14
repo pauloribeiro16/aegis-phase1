@@ -12,15 +12,15 @@ from aegis_phase1.state import (
 
 
 def test_phase1_state_has_doc_paths():
-    assert (
-        "doc_paths" in Phase1State.__annotations__
-    ), "Phase1State missing 'doc_paths' (written by n13_produce_doc07)"
+    assert "doc_paths" in Phase1State.__annotations__, (
+        "Phase1State missing 'doc_paths' (written by n13_produce_doc07)"
+    )
 
 
 def test_phase1_state_has_current_phase():
-    assert (
-        "current_phase" in Phase1State.__annotations__
-    ), "Phase1State missing 'current_phase' (written by multiple nodes)"
+    assert "current_phase" in Phase1State.__annotations__, (
+        "Phase1State missing 'current_phase' (written by multiple nodes)"
+    )
 
 
 def test_all_node_writes_declared():
@@ -150,6 +150,6 @@ def test_reducers_present_for_list_keys():
         if origin is typing.Annotated:
             args = getattr(annotation, "__args__", ())
             assert len(args) >= 2, f"{key}: Annotated should have type + reducer"
-            assert (
-                args[1] is expected_reducer
-            ), f"{key}: expected reducer {expected_reducer}, got {args[1]}"
+            assert args[1] is expected_reducer, (
+                f"{key}: expected reducer {expected_reducer}, got {args[1]}"
+            )

@@ -27,7 +27,7 @@ def a04_complexity_tier(state: Phase1State) -> dict:
     """
     applicable = state.get("applicable_regulations", [])
     count = len(applicable)
-    applicable_set = set(r.upper() for r in applicable)
+    applicable_set = {r.upper() for r in applicable}
 
     if count >= 4 or _HIGH_RISK_COMBO.issubset(applicable_set):
         tier = ComplexityTier.HIGH.value
