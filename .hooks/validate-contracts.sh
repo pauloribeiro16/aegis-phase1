@@ -117,6 +117,22 @@ check "11. layer0_* renamed to regulatory_baseline_* (canonical names exist)" \
 warn_check "12. Deprecation aliases for layer0_ preserved (backwards compat)" \
     'cd "$REPO_ROOT" && grep -q "def get_layer0_root" src/aegis_phase1/prompts_v2/factory.py'
 
+# Check 13: Sequential wizard is the default interactive entry (CORR-006)
+check "13. Sequential wizard is default (run_wizard exists; legacy run_menu is alias)" \
+    'cd "$REPO_ROOT" && grep -q "^def run_wizard" src/aegis_phase1/v2/cli/menu.py'
+
+# Check 14: Hub-spoke menu legacy code removed (CORR-006)
+check "14. Legacy build_menu/_resolve_menu_choice removed from menu.py" \
+    'cd "$REPO_ROOT" && ! grep -q "^def build_menu" src/aegis_phase1/v2/cli/menu.py'
+
+# Check 15: runner.py invokes run_wizard (not run_menu)
+check "15. runner.py invokes run_wizard" \
+    'cd "$REPO_ROOT" && grep -q "from aegis_phase1.v2.cli.menu import run_wizard" src/aegis_phase1/v2/runner.py'
+
+# Check 16 (warn): run_menu backwards-compat alias preserved
+warn_check "16. run_menu() backwards-compat alias preserved (one-release deprecation)" \
+    'cd "$REPO_ROOT" && grep -q "^def run_menu" src/aegis_phase1/v2/cli/menu.py'
+
 echo ""
 echo "${CYAN}═══════════════════════════════════════════${RESET}"
 echo "${CYAN}  Summary${RESET}"
