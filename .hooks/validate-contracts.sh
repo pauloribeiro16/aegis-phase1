@@ -133,6 +133,18 @@ check "15. runner.py invokes run_wizard" \
 warn_check "16. run_menu() backwards-compat alias preserved (one-release deprecation)" \
     'cd "$REPO_ROOT" && grep -q "^def run_menu" src/aegis_phase1/v2/cli/menu.py'
 
+# Check 17: Wizard uses beaupy.select (CORR-007)
+check "17. Wizard uses beaupy.select (CORR-007)" \
+    'cd "$REPO_ROOT" && grep -q "beaupy.select" src/aegis_phase1/v2/cli/menu.py'
+
+# Check 18: Static case catalogue defined (CORR-007)
+check "18. Static case catalogue defined (CORR-007 — 3 cases)" \
+    'cd "$REPO_ROOT" && grep -q "Case_01_TinyTask_SaaS" src/aegis_phase1/v2/cli/menu.py && grep -q "Case_02_SecureBorder_Solutions" src/aegis_phase1/v2/cli/menu.py && grep -q "Case_03_OmniBank_Financial" src/aegis_phase1/v2/cli/menu.py'
+
+# Check 19: run_wizard importable and callable (CORR-007)
+check "19. run_wizard() importable from menu module" \
+    'cd "$REPO_ROOT" && .venv/bin/python -c "from aegis_phase1.v2.cli.menu import run_wizard; assert callable(run_wizard)"'
+
 echo ""
 echo "${CYAN}═══════════════════════════════════════════${RESET}"
 echo "${CYAN}  Summary${RESET}"
