@@ -36,7 +36,8 @@ related_documents:
 | **AEGIS-P1-CORR-003** | Validator cleanup + adapter fix + CI gate |  🟢 MERGED | 🟢 `feature/aegis-p1-corr-003` | TBD | 194 | Re-validated CORR-002 with correct signatures; fixed invoker bypass; pre-push hook script |
 | [AEGIS-P1-CORR-004](#corr-004) | Wire P1B-LLM-02 RATIONALE | ✅ MERGED | ⚫ deleted | TBD | 206+ | Wired per-regulation rationale synthesis into Phase1Orchestrator; rendered into Doc 05 §6.1b |
 | [AEGIS-P1-CORR-005](#corr-005) | Rename layer0_* → regulatory_baseline_* | ✅ MERGED | ⚫ deleted | TBD | 329 | Hard rename with backwards-compat aliases; wire-protocol keys deferred (Methodology-main scope) |
-| **AEGIS-P1-CORR-006** | Sequential wizard replaces hub-spoke menu | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-006` | TBD | 217 | Replaced 9-option menu with 6-step linear wizard; legacy `run_menu` kept as 1-release deprecation alias |
+| [AEGIS-P1-CORR-006](#corr-006) | Sequential wizard replaces hub-spoke menu | ✅ MERGED | ⚫ deleted | `fbfb77f` | 217 | Replaced 9-option menu with 6-step linear wizard; legacy `run_menu` kept as 1-release deprecation alias |
+| **AEGIS-P1-CORR-007** | beaupy.select wizard + static case catalogue | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-007` | TBD | 218 | Replaced input()-based prompts with beaupy.select(); 4-step wizard; static catalogue of 3 Methodology-main cases |
 
 ---
 
@@ -187,6 +188,50 @@ Correct `LLM_ARCHITECTURE_DECISION.md` warning about `gemma4:e4b` context. Was s
 
 ### In Progress as of 2026-07-14
 
+> Superseded by **AEGIS-P1-CORR-007** (next section): the wizard was redesigned around `beaupy.select` for arrow-key navigation, the case catalogue was made static (3 Methodology-main cases + local option removed), and Regulatory Baseline became auto-detected.
+
+---
+
+## <a name="corr-007"></a>AEGIS-P1-CORR-007 — beaupy.select Wizard + Static Case Catalogue
+
+### Scope
+- Replace `input()`-based prompts with `beaupy.select()` (arrow-key navigation)
+- Reduce wizard from 6 steps to 4 (removed explicit Regulatory Baseline + Skip flags prompts; auto-detected defaults)
+- Static case catalogue (3 Methodology-main cases) instead of dynamic filesystem scan
+- Removed: `_read_applicable_regs()` (no longer needed with static catalogue)
+
+### Decisions
+- **Static > dynamic catalogue**: User asked to "not search automatically, leave it static"
+- **No local case**: Removed `cases/case1-tinytask/` from catalogue per user request
+- **Auto-detect Regulatory Baseline**: walks up from case path to find sibling `Methodology-main/00_METHODOLOGY/PREPROCESSING`
+- **beaupy.select for everything**: arrow-key UX, validation handled by library
+
+### Wizard flow (user-facing)
+```
+[1/4] Select case
+  > Case 01 - TinyTask SaaS (GDPR, CRA)
+    Case 02 - SecureBorder (GDPR, CRA, NIS2, AI Act)
+    Case 03 - OmniBank (GDPR, CRA, NIS2, DORA, AI Act)
+    Custom path...
+[2/4] Select mode
+  > Mock (no Ollama, fast)
+    Real (Ollama + gemma4:e4b)
+[3/4] Select model       (only if Mode=Real)
+  > gemma4:e4b
+    gemma4:e2b
+    Custom...
+[4/4] Confirm
+  > Run pipeline
+    Cancel
+```
+
+### CI gate additions
+- Check 17 (critical): Wizard uses `beaupy.select`
+- Check 18 (critical): Static case catalogue has 3 cases
+- Check 19 (critical): `run_wizard()` importable and callable
+
+### In Progress as of 2026-07-14
+
 ---
 
 ## Repository stats (as of CORR-003 T4 creation)
@@ -194,9 +239,9 @@ Correct `LLM_ARCHITECTURE_DECISION.md` warning about `gemma4:e4b` context. Was s
 | Metric | Value |
 |---|---|
 | Python source files in `src/aegis_phase1/v2/` | 50 |
-| v2 unit tests collected | 217 |
-| v2 unit tests passing | 217 |
-| Test growth since CORR-002 | +23 (3 invoker bypass + 3 validate-contracts + 12 phase_1b + 5 doc_05_rationale + 11 wizard menu − 6 reorganized) |
+| v2 unit tests collected | 218 |
+| v2 unit tests passing | 218 |
+| Test growth since CORR-002 | +24 (3 invoker bypass + 3 validate-contracts + 12 phase_1b + 5 doc_05_rationale + 12 wizard menu − 11 reorganized) |
 
 ---
 
