@@ -35,7 +35,8 @@ related_documents:
 | [AEGIS-P1-CORR-002-fix](#corr-002-fix) | LLM context size correction | ✅ MERGED | ⚫ deleted | `f624c24` | 188 | Corrected `gemma4:e4b` context from 5K to 32K in `LLM_ARCHITECTURE_DECISION.md` |
 | **AEGIS-P1-CORR-003** | Validator cleanup + adapter fix + CI gate |  🟢 MERGED | 🟢 `feature/aegis-p1-corr-003` | TBD | 194 | Re-validated CORR-002 with correct signatures; fixed invoker bypass; pre-push hook script |
 | [AEGIS-P1-CORR-004](#corr-004) | Wire P1B-LLM-02 RATIONALE | ✅ MERGED | ⚫ deleted | TBD | 206+ | Wired per-regulation rationale synthesis into Phase1Orchestrator; rendered into Doc 05 §6.1b |
-| **AEGIS-P1-CORR-005** | Rename layer0_* → regulatory_baseline_* | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-004` | TBD | 329 | Hard rename with backwards-compat aliases; wire-protocol keys deferred (Methodology-main scope) |
+| [AEGIS-P1-CORR-005](#corr-005) | Rename layer0_* → regulatory_baseline_* | ✅ MERGED | ⚫ deleted | TBD | 329 | Hard rename with backwards-compat aliases; wire-protocol keys deferred (Methodology-main scope) |
+| **AEGIS-P1-CORR-006** | Sequential wizard replaces hub-spoke menu | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-006` | TBD | 217 | Replaced 9-option menu with 6-step linear wizard; legacy `run_menu` kept as 1-release deprecation alias |
 
 ---
 
@@ -147,14 +148,55 @@ Correct `LLM_ARCHITECTURE_DECISION.md` warning about `gemma4:e4b` context. Was s
 
 ---
 
+## <a name="corr-006"></a>AEGIS-P1-CORR-006 — Sequential Wizard Replaces Hub-Spoke Menu
+
+### Scope
+- Replace 9-option hub-and-spoke menu in `src/aegis_phase1/v2/cli/menu.py` with
+  linear 6-step wizard (`run_wizard()`)
+- One question at a time; Enter accepts default at every step
+- Steps: Case directory → Regulatory Baseline → Mode (Mock/Real) →
+  Model (only if Real) → Skip flags → Run? [Y/n]
+- Keep `run_menu()` as one-release backwards-compat alias (emits
+  DeprecationWarning, delegates to `run_wizard`)
+- Remove legacy `build_menu()` and `_resolve_menu_choice()`
+- Add 4 new CI gate checks (13-16) to `validate-contracts.sh`
+
+### Decisions
+- **Linear, no Back**: simpler than a Back-navigable wizard; user can Ctrl+C
+- **5-6 questions**: configuration complete (case, baseline, mode, model,
+  skip flags, run confirmation); not ultra-minimal
+- **Remove old menu**: `build_menu()` and `_resolve_menu_choice()`
+  deleted; `run_menu()` kept as deprecated alias only
+- **Defaults work for Case_01**: TinyTask paths auto-detected
+
+### Wizard flow (user-facing)
+```
+[1/6] Case directory             [default: .../Case_01_TinyTask_SaaS]
+[2/6] Regulatory Baseline dir    [default: .../00_METHODOLOGY/PREPROCESSING]
+[3/6] Mode                       [1=mock / 2=real]
+[4/6] Model                      [gemma4:e4b]  (only shown if Real)
+[5/6] Skip flags                 [defaults: no, no]
+[6/6] Run pipeline?              [Y/n]
+```
+
+### CI gate additions
+- Check 13 (critical): Sequential wizard is default
+- Check 14 (critical): Legacy `build_menu()` removed
+- Check 15 (critical): `runner.py` invokes `run_wizard`
+- Check 16 (warn): `run_menu()` backwards-compat alias preserved
+
+### In Progress as of 2026-07-14
+
+---
+
 ## Repository stats (as of CORR-003 T4 creation)
 
 | Metric | Value |
 |---|---|
 | Python source files in `src/aegis_phase1/v2/` | 50 |
-| v2 unit tests collected | 194 |
-| v2 unit tests passing | 194 |
-| Test growth since CORR-002 | +6 (3 invoker bypass + 3 validate-contracts) |
+| v2 unit tests collected | 217 |
+| v2 unit tests passing | 217 |
+| Test growth since CORR-002 | +23 (3 invoker bypass + 3 validate-contracts + 12 phase_1b + 5 doc_05_rationale + 11 wizard menu − 6 reorganized) |
 
 ---
 
