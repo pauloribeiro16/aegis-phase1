@@ -245,10 +245,10 @@ def main() -> None:
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
     else:
-        logger.info("Interactive mode — showing menu")
-        from aegis_phase1.v2.cli.menu import run_menu
+        logger.info("Interactive mode — running wizard (CORR-006)")
+        from aegis_phase1.v2.cli.menu import run_wizard
 
-        run_menu(orch, case_path, prep_path, output_path)
+        run_wizard(orch, case_path, prep_path, output_path)
 
 
 if __name__ == "__main__":
