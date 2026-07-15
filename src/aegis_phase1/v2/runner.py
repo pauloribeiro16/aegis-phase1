@@ -121,6 +121,16 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--skip-phase-1b",
+        action="store_true",
+        help=(
+            "Skip the per-regulation P1B-LLM-02 RATIONALE call (Phase 1B). "
+            "DOC 05 §6.1b will render a PENDING-REVIEW marker instead of "
+            "per-regulation rationale prose. Use for fast iteration or "
+            "when running with --mock-llm. (CORR-004 / CORR-005)"
+        ),
+    )
+    parser.add_argument(
         "--mock-llm",
         action="store_true",
         help="Use MockInvoker (equivalent to MOCK_LLM=true)",
@@ -186,6 +196,8 @@ def main() -> None:
     orch = Phase1Orchestrator(llm_invoker=llm_invoker)
     if args.skip_reduce_llms:
         orch.set_skip_reduce_llms(True)
+    if getattr(args, "skip_phase_1b", False):
+        orch.set_skip_phase_1b(True)
 
     if args.run_all:
         logger.info("Non-interactive mode — running all stages")

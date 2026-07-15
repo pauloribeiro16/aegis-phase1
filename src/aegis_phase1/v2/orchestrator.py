@@ -37,6 +37,7 @@ class Phase1Orchestrator:
         self.work_dir.mkdir(parents=True, exist_ok=True)
         self.llm_invoker = llm_invoker
         self._skip_reduce_llms = False
+        self._skip_phase_1b = False
         self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
 
     def set_skip_reduce_llms(self, skip: bool) -> None:
@@ -45,6 +46,15 @@ class Phase1Orchestrator:
         Set to True via the ``--skip-reduce-llms`` CLI flag.
         """
         self._skip_reduce_llms = bool(skip)
+
+    def set_skip_phase_1b(self, skip: bool) -> None:
+        """Toggle skipping of Phase 1B RATIONALE LLM calls. Default: False.
+
+        Set to True via the ``--skip-phase-1b`` CLI flag. Covers the
+        per-regulation ``P1B-LLM-02 RATIONALE`` synthesis stage that
+        runs between MAP and REDUCE (CORR-004 / CORR-005).
+        """
+        self._skip_phase_1b = bool(skip)
 
     def load(
         self,
@@ -455,6 +465,13 @@ class Phase1Orchestrator:
             logger.info("REDUCE-LLM skipped: --skip-reduce-llms flag set")
             return None
 
+        if self._skip_phase_1b:
+            logger.info(
+                "Phase1Executor skipped: --skip-phase-1b flag set (covers "
+                "Phase 1B P1B-LLM-02 RATIONALE)"
+            )
+            return None
+
         if os.environ.get("MOCK_LLM", "").strip().lower() in (
             "1",
             "true",
@@ -712,9 +729,152 @@ class Phase1Orchestrator:
             preprocessing_path=preprocessing_path,
         )
         self.map_domains()
+        self.run_phase_1b()
         self.reduce()
         self.generate_outputs(output_dir)
         logger.info("=== PIPELINE COMPLETE ===")
+        return self.state
+
+    def run_phase_1b(self) -> V2State:
+        """Stage 1.5: Per-regulation rationale synthesis via P1B-LLM-02.
+
+        Runs after MAP, before REDUCE. One LLM call per applicable
+        regulation (delegated to ``Phase1Executor.run_phase_1b`` which
+        also fires P1B-LLM-01 INTERPRETATION first). Output stored in
+        ``state["aggregated_data"]["rationale_by_reg"]`` keyed by
+        regulation code (e.g. ``"GDPR"`` →
+        ``{synthesis: {rationale, implications, gaps}, ...}``).
+
+        Skipped when:
+
+        - ``llm_invoker`` is None (deterministic-only run),
+        - ``--skip-reduce-llms`` flag is set (covers Phase 1B by convention),
+        - ``MOCK_LLM`` env var is truthy,
+        - ``--skip-phase-1b`` flag is set (explicit skip).
+
+        Failures are caught and logged; the pipeline continues so the
+        deterministic DOC 05 / DOC 07 renderers still run with a
+        PENDING-REVIEW marker instead of crashing.
+        """
+        logger.info("=== STAGE 1.5: PHASE 1B RATIONALE ===")
+
+        if "aggregated_data" not in self.state or not isinstance(
+            self.state["aggregated_data"], dict
+        ):
+            self.state["aggregated_data"] = {}
+
+        executor = self._get_phase1_executor()
+        if executor is None:
+            logger.info(
+                "Phase 1B RATIONALE skipped (deterministic/mock "
+                "mode or --skip-phase-1b flag)"
+            )
+            self.state["aggregated_data"]["rationale_by_reg"] = None
+            self._persist_state()
+            return self.state
+
+        # Extract applicable_regs (mirrors reduce() extraction pattern
+        # because company_context may be a Pydantic model).
+        cc_raw = self.state.get("company_context")
+        if hasattr(cc_raw, "model_dump"):
+            cc = cc_raw.model_dump()
+        elif isinstance(cc_raw, dict):
+            cc = dict(cc_raw)
+        else:
+            cc = {}
+
+        regs: list[str] = []
+        for candidate in cc.get("applicable_regs") or []:
+            if candidate:
+                regs.append(str(candidate))
+        if not regs:
+            appl = cc.get("applicable_regulations", [])
+            if isinstance(appl, list):
+                for entry in appl:
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get("applicable") and entry.get("abbreviation"):
+                        regs.append(str(entry["abbreviation"]))
+
+        if not regs:
+            logger.warning(
+                "Phase 1B RATIONALE skipped: no applicable regulations"
+            )
+            self.state["aggregated_data"]["rationale_by_reg"] = {}
+            self._persist_state()
+            return self.state
+
+        # Aggregate sub-domain activations from MAP domain_results.
+        aggregated_activations: list[Any] = []
+        for lr in (self.state.get("domain_results") or {}).values():
+            subs = lr.get("subdomains", []) if isinstance(lr, dict) else []
+            if isinstance(subs, list):
+                aggregated_activations.extend(subs)
+
+        # Coverage matrix rows scoped to applicable regs.
+        coverage_rows: list[Any] = []
+        ontology = self.state.get("ontology") or {}
+        cm = ontology.get("clause_mappings") or []
+        if isinstance(cm, list):
+            for entry in cm:
+                if not isinstance(entry, dict):
+                    continue
+                regs_in_mapping = [entry.get("regulation"), entry.get("reg")]
+                if any(r in regs for r in regs_in_mapping if r):
+                    coverage_rows.append(entry)
+
+        try:
+            case_id = Path(self.state.get("case_path") or "case").name
+            result = executor.run_phase_1b(
+                case_id=case_id,
+                applicable_regs=regs,
+                p1b_llm_01_outputs=None,
+                company_facts=cc,
+                coverage_matrix_row=coverage_rows,
+                aggregated_activations=aggregated_activations,
+                layer0_subdomain_refs=list(
+                    (self.state.get("subdomains") or {}).keys()
+                ),
+                classification={
+                    "role": cc.get("role") or cc.get("obligated_party") or "controller",
+                    "tier": cc.get("complexity_tier") or "LOW",
+                    "basis": "Doc 04 §5",
+                },
+            )
+        except Exception as exc:
+            logger.warning(
+                "Phase 1B RATIONALE failed (continuing): %s", exc
+            )
+            self.state.setdefault("errors", []).append(f"phase_1b: {exc}")
+            self.state["aggregated_data"]["rationale_by_reg"] = {}
+            self._persist_state()
+            return self.state
+
+        # Stored shape: {reg_code: synthesis_dict} from
+        # ``run_phase_1b``'s ``aggregated_synthesis``. We also surface
+        # the run-level status so renderers can introspect it.
+        if isinstance(result, dict):
+            synth = result.get("aggregated_synthesis")
+            if isinstance(synth, dict):
+                self.state["aggregated_data"]["rationale_by_reg"] = synth
+            elif "results" in result and isinstance(result["results"], dict):
+                self.state["aggregated_data"]["rationale_by_reg"] = result["results"]
+            else:
+                self.state["aggregated_data"]["rationale_by_reg"] = result
+            logger.info(
+                "Phase 1B RATIONALE complete for %d regulation(s) "
+                "(status=%s)",
+                len(self.state["aggregated_data"]["rationale_by_reg"]),
+                result.get("status", "?"),
+            )
+        else:
+            logger.warning(
+                "Phase 1B RATIONALE: unexpected return type %s",
+                type(result).__name__,
+            )
+            self.state["aggregated_data"]["rationale_by_reg"] = {}
+
+        self._persist_state()
         return self.state
 
     def _init_state(self) -> V2State:
