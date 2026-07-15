@@ -54,7 +54,7 @@ def test_case_01_e2e_mocked():
                         "scope_overlap": "Y",
                         "verified_relationship_per_pair": [],
                         "applicable_regulations": ["GDPR", "CRA"],
-                        "layer0_refs": [],
+                        "regulatory_baseline_refs": [],
                     }
                 ]
             },
@@ -139,12 +139,12 @@ def test_e2e_with_sync_conflict():
                             "verified_relationship_per_pair": [
                                 {
                                     "reg_pair": ["GDPR", "CRA"],
-                                    "layer0_relationship": "CONDITIONAL",
+                                    "regulatory_baseline_relationship": "CONDITIONAL",
                                     "company_scope_verdict": "OVERLAP_CONFIRMED" if d == "D-04" else "SCOPE_DISJOINT",
                                 }
                             ],
                             "applicable_regulations": ["GDPR", "CRA"],
-                            "layer0_refs": [],
+                            "regulatory_baseline_refs": [],
                         }
                     ]
                 },

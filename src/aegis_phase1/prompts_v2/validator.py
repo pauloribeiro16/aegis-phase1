@@ -2,8 +2,8 @@
 
 Enforces (per implementation contract):
   AC1 — JSON Schema compliance
-  AC2 — Layer 0 file existence (every layer0_refs[] path resolves)
-  AC3 — No re-classification of Layer 0 relationships
+  AC2 — Regulatory Baseline file existence (every regulatory_baseline_refs[] path resolves)
+  AC3 — No re-classification of Regulatory Baseline relationships
   AC4 — INSUFFICIENT_EVIDENCE handling
   AC5 — Status field consistency
 """
@@ -29,14 +29,43 @@ class ValidationError(dict):
 
 
 class Phase1Validator:
-    """Validate Phase 1 LLM outputs against JSON Schema + Layer 0 invariants."""
+    """Validate Phase 1 LLM outputs against JSON Schema + Regulatory Baseline invariants."""
 
     def __init__(
         self,
-        layer0_root: Path,
+        regulatory_baseline_root: Path | None = None,
+        layer0_root: Path | None = None,
         output_schemas_path: Path | None = None,
     ) -> None:
-        self.layer0_root = Path(layer0_root)
+        """Construct a Phase1Validator.
+
+        Args:
+            regulatory_baseline_root: Canonical (CORR-005) root directory for the
+                Regulatory Baseline (formerly Layer 0). Required unless the
+                deprecated ``layer0_root`` alias is used.
+            layer0_root: DEPRECATED alias for ``regulatory_baseline_root``.
+                Kept for backwards compatibility with code written before
+                CORR-005. Emits ``DeprecationWarning`` when used. Will be
+                removed in a future contract.
+            output_schemas_path: Optional path to a YAML file containing JSON
+                Schemas keyed by ``prompt_spec_id``.
+        """
+        import warnings
+
+        if regulatory_baseline_root is None and layer0_root is not None:
+            warnings.warn(
+                "Argument 'layer0_root' is deprecated; "
+                "use 'regulatory_baseline_root' instead. (CORR-005)",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            regulatory_baseline_root = layer0_root
+        if regulatory_baseline_root is None:
+            raise TypeError(
+                "Phase1Validator requires 'regulatory_baseline_root' "
+                "(or deprecated alias 'layer0_root')."
+            )
+        self.regulatory_baseline_root = Path(regulatory_baseline_root)
         self.output_schemas_path = (
             Path(output_schemas_path) if output_schemas_path else None
         )
@@ -105,10 +134,10 @@ class Phase1Validator:
         else:
             warnings.append(f"No schema registered for spec_id={spec_id}")
 
-        # 2. Layer 0 citation presence (every layer0_refs[] file must exist)
+        # 2. Regulatory Baseline citation presence (every regulatory_baseline_refs[] file must exist)
         citation_errors = self._validate_citations(output)
 
-        # 3. No re-classification (P1C-LLM-01 specific: layer0_relationship preserved)
+        # 3. No re-classification (P1C-LLM-01 specific: regulatory_baseline_relationship preserved)
         if spec_id == "P1C-LLM-01-OVERLAP-CLASSIFICATION":
             reclass_errors = self._validate_no_reclassification(output)
             citation_errors.extend(reclass_errors)
@@ -302,19 +331,32 @@ class Phase1Validator:
             return value is None
         return True  # Unknown type — permissive
 
-    def _extract_layer0_refs(self, output: Any) -> list[str]:
-        """Recursively collect all `layer0_refs[]` entries from output."""
+    def _extract_regulatory_baseline_refs(self, output: Any) -> list[str]:
+        """Recursively collect all `regulatory_baseline_refs[]` entries from output."""
         refs: list[str] = []
         if isinstance(output, dict):
             for k, v in output.items():
-                if k == "layer0_refs" and isinstance(v, list):
+                if k == "regulatory_baseline_refs" and isinstance(v, list):
                     refs.extend(str(x) for x in v)
                 else:
-                    refs.extend(self._extract_layer0_refs(v))
+                    refs.extend(self._extract_regulatory_baseline_refs(v))
         elif isinstance(output, list):
             for item in output:
-                refs.extend(self._extract_layer0_refs(item))
+                refs.extend(self._extract_regulatory_baseline_refs(item))
         return refs
+
+    # DEPRECATED alias (CORR-005) — preserved for backwards compatibility.
+    def _extract_layer0_refs(self, output: Any) -> list[str]:
+        """DEPRECATED: use ``_extract_regulatory_baseline_refs`` instead."""
+        import warnings as _warnings
+
+        _warnings.warn(
+            "Phase1Validator._extract_layer0_refs is deprecated; "
+            "use _extract_regulatory_baseline_refs instead. (CORR-005)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._extract_regulatory_baseline_refs(output)
 
     def _extract_doc07b_refs(self, output: Any) -> list[str]:
         """Recursively collect all `doc07b_refs[]` entries from output."""
@@ -331,14 +373,14 @@ class Phase1Validator:
         return refs
 
     def _validate_citations(self, output: dict[str, Any]) -> list[ValidationError]:
-        """Every layer0_refs[] / doc07b_refs[] path must resolve to an existing file."""
+        """Every regulatory_baseline_refs[] / doc07b_refs[] path must resolve to an existing file."""
         errors: list[ValidationError] = []
-        for ref in self._extract_layer0_refs(output):
+        for ref in self._extract_regulatory_baseline_refs(output):
             if not self._path_exists(ref):
                 errors.append(
                     ValidationError(
-                        "layer0_refs",
-                        f"Layer 0 file does not exist: {ref}",
+                        "regulatory_baseline_refs",
+                        f"Regulatory Baseline file does not exist: {ref}",
                         ref=ref,
                     )
                 )
@@ -356,17 +398,17 @@ class Phase1Validator:
     def _validate_no_reclassification(
         self, output: dict[str, Any]
     ) -> list[ValidationError]:
-        """P1C-LLM-01 specific: layer0_relationship must match Layer 0 source.
+        """P1C-LLM-01 specific: regulatory_baseline_relationship must match Regulatory Baseline source.
 
         For v1.2 MVP, this is a soft check — we log warnings if relationships
-        look suspicious. Full Layer 0 comparison is a stretch goal.
+        look suspicious. Full Regulatory Baseline comparison is a stretch goal.
         """
         errors: list[ValidationError] = []
         # The P1C-LLM-01 output has sub_domain_activations[].verified_relationship_per_pair[]
         sd_activations = output.get("sub_domain_activations", [])
         for sd in sd_activations:
             for pair in sd.get("verified_relationship_per_pair", []):
-                rel = pair.get("layer0_relationship")
+                rel = pair.get("regulatory_baseline_relationship")
                 verdict = pair.get("company_scope_verdict")
                 # If LLM invented a non-standard relationship, flag it
                 valid_rels = {"SAME", "COMPLEMENTARY", "CONTRADICTORY", "SCOPE_DISJOINT", "CONDITIONAL"}
@@ -374,7 +416,7 @@ class Phase1Validator:
                     errors.append(
                         ValidationError(
                             "sub_domain_activations.verified_relationship_per_pair",
-                            f"Non-standard layer0_relationship: '{rel}' (allowed: {valid_rels})",
+                            f"Non-standard regulatory_baseline_relationship: '{rel}' (allowed: {valid_rels})",
                         )
                     )
                 # If LLM uses CONDITIONAL, it MUST have a verdict
@@ -392,7 +434,7 @@ class Phase1Validator:
 
         Tries:
           1. As absolute path
-          2. As path relative to layer0_root
+          2. As path relative to regulatory_baseline_root
           3. As path relative to current working directory
         """
         if not ref:
@@ -400,15 +442,15 @@ class Phase1Validator:
         p = Path(ref)
         if p.is_absolute() and p.exists():
             return True
-        candidate = self.layer0_root / ref
+        candidate = self.regulatory_baseline_root / ref
         if candidate.exists():
             return True
         candidate2 = Path.cwd() / ref
         if candidate2.exists():
             return True
-        # If layer0_root is itself a relative path, try resolving
-        if not self.layer0_root.is_absolute():
-            candidate3 = (Path.cwd() / self.layer0_root / ref).resolve()
+        # If regulatory_baseline_root is itself a relative path, try resolving
+        if not self.regulatory_baseline_root.is_absolute():
+            candidate3 = (Path.cwd() / self.regulatory_baseline_root / ref).resolve()
             if candidate3.exists():
                 return True
         return False

@@ -22,7 +22,7 @@ def test_b01_v2_calls_invoker() -> None:
                     {
                         "entry_id": "TIPO2-TEST",
                         "applicable": True,
-                        "layer0_refs": ["test"],
+                        "regulatory_baseline_refs": ["test"],
                         "company_fact_refs": [],
                     }
                 ],

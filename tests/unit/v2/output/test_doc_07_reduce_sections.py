@@ -54,7 +54,7 @@ def test_compound_events_section_renders_table():
                 "regulations_triggered": ["GDPR", "CRA"],
                 "tension_type": "TEMPORAL_CONFLICT",
                 "severity": "CRITICAL",
-                "layer0_refs": ["SubDomains/D-04_Incident-Response/D-04.3.md"],
+                "regulatory_baseline_refs": ["SubDomains/D-04_Incident-Response/D-04.3.md"],
             }
         ],
         "negative_events": [],

@@ -54,6 +54,13 @@ def b01_load_regulations_v2(state: dict) -> dict:
     Returns:
         Dict with aggregate and per-regulation outputs ready to be merged
         into the LangGraph state.
+
+    Note (CORR-005): The ``layer0_catalog`` and ``layer0_subdomain_refs``
+    keys below are WIRE-PROTOCOL names referenced by the PROMPTS templates
+    living in the sibling Methodology-main repo (not this contract's scope).
+    Renaming them here would silently break the rendered prompt template
+    substitution. The PROMPTS-side rename will land in a follow-up contract
+    that touches Methodology-main; this file is the consumer-side mirror.
     """
     invoker = get_invoker()
 

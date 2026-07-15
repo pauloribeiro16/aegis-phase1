@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # .hooks/validate-contracts.sh
 # Pre-push validation script for AEGIS contracts.
-# Runs the 8 critical checks defined in CORR-003 Phase B.
+# Runs the 11 critical + 2 warning checks defined across
+# CORR-001 → CORR-005 (see docs/CONTRACTS.md).
 #
 # Usage: ./scripts/run_phase1.py  (.hooks/validate-contracts.sh)
 #        or manually:  bash .hooks/validate-contracts.sh
@@ -103,6 +104,18 @@ check "8. Invoker bypass fix in place (orchestrator reads llm_invoker.model)" \
 # Check 9 (warning only): No uncommitted v2/ files
 warn_check "9. No orphan v2/ untracked files" \
     '[ "$(git ls-files --others --exclude-standard src/aegis_phase1/v2/ | wc -l)" = "0" ]'
+
+# Check 10: P1B-LLM-02 RATIONALE phase wired into orchestrator (CORR-004 invariant)
+check "10. P1B-LLM-02 RATIONALE phase wired into orchestrator" \
+    'cd "$REPO_ROOT" && grep -q "def run_phase_1b" src/aegis_phase1/v2/orchestrator.py'
+
+# Check 11: layer0_* renamed (CORR-005 invariant)
+check "11. layer0_* renamed to regulatory_baseline_* (canonical names exist)" \
+    'cd "$REPO_ROOT" && grep -q "def get_regulatory_baseline_root" src/aegis_phase1/prompts_v2/factory.py'
+
+# Check 12 (warn): deprecated layer0_ aliases still present (backwards compat)
+warn_check "12. Deprecation aliases for layer0_ preserved (backwards compat)" \
+    'cd "$REPO_ROOT" && grep -q "def get_layer0_root" src/aegis_phase1/prompts_v2/factory.py'
 
 echo ""
 echo "${CYAN}═══════════════════════════════════════════${RESET}"

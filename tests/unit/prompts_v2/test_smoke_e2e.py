@@ -53,13 +53,16 @@ PROMPTS_ROOT = (
     / "00_METHODOLOGY"
     / "PROMPTS"
 )
-LAYER0_ROOT = (
+REGULATORY_BASELINE_ROOT = (
     PROJECT_ROOT.parent
     / "Methodology-main"
     / "00_METHODOLOGY"
     / "PREPROCESSING"
     / "SubDomains"
 )
+# DEPRECATED alias (CORR-005) — kept so we can exercise the backwards-compat
+# code path with the old kwarg. Mirrors the same alias in test_validator.py.
+LAYER0_ROOT = REGULATORY_BASELINE_ROOT
 LOGS_DIR = PROJECT_ROOT / "logs" / "phase1"
 
 
@@ -70,7 +73,7 @@ def _build_invoker() -> Phase1LLMInvoker:
         root=PROMPTS_ROOT / "catalogs"
     )
     validator = Phase1Validator(
-        layer0_root=LAYER0_ROOT,
+        regulatory_baseline_root=REGULATORY_BASELINE_ROOT,
         output_schemas_path=PROMPTS_ROOT / "output_schemas.yaml",
     )
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
