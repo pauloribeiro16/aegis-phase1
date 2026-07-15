@@ -34,6 +34,8 @@ related_documents:
 | [AEGIS-P1-CORR-002](#corr-002) | REDUCE synthesis wire-up | ✅ MERGED | ⚫ deleted | `2c43064` | 188 | Wired P1C-LLM-03 + P1C-LLM-02 into `Phase1Orchestrator.reduce()`; rendered Doc 07 §5.2/§6.2 |
 | [AEGIS-P1-CORR-002-fix](#corr-002-fix) | LLM context size correction | ✅ MERGED | ⚫ deleted | `f624c24` | 188 | Corrected `gemma4:e4b` context from 5K to 32K in `LLM_ARCHITECTURE_DECISION.md` |
 | **AEGIS-P1-CORR-003** | Validator cleanup + adapter fix + CI gate |  🟢 MERGED | 🟢 `feature/aegis-p1-corr-003` | TBD | 194 | Re-validated CORR-002 with correct signatures; fixed invoker bypass; pre-push hook script |
+| [AEGIS-P1-CORR-004](#corr-004) | Wire P1B-LLM-02 RATIONALE | ✅ MERGED | ⚫ deleted | TBD | 206+ | Wired per-regulation rationale synthesis into Phase1Orchestrator; rendered into Doc 05 §6.1b |
+| **AEGIS-P1-CORR-005** | Rename layer0_* → regulatory_baseline_* | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-004` | TBD | 329 | Hard rename with backwards-compat aliases; wire-protocol keys deferred (Methodology-main scope) |
 
 ---
 
@@ -90,6 +92,61 @@ Correct `LLM_ARCHITECTURE_DECISION.md` warning about `gemma4:e4b` context. Was s
 
 ---
 
+## <a name="corr-004"></a>AEGIS-P1-CORR-004 — Wire P1B-LLM-02 RATIONALE
+
+### Scope
+- Add `Phase1Orchestrator.run_phase_1b()` method (~170 lines)
+- Call between MAP and REDUCE in `run_all()` (5-stage pipeline: LOAD → MAP → PHASE_1B → REDUCE → OUTPUT)
+- Render per-regulation rationale + implications + gaps into Doc 05 §6.1b
+- Add `--skip-phase-1b` CLI flag
+- Add Check 10 to validate-contracts.sh
+
+### Decisions
+- **§6.1b layout**: NEW section (don't replace §6.1 deterministic)
+- **N LLM calls** (one per applicable_reg): accepted; documented; --skip-phase_1b for fast iteration
+- **PENDING REVIEW** marker on failure (never silent fallback)
+- **Backwards-compat**: P1B-LLM-01 output not yet wired (--no --skip Phase 1B can still run)
+
+### LLM calls/case after CORR-004
+- 10 (MAP adapted_objective)
+- N (Phase 1B RATIONALE, one per applicable_reg)
+- 2 (REDUCE: P1C-LLM-03 + P1C-LLM-02)
+- 8 (mandatory narrative sections from CORR-004 + earlier)
+- **Total**: 20 + N LLM calls per case
+
+### In Progress as of 2026-07-14 (merged same day)
+
+---
+
+## <a name="corr-005"></a>AEGIS-P1-CORR-005 — Rename layer0_* → regulatory_baseline_*
+
+### Scope
+- Hard rename `layer0_refs` → `regulatory_baseline_refs` (JSON field name)
+- Hard rename `layer0_relationship` → `regulatory_baseline_relationship`
+- Hard rename `layer0_root` (Python attr) → `regulatory_baseline_root`
+- Hard rename `get_layer0_root()` → `get_regulatory_baseline_root()` (function name)
+- Keep backwards-compat aliases for Python (emit DeprecationWarning)
+
+### Decisions
+- **Option B.1 chosen**: hard rename for JSON field names (single producer internal)
+- **Alias pattern** for Python identifiers (function names, params)
+- **Wire-protocol keys deferred**: `layer0_catalog` and `layer0_subdomain_refs` kept
+  in 3 files because they serialize into prompts that live in `Methodology-main/`
+  (sibling repo, out of this contract's scope). Future contract owns PROMPTS-side rename.
+
+### In Progress as of 2026-07-14
+
+### Known limitations (updated)
+- **Wire-protocol constraint**: 3 files still use `layer0_catalog` / `layer0_subdomain_refs`
+  in `invoker.invoke(inputs=...)` payloads. Renaming them in this contract would
+  silently break the rendered PROMPTS templates (different repo).
+  Deferred to a future contract that owns PROMPTS-side renames.
+- **Documentation references**: `docs/CONTRACTS.md`, `docs/LLM_ARCHITECTURE_DECISION.md`,
+  `docs/prompts_v2_usage.md` still mention old names in historical context.
+  New documents use new names.
+
+---
+
 ## Repository stats (as of CORR-003 T4 creation)
 
 | Metric | Value |
@@ -106,9 +163,9 @@ Correct `LLM_ARCHITECTURE_DECISION.md` warning about `gemma4:e4b` context. Was s
 | # | Topic | Decision needed | Status |
 |---|---|---|---|
 | 1 | P1B-LLM-01 INTERPRETATION wire-up | Separate contract? | Open |
-| 2 | P1B-LLM-02 RATIONALE wire-up | Same or separate contract? | Open |
-| 3 | P1C-LLM-01 OVERLAP-CLASSIFICATION wire-up | Same or separate contract? | Open |
-| 4 | JSON Schema field renaming `layer0_refs` → `regulatory_baseline_refs` | Separate contract? | Open |
+| 2 | P1B-LLM-02 RATIONALE wire-up | **✅ MERGED via CORR-004** | Closed |
+| 3 | P1C-LLM-01 OVERLAP-CLASSIFICATION wire-up | Separate contract? | Open |
+| 4 | JSON Schema field renaming `layer0_refs` → `regulatory_baseline_refs` | **✅ MERGED via CORR-005** | Closed |
 | 5 | Case_02 / Case_03 rebranding in `Methodology-main` | Separate contract? | Open |
 | 6 | Switch Ollama → remote `MiniMax-M2.7` | Separate contract with API key handling | Open |
 
