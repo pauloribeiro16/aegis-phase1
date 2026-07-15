@@ -288,7 +288,7 @@ def _render_compound_events_section(state: dict[str, Any]) -> list[str]:
     if positive:
         parts.append("\n#### Confirmed compound events\n")
         parts.append(
-            "| Event ID | Description | Sub-domains | Regulations | Tension | Severity | layer0_refs |\n"
+            "| Event ID | Description | Sub-domains | Regulations | Tension | Severity | regulatory_baseline_refs |\n"
             "|---|---|---|---|---|---|---|\n"
         )
         for ev in positive:
@@ -300,7 +300,7 @@ def _render_compound_events_section(state: dict[str, Any]) -> list[str]:
             regs = ", ".join(str(r) for r in (ev.get("regulations_triggered") or []))
             tension = str(ev.get("tension_type", "?"))
             severity = str(ev.get("severity", "?"))
-            refs = ", ".join(str(r) for r in (ev.get("layer0_refs") or []))
+            refs = ", ".join(str(r) for r in (ev.get("regulatory_baseline_refs") or []))
             parts.append(f"| {ev_id} | {desc} | {subs} | {regs} | {tension} | {severity} | {refs} |\n")
     else:
         parts.append("\n*No positive compound events detected for this company.*\n")

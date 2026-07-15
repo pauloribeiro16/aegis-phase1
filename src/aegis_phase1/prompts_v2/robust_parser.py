@@ -350,7 +350,7 @@ class RobustParser:
                     "entry_id": ids[0],
                     "applicable": False,
                     "activation_rationale": "Parser fallback (incomplete response)",
-                    "layer0_refs": [],
+                    "regulatory_baseline_refs": [],
                     "company_fact_refs": [],
                 }
             ]

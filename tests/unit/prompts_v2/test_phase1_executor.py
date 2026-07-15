@@ -315,7 +315,7 @@ def test_run_sync_no_conflicts_all_agree() -> None:
                         {
                             "reg_pair": ["GDPR", "CRA"],
                             "company_scope_verdict": "OVERLAP_CONFIRMED",
-                            "layer0_relationship": "COMPLEMENTARY",
+                            "regulatory_baseline_relationship": "COMPLEMENTARY",
                         }
                     ],
                 }
@@ -330,7 +330,7 @@ def test_run_sync_no_conflicts_all_agree() -> None:
                         {
                             "reg_pair": ["GDPR", "CRA"],
                             "company_scope_verdict": "OVERLAP_CONFIRMED",
-                            "layer0_relationship": "COMPLEMENTARY",
+                            "regulatory_baseline_relationship": "COMPLEMENTARY",
                         }
                     ],
                 }
@@ -356,7 +356,7 @@ def test_run_sync_detects_cross_lane_conflict() -> None:
                         {
                             "reg_pair": ["GDPR", "CRA"],
                             "company_scope_verdict": "OVERLAP_CONFIRMED",
-                            "layer0_relationship": "COMPLEMENTARY",
+                            "regulatory_baseline_relationship": "COMPLEMENTARY",
                         }
                     ],
                 }
@@ -371,7 +371,7 @@ def test_run_sync_detects_cross_lane_conflict() -> None:
                         {
                             "reg_pair": ["GDPR", "CRA"],
                             "company_scope_verdict": "SCOPE_DISJOINT",
-                            "layer0_relationship": "COMPLEMENTARY",
+                            "regulatory_baseline_relationship": "COMPLEMENTARY",
                         }
                     ],
                 }

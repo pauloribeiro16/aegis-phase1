@@ -25,6 +25,7 @@ from aegis_phase1.prompts_v2.factory import (
     get_layer0_root,
     get_logs_dir,
     get_prompts_root,
+    get_regulatory_baseline_root,
     get_validator,
 )
 from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
@@ -70,6 +71,7 @@ __all__ = [
     "get_layer0_root",
     "get_logs_dir",
     "get_prompts_root",
+    "get_regulatory_baseline_root",
     "get_validator",
     "invoker_to_executor",
     "list_specs",

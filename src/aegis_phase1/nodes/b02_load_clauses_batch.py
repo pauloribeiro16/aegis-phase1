@@ -364,6 +364,11 @@ def b02_load_clauses_batch_v2(state: dict) -> dict:
     Returns:
         Dict with aggregate and per-regulation synthesis outputs ready to
         be merged into the LangGraph state.
+
+    Note (CORR-005): ``layer0_subdomain_refs`` is a WIRE-PROTOCOL name
+    referenced by the PROMPTS templates in the sibling Methodology-main
+    repo (out of this contract's scope). See the matching note in
+    ``b01_load_regulations_v2``.
     """
     invoker = get_invoker()
 

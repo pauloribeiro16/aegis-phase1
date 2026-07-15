@@ -9,6 +9,14 @@ MAP stage (Sprint MAP-3):
     - Per-domain parse failures accumulate; ``MapPartialFailure`` is
       raised at the end if any domain is still ``FAILED``.
     - ``retry_failed()`` re-processes a chosen subset of failed domains.
+
+Note (CORR-005): ``layer0_subdomain_refs`` kwargs forwarded to
+``executor.run_phase_1b`` / ``run_phase_1c_reduce`` are WIRE-PROTOCOL
+names. They land in the inputs dict serialised into the PROMPTS
+template substitution performed by the sibling Methodology-main repo
+(out of this contract's scope). The PROMPTS-side rename will land in a
+follow-up contract; this file is the consumer-side mirror and must
+keep the wire name for now.
 """
 
 import json

@@ -33,7 +33,7 @@ _DEFAULT_PROMPTS_ROOT = (
     / "00_METHODOLOGY"
     / "PROMPTS"
 )
-_DEFAULT_LAYER0_ROOT = (
+_DEFAULT_REGULATORY_BASELINE_ROOT = (
     Path(__file__).parent.parent.parent.parent.parent
     / "Methodology-main"
     / "00_METHODOLOGY"
@@ -48,9 +48,34 @@ def get_prompts_root() -> Path:
     return _DEFAULT_PROMPTS_ROOT
 
 
+def get_regulatory_baseline_root() -> Path:
+    """Return the Regulatory Baseline SubDomains/ root directory (canonical).
+
+    The Regulatory Baseline (formerly called Layer 0) is the deterministic
+    source of truth: 38 sub-domains across 10 domains, with their clauses,
+    sub-domain references, and cross-regulation relationships. Renamed under
+    contract CORR-005; see ``00_METHODOLOGY/REFERENCE/citation_system.md``
+    for the rationale.
+    """
+    return _DEFAULT_REGULATORY_BASELINE_ROOT
+
+
 def get_layer0_root() -> Path:
-    """Return the Layer 0 SubDomains/ root directory."""
-    return _DEFAULT_LAYER0_ROOT
+    """DEPRECATED alias for ``get_regulatory_baseline_root``.
+
+    Kept for backwards compatibility with code written before CORR-005.
+    Emits ``DeprecationWarning`` when called. Will be removed in a future
+    contract.
+    """
+    import warnings
+
+    warnings.warn(
+        "get_layer0_root() is deprecated; "
+        "use get_regulatory_baseline_root() instead. (CORR-005)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return get_regulatory_baseline_root()
 
 
 def get_logs_dir() -> Path:
@@ -59,34 +84,70 @@ def get_logs_dir() -> Path:
     return _DEFAULT_LOGS_DIR
 
 
-def get_validator(layer0_root: Path | None = None) -> Any:
-    """Get a Phase1Validator with default Layer 0 root."""
+def get_validator(
+    regulatory_baseline_root: Path | None = None,
+    layer0_root: Path | None = None,
+) -> Any:
+    """Get a Phase1Validator with default Regulatory Baseline root.
+
+    Args:
+        regulatory_baseline_root: Canonical (CORR-005) root directory.
+            When ``None``, falls back to the deprecated ``layer0_root``
+            argument or the default sibling-repo path.
+        layer0_root: DEPRECATED alias for ``regulatory_baseline_root``.
+            Kept for backwards compatibility with code written before
+            CORR-005. Emits ``DeprecationWarning`` when used.
+    """
+    import warnings
+
     from aegis_phase1.prompts_v2.validator import Phase1Validator
 
-    root = layer0_root or get_layer0_root()
+    if regulatory_baseline_root is None and layer0_root is not None:
+        warnings.warn(
+            "Argument 'layer0_root' is deprecated; "
+            "use 'regulatory_baseline_root' instead. (CORR-005)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        regulatory_baseline_root = layer0_root
+    root = regulatory_baseline_root or get_regulatory_baseline_root()
     schemas_path = get_prompts_root() / "output_schemas.yaml"
-    return Phase1Validator(layer0_root=root, output_schemas_path=schemas_path)
+    return Phase1Validator(
+        regulatory_baseline_root=root, output_schemas_path=schemas_path
+    )
 
 
 def get_invoker(
     model: str | None = None,
     base_url: str | None = None,
     prompts_root: Path | None = None,
+    regulatory_baseline_root: Path | None = None,
     layer0_root: Path | None = None,
 ) -> Any:
     """Get a fully-wired Phase1LLMInvoker with default config.
 
     Reads OLLAMA_MODEL and OLLAMA_BASE_URL from environment if not provided.
+    Accepts ``regulatory_baseline_root`` (canonical, CORR-005) or
+    ``layer0_root`` (deprecated alias).
     """
     import os
+    import warnings
 
     from aegis_phase1.prompts_v2.catalog import CatalogLoader
     from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
     from aegis_phase1.prompts_v2.loader import PromptLoader
     from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 
+    if regulatory_baseline_root is None and layer0_root is not None:
+        warnings.warn(
+            "Argument 'layer0_root' is deprecated; "
+            "use 'regulatory_baseline_root' instead. (CORR-005)",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        regulatory_baseline_root = layer0_root
     prompts = prompts_root or get_prompts_root()
-    layer0 = layer0_root or get_layer0_root()
+    baseline = regulatory_baseline_root or get_regulatory_baseline_root()
     logs = get_logs_dir()
 
     model = model or os.getenv("OLLAMA_MODEL", Phase1LLMInvoker.DEFAULT_MODEL)
@@ -96,7 +157,7 @@ def get_invoker(
 
     prompt_loader = PromptLoader(root=prompts)
     catalog_loader = CatalogLoader(root=prompts / "catalogs")
-    validator = get_validator(layer0_root=layer0)
+    validator = get_validator(regulatory_baseline_root=baseline)
     llm_logger = JSONLLogger(logs / "llm-calls.jsonl")
     format_logger = JSONLLogger(logs / "format-errors.jsonl")
 

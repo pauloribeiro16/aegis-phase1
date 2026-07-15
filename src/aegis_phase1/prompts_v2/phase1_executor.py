@@ -306,7 +306,7 @@ class Phase1Executor:
                         {
                             "lane_id": lane_id,
                             "verdict": pair.get("company_scope_verdict"),
-                            "relationship": pair.get("layer0_relationship"),
+                            "relationship": pair.get("regulatory_baseline_relationship"),
                         }
                     )
 

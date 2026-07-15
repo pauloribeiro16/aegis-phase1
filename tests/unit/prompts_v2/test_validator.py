@@ -1,4 +1,4 @@
-"""Tests for Phase1Validator — JSON Schema + Layer 0 citation checks."""
+"""Tests for Phase1Validator — JSON Schema + Regulatory Baseline citation checks."""
 
 from __future__ import annotations
 
@@ -8,27 +8,32 @@ import pytest
 
 from aegis_phase1.prompts_v2.validator import Phase1Validator
 
-# Path to Layer 0 source (Preprocessing/SubDomains) for citation checks
-LAYER0_ROOT = (
+# Path to Regulatory Baseline source (Preprocessing/SubDomains) for citation checks
+REGULATORY_BASELINE_ROOT = (
     Path(__file__).parent.parent.parent.parent.parent.parent
     / "Methodology-main"
     / "00_METHODOLOGY"
     / "PREPROCESSING"
     / "SubDomains"
 )
+# DEPRECATED alias (CORR-005) — kept to test the backwards-compat path.
+LAYER0_ROOT = REGULATORY_BASELINE_ROOT
 
 
 @pytest.fixture
 def validator() -> Phase1Validator:
-    """Create validator with Layer 0 root pointing to real SubDomains dir."""
-    if not LAYER0_ROOT.exists():
-        pytest.skip(f"Layer 0 root not found: {LAYER0_ROOT}")
+    """Create validator with Regulatory Baseline root pointing to real SubDomains dir."""
+    if not REGULATORY_BASELINE_ROOT.exists():
+        pytest.skip(f"Regulatory Baseline root not found: {REGULATORY_BASELINE_ROOT}")
     schemas_path = (
-        LAYER0_ROOT.parent.parent
+        REGULATORY_BASELINE_ROOT.parent.parent
         / "PROMPTS"
         / "output_schemas.yaml"
     )
-    return Phase1Validator(layer0_root=LAYER0_ROOT, output_schemas_path=schemas_path)
+    return Phase1Validator(
+        regulatory_baseline_root=REGULATORY_BASELINE_ROOT,
+        output_schemas_path=schemas_path,
+    )
 
 
 class TestValidOutput:
@@ -47,7 +52,7 @@ class TestValidOutput:
                     "entry_id": "TIPO2-GDPR-RTS-DEADLINES",
                     "applicable": False,
                     "activation_rationale": "Not applicable",
-                    "layer0_refs": ["SubDomains/D-09_Governance-Documentation/D-09.1.md §2 HSO"],
+                    "regulatory_baseline_refs": ["SubDomains/D-09_Governance-Documentation/D-09.1.md §2 HSO"],
                     "company_fact_refs": ["DOC04:SEC-04"],
                 }
             ],
@@ -73,7 +78,7 @@ class TestValidOutput:
                         "id": "IMP-D-01.1-1",
                         "description": "Implement at-rest encryption for personal data.",
                         "effort_estimate": "days",
-                        "layer0_refs": ["SubDomains/D-01_Data-Protection/D-01.1.md §2 HSO"],
+                        "regulatory_baseline_refs": ["SubDomains/D-01_Data-Protection/D-01.1.md §2 HSO"],
                         "company_fact_refs": ["DOC04:ARCH-07"],
                     }
                 ],
@@ -139,8 +144,8 @@ class TestSchemaValidation:
 
 
 class TestCitationValidation:
-    def test_valid_layer0_citation_passes(self, validator: Phase1Validator) -> None:
-        """Citation to an existing Layer 0 file passes."""
+    def test_valid_regulatory_baseline_citation_passes(self, validator: Phase1Validator) -> None:
+        """Citation to an existing Regulatory Baseline file passes."""
         output = {
             "prompt_spec_id": "P1B-LLM-01-INTERPRETATION",
             "schema_version": "1.0.0",
@@ -153,7 +158,7 @@ class TestCitationValidation:
                 {
                     "entry_id": "TEST",
                     "applicable": True,
-                    "layer0_refs": ["D-09_Governance-Documentation/D-09.1.md"],  # exists
+                    "regulatory_baseline_refs": ["D-09_Governance-Documentation/D-09.1.md"],  # exists
                     "company_fact_refs": [],
                 }
             ],
@@ -162,7 +167,7 @@ class TestCitationValidation:
         result = validator.validate("P1B-LLM-01-INTERPRETATION", output)
         assert not result["citation_errors"]
 
-    def test_invalid_layer0_citation_fails(self, validator: Phase1Validator) -> None:
+    def test_invalid_regulatory_baseline_citation_fails(self, validator: Phase1Validator) -> None:
         """Citation to a non-existent file produces a citation error."""
         output = {
             "prompt_spec_id": "P1B-LLM-01-INTERPRETATION",
@@ -176,7 +181,7 @@ class TestCitationValidation:
                 {
                     "entry_id": "TEST",
                     "applicable": True,
-                    "layer0_refs": ["D-99_NONEXISTENT/non_existent_file.md"],  # doesn't exist
+                    "regulatory_baseline_refs": ["D-99_NONEXISTENT/non_existent_file.md"],  # doesn't exist
                     "company_fact_refs": [],
                 }
             ],
@@ -189,7 +194,7 @@ class TestCitationValidation:
 
 class TestNoReclassification:
     def test_standard_relationship_passes(self, validator: Phase1Validator) -> None:
-        """P1C-LLM-01 with standard layer0_relationship passes no-reclass check."""
+        """P1C-LLM-01 with standard regulatory_baseline_relationship passes no-reclass check."""
         output = {
             "prompt_spec_id": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
             "schema_version": "1.0.0",
@@ -213,12 +218,12 @@ class TestNoReclassification:
                     "verified_relationship_per_pair": [
                         {
                             "reg_pair": ["GDPR", "CRA"],
-                            "layer0_relationship": "CONDITIONAL",
+                            "regulatory_baseline_relationship": "CONDITIONAL",
                             "company_scope_verdict": "OVERLAP_CONFIRMED",
-                            "layer0_refs": ["D-01_Data-Protection/D-01.1.md"],
+                            "regulatory_baseline_refs": ["D-01_Data-Protection/D-01.1.md"],
                         }
                     ],
-                    "layer0_refs": ["D-01_Data-Protection/D-01.1.md"],
+                    "regulatory_baseline_refs": ["D-01_Data-Protection/D-01.1.md"],
                 }
             ],
         }
@@ -228,7 +233,7 @@ class TestNoReclassification:
         assert len(reclass_errors) == 0
 
     def test_non_standard_relationship_flagged(self, validator: Phase1Validator) -> None:
-        """Non-standard layer0_relationship (e.g. invented) is flagged."""
+        """Non-standard regulatory_baseline_relationship (e.g. invented) is flagged."""
         output = {
             "prompt_spec_id": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
             "schema_version": "1.0.0",
@@ -248,12 +253,12 @@ class TestNoReclassification:
                     "verified_relationship_per_pair": [
                         {
                             "reg_pair": ["GDPR", "CRA"],
-                            "layer0_relationship": "INVENTED_RELATIONSHIP",  # not in enum
+                            "regulatory_baseline_relationship": "INVENTED_RELATIONSHIP",  # not in enum
                             "company_scope_verdict": "OVERLAP_CONFIRMED",
-                            "layer0_refs": ["D-01_Data-Protection/D-01.1.md"],
+                            "regulatory_baseline_refs": ["D-01_Data-Protection/D-01.1.md"],
                         }
                     ],
-                    "layer0_refs": ["D-01_Data-Protection/D-01.1.md"],
+                    "regulatory_baseline_refs": ["D-01_Data-Protection/D-01.1.md"],
                 }
             ],
         }
@@ -282,12 +287,12 @@ class TestNoReclassification:
                     "verified_relationship_per_pair": [
                         {
                             "reg_pair": ["GDPR", "CRA"],
-                            "layer0_relationship": "CONDITIONAL",
+                            "regulatory_baseline_relationship": "CONDITIONAL",
                             # missing company_scope_verdict
-                            "layer0_refs": ["D-01_Data-Protection/D-01.1.md"],
+                            "regulatory_baseline_refs": ["D-01_Data-Protection/D-01.1.md"],
                         }
                     ],
-                    "layer0_refs": ["D-01_Data-Protection/D-01.1.md"],
+                    "regulatory_baseline_refs": ["D-01_Data-Protection/D-01.1.md"],
                 }
             ],
         }
