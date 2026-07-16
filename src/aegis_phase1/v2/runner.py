@@ -25,6 +25,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+from aegis_phase1.llm.unified import OllamaUnreachableError  # noqa: E402 — placed after logger
+
 _DEFAULT_PROJECTS = Path(__file__).resolve().parents[4]
 DEFAULT_CASE = str(_DEFAULT_PROJECTS / "Methodology-main" / "02_CASES" / "Case_01_TinyTask_SaaS")
 DEFAULT_PREPROC = str(_DEFAULT_PROJECTS / "Methodology-main" / "00_METHODOLOGY" / "PREPROCESSING")
@@ -248,7 +250,13 @@ def main() -> None:
         logger.info("Interactive mode — running wizard (CORR-006)")
         from aegis_phase1.v2.cli.menu import run_wizard
 
-        run_wizard(orch, case_path, prep_path, output_path)
+        try:
+            run_wizard(orch, case_path, prep_path, output_path)
+        except OllamaUnreachableError as exc:
+            print(f"⚠ Ollama not reachable at {exc.base_url}.")
+            print("  Start it with: ollama serve")
+            print("  Or run with --mock-llm for offline mode.")
+            sys.exit(2)
 
 
 if __name__ == "__main__":
