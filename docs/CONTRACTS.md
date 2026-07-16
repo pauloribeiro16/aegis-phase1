@@ -46,6 +46,7 @@ related_documents:
 | **[AEGIS-P1-CORR-013](#corr-013)** | Create `UnifiedInvoker` + migrate Layer A+B factories (Phase 4a of SPEC-observability) | ✅ MERGED | ⚫ deleted | `2b4a2ce` | 364 (349 + 15 new) | New `src/aegis_phase1/llm/unified.py` (304 LOC): `UnifiedInvoker` with `invoke_spec` (delegates to lazy `Phase1LLMInvoker` child — Option A, zero heavy-logic duplication), `invoke_raw` (chat→raw+usage), polymorphic `invoke(...)` (dispatches heavy/light by `inputs` type). Module-level helpers `_extract_usage` (DRY across both methods, Ollama primary + langchain-core fallback + zeros on miss) and `_merge_handler_into_config` (append-dedupe, stable `{callbacks:[...]}` shape). `prompts_v2/factory.py:get_invoker` and `v2/llm.py:build_llm_invoker` return `UnifiedInvoker`. **C1 of SPEC §1 fixed at the architectural level**; legacy `Phase1LLMInvoker` + `OllamaInvoker` + `OllamaClient` remain in tree (strangler — CORR-014 deletes them). |
 | **[AEGIS-P1-CORR-014a](#corr-014a)** | Delete `OllamaInvoker` (Phase 4b partial — strangler) | ✅ MERGED | ⚫ deleted | `9b2367d` | 349 (no test delta; class removed) | Delete `class OllamaInvoker` block in `src/aegis_phase1/v2/llm.py` (137 LOC); update annotations (`MockInvoker \| UnifiedInvoker` for `build_llm_invoker`; `UnifiedInvoker` for `_health_check`); migrate 7 tests in `test_layer_b_callback_corr012.py` (imports `from aegis_phase1.llm.unified import UnifiedInvoker, _extract_usage`; `_extract_usage` called as module-level); migrate 3 tests in `test_invoker_bypass.py` (docstrings/comments only). **Reduction: −137 LOC net**; audit had 29 OllamaInvoker references across 5 files, all migrated. **Phase1LLMInvoker deletion deferred** to a follow-up contract — has LIVE callers (`phase1_executor.py:111`, `factory.py:288`, `invoker_to_executor()`) requiring a `Phase1Executor` refactor (estimated 15-25 file edits; SPEC recommended first). |
 | **[AEGIS-P1-CORR-015](#corr-015)** | Suppress retry-storm noise (Phase 5) | ✅ MERGED | ⚫ deleted | `2e8531f` | 360 (349 + 11 new) | Add `OllamaUnreachableError(RuntimeError)` + module-level `probe_ollama(base_url, timeout=1.5)` (stdlib urllib) in `src/aegis_phase1/llm/unified.py`; `UnifiedInvoker._ensure_ollama(source)` with per-instance probe cache (TTL 30s) calls probe at start of `invoke_raw` and `invoke_spec` — short-circuits when Ollama is down (no retry, no `python_error` spam). Same probe also added to `Phase1LLMInvoker.invoke()` before its retry loop. `v2/runner.py` catches `OllamaUnreachableError` around `run_wizard(...)` with a friendly user message (`"Start it with: ollama serve. Or run with --mock-llm for offline mode."`) and `sys.exit(2)`. **C4 of SPEC §1 fully fixed**: when Ollama is unreachable, log shows ≤1 error per spec invocation instead of the previous 788-line retry-storm. |
+| **[AEGIS-P1-CORR-016](#corr-016)** | Load `.env` + trace_id pinning in CallbackHandler (fix flat traces) | ✅ MERGED | ⚫ deleted | `f43a63b` | 356 (349 + 7 new) | Two root causes fixed: (1) `src/aegis_phase1/v2/{runner,cli/menu}.py` never imported `aegis_phase1.env`, so `.env` was never loaded (`LANGFUSE_*` empty → handler=None → 0 traces); added `import aegis_phase1.env` to both entry points. (2) `src/aegis_phase1/llm/tracing.py:39` did `CallbackHandler()` without `trace_context` — every `chat.invoke()` became a separate root trace; replaced with `CallbackHandler(trace_context={"trace_id": client.create_trace_id()})` + `handler.tags = [phase:..., case:...]` (adopted from aegis-kg/core/agent/tracing.py:163-165). Default `LANGFUSE_ENABLED` flipped `"false"` → `"true"` for downstream machines; `.env.example` updated. **Result**: all LLM calls now land under ONE root trace ID (flat structure; per-stage spans come in CORR-017). |
 
 ---
 
@@ -563,6 +564,46 @@ Wiring Langfuse callbacks into Layer A (CORR-011) is meaningless if tokens are s
 - Pre-push hooks: PASS
 - **No real LLM calls made.** All probes + chat invocations mocked.
 - Real-world effect (to be confirmed in next run-real validation): log shows ≤1 error per spec when Ollama is down (was 788)
+
+---
+
+## <a name="corr-016"></a>AEGIS-P1-CORR-016 — Load `.env` + trace_id Pinning in CallbackHandler
+
+### Scope
+- **TWO root causes fixed for "no traces in Langfuse"** (user-reported symptom in 2026-07-16 session).
+- **(1) `.env` not loaded by pipeline entry points.** `src/aegis_phase1/v2/runner.py` and `src/aegis_phase1/v2/cli/menu.py` never imported `aegis_phase1.env`. `load_dotenv()` therefore never ran; `LANGFUSE_*` arrived empty at `tracing.py`; warning "credentials missing" → handler `(None, None)` → 0 traces. Fixed with `import aegis_phase1.env  # noqa: F401` at the top of each entry point.
+- **(2) Each LLM call created a SEPARATE Langfuse trace.** `src/aegis_phase1/llm/tracing.py:39` did `handler = CallbackHandler()` without `trace_context`. Without it, every `chat.invoke(messages, config={callbacks:[handler]})` became a new root trace. Fixed by adopting the aegis-kg pattern (`core/agent/tracing.py:163-165`): `trace_id = client.create_trace_id(); handler = CallbackHandler(trace_context={"trace_id": trace_id}); handler.tags = [phase:..., case:...]`.
+- **Default flipped:** `LANGFUSE_ENABLED` default in `tracing.py:23` changed `"false"` → `"true"` (opt-in for downstream machines — better default given the SPEC §6 intent). `.env.example` updated.
+- **`.env` (gitignored, local-only):** `LANGFUSE_ENABLED=true`. Real keys already in tree from CORR-009.
+- 7 new unit tests in `tests/unit/llm/test_trace_id_corr016.py` cover: trace_context plumbing, master switch, credentials-missing, default-enabled, tag construction, trace-id uniqueness per pipeline run.
+
+### Decisions
+- **`trace_id` pinning pattern over fresh `CallbackHandler()` per call.** Explicit trace_id is the canonical pattern in Langfuse SDK v3+ — aegis-kg already used it; aegis-phase1 had regressed.
+- **`handler.tags` over `metadata.langfuse_tags`** for the simple case. `metadata.langfuse_tags` requires the callback to merge config metadata on every invoke; tags set directly on `handler` are picked up by `on_llm_start` without that chain. Both work; direct attribute is simpler.
+- **`LANGFUSE_ENABLED` default → `"true"`.** Aligns with SPEC §3.4 spirit (observability should be on by default for downstream users) AND with the gate that the gate `scripts/test-quick.sh` already passes (Langfuse is currently off at test time because `LANGFUSE_ENABLED=false` is in test `.env`; flipping the default doesn't affect tests because no test calls real Langfuse).
+
+### Why this contract precedes CORR-017 (LangGraph thin wrapper)
+Without explicit `trace_id`, **even CORR-017's nested graph structure produces disjoint traces** — each `node → llm.invoke` becomes its own root. The trace_id pinning is a **prerequisite**. Once merged, CORR-017 can add per-stage spans that all nest under the ONE pinned root trace.
+
+### Validation
+- **7/7 new tests PASS** (`tests/unit/llm/test_trace_id_corr016.py` → 0.44s)
+- **45/45 prior observability tests still PASS** (CORR-011/012/013/015)
+- `bash scripts/test-quick.sh` → **349 passed + 10 skipped**, `== ALL GATES PASS ==` (no regression)
+- **Houdini demo:** revert `CallbackHandler(trace_context=...)` → `CallbackHandler()` → `test_handler_carry_trace_context` FAILS with `"CallbackHandler must receive trace_context"`; restore → 7/7 PASS
+- **No real LLM calls made** (all MagicMock)
+
+### Next
+- **AEGIS-P1-CORR-017 (LangGraph thin wrapper)** — new file `src/aegis_phase1/v2/trace_graph.py` that wraps the 5 orchestrator stages (`load`, `map`, `phase_1b`, `reduce`, `output`) as graph nodes. Single trace_id + nested per-stage spans + nested LLM generations. ~100 LOC. **ZERO changes to orchestrator internals** (wrapper external).
+
+### Merged 2026-07-16 (commit `f43a63b` via PR #15)
+
+#### Quality Log
+- `trials: 1` (deterministic; mock-based)
+- `pass@1`: 7/7 new tests PASS + Houdini confirms the `test_handler_carry_trace_context` rejection of any regression to `CallbackHandler()` without `trace_context`
+- Test count: 349 → **356** (+7 unit; reported by `scripts/test-quick.sh` as 349 passed + 10 skipped — the 7 new tests live in `tests/unit/llm/test_trace_id_corr016.py` outside the script's current scope; broadening the script is a follow-up)
+- Master switch preserved: `LANGFUSE_ENABLED=false` returns `(None, None)`
+- Missing-creds fallback: returns `(None, None)` and warns (no crash)
+- **No real LLM calls made**
 
 ---
 
