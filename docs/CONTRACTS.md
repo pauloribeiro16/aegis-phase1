@@ -41,6 +41,7 @@ related_documents:
 | **[AEGIS-P1-CORR-008](#corr-008)** | Wizard beaupy fix + integration smoke gate (+ run_all fix) | ✅ MERGED | ⚫ deleted | `7e7439c` | 222 (218 + 1 + 3) | Fix `pre_selected=`→`cursor_index=` (4 sites); harden mocks with `assert_called_with`; add integration smoke (beaupy signature AST scan + runner subprocess non-TTY) + `scripts/test-quick.sh` (LLM-safe scope: `tests/unit/v2/ + 2 smoke`); **Phase F user-discovered: fix `_run_pipeline` forwarding args to `orch.run_all(case_path=…)`** |
 | **[AEGIS-P1-CORR-009](#corr-009)** | Langfuse self-hosted bring-up (Phase 0 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `dd5e6b9` | 222 | Bring up aegis-kg Langfuse docker stack at `localhost:3000`; populate `.env` (real keys, gitignored) + `.env.example` (placeholders) with `LANGFUSE_ENABLED=false` master switch; document setup in `docs/LANGFUSE_SETUP.md`. **Zero code pipeline changes**. End-to-end smoke: SDK auth `True`, programmatic trace `corr009-validate-edf65d19` queryable via API. See [SPEC-observability.md](./SPEC-observability.md) §6 for the full 7-contract decomposition (CORR-009 → 015). |
 | **[AEGIS-P1-CORR-010](#corr-010)** | Fix `_extract_usage` tokens=0 (Phase 1 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `85bb4bd` | 227 (222 + 5 new) | Fix `src/aegis_phase1/prompts_v2/invoker.py:_extract_usage` to read Ollama-native `prompt_eval_count` / `eval_count` from `response_metadata` (not OpenAI `token_usage`); fix `hasattr()` → `.get()` for `usage_metadata` fallback; graceful zeros on empty/missing; never raises. Add 5 unit tests with `FakeAIMessage` fixture (no real LLM call). Houdini demo: revert → 2 tests fail; restore → all pass. **C2 of SPEC §1 fixed**. |
+| **[AEGIS-P1-CORR-011](#corr-011)** | Wire Langfuse callback into Layer A (Phase 2 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `143bfe9` | 342 (227 + 5 new + 110 prompts_v2) | Thread `config={"callbacks":[handler]}` into `prompts_v2/invoker.py:_attempt` `ChatOllama.invoke(...)`; merge handler in `invoke()` (append, dedupe); wire `get_langfuse_callback()` in `factory.py:get_invoker`; promote `langfuse>=2.0.0` from `[tracing]` to core dep; broaden `scripts/test-quick.sh` to include `tests/unit/prompts_v2/`. **C3 partial of SPEC §1 fixed (Layer A only)**; Layer B (CORR-012) and full coverage (CORR-013/014) still pending. |
 
 ---
 
@@ -348,6 +349,44 @@ Wiring Langfuse callbacks into Layer A (CORR-011) is meaningless if tokens are s
 - Test count: 222 → **227** (+5 unit tests in `tests/unit/prompts_v2/test_extract_usage_corr010.py`)
 - Real-world effect: `total_tokens` in `llm-calls.jsonl` will be > 0 from the next real run onward (was 60/60 zero before)
 - Pre-push hooks: 16 critical PASS
+
+---
+
+## <a name="corr-011"></a>AEGIS-P1-CORR-011 — Wire Langfuse Callback into Layer A (Phase 2)
+
+### Scope
+- **C3 partial** of [SPEC-observability.md §1](./SPEC-observability.md): Layer A (the 5 canonical `P1?-LLM-*` LLM invocations) now threads `config={"callbacks":[handler]}` through to `ChatOllama.invoke(messages, config=...)`. Pre-CORR-011, `chat.invoke(msgs)` was called with no `config=` — Langfuse never saw the calls.
+- Threads `config: RunnableConfig | None = None` through `invoke() → _attempt() → llm.invoke()`.
+- `factory.get_invoker` now calls `get_langfuse_callback()` (existing stub at `src/aegis_phase1/llm/tracing.py`) and passes the handler to `Phase1LLMInvoker`.
+- Promote `langfuse>=2.0.0` from `[tracing]` extra to `dependencies` in `pyproject.toml` (no more opt-in install).
+- Broaden `scripts/test-quick.sh` `[2/4]` scope to include `tests/unit/prompts_v2/` (catches CORR-010 + CORR-011 tests in the daily gate; main count grew 222 → 342).
+
+### Decisions
+- **Append, don't overwrite** — if a caller passes `config={"callbacks":[existing]}`, our handler is appended. Protects any future external callbacks.
+- **Conditional kwarg** — `_attempt()` only passes `config=...` to `ChatOllama.invoke()` when truthy. The legacy `chat.invoke(messages)` signature is preserved byte-for-byte when `LANGFUSE_ENABLED=false` (defense-in-depth against unforeseen reflection / instrumentation).
+- **Master switch preserved** — `LANGFUSE_ENABLED=false` keeps `get_langfuse_callback()` returning `(None, None)`, the invoker's `_langfuse_handler` stays `None`, and no `config` is constructed. Pipeline is byte-equivalent to pre-CORR-011.
+- **No optimization** — `get_langfuse_callback()` is called once per `get_invoker()` construction. Not memoized; if hot loops ever construct many, a future contract can add caching.
+
+### Why this precedes CORR-012 (Layer B callback)
+- `CORR-010` already fixed `_extract_usage`. With CORR-011, the Langfuse `CallbackHandler` will AUTOMATICALLY populate `usage_metadata` on the AIMessage (it parses `response_metadata` / `usage_metadata`) — so we get token counts in the Langfuse UI for FREE. No additional code needed for token capture.
+- CORR-012 will mirror the same wiring for `v2/llm.py:OllamaInvoker` + thread `config` through `DomainProcessor` and `_narrative.py`.
+
+### Validator notes
+- **5/5 new tests pass.** The Houdini demo (Executor + Orchestrator self-verified) confirms the test catches a missing callback attach: revert → 2 tests fail.
+- `scripts/test-quick.sh` is now 342 passed, 10 skipped, ~5s runtime. (The 10 skips are pre-existing in `test_validator.py` — env-specific Regulatory Baseline path.)
+- `pyproject.toml` cleanup: `[tracing]` extra removed; `all = ["aegis-phase1[dev]"]` simplifies.
+
+### Merged 2026-07-16 (commit `143bfe9` via PR #5)
+
+#### Quality Log
+- `trials: 1` (deterministic wiring; mock-based tests)
+- `pass@1`: gates all PASS (5/5 new tests + 222 regression unchanged + Houdini reverses correctly)
+- Test count: 227 → **342** (per-file `prompts_v2/` tests now exercised; +110 from already-existing prompts_v2 tests that were never in the gate)
+- Master switch preserved: `LANGFUSE_ENABLED=false` → pipeline behaves identically to pre-CORR-011
+- Pre-push hooks: PASS
+
+### Next
+- AEGIS-P1-CORR-012 (Phase 3 — Layer B: `v2/llm.py:OllamaInvoker` callback + token extraction; thread `config` through MAP + 11 narrative calls)
 
 ---
 
