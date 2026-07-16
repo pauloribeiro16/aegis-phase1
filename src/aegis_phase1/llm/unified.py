@@ -2,7 +2,6 @@
 
 Replaces (does NOT yet delete — CORR-014 will remove):
 - Phase1LLMInvoker (Layer A, prompts_v2/invoker.py)
-- OllamaInvoker (Layer B, v2/llm.py)
 
 Two public methods plus a polymorphic dispatcher:
 
@@ -249,7 +248,7 @@ class UnifiedInvoker:
 
         This preserves backward compatibility with both
         ``Phase1LLMInvoker.invoke(spec_id, inputs)`` (heavy) and
-        ``OllamaInvoker.invoke(prompt)`` (light) without changing any
+        ``UnifiedInvoker.invoke_raw(prompt)`` (light) without changing any
         caller in the tree.
         """
         if isinstance(inputs, dict):
