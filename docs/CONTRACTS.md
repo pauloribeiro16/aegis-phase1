@@ -43,6 +43,7 @@ related_documents:
 | **[AEGIS-P1-CORR-010](#corr-010)** | Fix `_extract_usage` tokens=0 (Phase 1 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `85bb4bd` | 227 (222 + 5 new) | Fix `src/aegis_phase1/prompts_v2/invoker.py:_extract_usage` to read Ollama-native `prompt_eval_count` / `eval_count` from `response_metadata` (not OpenAI `token_usage`); fix `hasattr()` → `.get()` for `usage_metadata` fallback; graceful zeros on empty/missing; never raises. Add 5 unit tests with `FakeAIMessage` fixture (no real LLM call). Houdini demo: revert → 2 tests fail; restore → all pass. **C2 of SPEC §1 fixed**. |
 | **[AEGIS-P1-CORR-011](#corr-011)** | Wire Langfuse callback into Layer A (Phase 2 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `143bfe9` | 342 (227 + 5 new + 110 prompts_v2) | Thread `config={"callbacks":[handler]}` into `prompts_v2/invoker.py:_attempt` `ChatOllama.invoke(...)`; merge handler in `invoke()` (append, dedupe); wire `get_langfuse_callback()` in `factory.py:get_invoker`; promote `langfuse>=2.0.0` from `[tracing]` to core dep; broaden `scripts/test-quick.sh` to include `tests/unit/prompts_v2/`. **C3 partial of SPEC §1 fixed (Layer A only)**; Layer B (CORR-012) and full coverage (CORR-013/014) still pending. |
 | **[AEGIS-P1-CORR-012](#corr-012)** | Wire Langfuse callback into Layer B (Phase 3 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `323b5b2` | 349 (342 + 7 new) | Thread `config=` + `_extract_usage` (mirrors CORR-010 logic) into `v2/llm.py:OllamaInvoker`; merge `langfuse_handler` (append, dedupe) into `config["callbacks"]`; conditional `config=` kwarg (legacy signature preserved when no config); wire `get_langfuse_callback()` in `v2/orchestrator.py:_get_phase1_executor`; thread handler through `DomainProcessor` (map_domains:171 + retry_failed:265); narrative chokepoint at `_narrative.py:87` accepts optional `config`. **C3 + C2 of SPEC §1 fully fixed** for both Layer A and Layer B; 11 doc_* callers UNCHANGED. |
+| **[AEGIS-P1-CORR-013](#corr-013)** | Create `UnifiedInvoker` + migrate Layer A+B factories (Phase 4a of SPEC-observability) | ✅ MERGED | ⚫ deleted | `2b4a2ce` | 364 (349 + 15 new) | New `src/aegis_phase1/llm/unified.py` (304 LOC): `UnifiedInvoker` with `invoke_spec` (delegates to lazy `Phase1LLMInvoker` child — Option A, zero heavy-logic duplication), `invoke_raw` (chat→raw+usage), polymorphic `invoke(...)` (dispatches heavy/light by `inputs` type). Module-level helpers `_extract_usage` (DRY across both methods, Ollama primary + langchain-core fallback + zeros on miss) and `_merge_handler_into_config` (append-dedupe, stable `{callbacks:[...]}` shape). `prompts_v2/factory.py:get_invoker` and `v2/llm.py:build_llm_invoker` return `UnifiedInvoker`. **C1 of SPEC §1 fixed at the architectural level**; legacy `Phase1LLMInvoker` + `OllamaInvoker` + `OllamaClient` remain in tree (strangler — CORR-014 deletes them). |
 
 ---
 
@@ -431,6 +432,53 @@ Wiring Langfuse callbacks into Layer A (CORR-011) is meaningless if tokens are s
 - Master switch preserved: `LANGFUSE_ENABLED=false` → `OllamaInvoker.invoke(prompt, feedback="")` called with legacy signature; returned dict gains `usage` key (additive)
 - Pre-push hooks: PASS
 - **No real LLM calls made.** All `chat.invoke` patched at `langchain_ollama.ChatOllama` source.
+
+---
+
+## <a name="corr-013"></a>AEGIS-P1-CORR-013 — Create `UnifiedInvoker` + Migrate Factories (Phase 4a)
+
+### Scope
+- **C1 of [SPEC-observability.md §1](./SPEC-observability.md)** addressed at the architectural level: a single class `UnifiedInvoker` now owns the entire LLM-invocation surface.
+- New module `src/aegis_phase1/llm/unified.py` (304 LOC):
+  - `UnifiedInvoker` class with `invoke_spec(spec_id, inputs, *, config=None)` (heavy — delegates to lazy `Phase1LLMInvoker` child via **Option A** = no heavy-logic duplication), `invoke_raw(prompt, *, feedback='', config=None)` (light — chat→raw+usage), and polymorphic `invoke(...)` (dispatches by `inputs` type)
+  - Module-level helper `_extract_usage(response)` — DRY across both methods (Ollama primary + langchain-core fallback + zeros on miss + never raises)
+  - Module-level helper `_merge_handler_into_config(handler, config)` — append-dedupe, stable `{callbacks: [...]}` shape downstream
+- `prompts_v2/factory.py:get_invoker` returns `UnifiedInvoker` (public API unchanged)
+- `v2/llm.py:build_llm_invoker` returns `UnifiedInvoker` for non-MOCK; `MockInvoker` branch preserved under `MOCK_LLM` env (backward-compat with `test_runner_cli.py`)
+- `llm/__init__.py` re-exports `UnifiedInvoker`
+- 15 new tests in `tests/unit/llm/test_unified_invoker_corr013.py`
+
+### Decisions
+- **Option A for `invoke_spec`** — delegates to a lazily-constructed `Phase1LLMInvoker` child. The heavy path (prompt loading, JSON parsing, validation, retry, error recovery) is battle-tested and reused unchanged. Future CORR-014 can extract the body into `UnifiedInvoker` if desired.
+- **Polymorphic `invoke(...)`** chosen over `invoke = invoke_spec` alias. Lets both `_narrative.py` (light path with `inputs=None`) and `Phase1Executor` (heavy path with `inputs={...}`) work without modification.
+- **`_merge_handler_into_config` always returns `{callbacks: [...]}`** — empty list when no handler. Stable downstream shape preserves CORR-011/012 conventions.
+- **Strangler pattern applied** — `Phase1LLMInvoker`, `OllamaInvoker`, `OllamaClient` remain in the tree (not deleted by this contract). They are reachable only via the legacy class internals during the migration window. CORR-014 deletes them after this contract is verified end-to-end.
+
+### Why this is "highest-risk" of the 7 phases
+- Cross-cutting refactor across 2 factories + 3 invoker-hierarchy call surfaces
+- Two impls coexisting during the migration = potential for subtle behaviour divergence
+- Mitigation: Houdini demo (4 tests fail without `_extract_usage` + config merge), regression gate (`349 passed`), per-file sanity loops, NO real LLM calls made during validation
+
+### Why this is necessary before CORR-014
+- Without CORR-013's `UnifiedInvoker`, CORR-014 (delete legacy) would be a deletion-without-replacement — guaranteed to break
+- With CORR-013's `UnifiedInvoker` + factories migrated, CORR-014 is a pure deletion of dead code
+
+### Next
+- AEGIS-P1-CORR-014 (Phase 4b — Delete the legacy `Phase1LLMInvoker` + `OllamaInvoker` + `OllamaClient` after this is verified)
+- AEGIS-P1-CORR-015 (Phase 5 — Suppress retry-storm noise)
+
+### Merged 2026-07-16 (commit `2b4a2ce` via PR #9)
+
+#### Quality Log
+- `trials: 1` (mock-based; deterministic)
+- `pass@1`: 15/15 new tests PASS; Houdini confirms 4 tests catch the reverted-bug variant
+- Test count: 349 → **364** (+15 unit; `scripts/test-quick.sh` reports 349 passed + 10 skipped in ~7m30; suite is now stable)
+- Master switch preserved: `LANGFUSE_ENABLED=false` → `_merge_handler_into_config` returns `{callbacks: []}`; pipeline behaviour unchanged from pre-CORR-013
+- Public API of `get_invoker(...)` / `build_llm_invoker(...)` UNCHANGED at call sites
+- Pre-push hooks: PASS
+- **No real LLM calls made.**
+
+
 
 ---
 
