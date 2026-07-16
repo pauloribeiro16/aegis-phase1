@@ -42,6 +42,7 @@ related_documents:
 | **[AEGIS-P1-CORR-009](#corr-009)** | Langfuse self-hosted bring-up (Phase 0 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `dd5e6b9` | 222 | Bring up aegis-kg Langfuse docker stack at `localhost:3000`; populate `.env` (real keys, gitignored) + `.env.example` (placeholders) with `LANGFUSE_ENABLED=false` master switch; document setup in `docs/LANGFUSE_SETUP.md`. **Zero code pipeline changes**. End-to-end smoke: SDK auth `True`, programmatic trace `corr009-validate-edf65d19` queryable via API. See [SPEC-observability.md](./SPEC-observability.md) §6 for the full 7-contract decomposition (CORR-009 → 015). |
 | **[AEGIS-P1-CORR-010](#corr-010)** | Fix `_extract_usage` tokens=0 (Phase 1 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `85bb4bd` | 227 (222 + 5 new) | Fix `src/aegis_phase1/prompts_v2/invoker.py:_extract_usage` to read Ollama-native `prompt_eval_count` / `eval_count` from `response_metadata` (not OpenAI `token_usage`); fix `hasattr()` → `.get()` for `usage_metadata` fallback; graceful zeros on empty/missing; never raises. Add 5 unit tests with `FakeAIMessage` fixture (no real LLM call). Houdini demo: revert → 2 tests fail; restore → all pass. **C2 of SPEC §1 fixed**. |
 | **[AEGIS-P1-CORR-011](#corr-011)** | Wire Langfuse callback into Layer A (Phase 2 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `143bfe9` | 342 (227 + 5 new + 110 prompts_v2) | Thread `config={"callbacks":[handler]}` into `prompts_v2/invoker.py:_attempt` `ChatOllama.invoke(...)`; merge handler in `invoke()` (append, dedupe); wire `get_langfuse_callback()` in `factory.py:get_invoker`; promote `langfuse>=2.0.0` from `[tracing]` to core dep; broaden `scripts/test-quick.sh` to include `tests/unit/prompts_v2/`. **C3 partial of SPEC §1 fixed (Layer A only)**; Layer B (CORR-012) and full coverage (CORR-013/014) still pending. |
+| **[AEGIS-P1-CORR-012](#corr-012)** | Wire Langfuse callback into Layer B (Phase 3 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `323b5b2` | 349 (342 + 7 new) | Thread `config=` + `_extract_usage` (mirrors CORR-010 logic) into `v2/llm.py:OllamaInvoker`; merge `langfuse_handler` (append, dedupe) into `config["callbacks"]`; conditional `config=` kwarg (legacy signature preserved when no config); wire `get_langfuse_callback()` in `v2/orchestrator.py:_get_phase1_executor`; thread handler through `DomainProcessor` (map_domains:171 + retry_failed:265); narrative chokepoint at `_narrative.py:87` accepts optional `config`. **C3 + C2 of SPEC §1 fully fixed** for both Layer A and Layer B; 11 doc_* callers UNCHANGED. |
 
 ---
 
@@ -387,6 +388,49 @@ Wiring Langfuse callbacks into Layer A (CORR-011) is meaningless if tokens are s
 
 ### Next
 - AEGIS-P1-CORR-012 (Phase 3 — Layer B: `v2/llm.py:OllamaInvoker` callback + token extraction; thread `config` through MAP + 11 narrative calls)
+
+---
+
+## <a name="corr-012"></a>AEGIS-P1-CORR-012 — Wire Langfuse Callback into Layer B (Phase 3)
+
+### Scope
+- **C3 + C2 for Layer B** of [SPEC-observability.md §1](./SPEC-observability.md). Mirror of CORR-011 (Layer A) applied to `src/aegis_phase1/v2/llm.py:OllamaInvoker`. Covers 8 of the 13 call sites in SPEC §4: 1 MAP + 11 narrative chokepoints.
+- `OllamaInvoker.__init__` accepts `langfuse_handler` kwarg; `invoke()` accepts `config` kwarg; merges handler into `config["callbacks"]` (append, dedupe — matches CORR-011 convention).
+- New staticmethod `_extract_usage` mirrors CORR-010 (primary `response_metadata` + `usage_metadata` fallback + zeros on miss + never raises).
+- `MockInvoker.invoke` gains `*, config=None` for signature parity (ignored at runtime).
+- `build_llm_invoker(model, langfuse_handler)` wires handler through.
+- `DomainProcessor.__init__` accepts `langfuse_handler`; both construction sites (`map_domains:171`, `retry_failed:265`) updated.
+- `render_mandatory_narrative(invoker, ..., *, config=None)` at `v2/output/_narrative.py:87` adds optional config param. **All 11 `doc_*` callers UNCHANGED** (the handler is auto-merged at the invoker level).
+- `Phase1Orchestrator.__init__` resolves `get_langfuse_callback()` once and forwards to invoker at construction.
+- 7 new unit tests in `tests/unit/v2/test_layer_b_callback_corr012.py`.
+
+### Decisions
+- **Append handler, don't replace** — same convention as CORR-011. When caller passes `config={"callbacks":[existing]}`, our handler is appended to the list.
+- **Conditional `config=` kwarg** — `invoker.invoke(prompt)` (legacy) when no config; `invoker.invoke(prompt, config=config)` when present. Necessary because existing narrative tests have inline invokers without `config` param.
+- **`_extract_usage` kept inline** — 30 LOC duplicated once is cleaner than cross-layer coupling. Future refactor if a third caller appears.
+- **`MockInvoker.invoke` accepts `config`** but ignores it — signature parity, no behaviour change.
+- **11 `doc_*` callers untouched** — wiring is at invoker construction; the chokepoint accepts optional `config` for future use but defaults to None.
+
+### Why C2+C3 are now fully fixed
+- Before CORR-011: only Layer A had access to tokens.
+- CORR-011: Layer A threaded config but `_extract_usage` was already correct (CORR-010). Now Layer A is fully traceable.
+- CORR-012: Layer B gets BOTH `_extract_usage` AND config threading in one shot.
+- After CORR-012: **all 13 call sites** are Langfuse-instrumented with prompt + completion + tokens.
+
+### Next
+- AEGIS-P1-CORR-013 (Phase 4a — Create `UnifiedInvoker` class; migrate callers; **strangler pattern**: old invokers stay until 4b removes them)
+- AEGIS-P1-CORR-014 (Phase 4b — Remove the legacy `Phase1LLMInvoker` + `OllamaInvoker` + `OllamaClient` after 013 is verified)
+- AEGIS-P1-CORR-015 (Phase 5 — Suppress retry-storm noise; detect Ollama unreachable + short-circuit retries)
+
+### Merged 2026-07-16 (commit `323b5b2` via PR #7)
+
+#### Quality Log
+- `trials: 1` (deterministic; mock-based)
+- `pass@1`: 7/7 new tests PASS + per-file v2 loop 8/8 green + Houdini confirms 2 tests catch bug
+- Test count: 342 → **349** (+7 unit; baseline `scripts/test-quick.sh` reported 349)
+- Master switch preserved: `LANGFUSE_ENABLED=false` → `OllamaInvoker.invoke(prompt, feedback="")` called with legacy signature; returned dict gains `usage` key (additive)
+- Pre-push hooks: PASS
+- **No real LLM calls made.** All `chat.invoke` patched at `langchain_ollama.ChatOllama` source.
 
 ---
 
