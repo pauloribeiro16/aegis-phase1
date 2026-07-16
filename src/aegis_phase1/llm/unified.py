@@ -27,11 +27,47 @@ API is validated.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 logger = logging.getLogger(__name__)
+
+
+_PROBE_TTL_SECONDS = 30.0
+
+
+class OllamaUnreachableError(RuntimeError):
+    """Raised when Ollama is not reachable at the configured base_url.
+
+    Distinct from connection-during-invocation: this is detected BEFORE any
+    chat attempt, so callers don't waste `max_retries` attempts on a known-down
+    server. The orchestrator/CLI catches this and surfaces a clean user
+    message instead of letting 788 lines of `python_error` flood the log.
+    """
+
+    def __init__(self, base_url: str, source: str = "unknown") -> None:
+        self.base_url = base_url
+        self.source = source
+        super().__init__(f"Ollama not reachable at {base_url} (probe from {source})")
+
+
+def probe_ollama(base_url: str = "http://localhost:11434", timeout: float = 1.5) -> bool:
+    """Return True iff Ollama responds to GET /api/version within timeout.
+
+    Fast (single http GET, short timeout). Used to short-circuit retry-storms
+    when Ollama is unreachable.
+    """
+    import urllib.request
+    from urllib.error import URLError
+
+    try:
+        req = urllib.request.Request(f"{base_url}/api/version", method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return 200 <= resp.status < 400
+    except (URLError, OSError, ConnectionRefusedError, TimeoutError):
+        return False
 
 
 def _extract_usage(response: Any) -> dict[str, int]:
@@ -169,6 +205,9 @@ class UnifiedInvoker:
         )
         self._heavy: Any | None = None
 
+        self._ollama_reachable: bool | None = None
+        self._ollama_probe_ts: float = 0.0
+
     def invoke_raw(
         self,
         prompt: str,
@@ -185,7 +224,14 @@ class UnifiedInvoker:
         - Ollama errors are returned as
           ``{"raw": "", "status": "FAILED_AFTER_RETRIES", "error": ...}``
           so callers can decide whether to retry or propagate.
+
+        Probes Ollama before invocation (cached for
+        ``_PROBE_TTL_SECONDS``) and raises
+        :class:`OllamaUnreachableError` immediately when down — no retry,
+        no log spam (CORR-015).
         """
+        self._ensure_ollama("invoke_raw")
+
         msgs: list[Any] = [HumanMessage(content=prompt)]
         if feedback:
             msgs.append(
@@ -225,7 +271,13 @@ class UnifiedInvoker:
         ``config`` kwarg is reserved for future use — the child already has
         the Langfuse handler baked into its constructor, matching CORR-011
         semantics.
+
+        Probes Ollama before delegating (cached for
+        ``_PROBE_TTL_SECONDS``); raises :class:`OllamaUnreachableError`
+        when down — no retry, no log spam (CORR-015). The heavy child also
+        re-probes as defense-in-depth.
         """
+        self._ensure_ollama("invoke_spec")
         heavy = self._get_heavy()
         return heavy.invoke(spec_id, inputs)
 
@@ -295,9 +347,31 @@ class UnifiedInvoker:
         )
         return self._heavy
 
+    def _ensure_ollama(self, source: str) -> None:
+        """Probe Ollama; raise ``OllamaUnreachableError`` if down.
+
+        Caches the probe result for ``_PROBE_TTL_SECONDS`` to avoid probing
+        on every invocation when many calls happen in sequence.
+        """
+        now = time.time()
+        if (
+            self._ollama_reachable is not None
+            and (now - self._ollama_probe_ts) < _PROBE_TTL_SECONDS
+        ):
+            if not self._ollama_reachable:
+                raise OllamaUnreachableError(self.base_url, source)
+            return
+        reachable = probe_ollama(self.base_url)
+        self._ollama_reachable = reachable
+        self._ollama_probe_ts = now
+        if not reachable:
+            raise OllamaUnreachableError(self.base_url, source)
+
 
 __all__ = [
     "UnifiedInvoker",
+    "OllamaUnreachableError",
+    "probe_ollama",
     "_extract_usage",
     "_merge_handler_into_config",
 ]

@@ -35,6 +35,7 @@ from aegis_phase1.prompts_v2.loader import PromptLoader
 from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 from aegis_phase1.prompts_v2.robust_parser import RobustParser
 from aegis_phase1.prompts_v2.validator import Phase1Validator
+from aegis_phase1.llm.unified import OllamaUnreachableError, probe_ollama
 
 
 class Phase1LLMInvoker:
@@ -105,6 +106,9 @@ class Phase1LLMInvoker:
             if self._langfuse_handler not in existing:
                 existing.append(self._langfuse_handler)
             config = {**config, "callbacks": existing}
+
+        if not probe_ollama(base_url=self.base_url):
+            raise OllamaUnreachableError(self.base_url, "Phase1LLMInvoker.invoke")
 
         all_attempts: list[dict[str, Any]] = []
         total_start = time.time()
