@@ -102,6 +102,16 @@ def main() -> None:
         help="Run all stages non-interactively",
     )
     parser.add_argument(
+        "--run-all-traced",
+        action="store_true",
+        help=(
+            "AEGIS-P1-CORR-017: run all stages through the LangGraph "
+            "tracer (one root trace, 5 stage spans, nested LLM calls). "
+            "Opt-in alternative to --run-all. Falls back to direct "
+            "orchestrator calls when Langfuse is disabled."
+        ),
+    )
+    parser.add_argument(
         "--map-only",
         action="store_true",
         help="Run only the MAP stage (skip REDUCE/OUTPUT)",
@@ -220,6 +230,30 @@ def main() -> None:
                     logger.error("Retry still failing: %s", exc)
                     sys.exit(3)
         logger.info("Pipeline complete")
+    elif args.run_all_traced:
+        logger.info("Non-interactive mode — running all stages via LangGraph tracer (CORR-017)")
+        try:
+            rc = cmd_run_all_traced(
+                orch=orch,
+                case_path=case_path,
+                prep_path=prep_path,
+                output_path=output_path,
+            )
+        except MapPartialFailure as exc:
+            logger.error("Pipeline aborted — MAP partial failure: %s", exc)
+            sys.exit(2)
+        if rc != 0:
+            sys.exit(rc)
+        if args.retry_failed:
+            domains = [d.strip() for d in args.retry_failed.split(",") if d.strip()]
+            if domains:
+                logger.info("Retrying failed domains: %s", domains)
+                try:
+                    orch.retry_failed(domains)
+                except MapPartialFailure as exc:
+                    logger.error("Retry still failing: %s", exc)
+                    sys.exit(3)
+        logger.info("Pipeline complete")
     elif args.map_only:
         logger.info("Non-interactive mode — MAP only")
         orch.load(case_path, prep_path)
@@ -259,6 +293,48 @@ def main() -> None:
             print("  Start it with: ollama serve")
             print("  Or run with --mock-llm for offline mode.")
             sys.exit(2)
+
+
+def cmd_run_all_traced(
+    *,
+    orch: "Phase1Orchestrator",
+    case_path: str,
+    prep_path: str,
+    output_path: str,
+) -> int:
+    """AEGIS-P1-CORR-017 entry: run the pipeline through the LangGraph tracer.
+
+    Builds the 5-node trace graph, wires callbacks / tags / metadata, and
+    invokes it. The orchestrator's ``_langfuse_handler`` is forwarded (if
+    present) so every LLM call inside each stage nests under its stage
+    span. When Langfuse is disabled (``LANGFUSE_ENABLED=false``) the
+    handler is ``None`` and the graph still runs — just without spans.
+
+    Returns:
+        Process-style exit code: ``0`` on success, ``2`` on
+        ``OllamaUnreachableError`` (re-raised so the CLI can also map it).
+    """
+    from aegis_phase1.v2.trace_graph import run_orchestrator_graph
+
+    case_name = Path(case_path).name
+    callbacks = [orch._langfuse_handler] if orch._langfuse_handler else None
+
+    try:
+        run_orchestrator_graph(
+            orch,
+            case_path,
+            prep_path,
+            output_path,
+            callbacks=callbacks,
+            tags=[f"phase:phase1", f"case:{case_name}"],
+            extra_metadata={"stage": "phase1"},
+        )
+    except OllamaUnreachableError as exc:
+        print(f"⚠ Ollama not reachable at {exc.base_url}.")
+        print("  Start it with: ollama serve")
+        print("  Or run with --mock-llm for offline mode.")
+        return 2
+    return 0
 
 
 if __name__ == "__main__":
