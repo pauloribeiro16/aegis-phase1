@@ -39,7 +39,7 @@ related_documents:
 | [AEGIS-P1-CORR-006](#corr-006) | Sequential wizard replaces hub-spoke menu | ✅ MERGED | ⚫ deleted | `fbfb77f` | 217 | Replaced 9-option menu with 6-step linear wizard; legacy `run_menu` kept as 1-release deprecation alias |
 | **AEGIS-P1-CORR-007** | beaupy.select wizard + static case catalogue | ✅ MERGED | ⚫ deleted | TBD | 218 | Replaced input()-based prompts with beaupy.select(); 4-step wizard; static catalogue of 3 Methodology-main cases |
 | **[AEGIS-P1-CORR-008](#corr-008)** | Wizard beaupy fix + integration smoke gate (+ run_all fix) | ✅ MERGED | ⚫ deleted | `7e7439c` | 222 (218 + 1 + 3) | Fix `pre_selected=`→`cursor_index=` (4 sites); harden mocks with `assert_called_with`; add integration smoke (beaupy signature AST scan + runner subprocess non-TTY) + `scripts/test-quick.sh` (LLM-safe scope: `tests/unit/v2/ + 2 smoke`); **Phase F user-discovered: fix `_run_pipeline` forwarding args to `orch.run_all(case_path=…)`** |
-| **AEGIS-P1-CORR-009** | Langfuse self-hosted bring-up (Phase 0 of SPEC-observability) | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-009` | TBD | TBD | Bring up aegis-kg Langfuse docker stack at `localhost:3000`; populate `.env` (real keys, gitignored) + `.env.example` (placeholders) with `LANGFUSE_ENABLED=false` master switch; document setup in `docs/LANGFUSE_SETUP.md`. **Zero code pipeline changes**. See [SPEC-observability.md](./SPEC-observability.md) §6 for the full 7-contract decomposition (CORR-009 → 015). |
+| **[AEGIS-P1-CORR-009](#corr-009)** | Langfuse self-hosted bring-up (Phase 0 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `dd5e6b9` | 222 | Bring up aegis-kg Langfuse docker stack at `localhost:3000`; populate `.env` (real keys, gitignored) + `.env.example` (placeholders) with `LANGFUSE_ENABLED=false` master switch; document setup in `docs/LANGFUSE_SETUP.md`. **Zero code pipeline changes**. End-to-end smoke: SDK auth `True`, programmatic trace `corr009-validate-edf65d19` queryable via API. See [SPEC-observability.md](./SPEC-observability.md) §6 for the full 7-contract decomposition (CORR-009 → 015). |
 
 ---
 
@@ -302,7 +302,16 @@ None (CORR-009 is infra-only). Smoke lives in `docs/LANGFUSE_SETUP.md` for manua
 ### Validator notes (non-blocking)
 - G6 one-liner in `docs/LANGFUSE_SETUP.md` smoke test originally used `load_dotenv(override=True)` which clobbered shell `LANGFUSE_ENABLED=true`. Fixed post-validation by removing `override=True` — shell env now wins.
 
-### In Progress as of 2026-07-16
+### Merged 2026-07-16 (commit `dd5e6b9`)
+
+#### Quality Log
+
+- `trials: 1` (infra-only, deterministic)
+- `pass@1: 9/10` Validator gates PASS (G1-G10 all PASS; G6 one-liner sniped by shell-vs-load_dotenv precedence — fixed in housekeeping)
+- Test count: unchanged (still 222; no test changes)
+- End-to-end smoke confirmed: `client.auth_check()=True`, programmatic trace `corr009-validate-edf65d19` queryable via Langfuse API at `localhost:3000/api/public/traces`
+- Branch fast-forward merged to `main`; `feature/aegis-p1-corr-009` deleted
+- **Next**: AEGIS-P1-CORR-010 (Phase 1 — fix `_extract_usage` tokens=0; lowest-risk first per SPEC §6 ordering)
 
 ---
 
