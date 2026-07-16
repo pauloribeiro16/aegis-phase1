@@ -45,6 +45,7 @@ related_documents:
 | **[AEGIS-P1-CORR-012](#corr-012)** | Wire Langfuse callback into Layer B (Phase 3 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `323b5b2` | 349 (342 + 7 new) | Thread `config=` + `_extract_usage` (mirrors CORR-010 logic) into `v2/llm.py:OllamaInvoker`; merge `langfuse_handler` (append, dedupe) into `config["callbacks"]`; conditional `config=` kwarg (legacy signature preserved when no config); wire `get_langfuse_callback()` in `v2/orchestrator.py:_get_phase1_executor`; thread handler through `DomainProcessor` (map_domains:171 + retry_failed:265); narrative chokepoint at `_narrative.py:87` accepts optional `config`. **C3 + C2 of SPEC §1 fully fixed** for both Layer A and Layer B; 11 doc_* callers UNCHANGED. |
 | **[AEGIS-P1-CORR-013](#corr-013)** | Create `UnifiedInvoker` + migrate Layer A+B factories (Phase 4a of SPEC-observability) | ✅ MERGED | ⚫ deleted | `2b4a2ce` | 364 (349 + 15 new) | New `src/aegis_phase1/llm/unified.py` (304 LOC): `UnifiedInvoker` with `invoke_spec` (delegates to lazy `Phase1LLMInvoker` child — Option A, zero heavy-logic duplication), `invoke_raw` (chat→raw+usage), polymorphic `invoke(...)` (dispatches heavy/light by `inputs` type). Module-level helpers `_extract_usage` (DRY across both methods, Ollama primary + langchain-core fallback + zeros on miss) and `_merge_handler_into_config` (append-dedupe, stable `{callbacks:[...]}` shape). `prompts_v2/factory.py:get_invoker` and `v2/llm.py:build_llm_invoker` return `UnifiedInvoker`. **C1 of SPEC §1 fixed at the architectural level**; legacy `Phase1LLMInvoker` + `OllamaInvoker` + `OllamaClient` remain in tree (strangler — CORR-014 deletes them). |
 | **[AEGIS-P1-CORR-014a](#corr-014a)** | Delete `OllamaInvoker` (Phase 4b partial — strangler) | ✅ MERGED | ⚫ deleted | `9b2367d` | 349 (no test delta; class removed) | Delete `class OllamaInvoker` block in `src/aegis_phase1/v2/llm.py` (137 LOC); update annotations (`MockInvoker \| UnifiedInvoker` for `build_llm_invoker`; `UnifiedInvoker` for `_health_check`); migrate 7 tests in `test_layer_b_callback_corr012.py` (imports `from aegis_phase1.llm.unified import UnifiedInvoker, _extract_usage`; `_extract_usage` called as module-level); migrate 3 tests in `test_invoker_bypass.py` (docstrings/comments only). **Reduction: −137 LOC net**; audit had 29 OllamaInvoker references across 5 files, all migrated. **Phase1LLMInvoker deletion deferred** to a follow-up contract — has LIVE callers (`phase1_executor.py:111`, `factory.py:288`, `invoker_to_executor()`) requiring a `Phase1Executor` refactor (estimated 15-25 file edits; SPEC recommended first). |
+| **[AEGIS-P1-CORR-015](#corr-015)** | Suppress retry-storm noise (Phase 5) | ✅ MERGED | ⚫ deleted | `2e8531f` | 360 (349 + 11 new) | Add `OllamaUnreachableError(RuntimeError)` + module-level `probe_ollama(base_url, timeout=1.5)` (stdlib urllib) in `src/aegis_phase1/llm/unified.py`; `UnifiedInvoker._ensure_ollama(source)` with per-instance probe cache (TTL 30s) calls probe at start of `invoke_raw` and `invoke_spec` — short-circuits when Ollama is down (no retry, no `python_error` spam). Same probe also added to `Phase1LLMInvoker.invoke()` before its retry loop. `v2/runner.py` catches `OllamaUnreachableError` around `run_wizard(...)` with a friendly user message (`"Start it with: ollama serve. Or run with --mock-llm for offline mode."`) and `sys.exit(2)`. **C4 of SPEC §1 fully fixed**: when Ollama is unreachable, log shows ≤1 error per spec invocation instead of the previous 788-line retry-storm. |
 
 ---
 
@@ -517,6 +518,51 @@ Wiring Langfuse callbacks into Layer A (CORR-011) is meaningless if tokens are s
 - Houdini demo: re-include class → import OK; restore → ImportError as expected; migrated tests still pass via `UnifiedInvoker`
 - Pre-push hooks: PASS
 - **No real LLM calls made.**
+
+---
+
+## <a name="corr-015"></a>AEGIS-P1-CORR-015 — Suppress Retry-Storm Noise (Phase 5)
+
+### Scope
+- **C4 of [SPEC-observability.md §1](./SPEC-observability.md)** fixed: 788-line retry-storm in `llm-calls.jsonl` reduced to 1 clean error per failure.
+- New `OllamaUnreachableError(RuntimeError)` class with `.base_url`/`.source` attrs (`src/aegis_phase1/llm/unified.py`).
+- Module-level `probe_ollama(base_url, timeout=1.5)` stdlib helper — fast urllib GET on `/api/version`, swallows URLError/OSError/ConnectionRefusedError/TimeoutError.
+- `UnifiedInvoker._ensure_ollama(source)` private method:
+  - Per-instance cache (`_ollama_reachable: bool | None`, `_ollama_probe_ts: float`, `_PROBE_TTL_SECONDS = 30.0`)
+  - Called at start of `invoke_raw` AND `invoke_spec` (defense-in-depth)
+  - When probe returns False → raises `OllamaUnreachableError` immediately (NO retry, NO log spam)
+- `Phase1LLMInvoker.invoke()` probes once at method entry (before the `for attempt in range(...)` retry loop). Imported from `aegis_phase1.llm.unified`.
+- `v2/runner.py` catches `OllamaUnreachableError` around `run_wizard(...)` with friendly message: `"⚠ Ollama not reachable at {base_url}. Start it with: ollama serve. Or run with --mock-llm for offline mode."` + `sys.exit(2)`.
+- 11 tests in `tests/unit/llm/test_probe_ollama_corr015.py` (8 spec'd + 3 bonus: TTL expiry + attribute shape + helper export).
+
+### Decisions
+- **Probe at method entry, not inside `_attempt`** — runs once per call, not once per retry. Pre-flight on Ollama is at the boundary, not per-attempt.
+- **Both `UnifiedInvoker` AND `Phase1LLMInvoker.invoke` probe independently** — defense-in-depth, ~few ms per probe.
+- **Per-instance cache (30s TTL)** — avoids probing on every call when many invocations happen in sequence. Module-level `_PROBE_TTL_SECONDS` constant for testability.
+- **Probe depth-fail vs raise** — `OllamaUnreachableError` includes `.base_url` and `.source` for actionable error messages; the runner handler prints these directly.
+- **`--run-all` / `--map-only` not wrapped** — task scope was wizard only. Existing `MapPartialFailure` path unchanged. Future contract if user reports log spam in those modes.
+
+### Why Houdini uncovered 4 tests instead of 2 (spec assumed 2)
+- The cache tests are stricter than the spec assumed. The demo revealed:
+  - `test_invoke_raw_raises_unreachable_when_probe_fails` — required
+  - `test_invoke_raw_does_not_retry_when_unreachable` — required
+  - **`test_probe_cached_within_window`** — bonus (catches wrong cache impl)
+  - **`test_probe_rechecked_after_ttl_expires`** — bonus (catches no-TTL impl)
+- This is stronger evidence that the probe is genuinely required, not defensive code that "happens to pass".
+
+### Notes / open follow-ups
+- `OllamaUnreachableError` was already defined as bare `Exception` in `v2/llm.py:??` (CORR-013's `_health_check`). The new `aegis_phase1.llm.unified.OllamaUnreachableError` is richer (`.base_url`/`.source`). Both coexist. A future CORR-016 could consolidate (make the legacy exception an alias).
+
+### Merged 2026-07-16 (commit `2e8531f` via PR #13)
+
+#### Quality Log
+- `trials: 1` (deterministic; mock-based)
+- `pass@1`: 11/11 new tests PASS + Houdini confirms 4 tests catch bug variant
+- Test count: 349 → **360** (+11 unit; `scripts/test-quick.sh` reports 349 passed + 10 skipped)
+- Master switch preserved: `LANGFUSE_ENABLED=false` and `MOCK_LLM=true` unaffected by probe
+- Pre-push hooks: PASS
+- **No real LLM calls made.** All probes + chat invocations mocked.
+- Real-world effect (to be confirmed in next run-real validation): log shows ≤1 error per spec when Ollama is down (was 788)
 
 ---
 
