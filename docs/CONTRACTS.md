@@ -47,6 +47,7 @@ related_documents:
 | **[AEGIS-P1-CORR-014a](#corr-014a)** | Delete `OllamaInvoker` (Phase 4b partial — strangler) | ✅ MERGED | ⚫ deleted | `9b2367d` | 349 (no test delta; class removed) | Delete `class OllamaInvoker` block in `src/aegis_phase1/v2/llm.py` (137 LOC); update annotations (`MockInvoker \| UnifiedInvoker` for `build_llm_invoker`; `UnifiedInvoker` for `_health_check`); migrate 7 tests in `test_layer_b_callback_corr012.py` (imports `from aegis_phase1.llm.unified import UnifiedInvoker, _extract_usage`; `_extract_usage` called as module-level); migrate 3 tests in `test_invoker_bypass.py` (docstrings/comments only). **Reduction: −137 LOC net**; audit had 29 OllamaInvoker references across 5 files, all migrated. **Phase1LLMInvoker deletion deferred** to a follow-up contract — has LIVE callers (`phase1_executor.py:111`, `factory.py:288`, `invoker_to_executor()`) requiring a `Phase1Executor` refactor (estimated 15-25 file edits; SPEC recommended first). |
 | **[AEGIS-P1-CORR-015](#corr-015)** | Suppress retry-storm noise (Phase 5) | ✅ MERGED | ⚫ deleted | `2e8531f` | 360 (349 + 11 new) | Add `OllamaUnreachableError(RuntimeError)` + module-level `probe_ollama(base_url, timeout=1.5)` (stdlib urllib) in `src/aegis_phase1/llm/unified.py`; `UnifiedInvoker._ensure_ollama(source)` with per-instance probe cache (TTL 30s) calls probe at start of `invoke_raw` and `invoke_spec` — short-circuits when Ollama is down (no retry, no `python_error` spam). Same probe also added to `Phase1LLMInvoker.invoke()` before its retry loop. `v2/runner.py` catches `OllamaUnreachableError` around `run_wizard(...)` with a friendly user message (`"Start it with: ollama serve. Or run with --mock-llm for offline mode."`) and `sys.exit(2)`. **C4 of SPEC §1 fully fixed**: when Ollama is unreachable, log shows ≤1 error per spec invocation instead of the previous 788-line retry-storm. |
 | **[AEGIS-P1-CORR-016](#corr-016)** | Load `.env` + trace_id pinning in CallbackHandler (fix flat traces) | ✅ MERGED | ⚫ deleted | `f43a63b` | 356 (349 + 7 new) | Two root causes fixed: (1) `src/aegis_phase1/v2/{runner,cli/menu}.py` never imported `aegis_phase1.env`, so `.env` was never loaded (`LANGFUSE_*` empty → handler=None → 0 traces); added `import aegis_phase1.env` to both entry points. (2) `src/aegis_phase1/llm/tracing.py:39` did `CallbackHandler()` without `trace_context` — every `chat.invoke()` became a separate root trace; replaced with `CallbackHandler(trace_context={"trace_id": client.create_trace_id()})` + `handler.tags = [phase:..., case:...]` (adopted from aegis-kg/core/agent/tracing.py:163-165). Default `LANGFUSE_ENABLED` flipped `"false"` → `"true"` for downstream machines; `.env.example` updated. **Result**: all LLM calls now land under ONE root trace ID (flat structure; per-stage spans come in CORR-017). |
+| **[AEGIS-P1-CORR-017](#corr-017)** | Thin LangGraph wrapper around `Phase1Orchestrator` (5 stage spans + nested LLMs) | ✅ MERGED | ⚫ deleted | `e710df7` | 364 (356 + 8 new) | New `src/aegis_phase1/v2/trace_graph.py` (~237 LOC): linear `StateGraph(OrchestratorRunState)` with 5 nodes (`_load → _map → _phase_1b → _reduce → _output`); each node is a thin wrapper that calls the existing `Phase1Orchestrator` method — **ZERO modifications to the orchestrator internals**. `run_orchestrator_graph()` builds `run_config = {"callbacks": [handler], "metadata": {"langfuse_tags": [...]}}`; `graph.invoke(state, config=...)` establishes the root trace + creates per-stage chain spans; LLM calls inside each stage inherit the context → nested GENERATION observations with CORR-010's token extraction. New CLI flag `--run-all-traced` adds the opt-in path alongside legacy `--run-all`. **Result**: ONE Langfuse trace showing the full Phase 1 with 5 stage spans (load → map → phase_1b → reduce → output) and nested LLM generations per stage — the user's "show me Phase 1 in one trace" request. 8 new unit tests cover graph structure, callback propagation, tag propagation, exception flow, and master switch. |
 
 ---
 
@@ -604,6 +605,63 @@ Without explicit `trace_id`, **even CORR-017's nested graph structure produces d
 - Master switch preserved: `LANGFUSE_ENABLED=false` returns `(None, None)`
 - Missing-creds fallback: returns `(None, None)` and warns (no crash)
 - **No real LLM calls made**
+
+---
+
+## <a name="corr-017"></a>AEGIS-P1-CORR-017 — Thin LangGraph Wrapper (One Nested Trace, 5 Stage Spans)
+
+### Scope
+- Wraps the 5 sequential `Phase1Orchestrator` methods as LangGraph nodes so that ONE `graph.invoke(state, config={"callbacks":[handler]})` produces a NESTED trace in Langfuse UI: one root span containing 5 stage chain spans, each with LLM-generation observations nested under it (via the existing callback + config propagation mechanism from aegis-kg's pattern).
+- `src/aegis_phase1/v2/trace_graph.py` (NEW, ~237 LOC):
+  - `OrchestratorRunState` `TypedDict` — case/baseline/output paths + `v2_state`.
+  - Node functions `_load`, `_map`, `_phase_1b`, `_reduce`, `_output` — each calls the existing orchestrator method on `config["configurable"]["orchestrator"]`. **Zero changes to `Phase1Orchestrator`**.
+  - `build_orchestrator_graph()` returns uncompiled `StateGraph`; `compile_orchestrator_graph()` returns the CompiledStateGraph.
+  - `run_orchestrator_graph(orchestrator, case_path, ..., *, callbacks=None, tags=None, extra_metadata=None)` — high-level entry: builds `run_config`, invokes, best-effort flush.
+- `src/aegis_phase1/v2/runner.py` — new flag `--run-all-traced` and new function `cmd_run_all_traced`. Existing `--run-all` UNCHANGED (legacy path). Opt-in design.
+- `tests/unit/v2/test_trace_graph_corr017.py` (NEW, 261 LOC, 8 tests).
+- **CRITICAL caveat:** module docstring documents that `from __future__ import annotations` is INTENTIONALLY NOT used — PEP-563 string annotations break LangGraph's runtime parameter-introspection that decides whether to inject `config` into nodes (silent regression; caught by Houdini-style review).
+
+### Decisions
+- **External wrapper, not orchestrator rewrite.** Future contracts can gradually migrate orchestrator internals into graph nodes if desired.
+- **`config["configurable"]["orchestrator"]`**, not state — idiomatic LangGraph pattern, keeps state serialisable.
+- **Orchestrator retains ownership of `self.state`** (the `V2State` dict). Each node returns `{"v2_state": dict(orch.state)}` for trace introspection. Canonical mutations happen on the orchestrator instance.
+- **`--run-all-traced` opt-in, not default.** Conservative — `run_all` stays the simple path; future contract can flip the default after user validation.
+
+### Hierarchy achieved in Langfuse UI (after PR merge + run-real validation)
+```
+trace (one root, named via tags [phase:phase1, case:<name>])
+├── span: load        (graph node name)
+├── span: map         (graph node name)
+│   └── (when LangChain emits on_llm_start for each P1C-LLM-01 invocation)
+│       └── generation: ChatOllama (model + prompt + completion + tokens via CORR-010 fix)
+├── span: phase_1b    (graph node name)
+│   └── generation: ChatOllama (P1B-LLM-02)
+├── span: reduce      (graph node name)
+│   ├── generation: ChatOllama (P1C-LLM-03)
+│   └── generation: ChatOllama (P1C-LLM-02)
+└── span: output      (graph node name)
+    └── (future: per-doc sub-nodes with their own generations)
+```
+
+### Validation
+- **8/8 new tests PASS** (`tests/unit/v2/test_trace_graph_corr017.py` → 0.38s)
+- **357 passed + 10 skipped** (`scripts/test-quick.sh`, ALL GATES PASS, ~5m20s)
+- **Houdini demo:** removed `g.add_node("phase_1b", ...)` → 8 tests FAILED with `ValueError: Found edge starting at unknown node 'phase_1b'`; restore → 8/8 PASS
+- **No real LLM calls made.**
+
+### Deferred (out of this contract)
+- Run-real validation against Ollama to **see** the trace hierarchy in the UI (per user instruction: "podes acabar mas não testes com o ollama real").
+- Per-domain sub-nodes inside `map` (`D-01..D-10` each as their own span) — would need orchestrator + DomainProcessor changes; future contract.
+- Branch housekeeping: `feature/aegis-p1-corr-017` deleted on merge via `--delete-branch`.
+
+### Merged 2026-07-16 (commit `e710df7` via PR #17)
+
+#### Quality Log
+- `trials: 1` (deterministic; mock-based)
+- `pass@1`: 8/8 new tests PASS + Houdini confirms graph-structure regressions caught
+- Test count: 356 → **364** (+8 unit; reported by `scripts/test-quick.sh` as 357 passed + 10 skipped — scope is `tests/unit/v2/` + 2 integration smoke + `tests/unit/prompts_v2/` + `tests/unit/llm/`; the new `tests/unit/v2/test_trace_graph_corr017.py` lives inside the existing scope and is picked up automatically)
+- **No regressions:** all 49 observability tests (CORR-010/011/012/013/014a/015/016/017) PASS
+- **No real LLM calls made.**
 
 ---
 
