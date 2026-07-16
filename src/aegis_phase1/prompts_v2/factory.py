@@ -133,6 +133,7 @@ def get_invoker(
     import os
     import warnings
 
+    from aegis_phase1.llm.tracing import get_langfuse_callback
     from aegis_phase1.prompts_v2.catalog import CatalogLoader
     from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
     from aegis_phase1.prompts_v2.loader import PromptLoader
@@ -161,6 +162,8 @@ def get_invoker(
     llm_logger = JSONLLogger(logs / "llm-calls.jsonl")
     format_logger = JSONLLogger(logs / "format-errors.jsonl")
 
+    _langfuse_client, _langfuse_handler = get_langfuse_callback()
+
     invoker = Phase1LLMInvoker(
         prompt_loader=prompt_loader,
         catalog_loader=catalog_loader,
@@ -169,6 +172,7 @@ def get_invoker(
         format_logger=format_logger,
         model=model,
         base_url=base_url,
+        langfuse_handler=_langfuse_handler,
     )
     invoker.prompts = prompt_loader
     invoker.catalogs = catalog_loader
