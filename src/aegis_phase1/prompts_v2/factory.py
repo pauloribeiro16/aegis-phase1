@@ -124,16 +124,21 @@ def get_invoker(
     regulatory_baseline_root: Path | None = None,
     layer0_root: Path | None = None,
 ) -> Any:
-    """Get a fully-wired Phase1LLMInvoker with default config.
+    """Get a fully-wired UnifiedInvoker with default config (CORR-013).
 
     Reads OLLAMA_MODEL and OLLAMA_BASE_URL from environment if not provided.
     Accepts ``regulatory_baseline_root`` (canonical, CORR-005) or
     ``layer0_root`` (deprecated alias).
+
+    The returned object is a ``aegis_phase1.llm.UnifiedInvoker``; the
+    legacy ``Phase1LLMInvoker`` is still constructed internally as a
+    child for the heavy path (strangler pattern, removed in CORR-014).
     """
     import os
     import warnings
 
     from aegis_phase1.llm.tracing import get_langfuse_callback
+    from aegis_phase1.llm.unified import UnifiedInvoker
     from aegis_phase1.prompts_v2.catalog import CatalogLoader
     from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
     from aegis_phase1.prompts_v2.loader import PromptLoader
@@ -151,9 +156,9 @@ def get_invoker(
     baseline = regulatory_baseline_root or get_regulatory_baseline_root()
     logs = get_logs_dir()
 
-    model = model or os.getenv("OLLAMA_MODEL", Phase1LLMInvoker.DEFAULT_MODEL)
+    model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
     base_url = base_url or os.getenv(
-        "OLLAMA_BASE_URL", Phase1LLMInvoker.DEFAULT_BASE_URL
+        "OLLAMA_BASE_URL", UnifiedInvoker.DEFAULT_BASE_URL
     )
 
     prompt_loader = PromptLoader(root=prompts)
@@ -164,7 +169,7 @@ def get_invoker(
 
     _langfuse_client, _langfuse_handler = get_langfuse_callback()
 
-    invoker = Phase1LLMInvoker(
+    invoker = UnifiedInvoker(
         prompt_loader=prompt_loader,
         catalog_loader=catalog_loader,
         validator=validator,
@@ -173,10 +178,6 @@ def get_invoker(
         model=model,
         base_url=base_url,
         langfuse_handler=_langfuse_handler,
+        prompts_root=prompts,
     )
-    invoker.prompts = prompt_loader
-    invoker.catalogs = catalog_loader
-    invoker.validator = validator
-    invoker.llm_logger = llm_logger
-    invoker.format_logger = format_logger
     return invoker
