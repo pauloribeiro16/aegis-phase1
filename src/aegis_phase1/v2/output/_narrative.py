@@ -33,6 +33,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Protocol
 
+from langchain_core.runnables.config import RunnableConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,12 +42,21 @@ class LLMInvoker(Protocol):
     """Structural type for the LLM invoker passed through the renderer chain.
 
     Concrete invokers live in ``aegis_phase1.llm`` and
-    ``aegis_phase1.prompts_v2``. They all expose ``invoke(prompt,
-    feedback="") -> dict[str, Any]`` returning at least ``"raw"`` and
-    ``"status"`` keys.
+    ``aegis_phase1.prompts_v2``. They all expose
+    ``invoke(prompt, feedback="", *, config=None) -> dict[str, Any]``
+    returning at least ``"raw"`` and ``"status"`` keys. The optional
+    ``config`` kwarg carries a Langfuse ``CallbackHandler`` (or any
+    compatible callbacks list) for observability; the invoker is
+    responsible for merging it into the underlying chat call.
     """
 
-    def invoke(self, prompt: str, feedback: str = "") -> dict[str, Any]: ...
+    def invoke(
+        self,
+        prompt: str,
+        feedback: str = "",
+        *,
+        config: RunnableConfig | None = None,
+    ) -> dict[str, Any]: ...
 
 
 def render_mandatory_narrative(
@@ -53,6 +64,8 @@ def render_mandatory_narrative(
     prompt: str,
     section_id: str,
     max_chars: int = 4000,
+    *,
+    config: RunnableConfig | None = None,
 ) -> str:
     """Render a mandatory LLM narrative section.
 
@@ -75,6 +88,10 @@ def render_mandatory_narrative(
             4000, matching the previous ``_MAX_FRAGMENT_BYTES`` ceiling
             for strategic-narrative sections. Smaller sections
             (per-domain Notes in ``doc_04b``) override this to 2000.
+        config: Optional Langfuse callbacks / run metadata forwarded
+            to the invoker so the call is traced. ``None`` (default)
+            preserves the legacy behaviour where the invoker handles
+            its own callback wiring.
 
     Returns:
         The LLM response text on success, or a ``[PENDING REVIEW]``
@@ -84,7 +101,10 @@ def render_mandatory_narrative(
         return _pending_marker(section_id, "LLM not configured")
 
     try:
-        result = invoker.invoke(prompt)
+        if config is None:
+            result = invoker.invoke(prompt)
+        else:
+            result = invoker.invoke(prompt, config=config)
     except Exception as exc:
         logger.warning(
             "render_mandatory_narrative[%s]: LLM invoke raised — %s",

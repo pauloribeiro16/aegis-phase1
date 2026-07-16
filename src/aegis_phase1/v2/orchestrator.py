@@ -48,6 +48,26 @@ class Phase1Orchestrator:
         self._skip_phase_1b = False
         self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
 
+        try:
+            from aegis_phase1.llm.tracing import get_langfuse_callback
+
+            _, self._langfuse_handler = get_langfuse_callback()
+        except Exception:  # noqa: BLE001 — tracing is optional
+            self._langfuse_handler = None
+
+        if (
+            self._langfuse_handler is not None
+            and self.llm_invoker is not None
+            and hasattr(self.llm_invoker, "_langfuse_handler")
+        ):
+            try:
+                self.llm_invoker._langfuse_handler = self._langfuse_handler
+            except Exception:  # noqa: BLE001 — handler attachment is best-effort
+                logger.debug(
+                    "Could not attach langfuse_handler to %s",
+                    type(self.llm_invoker).__name__,
+                )
+
     def set_skip_reduce_llms(self, skip: bool) -> None:
         """Toggle skipping of reduce-stage LLM calls. Default: False.
 
@@ -169,7 +189,9 @@ class Phase1Orchestrator:
 
         self.log_dir.mkdir(parents=True, exist_ok=True)
         processor = DomainProcessor(
-            llm_invoker=self.llm_invoker, log_dir=self.log_dir
+            llm_invoker=self.llm_invoker,
+            log_dir=self.log_dir,
+            langfuse_handler=self._langfuse_handler,
         )
         domain_ids = [f"D-{i:02d}" for i in range(1, 11)]
 
@@ -263,7 +285,9 @@ class Phase1Orchestrator:
 
         self.log_dir.mkdir(parents=True, exist_ok=True)
         processor = DomainProcessor(
-            llm_invoker=self.llm_invoker, log_dir=self.log_dir
+            llm_invoker=self.llm_invoker,
+            log_dir=self.log_dir,
+            langfuse_handler=self._langfuse_handler,
         )
 
         results: dict[str, Any] = dict(self.state.get("domain_results") or {})

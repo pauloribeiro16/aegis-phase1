@@ -58,8 +58,19 @@ class MockInvoker:
         self.last_prompt = ""
         self.last_feedback = ""
 
-    def invoke(self, prompt: str, feedback: str = "") -> dict[str, Any]:
-        """Return the next scripted response, or a default OK response."""
+    def invoke(
+        self,
+        prompt: str,
+        feedback: str = "",
+        *,
+        config: Any = None,
+    ) -> dict[str, Any]:
+        """Return the next scripted response, or a default OK response.
+
+        ``config`` is accepted for signature parity with
+        :class:`OllamaInvoker`; mock responses do not need Langfuse
+        tracing, so the argument is ignored.
+        """
         self.last_prompt = prompt
         self.last_feedback = feedback
         if self.call_count < len(self.script):
@@ -84,6 +95,8 @@ class OllamaInvoker:
         num_ctx: int = 32768,
         max_tokens: int = 2048,
         temperature: float = 0.0,
+        *,
+        langfuse_handler: Any = None,
     ) -> None:
         from langchain_ollama import ChatOllama
 
@@ -91,6 +104,7 @@ class OllamaInvoker:
         self.base_url = base_url
         self.num_ctx = num_ctx
         self.max_tokens = max_tokens
+        self._langfuse_handler = langfuse_handler
         self.chat = ChatOllama(
             model=model,
             base_url=base_url,
@@ -99,12 +113,26 @@ class OllamaInvoker:
             num_predict=max_tokens,
         )
 
-    def invoke(self, prompt: str, feedback: str = "") -> dict[str, Any]:
+    def invoke(
+        self,
+        prompt: str,
+        feedback: str = "",
+        *,
+        config: Any = None,
+    ) -> dict[str, Any]:
         """Call the LLM. Returns ``{"raw": str, "status": ...}``.
 
-        Network or Ollama errors are caught and returned as a
-        ``FAILED_AFTER_RETRIES`` status so the processor can decide
-        whether to retry or propagate.
+        When ``self._langfuse_handler`` is set, a ``callbacks=[handler]``
+        entry is merged into ``config`` (without overwriting any
+        caller-supplied callbacks). Network or Ollama errors are caught
+        and returned as ``FAILED_AFTER_RETRIES`` so the processor can
+        decide whether to retry or propagate.
+
+        Returns:
+            ``{"raw": str, "status": str, "usage": dict}`` on success.
+            ``"usage"`` carries ``prompt_tokens`` / ``completion_tokens``
+            / ``total_tokens`` extracted from Ollama's
+            ``response_metadata`` (or the langchain-core fallback).
         """
         from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -115,9 +143,27 @@ class OllamaInvoker:
                     content=f"PREVIOUS ERROR: {feedback}\nPlease correct."
                 )
             )
+
+        if config is None:
+            config = {}
+        if self._langfuse_handler is not None:
+            existing = list(config.get("callbacks") or [])
+            if self._langfuse_handler not in existing:
+                existing.append(self._langfuse_handler)
+            config = {**config, "callbacks": existing}
+
+        invoke_kwargs: dict[str, Any] = {}
+        if config:
+            invoke_kwargs["config"] = config
+
         try:
-            resp = self.chat.invoke(msgs)
-            return {"raw": str(resp.content), "status": "OK"}
+            resp = self.chat.invoke(msgs, **invoke_kwargs)
+            usage = self._extract_usage(resp)
+            return {
+                "raw": str(resp.content),
+                "status": "OK",
+                "usage": usage,
+            }
         except Exception as exc:  # noqa: BLE001 — any Ollama error becomes a status
             logger.warning("Ollama invoke failed: %s", exc)
             return {
@@ -126,8 +172,53 @@ class OllamaInvoker:
                 "error": str(exc),
             }
 
+    @staticmethod
+    def _extract_usage(response: Any) -> dict[str, int]:
+        """Extract token usage from an Ollama / langchain-core response.
 
-def build_llm_invoker(model: str | None = None) -> MockInvoker | OllamaInvoker:
+        Primary path: Ollama's top-level ``response_metadata`` keys
+        ``prompt_eval_count`` and ``eval_count``.
+
+        Fallback: langchain-core canonical ``usage_metadata`` with
+        ``input_tokens`` / ``output_tokens`` / ``total_tokens``.
+
+        Always returns a dict with ``prompt_tokens``,
+        ``completion_tokens`` and ``total_tokens`` keys (zeros on miss).
+        """
+        usage: dict[str, int] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
+        try:
+            meta = getattr(response, "response_metadata", None)
+            if isinstance(meta, dict) and meta:
+                usage["prompt_tokens"] = int(meta.get("prompt_eval_count", 0) or 0)
+                usage["completion_tokens"] = int(meta.get("eval_count", 0) or 0)
+                usage["total_tokens"] = (
+                    usage["prompt_tokens"] + usage["completion_tokens"]
+                )
+            else:
+                um = getattr(response, "usage_metadata", None)
+                if isinstance(um, dict) and um:
+                    usage["prompt_tokens"] = int(um.get("input_tokens", 0) or 0)
+                    usage["completion_tokens"] = int(
+                        um.get("output_tokens", 0) or 0
+                    )
+                    usage["total_tokens"] = int(
+                        um.get("total_tokens", 0)
+                        or usage["prompt_tokens"] + usage["completion_tokens"]
+                    )
+        except Exception:  # noqa: BLE001 — usage extraction must never raise
+            pass
+        return usage
+
+
+def build_llm_invoker(
+    model: str | None = None,
+    *,
+    langfuse_handler: Any = None,
+) -> MockInvoker | OllamaInvoker:
     """Build the LLM invoker for the current run.
 
     Selection rule:
@@ -138,6 +229,12 @@ def build_llm_invoker(model: str | None = None) -> MockInvoker | OllamaInvoker:
 
     Args:
         model: Optional model name override (default ``gemma4:e4b``).
+        langfuse_handler: Optional Langfuse ``CallbackHandler`` (or any
+            ``BaseCallbackHandler``-compatible object) to attach to the
+            invoker. MockInvoker ignores it (no network call → no tracing
+            benefit). When ``LANGFUSE_ENABLED=false`` (default), pass
+            ``None`` — behaviour is byte-identical to the pre-CORR-012
+            implementation.
 
     Returns:
         A configured invoker instance.
@@ -149,7 +246,10 @@ def build_llm_invoker(model: str | None = None) -> MockInvoker | OllamaInvoker:
         logger.info("MOCK_LLM=true → MockInvoker")
         return MockInvoker()
 
-    invoker = OllamaInvoker(model=model or "gemma4:e4b")
+    invoker = OllamaInvoker(
+        model=model or "gemma4:e4b",
+        langfuse_handler=langfuse_handler,
+    )
     _health_check(invoker)
     return invoker
 

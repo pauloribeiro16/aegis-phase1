@@ -82,11 +82,24 @@ class DomainProcessor:
         llm_invoker: Any,
         log_dir: Path | str | None = None,
         max_retries: int = 3,
+        *,
+        langfuse_handler: Any = None,
     ) -> None:
         self.llm_invoker = llm_invoker
         self.log_dir = Path(log_dir) if log_dir else None
         self.parser = OutputParser()
         self.max_retries = max(1, int(max_retries))
+        if (
+            langfuse_handler is not None
+            and hasattr(self.llm_invoker, "_langfuse_handler")
+        ):
+            try:
+                self.llm_invoker._langfuse_handler = langfuse_handler
+            except Exception:  # noqa: BLE001 — handler attachment is best-effort
+                logger.debug(
+                    "Could not attach langfuse_handler to %s",
+                    type(self.llm_invoker).__name__,
+                )
 
     # ── Public API ─────────────────────────────────────────────────────
 
