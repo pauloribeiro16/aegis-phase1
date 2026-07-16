@@ -122,7 +122,7 @@ def _step_select_case() -> tuple[str, str]:
         return DEFAULT_CASE_PATH, "Case_01_TinyTask_SaaS (default)"
 
     options = [c["label"] for c in cases] + ["Custom path..."]
-    selected = beaupy.select(options=options, pre_selected=0)
+    selected = beaupy.select(options=options, cursor_index=0)
     if selected is None or selected == "Custom path...":
         custom = beaupy.prompt("Path to case directory:")
         if custom and Path(custom).exists():
@@ -144,7 +144,7 @@ def _step_select_mode() -> str:
         "Mock (no Ollama, fast, deterministic)",
         "Real (Ollama + gemma4:e4b)",
     ]
-    selected = beaupy.select(options=options, pre_selected=0)
+    selected = beaupy.select(options=options, cursor_index=0)
     return "real" if selected and "Real" in selected else "mock"
 
 
@@ -152,7 +152,7 @@ def _step_select_model() -> str:
     """Step 3: Select model. Returns model name. Only called in Real mode."""
     import beaupy
 
-    selected = beaupy.select(MODEL_CHOICES, pre_selected=0)
+    selected = beaupy.select(MODEL_CHOICES, cursor_index=0)
     if selected is None or selected == DEFAULT_MODEL:
         return DEFAULT_MODEL
     if selected == "Custom...":
@@ -166,7 +166,7 @@ def _step_confirm() -> bool:
     import beaupy
 
     options = ["Run pipeline", "Cancel"]
-    selected = beaupy.select(options=options, pre_selected=0)
+    selected = beaupy.select(options=options, cursor_index=0)
     return selected is not None and selected == "Run pipeline"
 
 
@@ -208,7 +208,11 @@ def _run_pipeline(
     print()
 
     try:
-        paths = orch.run_all()
+        paths = orch.run_all(
+            case_path=case_path,
+            regulatory_baseline_path=regulatory_baseline_path,
+            output_dir=output_dir,
+        )
     except MapPartialFailure as exc:
         logger.error("MAP partial failure: %s", exc)
         print(f"  ⚠ MAP partial failure: {exc}")

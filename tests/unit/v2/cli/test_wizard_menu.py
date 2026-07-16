@@ -36,7 +36,11 @@ def _run_wizard_with_beaupy(orch, *, case=None, mode=None, model=None, confirm=N
          patch("beaupy.prompt", return_value="") as mock_prompt, \
          patch.object(__import__("sys").stdin, "isatty", return_value=True):
         from aegis_phase1.v2.cli.menu import run_wizard
-        return run_wizard(orch), (mock_select, mock_prompt)
+        result = run_wizard(orch)
+        for c in mock_select.call_args_list:
+            assert "pre_selected" not in c.kwargs
+            assert c.kwargs["cursor_index"] == 0
+        return result, (mock_select, mock_prompt)
 
 
 def test_wizard_runs_full_pipeline_with_defaults():
@@ -50,6 +54,7 @@ def test_wizard_runs_full_pipeline_with_defaults():
     )
     # 3 beaupy.select calls: case (Mock skips model), mode, confirm
     assert mock_select.call_count == 3
+    mock_select.assert_called_with(options=["Run pipeline", "Cancel"], cursor_index=0)
     orch.load.assert_called_once()
     orch.run_all.assert_called_once()
 
@@ -66,6 +71,8 @@ def test_wizard_real_mode_prompts_model():
     )
     # 4 beaupy.select calls: case, mode, model, confirm
     assert mock_select.call_count == 4
+    mock_select.assert_called_with(options=["Run pipeline", "Cancel"], cursor_index=0)
+    assert any(c.kwargs.get("cursor_index") == 0 for c in mock_select.call_args_list)
     orch.run_all.assert_called_once()
 
 
@@ -87,12 +94,13 @@ def test_wizard_returns_paths_on_success():
     """Successful run returns the paths dict from orchestrator.run_all."""
     orch = _make_orch()
     orch.run_all = MagicMock(return_value={"04_body": "/out/04.md", "xlsx": "/x.xlsx"})
-    paths, _ = _run_wizard_with_beaupy(
+    paths, (mock_select, _) = _run_wizard_with_beaupy(
         orch,
         case="Case 01 - TinyTask SaaS (GDPR, CRA)",
         mode="Mock (no Ollama, fast, deterministic)",
         confirm="Run pipeline",
     )
+    mock_select.assert_called_with(options=["Run pipeline", "Cancel"], cursor_index=0)
     assert paths == {"04_body": "/out/04.md", "xlsx": "/x.xlsx"}
 
 
@@ -100,12 +108,13 @@ def test_wizard_handles_load_exception():
     """If orch.load() raises, wizard returns empty (no run)."""
     orch = _make_orch()
     orch.load = MagicMock(side_effect=RuntimeError("case not found"))
-    paths, _ = _run_wizard_with_beaupy(
+    paths, (mock_select, _) = _run_wizard_with_beaupy(
         orch,
         case="Case 01 - TinyTask SaaS (GDPR, CRA)",
         mode="Mock (no Ollama, fast, deterministic)",
         confirm="Run pipeline",
     )
+    mock_select.assert_called_with(options=["Run pipeline", "Cancel"], cursor_index=0)
     orch.run_all.assert_not_called()
     assert paths == {}
 
@@ -148,13 +157,17 @@ def test_wizard_custom_path_via_beaupy_prompt():
     def select_side_effect(*args, **kwargs):
         return next(iter_responses)
 
-    with patch("beaupy.select", side_effect=select_side_effect), \
+    with patch("beaupy.select", side_effect=select_side_effect) as mock_select, \
          patch("beaupy.prompt", return_value="/tmp/custom_case") as mock_prompt, \
          patch.object(__import__("sys").stdin, "isatty", return_value=True), \
          patch("pathlib.Path.exists", return_value=True):
         from aegis_phase1.v2.cli.menu import run_wizard
         run_wizard(orch)
 
+    mock_select.assert_called_with(options=["Run pipeline", "Cancel"], cursor_index=0)
+    for c in mock_select.call_args_list:
+        assert "pre_selected" not in c.kwargs
+        assert c.kwargs["cursor_index"] == 0
     mock_prompt.assert_called()
     # Custom path should be used
     call_args = orch.load.call_args
@@ -171,7 +184,7 @@ def test_run_menu_alias_emits_deprecation_warning():
     def select_side_effect(*args, **kwargs):
         return next(iter_responses)
 
-    with patch("beaupy.select", side_effect=select_side_effect), \
+    with patch("beaupy.select", side_effect=select_side_effect) as mock_select, \
          patch.object(__import__("sys").stdin, "isatty", return_value=True):
         from aegis_phase1.v2.cli.menu import run_menu
 
@@ -183,6 +196,11 @@ def test_run_menu_alias_emits_deprecation_warning():
             w for w in caught if issubclass(w.category, DeprecationWarning)
         ]
         assert any("run_menu" in str(w.message) for w in deprecation_warnings)
+
+    mock_select.assert_called_with(options=["Run pipeline", "Cancel"], cursor_index=0)
+    for c in mock_select.call_args_list:
+        assert "pre_selected" not in c.kwargs
+        assert c.kwargs["cursor_index"] == 0
 
 
 def test_discover_cases_returns_three_cases():
@@ -216,11 +234,42 @@ def test_wizard_handles_map_partial_failure():
 
     orch.run_all = MagicMock(side_effect=MapPartialFailure("test failure"))
 
-    paths, _ = _run_wizard_with_beaupy(
+    paths, (mock_select, _) = _run_wizard_with_beaupy(
         orch,
         case="Case 01 - TinyTask SaaS (GDPR, CRA)",
         mode="Mock (no Ollama, fast, deterministic)",
         confirm="Run pipeline",
     )
-    # Wizard catches the exception and returns empty paths
+    mock_select.assert_called_with(options=["Run pipeline", "Cancel"], cursor_index=0)
     assert paths == {}
+
+
+def test_run_pipeline_passes_args_to_orchestrator_run_all():
+    """_run_pipeline forwards case_path/regulatory_baseline_path/output_dir to run_all.
+
+    Regression for CORR-008 Phase F: previously called orch.run_all() without
+    forwarding the args _run_pipeline already received, raising TypeError when
+    the wizard reached the Confirm step in a real TTY.
+    """
+    from aegis_phase1.v2.cli.menu import _run_pipeline
+    from unittest.mock import MagicMock
+
+    orch = MagicMock()
+    orch.load = MagicMock(return_value={"current_stage": "LOADED"})
+    orch.run_all = MagicMock(return_value={"04_body": "/out/04.md"})
+
+    paths = _run_pipeline(
+        orch,
+        case_path="/tmp/fake_case",
+        regulatory_baseline_path="/tmp/fake_baseline",
+        mode="mock",
+        model="gemma4:e4b",
+        output_dir="/tmp/fake_out",
+    )
+
+    assert orch.run_all.call_count == 1
+    kw = orch.run_all.call_args.kwargs
+    assert kw.get("case_path") == "/tmp/fake_case"
+    assert kw.get("regulatory_baseline_path") == "/tmp/fake_baseline"
+    assert kw.get("output_dir") == "/tmp/fake_out"
+    assert paths == {"04_body": "/out/04.md"}

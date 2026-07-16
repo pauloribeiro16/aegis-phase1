@@ -37,7 +37,8 @@ related_documents:
 | [AEGIS-P1-CORR-004](#corr-004) | Wire P1B-LLM-02 RATIONALE | ✅ MERGED | ⚫ deleted | TBD | 206+ | Wired per-regulation rationale synthesis into Phase1Orchestrator; rendered into Doc 05 §6.1b |
 | [AEGIS-P1-CORR-005](#corr-005) | Rename layer0_* → regulatory_baseline_* | ✅ MERGED | ⚫ deleted | TBD | 329 | Hard rename with backwards-compat aliases; wire-protocol keys deferred (Methodology-main scope) |
 | [AEGIS-P1-CORR-006](#corr-006) | Sequential wizard replaces hub-spoke menu | ✅ MERGED | ⚫ deleted | `fbfb77f` | 217 | Replaced 9-option menu with 6-step linear wizard; legacy `run_menu` kept as 1-release deprecation alias |
-| **AEGIS-P1-CORR-007** | beaupy.select wizard + static case catalogue | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-007` | TBD | 218 | Replaced input()-based prompts with beaupy.select(); 4-step wizard; static catalogue of 3 Methodology-main cases |
+| **AEGIS-P1-CORR-007** | beaupy.select wizard + static case catalogue | ✅ MERGED | ⚫ deleted | TBD | 218 | Replaced input()-based prompts with beaupy.select(); 4-step wizard; static catalogue of 3 Methodology-main cases |
+| **AEGIS-P1-CORR-008** | Wizard beaupy fix + integration smoke gate (+ run_all fix) | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-008` | TBD | TBD | Fix `pre_selected=`→`cursor_index=` (4 sites); harden mocks with `assert_called_with`; add integration smoke (beaupy signature + runner subprocess non-TTY) + `scripts/test-quick.sh`; **Phase F user-discovered: fix `_run_pipeline` forwarding args to `orch.run_all(case_path=…)`** |
 
 ---
 
@@ -230,7 +231,40 @@ Correct `LLM_ARCHITECTURE_DECISION.md` warning about `gemma4:e4b` context. Was s
 - Check 18 (critical): Static case catalogue has 3 cases
 - Check 19 (critical): `run_wizard()` importable and callable
 
-### In Progress as of 2026-07-14
+### Merged 2026-07-15 (commit `cce9a11`)
+
+_Post-merge fix: see AEGIS-P1-CORR-008 — `pre_selected` kwarg fix + smoke gate added after merge._
+
+---
+
+## <a name="corr-008"></a>AEGIS-P1-CORR-008 — Wizard beaupy fix + Integration Smoke Gate (+ run_all fix)
+
+### Scope
+- Fix `pre_selected=` → `cursor_index=` in `src/aegis_phase1/v2/cli/menu.py` (4 wizard-step sites). Installed `beaupy==3.12.0` signature uses `cursor_index=`.
+- Harden wizard unit mocks with `assert_called_with(options=..., cursor_index=0)` and a global `for c in mock.call_args_list: assert "pre_selected" not in c.kwargs`.
+- Add 2 integration smoke tests under `tests/integration/`: signature+AST check + subprocess `python -m aegis_phase1.v2.runner` non-TTY.
+- Add `scripts/test-quick.sh` standalone gate.
+- **Phase F (user-discovered mid-contract):** fix `_run_pipeline(...)` in `src/aegis_phase1/v2/cli/menu.py:211` calling `orch.run_all()` without forwarding its already-received `case_path`, `regulatory_baseline_path`, `output_dir`. Correct call: `paths = orch.run_all(case_path=case_path, regulatory_baseline_path=regulatory_baseline_path, output_dir=output_dir)`. Bug surfaced only when the wizard actually reached the Confirm step in a real TTY — existing unit tests mock `orch.run_all`, so they passed through.
+
+### Decisions
+- **Single gate, not 3.** Smoke at `scripts/test-quick.sh` + pytest integration suite. Skipped CI gate 20–22.
+- **MUST keep failing fast.** Subprocess smoke asserts stderr does NOT contain `"pre_selected"`.
+- **Hardened mocks, not removed mocks.** Behavior now validated explicitly via `assert_called_with` plus a global kwarg-absence guard.
+- **Phase F added mid-contract.** Orchestrator raised reasoned disagreement (P0): two distinct bugs in one contract complicates revert/bisect. User explicitly overrode; logged here for the record.
+
+### Test additions
+- OC1/OC2: kwarg sites in `menu.py` (grep gate)
+- OC3: ≥5 `assert_called_with(options=...)` in wizard tests
+- OC4: AST walk over `menu.py` against `beaupy.select` signature
+- OC5: subprocess `runner` non-TTY → exit 0 + TTY message + no `pre_selected` in stderr
+- OC6: `scripts/test-quick.sh` standalone
+- OC9: unit test asserting `_run_pipeline(orch, case_path=..., regulatory_baseline_path=..., output_dir=...)` forwards `case_path`/`regulatory_baseline_path`/`output_dir` as kwargs to `orch.run_all`. Uses `MagicMock` only — does NOT invoke the real orchestrator.
+
+### Gates reaffirmed
+- No smoke test calls `orch.run_all()` for real.
+- All LLM-touching paths remain gated behind Mock mode or real-orchestrator mocks.
+
+### In Progress as of 2026-07-16
 
 ---
 
