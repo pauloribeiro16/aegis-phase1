@@ -306,25 +306,40 @@ class Phase1LLMInvoker:
 
     @staticmethod
     def _extract_usage(response: Any) -> dict[str, Any]:
-        """Best-effort extraction of token usage from LangChain response."""
+        """Best-effort extraction of token usage from a LangChain response.
+
+        Primary path: ``response.response_metadata`` — Ollama puts token counts
+        at the top level as ``prompt_eval_count`` / ``eval_count`` (NOT nested
+        under ``token_usage`` / ``usage`` like the OpenAI format).
+
+        Fallback path: ``response.usage_metadata`` — langchain-core canonical
+        shape is a dict-like with ``input_tokens`` / ``output_tokens`` /
+        ``total_tokens``. We read it via ``.get()`` because in practice it is
+        a TypedDict / ``UsageMetadata``, NOT an object with attributes.
+
+        Always returns the three-key dict; never raises (mock/empty fixtures
+        must produce zeros).
+        """
         usage: dict[str, Any] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         try:
-            if hasattr(response, "response_metadata"):
-                meta = response.response_metadata
-                if isinstance(meta, dict):
-                    tu = meta.get("token_usage", {}) or meta.get("usage", {})
-                    if isinstance(tu, dict):
-                        usage["prompt_tokens"] = tu.get("prompt_tokens", tu.get("input_tokens", 0))
-                        usage["completion_tokens"] = tu.get(
-                            "completion_tokens", tu.get("output_tokens", 0)
-                        )
-                        usage["total_tokens"] = tu.get("total_tokens", 0)
-            if hasattr(response, "usage_metadata"):
-                meta = response.usage_metadata
-                if meta is not None and hasattr(meta, "input_tokens"):
-                    usage["prompt_tokens"] = getattr(meta, "input_tokens", 0) or 0
-                    usage["completion_tokens"] = getattr(meta, "output_tokens", 0) or 0
-                    usage["total_tokens"] = getattr(meta, "total_tokens", 0) or 0
+            meta = getattr(response, "response_metadata", None)
+            if isinstance(meta, dict) and meta:
+                prompt_tokens = int(meta.get("prompt_eval_count", 0) or 0)
+                completion_tokens = int(meta.get("eval_count", 0) or 0)
+                usage["prompt_tokens"] = prompt_tokens
+                usage["completion_tokens"] = completion_tokens
+                usage["total_tokens"] = prompt_tokens + completion_tokens
+            else:
+                usage_meta = getattr(response, "usage_metadata", None)
+                if isinstance(usage_meta, dict) and usage_meta:
+                    prompt_tokens = int(usage_meta.get("input_tokens", 0) or 0)
+                    completion_tokens = int(usage_meta.get("output_tokens", 0) or 0)
+                    total_tokens = int(
+                        usage_meta.get("total_tokens", prompt_tokens + completion_tokens) or 0
+                    )
+                    usage["prompt_tokens"] = prompt_tokens
+                    usage["completion_tokens"] = completion_tokens
+                    usage["total_tokens"] = total_tokens
         except Exception:
             pass
         return usage
