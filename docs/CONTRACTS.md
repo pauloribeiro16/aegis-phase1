@@ -39,6 +39,7 @@ related_documents:
 | [AEGIS-P1-CORR-006](#corr-006) | Sequential wizard replaces hub-spoke menu | ✅ MERGED | ⚫ deleted | `fbfb77f` | 217 | Replaced 9-option menu with 6-step linear wizard; legacy `run_menu` kept as 1-release deprecation alias |
 | **AEGIS-P1-CORR-007** | beaupy.select wizard + static case catalogue | ✅ MERGED | ⚫ deleted | TBD | 218 | Replaced input()-based prompts with beaupy.select(); 4-step wizard; static catalogue of 3 Methodology-main cases |
 | **[AEGIS-P1-CORR-008](#corr-008)** | Wizard beaupy fix + integration smoke gate (+ run_all fix) | ✅ MERGED | ⚫ deleted | `7e7439c` | 222 (218 + 1 + 3) | Fix `pre_selected=`→`cursor_index=` (4 sites); harden mocks with `assert_called_with`; add integration smoke (beaupy signature AST scan + runner subprocess non-TTY) + `scripts/test-quick.sh` (LLM-safe scope: `tests/unit/v2/ + 2 smoke`); **Phase F user-discovered: fix `_run_pipeline` forwarding args to `orch.run_all(case_path=…)`** |
+| **AEGIS-P1-CORR-009** | Langfuse self-hosted bring-up (Phase 0 of SPEC-observability) | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-009` | TBD | TBD | Bring up aegis-kg Langfuse docker stack at `localhost:3000`; populate `.env` (real keys, gitignored) + `.env.example` (placeholders) with `LANGFUSE_ENABLED=false` master switch; document setup in `docs/LANGFUSE_SETUP.md`. **Zero code pipeline changes**. See [SPEC-observability.md](./SPEC-observability.md) §6 for the full 7-contract decomposition (CORR-009 → 015). |
 
 ---
 
@@ -274,6 +275,34 @@ _Post-merge fix: see AEGIS-P1-CORR-008 — `pre_selected` kwarg fix + smoke gate
 - Smoke gate as built catches the regression — proved by Houdini demo (revert fix → `test_wizard_signature_smoke` fails with `pre_selected` in AST scan; restore → green)
 - Open follow-up: `test_runner_smoke.py` is structurally a no-op against the bug (runner short-circuits on non-TTY before step 1). Real detector is the AST scan. TTY-driven pty smoke (pexpect) is **not** in this contract; deferred to a future one if user wants.
 - Orchestrator P0 discordances logged (not blocking): (a) bug `run_all(case_path)` should arguably be a separate contract (CORR-009); user overrode mid-execution; (b) `scripts/test-quick.sh` initially included scope that triggered real Ollama tests; Executor detected and trimmed in Phase D.
+
+_Note_: that prior P0 mention is unrelated to the present **CORR-009** (which is the first contract of the observability incremental migration, scoped in [`docs/SPEC-observability.md`](./SPEC-observability.md)).
+
+---
+
+## <a name="corr-009"></a>AEGIS-P1-CORR-009 — Langfuse Self-Hosted Bring-Up (Phase 0)
+
+### Scope
+- Reuse the existing `aegis-kg/docker-compose.yml` Langfuse stack (already up on this host since ~2026-07-02) at `localhost:3000`. No new services.
+- Populate `aegis-phase1/.env` (gitignored, **real keys**) with the 4 LANGFUSE_* vars (`LANGFUSE_ENABLED=false`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL=http://localhost:3000`).
+- Update `aegis-phase1/.env.example` (tracked) with placeholders (`pk-lf-CHANGEME`, `sk-lf-CHANGEME`).
+- Validate end-to-end: SDK auth, programmatic trace lands in Langfuse, API query returns it.
+- Document setup in `docs/LANGFUSE_SETUP.md` (docker-compose path, master switch semantics, smoke test).
+- Create `docs/SPEC-observability.md` (root SPEC for the 7-contract observability incremental migration; this is CORR-009's entry point).
+
+### Decisions
+- **Reuse aegis-kg stack, no new docker stack** — single source of truth, no port conflicts, keys already configured at the docker level.
+- **`LANGFUSE_ENABLED=false` is the safe default** — pipeline behaves identically to pre-CORR-009 when off.
+- **`.env` is gitignored** (was already) — real keys stay local; `.env.example` is the canary.
+- **Zero code changes** under `src/aegis_phase1/` — confirmed by `git diff main..HEAD -- src/ tests/` empty. Code change happens in CORR-010 → 015.
+
+### CI gate additions
+None (CORR-009 is infra-only). Smoke lives in `docs/LANGFUSE_SETUP.md` for manual verify. CI gate entries are added per contract from CORR-010 onward as testable assertions accumulate.
+
+### Validator notes (non-blocking)
+- G6 one-liner in `docs/LANGFUSE_SETUP.md` smoke test originally used `load_dotenv(override=True)` which clobbered shell `LANGFUSE_ENABLED=true`. Fixed post-validation by removing `override=True` — shell env now wins.
+
+### In Progress as of 2026-07-16
 
 ---
 

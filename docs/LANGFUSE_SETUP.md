@@ -74,10 +74,10 @@ Set `LANGFUSE_ENABLED=true` to enable. Re-run pipeline; traces appear in <http:/
 LANGFUSE_ENABLED=true .venv/bin/python -c "
 import os
 from dotenv import load_dotenv
-load_dotenv(override=True)
+load_dotenv()  # NO override=True: shell LANGFUSE_ENABLED=true must win
 from aegis_phase1.llm.tracing import get_langfuse_callback
 client, handler = get_langfuse_callback()
-print('auth:', client.auth_check())
+print('auth:', client.auth_check() if client else False)
 with client.start_as_current_observation(as_type='span', name='corr009-smoke') as span:
     print('trace_id:', span.trace_id)
 client.flush()
