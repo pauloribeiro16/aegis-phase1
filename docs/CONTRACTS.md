@@ -44,6 +44,7 @@ related_documents:
 | **[AEGIS-P1-CORR-011](#corr-011)** | Wire Langfuse callback into Layer A (Phase 2 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `143bfe9` | 342 (227 + 5 new + 110 prompts_v2) | Thread `config={"callbacks":[handler]}` into `prompts_v2/invoker.py:_attempt` `ChatOllama.invoke(...)`; merge handler in `invoke()` (append, dedupe); wire `get_langfuse_callback()` in `factory.py:get_invoker`; promote `langfuse>=2.0.0` from `[tracing]` to core dep; broaden `scripts/test-quick.sh` to include `tests/unit/prompts_v2/`. **C3 partial of SPEC §1 fixed (Layer A only)**; Layer B (CORR-012) and full coverage (CORR-013/014) still pending. |
 | **[AEGIS-P1-CORR-012](#corr-012)** | Wire Langfuse callback into Layer B (Phase 3 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `323b5b2` | 349 (342 + 7 new) | Thread `config=` + `_extract_usage` (mirrors CORR-010 logic) into `v2/llm.py:OllamaInvoker`; merge `langfuse_handler` (append, dedupe) into `config["callbacks"]`; conditional `config=` kwarg (legacy signature preserved when no config); wire `get_langfuse_callback()` in `v2/orchestrator.py:_get_phase1_executor`; thread handler through `DomainProcessor` (map_domains:171 + retry_failed:265); narrative chokepoint at `_narrative.py:87` accepts optional `config`. **C3 + C2 of SPEC §1 fully fixed** for both Layer A and Layer B; 11 doc_* callers UNCHANGED. |
 | **[AEGIS-P1-CORR-013](#corr-013)** | Create `UnifiedInvoker` + migrate Layer A+B factories (Phase 4a of SPEC-observability) | ✅ MERGED | ⚫ deleted | `2b4a2ce` | 364 (349 + 15 new) | New `src/aegis_phase1/llm/unified.py` (304 LOC): `UnifiedInvoker` with `invoke_spec` (delegates to lazy `Phase1LLMInvoker` child — Option A, zero heavy-logic duplication), `invoke_raw` (chat→raw+usage), polymorphic `invoke(...)` (dispatches heavy/light by `inputs` type). Module-level helpers `_extract_usage` (DRY across both methods, Ollama primary + langchain-core fallback + zeros on miss) and `_merge_handler_into_config` (append-dedupe, stable `{callbacks:[...]}` shape). `prompts_v2/factory.py:get_invoker` and `v2/llm.py:build_llm_invoker` return `UnifiedInvoker`. **C1 of SPEC §1 fixed at the architectural level**; legacy `Phase1LLMInvoker` + `OllamaInvoker` + `OllamaClient` remain in tree (strangler — CORR-014 deletes them). |
+| **[AEGIS-P1-CORR-014a](#corr-014a)** | Delete `OllamaInvoker` (Phase 4b partial — strangler) | ✅ MERGED | ⚫ deleted | `9b2367d` | 349 (no test delta; class removed) | Delete `class OllamaInvoker` block in `src/aegis_phase1/v2/llm.py` (137 LOC); update annotations (`MockInvoker \| UnifiedInvoker` for `build_llm_invoker`; `UnifiedInvoker` for `_health_check`); migrate 7 tests in `test_layer_b_callback_corr012.py` (imports `from aegis_phase1.llm.unified import UnifiedInvoker, _extract_usage`; `_extract_usage` called as module-level); migrate 3 tests in `test_invoker_bypass.py` (docstrings/comments only). **Reduction: −137 LOC net**; audit had 29 OllamaInvoker references across 5 files, all migrated. **Phase1LLMInvoker deletion deferred** to a follow-up contract — has LIVE callers (`phase1_executor.py:111`, `factory.py:288`, `invoker_to_executor()`) requiring a `Phase1Executor` refactor (estimated 15-25 file edits; SPEC recommended first). |
 
 ---
 
@@ -464,7 +465,9 @@ Wiring Langfuse callbacks into Layer A (CORR-011) is meaningless if tokens are s
 - With CORR-013's `UnifiedInvoker` + factories migrated, CORR-014 is a pure deletion of dead code
 
 ### Next
-- AEGIS-P1-CORR-014 (Phase 4b — Delete the legacy `Phase1LLMInvoker` + `OllamaInvoker` + `OllamaClient` after this is verified)
+- AEGIS-P1-CORR-014a — Delete `OllamaInvoker` (safe). DONE (commit `9b2367d`, PR #11).
+- **AEGIS-P1-CORR-014b (deferred — separate contract)**: Refactor `Phase1Executor.__init__` to accept `UnifiedInvoker`/`SpecRuntime` collaborator, update `factory.get_invoker()` return + `invoker_to_executor()` reads, then delete `Phase1LLMInvoker`. Estimated 15-25 file edits. **SPEC recommended before implementation** given the multiple-file touch.
+- AEGIS-P1-CORR-014c (deferred): Delete `OllamaClient` + the 6 legacy modules that use `create_llm_client()`. Same risk class as 014b (live callers).
 - AEGIS-P1-CORR-015 (Phase 5 — Suppress retry-storm noise)
 
 ### Merged 2026-07-16 (commit `2b4a2ce` via PR #9)
@@ -478,7 +481,42 @@ Wiring Langfuse callbacks into Layer A (CORR-011) is meaningless if tokens are s
 - Pre-push hooks: PASS
 - **No real LLM calls made.**
 
+---
 
+## <a name="corr-014a"></a>AEGIS-P1-CORR-014a — Delete OllamaInvoker (Strangler Partial)
+
+### Scope
+- Reduced scope from original CORR-014 — after the Executor's re-audit showed `Phase1LLMInvoker` has LIVE production callers (`phase1_executor.py:111`, `factory.py:288`, `invoker_to_executor()`), the contract was split into:
+  - **CORR-014a (this)**: Delete `OllamaInvoker` only. Genuinely safe per audit (29 references across 5 files, all DOCSTRING/TEST).
+  - **CORR-014b (deferred)**: `Phase1LLMInvoker` refactor + delete (requires `Phase1Executor` refactor — multi-file, SPEC recommended).
+  - **CORR-014c (deferred)**: `OllamaClient` deletion + 6 legacy modules (`section_refill.py`, `nodes/a06/c01/c02`, `shared/document_producer.py`, `doc_evaluator.py`) retire `create_llm_client`.
+- 5 files changed: `src/aegis_phase1/v2/llm.py` (137 LOC class block deleted; annotations updated), `src/aegis_phase1/v2/orchestrator.py` (docstring), `src/aegis_phase1/llm/unified.py` (docstrings), `tests/unit/v2/test_layer_b_callback_corr012.py` (7 tests migrated), `tests/unit/v2/test_invoker_bypass.py` (3 docstrings).
+
+### Decisions
+- **No backward-compat alias** — `OllamaInvoker` is gone; `from aegis_phase1.v2.llm import OllamaInvoker` now raises `ImportError` (verified via Houdini).
+- **`_health_check` annotation `UnifiedInvoker`** — works because `UnifiedInvoker` has `.base_url`.
+- **`MockInvoker` stays independent** — no inheritance from `OllamaInvoker`; not affected by deletion.
+- **`build_llm_invoker` return annotation `MockInvoker | UnifiedInvoker`** — string forward-ref if needed; re-verified.
+
+### Why Orchestrator P0 flagged this
+- The original CORR-014 audit (Orchestrator) called `Phase1LLMInvoker` "LEGACY-ONLY" but Executor's re-audit correctly identified LIVE callers. The split into 014a (safe) + 014b (refactor) is a textbook strangler: delete what is truly dead first, refactor what has callers with a SPEC.
+
+### Next
+- AEGIS-P1-CORR-014b (deferred): `Phase1LLMInvoker` deletion via `Phase1Executor` refactor. SPEC recommended.
+- AEGIS-P1-CORR-014c (deferred): `OllamaClient` retirement + 6 legacy modules.
+- AEGIS-P1-CORR-015 (Phase 5 — Suppress retry-storm noise).
+
+### Merged 2026-07-16 (commit `9b2367d` via PR #11)
+
+#### Quality Log
+- `trials: 1` (deterministic class deletion)
+- `pass@1`: 7/7 migrated tests + 3/3 docstring tests + ALL GATES PASS
+- Test count: **349 passed + 10 skipped** (no test delta — old tests now use `UnifiedInvoker`; same count)
+- Master switch preserved: `LANGFUSE_ENABLED=false` → no behaviour change
+- Final grep: `grep -rn OllamaInvoker src/ tests/` → **NO MATCHES** (class fully purged)
+- Houdini demo: re-include class → import OK; restore → ImportError as expected; migrated tests still pass via `UnifiedInvoker`
+- Pre-push hooks: PASS
+- **No real LLM calls made.**
 
 ---
 
