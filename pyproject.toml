@@ -27,6 +27,7 @@ dependencies = [
     "langgraph>=0.2.0",
     "langchain-core>=0.3.0",
     "langchain-ollama>=0.2.0",
+    "langfuse>=2.0.0",
     "pydantic>=2.7.0",
     "pyyaml>=6.0",
     "python-dotenv>=1.0.0",
@@ -41,10 +42,7 @@ dev = [
     "mypy>=1.13.0",
     "pre-commit>=3.5.0",
 ]
-tracing = [
-    "langfuse>=2.0.0",
-]
-all = ["aegis-phase1[dev,tracing]"]
+all = ["aegis-phase1[dev]"]
 
 [project.urls]
 Homepage = "https://github.com/pauloribeiro16/aegis-phase1"

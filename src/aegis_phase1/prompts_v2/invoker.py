@@ -24,6 +24,7 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
+from langchain_core.runnables.config import RunnableConfig
 
 from aegis_phase1.prompts_v2.catalog import CatalogLoader
 from aegis_phase1.prompts_v2.llm_inventory import (
@@ -55,6 +56,7 @@ class Phase1LLMInvoker:
         model: str | None = None,
         base_url: str | None = None,
         timeout: int | None = None,
+        langfuse_handler: Any | None = None,
     ) -> None:
         self.prompts = prompt_loader
         self.catalogs = catalog_loader
@@ -64,12 +66,14 @@ class Phase1LLMInvoker:
         self.model = model or self.DEFAULT_MODEL
         self.base_url = base_url or self.DEFAULT_BASE_URL
         self.timeout = timeout or self.DEFAULT_TIMEOUT
+        self._langfuse_handler = langfuse_handler
 
     def invoke(
         self,
         spec_id: str,
         inputs: dict[str, Any],
         max_retries: int | None = None,
+        config: RunnableConfig | None = None,
     ) -> dict[str, Any]:
         """Invoke a Phase 1 LLM with full orchestration.
 
@@ -94,6 +98,14 @@ class Phase1LLMInvoker:
         invocation_pattern = get_invocation_pattern(spec_id)
         stage = get_stage(spec_id)
 
+        if config is None:
+            config = {}
+        if self._langfuse_handler is not None:
+            existing = list(config.get("callbacks") or [])
+            if self._langfuse_handler not in existing:
+                existing.append(self._langfuse_handler)
+            config = {**config, "callbacks": existing}
+
         all_attempts: list[dict[str, Any]] = []
         total_start = time.time()
 
@@ -104,6 +116,7 @@ class Phase1LLMInvoker:
                 invocation_pattern=invocation_pattern,
                 stage=stage,
                 attempt=attempt,
+                config=config,
             )
             all_attempts.append(attempt_result)
 
@@ -144,6 +157,7 @@ class Phase1LLMInvoker:
         invocation_pattern: str,
         stage: str,
         attempt: int,
+        config: RunnableConfig | None = None,
     ) -> dict[str, Any]:
         """Single attempt at invoking the LLM."""
         try:
@@ -164,11 +178,15 @@ class Phase1LLMInvoker:
             # 3. Call LLM
             start = time.time()
             try:
+                invoke_kwargs: dict[str, Any] = {}
+                if config is not None:
+                    invoke_kwargs["config"] = config
                 response = llm.invoke(
                     [
                         SystemMessage(content=prompt["system"]),
                         HumanMessage(content=prompt["user"]),
-                    ]
+                    ],
+                    **invoke_kwargs,
                 )
                 latency_ms = (time.time() - start) * 1000
                 raw = response.content if hasattr(response, "content") else str(response)

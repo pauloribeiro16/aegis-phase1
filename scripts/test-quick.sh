@@ -13,9 +13,10 @@ if .venv/bin/python -m pytest tests/unit/ tests/integration/ --co -q 2>&1 | grep
   exit 1
 fi
 
-echo "== [2/4] Unit (v2 only) + integration smoke =="
+echo "== [2/4] Unit (v2 + prompts_v2) + integration smoke =="
 .venv/bin/python -m pytest \
     tests/unit/v2/ \
+    tests/unit/prompts_v2/ \
     tests/integration/test_runner_smoke.py \
     tests/integration/test_wizard_signature_smoke.py \
     -q
