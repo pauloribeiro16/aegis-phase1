@@ -38,7 +38,7 @@ related_documents:
 | [AEGIS-P1-CORR-005](#corr-005) | Rename layer0_* → regulatory_baseline_* | ✅ MERGED | ⚫ deleted | TBD | 329 | Hard rename with backwards-compat aliases; wire-protocol keys deferred (Methodology-main scope) |
 | [AEGIS-P1-CORR-006](#corr-006) | Sequential wizard replaces hub-spoke menu | ✅ MERGED | ⚫ deleted | `fbfb77f` | 217 | Replaced 9-option menu with 6-step linear wizard; legacy `run_menu` kept as 1-release deprecation alias |
 | **AEGIS-P1-CORR-007** | beaupy.select wizard + static case catalogue | ✅ MERGED | ⚫ deleted | TBD | 218 | Replaced input()-based prompts with beaupy.select(); 4-step wizard; static catalogue of 3 Methodology-main cases |
-| **AEGIS-P1-CORR-008** | Wizard beaupy fix + integration smoke gate (+ run_all fix) | 🚧 IN PROGRESS | 🟢 `feature/aegis-p1-corr-008` | TBD | TBD | Fix `pre_selected=`→`cursor_index=` (4 sites); harden mocks with `assert_called_with`; add integration smoke (beaupy signature + runner subprocess non-TTY) + `scripts/test-quick.sh`; **Phase F user-discovered: fix `_run_pipeline` forwarding args to `orch.run_all(case_path=…)`** |
+| **[AEGIS-P1-CORR-008](#corr-008)** | Wizard beaupy fix + integration smoke gate (+ run_all fix) | ✅ MERGED | ⚫ deleted | `7e7439c` | 222 (218 + 1 + 3) | Fix `pre_selected=`→`cursor_index=` (4 sites); harden mocks with `assert_called_with`; add integration smoke (beaupy signature AST scan + runner subprocess non-TTY) + `scripts/test-quick.sh` (LLM-safe scope: `tests/unit/v2/ + 2 smoke`); **Phase F user-discovered: fix `_run_pipeline` forwarding args to `orch.run_all(case_path=…)`** |
 
 ---
 
@@ -264,7 +264,16 @@ _Post-merge fix: see AEGIS-P1-CORR-008 — `pre_selected` kwarg fix + smoke gate
 - No smoke test calls `orch.run_all()` for real.
 - All LLM-touching paths remain gated behind Mock mode or real-orchestrator mocks.
 
-### In Progress as of 2026-07-16
+### Merged 2026-07-16 (commit `7e7439c`)
+
+#### Quality Log
+
+- `trials: 1` (deterministic rename + mock hardening, per skill ref)
+- `pass@1: 7/7` Validator gates PASS (G1–G8)
+- Test count: 218 → **222** (+1 unit: `test_run_pipeline_passes_args_to_orchestrator_run_all`; +2 integration: `test_wizard_signature_smoke` [1 file ×2 tests] + `test_runner_smoke`)
+- Smoke gate as built catches the regression — proved by Houdini demo (revert fix → `test_wizard_signature_smoke` fails with `pre_selected` in AST scan; restore → green)
+- Open follow-up: `test_runner_smoke.py` is structurally a no-op against the bug (runner short-circuits on non-TTY before step 1). Real detector is the AST scan. TTY-driven pty smoke (pexpect) is **not** in this contract; deferred to a future one if user wants.
+- Orchestrator P0 discordances logged (not blocking): (a) bug `run_all(case_path)` should arguably be a separate contract (CORR-009); user overrode mid-execution; (b) `scripts/test-quick.sh` initially included scope that triggered real Ollama tests; Executor detected and trimmed in Phase D.
 
 ---
 
@@ -289,12 +298,14 @@ _Post-merge fix: see AEGIS-P1-CORR-008 — `pre_selected` kwarg fix + smoke gate
 | 4 | JSON Schema field renaming `layer0_refs` → `regulatory_baseline_refs` | **✅ MERGED via CORR-005** | Closed |
 | 5 | Case_02 / Case_03 rebranding in `Methodology-main` | Separate contract? | Open |
 | 6 | Switch Ollama → remote `MiniMax-M2.7` | Separate contract with API key handling | Open |
+| 7 | TTY-driven smoke (pexpect/pty) for wizard step 1 | Separate contract (CORR-009?); current `test_runner_smoke.py` is structurally a no-op against the `pre_selected` bug because `run_wizard` short-circuits on non-TTY before reaching `beaupy.select` | Open (follow-up CORR-008) |
 
 ## Known limitations
 
 - **Adapter design**: The `_get_phase1_executor()` fix (CORR-003 Phase A) reads `model` from `self.llm_invoker` but still creates a fresh `Phase1LLMInvoker` via `get_invoker()`. A full adapter (single invoker for both stages) would require refactoring `Phase1LLMInvoker` to accept `MockInvoker`/`OllamaInvoker` via duck-typing — deferred.
 - **CI gate only runs on push**: `validate-contracts.sh` is wired to `pre-push` only. For team-scale CI, GitHub Action integration is future work.
 - **Methodology-main contracts**: This index only covers `aegis-phase1` repo. `Methodology-main` has its own contracts (rebranding was a sub-step of CORR-001 but covered there).
+- **CORR-008 sub-detector** (open follow-up): the AST-scan signature smoke (`tests/integration/test_wizard_signature_smoke.py`) is what actually catches a `pre_selected=` regression. The runner-subprocess smoke (`tests/integration/test_runner_smoke.py`) and the wizard non-TTY hand-test (`scripts/test-quick.sh` step 3) both short-circuit before reaching the bug site. A TTY-driven smoke (pexpect / pty) would close the loop end-to-end — see Pending decisions #7.
 
 ## See also
 
