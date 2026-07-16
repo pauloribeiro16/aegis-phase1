@@ -23,6 +23,8 @@ import logging
 import sys
 from pathlib import Path
 
+import aegis_phase1.env  # noqa: F401 — load .env via env.py module-import side-effect
+
 logger = logging.getLogger(__name__)
 
 from aegis_phase1.llm.unified import OllamaUnreachableError  # noqa: E402 — placed after logger

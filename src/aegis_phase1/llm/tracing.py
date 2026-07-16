@@ -20,7 +20,7 @@ def get_langfuse_callback(case_name: str = "default", phase: str = "phase1") -> 
 
     If Langfuse is disabled or not available, returns (None, None).
     """
-    if os.environ.get("LANGFUSE_ENABLED", "false").lower() not in ("true", "1", "yes"):
+    if os.environ.get("LANGFUSE_ENABLED", "true").lower() not in ("true", "1", "yes"):
         return None, None
 
     try:
@@ -36,8 +36,13 @@ def get_langfuse_callback(case_name: str = "default", phase: str = "phase1") -> 
             return None, None
 
         client = Langfuse(public_key=public_key, secret_key=secret_key, host=host)
-        handler = CallbackHandler()
-        logger.info("[tracing] Langfuse enabled host=%s case=%s phase=%s", host, case_name, phase)
+        trace_id = client.create_trace_id()
+        handler = CallbackHandler(trace_context={"trace_id": trace_id})
+        handler.tags = [t for t in [
+            f"phase:{phase}" if phase else None,
+            f"case:{case_name}" if case_name else None,
+        ] if t]
+        logger.info("[tracing] Langfuse enabled host=%s case=%s phase=%s trace_id=%s", host, case_name, phase, trace_id)
         return client, handler
     except ImportError:
         logger.warning("[tracing] langfuse not installed, skipping")
