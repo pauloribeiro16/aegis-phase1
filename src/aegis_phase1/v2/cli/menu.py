@@ -208,7 +208,11 @@ def _run_pipeline(
     print()
 
     try:
-        paths = orch.run_all()
+        paths = orch.run_all(
+            case_path=case_path,
+            regulatory_baseline_path=regulatory_baseline_path,
+            output_dir=output_dir,
+        )
     except MapPartialFailure as exc:
         logger.error("MAP partial failure: %s", exc)
         print(f"  ⚠ MAP partial failure: {exc}")

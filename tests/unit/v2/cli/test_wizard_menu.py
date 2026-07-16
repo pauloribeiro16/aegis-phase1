@@ -242,3 +242,34 @@ def test_wizard_handles_map_partial_failure():
     )
     mock_select.assert_called_with(options=["Run pipeline", "Cancel"], cursor_index=0)
     assert paths == {}
+
+
+def test_run_pipeline_passes_args_to_orchestrator_run_all():
+    """_run_pipeline forwards case_path/regulatory_baseline_path/output_dir to run_all.
+
+    Regression for CORR-008 Phase F: previously called orch.run_all() without
+    forwarding the args _run_pipeline already received, raising TypeError when
+    the wizard reached the Confirm step in a real TTY.
+    """
+    from aegis_phase1.v2.cli.menu import _run_pipeline
+    from unittest.mock import MagicMock
+
+    orch = MagicMock()
+    orch.load = MagicMock(return_value={"current_stage": "LOADED"})
+    orch.run_all = MagicMock(return_value={"04_body": "/out/04.md"})
+
+    paths = _run_pipeline(
+        orch,
+        case_path="/tmp/fake_case",
+        regulatory_baseline_path="/tmp/fake_baseline",
+        mode="mock",
+        model="gemma4:e4b",
+        output_dir="/tmp/fake_out",
+    )
+
+    assert orch.run_all.call_count == 1
+    kw = orch.run_all.call_args.kwargs
+    assert kw.get("case_path") == "/tmp/fake_case"
+    assert kw.get("regulatory_baseline_path") == "/tmp/fake_baseline"
+    assert kw.get("output_dir") == "/tmp/fake_out"
+    assert paths == {"04_body": "/out/04.md"}
