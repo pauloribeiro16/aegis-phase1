@@ -24,6 +24,7 @@ References:
 
 from __future__ import annotations
 
+import aegis_phase1.env  # noqa: F401 — load .env via env.py module-import side-effect
 import json
 import logging
 import sys
