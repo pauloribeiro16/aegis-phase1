@@ -40,6 +40,7 @@ related_documents:
 | **AEGIS-P1-CORR-007** | beaupy.select wizard + static case catalogue | ✅ MERGED | ⚫ deleted | TBD | 218 | Replaced input()-based prompts with beaupy.select(); 4-step wizard; static catalogue of 3 Methodology-main cases |
 | **[AEGIS-P1-CORR-008](#corr-008)** | Wizard beaupy fix + integration smoke gate (+ run_all fix) | ✅ MERGED | ⚫ deleted | `7e7439c` | 222 (218 + 1 + 3) | Fix `pre_selected=`→`cursor_index=` (4 sites); harden mocks with `assert_called_with`; add integration smoke (beaupy signature AST scan + runner subprocess non-TTY) + `scripts/test-quick.sh` (LLM-safe scope: `tests/unit/v2/ + 2 smoke`); **Phase F user-discovered: fix `_run_pipeline` forwarding args to `orch.run_all(case_path=…)`** |
 | **[AEGIS-P1-CORR-009](#corr-009)** | Langfuse self-hosted bring-up (Phase 0 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `dd5e6b9` | 222 | Bring up aegis-kg Langfuse docker stack at `localhost:3000`; populate `.env` (real keys, gitignored) + `.env.example` (placeholders) with `LANGFUSE_ENABLED=false` master switch; document setup in `docs/LANGFUSE_SETUP.md`. **Zero code pipeline changes**. End-to-end smoke: SDK auth `True`, programmatic trace `corr009-validate-edf65d19` queryable via API. See [SPEC-observability.md](./SPEC-observability.md) §6 for the full 7-contract decomposition (CORR-009 → 015). |
+| **[AEGIS-P1-CORR-010](#corr-010)** | Fix `_extract_usage` tokens=0 (Phase 1 of SPEC-observability) | ✅ MERGED | ⚫ deleted | `85bb4bd` | 227 (222 + 5 new) | Fix `src/aegis_phase1/prompts_v2/invoker.py:_extract_usage` to read Ollama-native `prompt_eval_count` / `eval_count` from `response_metadata` (not OpenAI `token_usage`); fix `hasattr()` → `.get()` for `usage_metadata` fallback; graceful zeros on empty/missing; never raises. Add 5 unit tests with `FakeAIMessage` fixture (no real LLM call). Houdini demo: revert → 2 tests fail; restore → all pass. **C2 of SPEC §1 fixed**. |
 
 ---
 
@@ -312,6 +313,41 @@ None (CORR-009 is infra-only). Smoke lives in `docs/LANGFUSE_SETUP.md` for manua
 - End-to-end smoke confirmed: `client.auth_check()=True`, programmatic trace `corr009-validate-edf65d19` queryable via Langfuse API at `localhost:3000/api/public/traces`
 - Branch fast-forward merged to `main`; `feature/aegis-p1-corr-009` deleted
 - **Next**: AEGIS-P1-CORR-010 (Phase 1 — fix `_extract_usage` tokens=0; lowest-risk first per SPEC §6 ordering)
+
+---
+
+## <a name="corr-010"></a>AEGIS-P1-CORR-010 — Fix `_extract_usage` tokens=0 (Phase 1)
+
+### Scope
+- **C2** of [SPEC-observability.md §1](./SPEC-observability.md): `_extract_usage` reads `meta["token_usage"]` / `["usage"]` (OpenAI format) — Ollama returns top-level `prompt_eval_count` / `eval_count`.
+- Secondary bug: `hasattr(meta, "input_tokens")` on a `TypedDict` always `False`; should be `.get(...)`.
+- Fix in `src/aegis_phase1/prompts_v2/invoker.py:_extract_usage` (lines 307–345). Two paths:
+  - **Primary**: `response_metadata["prompt_eval_count"]` → `prompt_tokens`, `["eval_count"]` → `completion_tokens`, sum → `total_tokens`.
+  - **Fallback**: `usage_metadata.get("input_tokens"/"output_tokens"/"total_tokens")`.
+  - Zeros on empty/missing; never raises.
+- Add 5 unit tests in `tests/unit/prompts_v2/test_extract_usage_corr010.py` using `FakeAIMessage` (no real LLM, no `ChatOllama.invoke()`).
+
+### Decisions
+- **Mirror `llm/ollama.py:178-183`** — the codebase already had the correct key names in the legacy client. Port the style; don't reinvent.
+- **Two-path extraction** (primary + fallback) — robust to langchain-core canonical format (`usage_metadata`) AND Ollama-native (`response_metadata`).
+- **Graceful zeros** — never raises inside the invoker's logging path (callers expect a dict).
+- **`FakeAIMessage` fixture** — minimal stand-in for `AIMessage`; no langchain-core runtime dependency in tests.
+
+### Why this matters before CORR-011 (Phase 2)
+Wiring Langfuse callbacks into Layer A (CORR-011) is meaningless if tokens are still 0. C2 first, then C3 — otherwise Langfuse UI shows correct spans but `usage=null`.
+
+### Validator notes
+- Houdini demo executed by Executor + replicated by Orchestrator: `sed`-revert of the fix makes `test_extract_usage_ollama_response_metadata` fail with `assert 0 == 1234` (catches bug a) AND `test_extract_usage_usage_metadata_fallback` fail with `assert 0 == 100` (catches bug b). After `cp` restore, 5/5 pass.
+- Per-file pytest runs all green; whole-`tests/unit/prompts_v2/` directory was reported to hang under default 120 s timeout — appears to be a fixture/ordering artifact unrelated to this contract (gate authority is `scripts/test-quick.sh` + per-file).
+
+### Merged 2026-07-16 (commit `85bb4bd`)
+
+#### Quality Log
+- `trials: 1` (deterministic; no LLM variance)
+- `pass@1: 9/9` gates PASS (G1-G9; Houdini confirms tests catch both bug variants)
+- Test count: 222 → **227** (+5 unit tests in `tests/unit/prompts_v2/test_extract_usage_corr010.py`)
+- Real-world effect: `total_tokens` in `llm-calls.jsonl` will be > 0 from the next real run onward (was 60/60 zero before)
+- Pre-push hooks: 16 critical PASS
 
 ---
 
