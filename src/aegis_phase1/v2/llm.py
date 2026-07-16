@@ -23,6 +23,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+from aegis_phase1.llm.unified import UnifiedInvoker  # noqa: E402 — re-exported for callers
+
 _MOCK_TRUTHS = {"1", "true", "yes", "on"}
 
 _DEFAULT_OK_RESPONSE = (
@@ -218,14 +220,16 @@ def build_llm_invoker(
     model: str | None = None,
     *,
     langfuse_handler: Any = None,
-) -> MockInvoker | OllamaInvoker:
-    """Build the LLM invoker for the current run.
+) -> MockInvoker | "OllamaInvoker | UnifiedInvoker":
+    """Build the LLM invoker for the current run (CORR-013).
 
     Selection rule:
         - If ``MOCK_LLM`` env var is truthy, returns a :class:`MockInvoker`.
-        - Otherwise returns an :class:`OllamaInvoker` and runs a 1-line
-          health-check ping. Raises :class:`OllamaUnreachableError` if
-          Ollama is down.
+        - Otherwise returns a :class:`aegis_phase1.llm.UnifiedInvoker`
+          (the new unified entry point; the legacy ``OllamaInvoker``
+          child is constructed lazily for the heavy path). A 1-line
+          health-check ping runs first; raises
+          :class:`OllamaUnreachableError` if Ollama is down.
 
     Args:
         model: Optional model name override (default ``gemma4:e4b``).
@@ -246,7 +250,7 @@ def build_llm_invoker(
         logger.info("MOCK_LLM=true → MockInvoker")
         return MockInvoker()
 
-    invoker = OllamaInvoker(
+    invoker = UnifiedInvoker(
         model=model or "gemma4:e4b",
         langfuse_handler=langfuse_handler,
     )
@@ -291,5 +295,6 @@ __all__ = [
     "MockInvoker",
     "OllamaInvoker",
     "OllamaUnreachableError",
+    "UnifiedInvoker",
     "build_llm_invoker",
-]
+] 
