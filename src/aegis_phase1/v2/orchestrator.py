@@ -480,7 +480,7 @@ class Phase1Orchestrator:
         or reduce-stage LLM calls were explicitly disabled.
 
         CORR-003 (Phase A): The model is sourced from ``self.llm_invoker``
-        (when it exposes a ``.model`` attribute, as ``OllamaInvoker``
+        (when it exposes a ``.model`` attribute, as ``UnifiedInvoker``
         does) before falling back to the ``OLLAMA_MODEL`` env var. This
         makes ``--model`` propagate consistently between MAP and REDUCE
         stages. ``MOCK_LLM`` is honoured by the guard above; ``MockInvoker``

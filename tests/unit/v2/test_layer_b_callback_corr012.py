@@ -3,7 +3,7 @@
 Reference: ``docs/SPEC-observability.md`` §6 (Phase 3, contract CORR-012).
 
 Goal:
-    Wire Langfuse tracing into Layer B (``v2/llm.OllamaInvoker``) so the
+    Wire Langfuse tracing into Layer B (``v2/llm.UnifiedInvoker``) so the
     MAP-stage call (1 site) and the 11 narrative calls all flow through
     a chokepoint that merges ``_langfuse_handler`` into the chat
     ``config``. Mirrors CORR-011 (Layer A) and re-uses CORR-010's
@@ -11,10 +11,10 @@ Goal:
 
 Behaviour contract verified here:
 
-  1. ``OllamaInvoker(langfuse_handler=h)`` → ``chat.invoke`` receives
+  1. ``UnifiedInvoker(langfuse_handler=h)`` → ``chat.invoke`` receives
      ``config={"callbacks":[h]}`` when called.
-  2. ``OllamaInvoker()`` (default handler=None) → ``chat.invoke`` is
-     called WITHOUT ``config=`` kwarg (byte-identical legacy behaviour).
+  2. ``UnifiedInvoker()`` (default handler=None) → ``chat.invoke`` is
+     called WITHOUT callbacks in config (empty callbacks list).
   3. ``_extract_usage`` reads Ollama ``response_metadata`` primary path.
   4. ``_extract_usage`` returns zeros on missing / empty metadata, no raise.
   5. ``invoke`` returns ``"usage"`` key in result dict, populated.
@@ -50,16 +50,16 @@ def _build_invoker_with_mocked_chat(
     handler: object | None = None,
     response: object | None = None,
 ):
-    """Construct an ``OllamaInvoker`` whose internal ``ChatOllama`` is a MagicMock.
+    """Construct a ``UnifiedInvoker`` whose internal ``ChatOllama`` is a MagicMock.
 
     Returns ``(invoker, mock_chat_instance)`` so tests can introspect the
     call arguments passed to ``chat.invoke``. The mock yields
     ``response`` (defaulting to a benign ``_FakeAIMessage``).
 
-    Note: ``v2/llm.py`` does ``from langchain_ollama import ChatOllama``
-    INSIDE ``OllamaInvoker.__init__`` (lazy import), so we patch at the
+    Note: ``llm/unified.py`` does ``from langchain_ollama import ChatOllama``
+    INSIDE ``UnifiedInvoker.__init__`` (lazy import), so we patch at the
     source module (``langchain_ollama.ChatOllama``) — patching
-    ``aegis_phase1.v2.llm.ChatOllama`` has no effect because the symbol
+    ``aegis_phase1.llm.unified.ChatOllama`` has no effect because the symbol
     is never bound there.
     """
     response = response if response is not None else _FakeAIMessage()
@@ -70,9 +70,9 @@ def _build_invoker_with_mocked_chat(
         mock_instance.invoke.return_value = response
         MockChatOllama.return_value = mock_instance
 
-        from aegis_phase1.v2.llm import OllamaInvoker
+        from aegis_phase1.llm.unified import UnifiedInvoker
 
-        invoker = OllamaInvoker(langfuse_handler=handler)
+        invoker = UnifiedInvoker(langfuse_handler=handler)
         yield invoker, mock_instance
 
 
@@ -109,9 +109,9 @@ def test_no_callback_when_handler_is_none():
         mock_instance.invoke.return_value = _FakeAIMessage()
         MockChatOllama.return_value = mock_instance
 
-        from aegis_phase1.v2.llm import OllamaInvoker
+        from aegis_phase1.llm.unified import UnifiedInvoker
 
-        invoker = OllamaInvoker()
+        invoker = UnifiedInvoker()
         assert invoker._langfuse_handler is None
 
         result = invoker.invoke("hello")
@@ -130,7 +130,7 @@ def test_no_callback_when_handler_is_none():
 
 def test_extract_usage_ollama_response_metadata():
     """Primary path: Ollama ``prompt_eval_count`` / ``eval_count``."""
-    from aegis_phase1.v2.llm import OllamaInvoker
+    from aegis_phase1.llm.unified import _extract_usage
 
     msg = _FakeAIMessage(
         response_metadata={
@@ -140,7 +140,7 @@ def test_extract_usage_ollama_response_metadata():
             "done": True,
         }
     )
-    usage = OllamaInvoker._extract_usage(msg)
+    usage = _extract_usage(msg)
     assert usage["prompt_tokens"] == 1234
     assert usage["completion_tokens"] == 567
     assert usage["total_tokens"] == 1801
@@ -151,10 +151,10 @@ def test_extract_usage_ollama_response_metadata():
 
 def test_extract_usage_empty_response_metadata():
     """Empty ``response_metadata`` dict → zeros, no raise."""
-    from aegis_phase1.v2.llm import OllamaInvoker
+    from aegis_phase1.llm.unified import _extract_usage
 
     msg = _FakeAIMessage(response_metadata={}, usage_metadata={})
-    usage = OllamaInvoker._extract_usage(msg)
+    usage = _extract_usage(msg)
     assert usage == {
         "prompt_tokens": 0,
         "completion_tokens": 0,
@@ -164,12 +164,12 @@ def test_extract_usage_empty_response_metadata():
 
 def test_extract_usage_missing_response_metadata():
     """No ``response_metadata`` attribute → zeros, no raise."""
-    from aegis_phase1.v2.llm import OllamaInvoker
+    from aegis_phase1.llm.unified import _extract_usage
 
     bare = MagicMock(spec=[])
     bare.response_metadata = None
     bare.usage_metadata = None
-    usage = OllamaInvoker._extract_usage(bare)
+    usage = _extract_usage(bare)
     assert usage == {
         "prompt_tokens": 0,
         "completion_tokens": 0,

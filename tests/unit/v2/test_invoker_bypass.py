@@ -4,12 +4,12 @@ Architectural bug fixed in this contract:
     ``Phase1Orchestrator._get_phase1_executor()`` constructed its own
     ``Phase1LLMInvoker`` via ``factory.get_invoker(model=OLLAMA_MODEL)``,
     ignoring ``self.llm_invoker`` (the runner-configured MockInvoker /
-    OllamaInvoker). This meant ``--model`` and ``--mock-llm`` did not
+    UnifiedInvoker). This meant ``--model`` and ``--mock-llm`` did not
     propagate consistently between MAP-stage and REDUCE-stage LLMs.
 
 Phase A fix:
     ``_get_phase1_executor()`` now reads ``self.llm_invoker.model`` first
-    (OllamaInvoker exposes this; MockInvoker does not), falling back to
+    (UnifiedInvoker exposes this; MockInvoker does not), falling back to
     the env-var ``OLLAMA_MODEL`` when the configured invoker has no
     ``.model`` attribute. MOCK_LLM is still respected by the existing
     guard at the top of ``_get_phase1_executor``.
@@ -65,7 +65,7 @@ def test_reduce_propagates_model_from_llm_invoker(monkeypatch):
     monkeypatch.delenv("MOCK_LLM", raising=False)
 
     mock_invoker = MagicMock()
-    mock_invoker.model = "configured-model:99b"  # OllamaInvoker exposes this
+    mock_invoker.model = "configured-model:99b"  # UnifiedInvoker exposes this
 
     orch = Phase1Orchestrator(
         work_dir=tempfile.mkdtemp(),
