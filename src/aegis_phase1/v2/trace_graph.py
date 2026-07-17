@@ -1,5 +1,17 @@
 """Thin LangGraph wrapper around Phase1Orchestrator (AEGIS-P1-CORR-017).
 
+DEPRECATED — superseded by the proper 18-node StateGraph in
+:mod:`aegis_phase1.v2.graph` (AEGIS-P1-CORR-018a S2). This module is kept as
+a back-compat shim so:
+
+- ``from aegis_phase1.v2.trace_graph import build_orchestrator_graph`` and
+  friends continue to work for any consumer that has not yet migrated.
+- The ``-W error::DeprecationWarning`` smoke check still fires the warning.
+- ``tests/unit/v2/test_trace_graph_corr017.py`` (legacy test file) keeps
+  validating the original 5-node behaviour.
+
+New code should import from :mod:`aegis_phase1.v2.graph`.
+
 Mirrors the aegis-kg pattern from ``core/workflow/phase1/graph.py:121-282``.
 Does NOT rewrite :class:`Phase1Orchestrator` internals; instead wraps each
 pipeline stage as a graph node that calls the existing method on a shared
@@ -27,14 +39,34 @@ defeat that introspection and silently drop ``config`` to its default
 ``None`` inside every node, breaking the orchestrator handoff.
 """
 
-from pathlib import Path
-from typing import Any, Optional, TypedDict
+import warnings
 
-from langchain_core.runnables import RunnableConfig
-from langgraph.graph import END, START, StateGraph
+warnings.warn(
+    "aegis_phase1.v2.trace_graph is deprecated; use aegis_phase1.v2.graph "
+    "(AEGIS-P1-CORR-018a S2). The 5-node thin wrapper was replaced by the "
+    "18-node StateGraph on 2026-07-16. This shim emits DeprecationWarning "
+    "on import and will be removed in a follow-up contract.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-from aegis_phase1.v2.domain.processor import MapPartialFailure, OllamaUnreachable
-from aegis_phase1.v2.orchestrator import Phase1Orchestrator
+from pathlib import Path  # noqa: E402 — placed after deprecation warning
+from typing import Any, Optional, TypedDict  # noqa: E402
+
+from langchain_core.runnables import RunnableConfig  # noqa: E402
+from langgraph.graph import END, START, StateGraph  # noqa: E402
+
+from aegis_phase1.v2.domain.processor import (  # noqa: E402
+    MapPartialFailure,
+    OllamaUnreachable,
+)
+from aegis_phase1.v2.graph import (  # noqa: E402,F401 — re-export new names
+    Phase1GraphState,
+    build_phase1_graph,
+    compile_phase1_graph,
+    run_phase1_graph,
+)
+from aegis_phase1.v2.orchestrator import Phase1Orchestrator  # noqa: E402,F401
 
 
 class OrchestratorRunState(TypedDict, total=False):
@@ -234,4 +266,8 @@ __all__ = [
     "build_orchestrator_graph",
     "compile_orchestrator_graph",
     "run_orchestrator_graph",
+    "Phase1GraphState",
+    "build_phase1_graph",
+    "compile_phase1_graph",
+    "run_phase1_graph",
 ]
