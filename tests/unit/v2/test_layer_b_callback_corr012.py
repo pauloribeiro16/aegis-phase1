@@ -150,10 +150,15 @@ def test_extract_usage_ollama_response_metadata():
 
 
 def test_extract_usage_empty_response_metadata():
-    """Empty ``response_metadata`` dict → zeros, no raise."""
+    """Empty ``response_metadata`` dict AND empty content → zeros, no raise.
+
+    CORR-021: when content is non-empty, the fallback estimates tokens
+    from len(content)//4 (1 token minimum). This test uses empty content
+    to verify the strictly-zero path still works.
+    """
     from aegis_phase1.llm.unified import _extract_usage
 
-    msg = _FakeAIMessage(response_metadata={}, usage_metadata={})
+    msg = _FakeAIMessage(content="", response_metadata={}, usage_metadata={})
     usage = _extract_usage(msg)
     assert usage == {
         "prompt_tokens": 0,

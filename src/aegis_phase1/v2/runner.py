@@ -7,7 +7,7 @@ Usage:
 
 Sprint MAP-3 flags:
     --mock-llm                  Set MOCK_LLM=true (use MockInvoker).
-    --model NAME                Ollama model (default: gemma4:e4b).
+    --model NAME                Ollama model (default: gemma4:e2b).
     --retry-failed D-04,D-07    After --run-all, re-process failed domains.
     --map-only                  Run only the MAP stage (skip REDUCE/OUTPUT).
 
@@ -48,6 +48,17 @@ def setup_logging(level: str = "INFO") -> None:
             logging.StreamHandler(sys.stdout),
         ],
     )
+
+    logging.getLogger("aegis_phase1.v2.output").setLevel(logging.WARNING)
+    logging.getLogger("aegis_phase1.v2.output.doc_04a").setLevel(logging.WARNING)
+    logging.getLogger("aegis_phase1.v2.output.doc_04b").setLevel(logging.WARNING)
+    logging.getLogger("aegis_phase1.v2.output.doc_04c").setLevel(logging.WARNING)
+    logging.getLogger("aegis_phase1.v2.output.doc_04d").setLevel(logging.WARNING)
+    logging.getLogger("aegis_phase1.v2.output.doc_05").setLevel(logging.WARNING)
+    logging.getLogger("aegis_phase1.v2.output.doc_07").setLevel(logging.WARNING)
+    logging.getLogger("aegis_phase1.v2.output.doc_07b").setLevel(logging.WARNING)
+    logging.getLogger("aegis_phase1.v2.output.xlsx_generator").setLevel(logging.WARNING)
+    logging.getLogger("aegis_phase1.v2.output._common").setLevel(logging.WARNING)
 
 
 def main() -> None:
@@ -160,8 +171,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="gemma4:e4b",
-        help="Ollama model name (default: gemma4:e4b)",
+        default="gemma4:e2b",
+        help="Ollama model name (default: gemma4:e2b)",
     )
     parser.add_argument(
         "--retry-failed",

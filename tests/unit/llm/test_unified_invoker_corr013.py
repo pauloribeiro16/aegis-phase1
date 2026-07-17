@@ -330,3 +330,10 @@ def test_invoke_dispatches_to_raw_when_inputs_is_not_dict():
     invoker.invoke_raw.assert_called_once()
     invoker.invoke_spec.assert_not_called()
     assert result == {"raw": "hi", "status": "OK"}
+
+
+def test_default_model_is_2b():
+    """CORR-020: default model switched from gemma4:e4b to gemma4:e2b."""
+    from aegis_phase1.llm.unified import UnifiedInvoker
+
+    assert UnifiedInvoker.DEFAULT_MODEL == "gemma4:e2b"

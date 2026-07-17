@@ -43,8 +43,8 @@ DEFAULT_REGULATORY_BASELINE_PATH = str(
     _DEFAULT_PROJECTS / "Methodology-main" / "00_METHODOLOGY" / "PREPROCESSING"
 )
 DEFAULT_OUTPUT_DIR = "output/phase1"
-DEFAULT_MODEL = "gemma4:e4b"
-MODEL_CHOICES = ["gemma4:e4b", "gemma4:e2b", "Custom..."]
+DEFAULT_MODEL = "gemma4:e2b"
+MODEL_CHOICES = ["gemma4:e2b", "gemma4:e4b", "Custom..."]
 
 
 def _log_action(action: str, **data) -> None:
@@ -143,7 +143,7 @@ def _step_select_mode() -> str:
 
     options = [
         "Mock (no Ollama, fast, deterministic)",
-        "Real (Ollama + gemma4:e4b)",
+        "Real (Ollama + gemma4:e2b)",
     ]
     selected = beaupy.select(options=options, cursor_index=0)
     return "real" if selected and "Real" in selected else "mock"
