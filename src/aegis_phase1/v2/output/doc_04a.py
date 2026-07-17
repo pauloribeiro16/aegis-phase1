@@ -53,6 +53,8 @@ def render_doc_04a(
     state: dict[str, Any],
     output_dir: str,
     llm_invoker: Any | None = None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Render AEGIS-P1-04a Architecture & Data Inventory.
 
@@ -62,6 +64,10 @@ def render_doc_04a(
         llm_invoker: Optional LLM invoker (``invoke(prompt) -> {"raw": str, ...}``).
             When ``None`` or when ``MOCK_LLM`` is truthy, deterministic
             fallback text is used.
+        config: Optional Langfuse / LangChain runnable config threaded
+            through to nested LLM calls so the GENERATION span is named
+            after the LangGraph node (``run_name`` is read by
+            :class:`aegis_phase1.v2.output._narrative.render_mandatory_narrative`).
 
     Returns:
         Mapping ``AEGIS-P1-04a`` -> absolute file path.
@@ -69,7 +75,9 @@ def render_doc_04a(
     inventory = _inventory(state)
     use_llm = _should_use_llm(llm_invoker)
     frontmatter = _build_frontmatter(state)
-    body = _build_body(state, inventory, llm_invoker if use_llm else None)
+    body = _build_body(
+        state, inventory, llm_invoker if use_llm else None, config=config
+    )
     path = write_output(output_dir, _FILENAME, frontmatter + body)
     logger.info("render_doc_04a: wrote %s", path)
     return {"AEGIS-P1-04a": path}
@@ -84,6 +92,8 @@ def _build_body(
     state: dict[str, Any],
     inventory: dict[str, list[dict]],
     llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> str:
     parts: list[str] = []
     parts.append("# AEGIS-P1-04a Architecture & Data Inventory\n")
@@ -95,7 +105,11 @@ def _build_body(
         f"Applicable regulations: {applicable_text}. "
         f"Active sub-domains: {len(active)}; inactive: {', '.join(inactive) or 'none'}."
     )
-    parts.extend(_section_1_technical_architecture(state, inventory, llm_invoker, summary))
+    parts.extend(
+        _section_1_technical_architecture(
+            state, inventory, llm_invoker, summary, config=config
+        )
+    )
     parts.extend(_section_2_data_inventory(state, inventory, llm_invoker))
     parts.extend(_section_3_compliance_mapping(state, active, inactive, inventory))
     parts.extend(_section_4_gate(state, inventory, active, applicable))
@@ -107,6 +121,8 @@ def _section_1_technical_architecture(
     inventory: dict[str, list[dict]],
     llm_invoker: Any | None,
     summary: str,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 1. Technical Architecture\n")
@@ -115,6 +131,7 @@ def _section_1_technical_architecture(
         prompt=_technical_architecture_prompt(state, inventory, summary),
         section_id="doc_04a.section_1.technical_architecture",
         max_chars=_MAX_FRAGMENT_BYTES,
+        config=config,
     )
     parts.append(narrative.rstrip() + "\n")
 
@@ -128,6 +145,7 @@ def _section_1_technical_architecture(
         prompt=_network_topology_prompt(state, inventory),
         section_id="doc_04a.section_1.network_topology",
         max_chars=_MAX_FRAGMENT_BYTES,
+        config=config,
     )
     parts.append(topology.rstrip() + "\n")
 

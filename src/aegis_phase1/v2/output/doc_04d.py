@@ -144,6 +144,8 @@ def render_doc_04d(
     state: dict[str, Any],
     output_dir: str,
     llm_invoker: Any | None = None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Render AEGIS-P1-04d Organisation, Roles & RACI Matrix.
 
@@ -153,13 +155,16 @@ def render_doc_04d(
         llm_invoker: Optional LLM invoker. When ``None`` or when
             ``MOCK_LLM`` is truthy, deterministic fallback text is used
             for the escalation-paths narrative.
+        config: Optional Langfuse / LangChain runnable config threaded
+            through to nested LLM calls so the GENERATION span is named
+            after the LangGraph node.
 
     Returns:
         Mapping ``AEGIS-P1-04d`` -> absolute file path.
     """
     use_llm = _should_use_llm(llm_invoker)
     frontmatter = _build_frontmatter(state)
-    body = _build_body(state, llm_invoker if use_llm else None)
+    body = _build_body(state, llm_invoker if use_llm else None, config=config)
     path = write_output(output_dir, _FILENAME, frontmatter + body)
     logger.info("render_doc_04d: wrote %s", path)
     return {"AEGIS-P1-04d": path}
@@ -170,18 +175,23 @@ def render_doc_04d(
 # ─────────────────────────────────────────────────────────────────────
 
 
-def _build_body(state: dict[str, Any], llm_invoker: Any | None) -> str:
+def _build_body(
+    state: dict[str, Any],
+    llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
+) -> str:
     parts: list[str] = []
     parts.append("# Organisation, Roles & RACI Matrix\n")
     parts.extend(_section_purpose_scope(state))
     parts.extend(_section_company_level(state))
     parts.extend(_section_regulation_level(state))
     parts.extend(_section_key_roles(state))
-    parts.extend(_section_reporting_lines(state, llm_invoker))
+    parts.extend(_section_reporting_lines(state, llm_invoker, config=config))
     parts.extend(_section_raci_matrix(state))
     parts.extend(_section_training_status(state))
     parts.extend(_section_compliance_mapping(state))
-    parts.extend(_section_escalation_paths(state, llm_invoker))
+    parts.extend(_section_escalation_paths(state, llm_invoker, config=config))
     parts.extend(_section_gaps(state))
     parts.extend(_section_gate(state))
     parts.extend(_section_version_history(state))
@@ -359,7 +369,12 @@ def _section_key_roles(state: dict[str, Any]) -> list[str]:
     return parts
 
 
-def _section_reporting_lines(state: dict[str, Any], llm_invoker: Any | None) -> list[str]:
+def _section_reporting_lines(
+    state: dict[str, Any],
+    llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
+) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. Reporting Lines\n")
     parts.append(
@@ -406,6 +421,7 @@ def _section_reporting_lines(state: dict[str, Any], llm_invoker: Any | None) -> 
         prompt=_reporting_lines_prompt(state),
         section_id="doc_04d.section_5.reporting_lines",
         max_chars=_MAX_FRAGMENT_BYTES,
+        config=config,
     )
     parts.append("**Plain-text description:**\n")
     parts.append(narrative.rstrip() + "\n")
@@ -562,7 +578,12 @@ def _section_compliance_mapping(state: dict[str, Any]) -> list[str]:
     return parts
 
 
-def _section_escalation_paths(state: dict[str, Any], llm_invoker: Any | None) -> list[str]:
+def _section_escalation_paths(
+    state: dict[str, Any],
+    llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
+) -> list[str]:
     parts: list[str] = []
     parts.append("## 9. Escalation Paths\n")
     narrative = render_mandatory_narrative(
@@ -570,6 +591,7 @@ def _section_escalation_paths(state: dict[str, Any], llm_invoker: Any | None) ->
         prompt=_escalation_prompt(state),
         section_id="doc_04d.section_9.escalation_paths",
         max_chars=_MAX_FRAGMENT_BYTES,
+        config=config,
     )
     parts.append(narrative.rstrip() + "\n")
     return parts

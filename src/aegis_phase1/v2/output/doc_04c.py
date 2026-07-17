@@ -78,6 +78,8 @@ def render_doc_04c(
     state: dict[str, Any],
     output_dir: str,
     llm_invoker: Any | None = None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Render AEGIS-P1-04c Third-Party Landscape Inventory.
 
@@ -87,13 +89,16 @@ def render_doc_04c(
         llm_invoker: Optional LLM invoker. When ``None`` or when
             ``MOCK_LLM`` is truthy, deterministic fallback text is used
             for the risk-classification narrative.
+        config: Optional Langfuse / LangChain runnable config threaded
+            through to nested LLM calls so the GENERATION span is named
+            after the LangGraph node.
 
     Returns:
         Mapping ``AEGIS-P1-04c`` -> absolute file path.
     """
     use_llm = _should_use_llm(llm_invoker)
     frontmatter = _build_frontmatter(state)
-    body = _build_body(state, llm_invoker if use_llm else None)
+    body = _build_body(state, llm_invoker if use_llm else None, config=config)
     path = write_output(output_dir, _FILENAME, frontmatter + body)
     logger.info("render_doc_04c: wrote %s", path)
     return {"AEGIS-P1-04c": path}
@@ -104,14 +109,19 @@ def render_doc_04c(
 # ─────────────────────────────────────────────────────────────────────
 
 
-def _build_body(state: dict[str, Any], llm_invoker: Any | None) -> str:
+def _build_body(
+    state: dict[str, Any],
+    llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
+) -> str:
     parts: list[str] = []
     parts.append("# Third-Party Landscape Inventory\n")
     parts.extend(_section_purpose_scope(state))
     parts.extend(_section_inherited_infrastructure(state))
     parts.extend(_section_overlap_implied(state))
     parts.extend(_section_contractual_controls(state))
-    parts.extend(_section_risk_classification(state, llm_invoker))
+    parts.extend(_section_risk_classification(state, llm_invoker, config=config))
     parts.extend(_section_compliance_mapping(state))
     parts.extend(_section_gaps(state))
     parts.extend(_section_gate(state))
@@ -274,7 +284,12 @@ def _section_contractual_controls(state: dict[str, Any]) -> list[str]:
     return parts
 
 
-def _section_risk_classification(state: dict[str, Any], llm_invoker: Any | None) -> list[str]:
+def _section_risk_classification(
+    state: dict[str, Any],
+    llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
+) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. Supply Chain Risk Assessment\n")
     inv = state.get("architecture_inventory") or {}
@@ -320,6 +335,7 @@ def _section_risk_classification(state: dict[str, Any], llm_invoker: Any | None)
         prompt=_risk_narrative_prompt(state, cloud, rows),
         section_id="doc_04c.section_5.concentration_risk_narrative",
         max_chars=_MAX_FRAGMENT_BYTES,
+        config=config,
     )
     parts.append("### 5.1 Concentration Risk Narrative\n")
     parts.append(narrative.rstrip() + "\n")

@@ -84,11 +84,13 @@ class DomainProcessor:
         max_retries: int = 3,
         *,
         langfuse_handler: Any = None,
+        config: dict[str, Any] | None = None,
     ) -> None:
         self.llm_invoker = llm_invoker
         self.log_dir = Path(log_dir) if log_dir else None
         self.parser = OutputParser()
         self.max_retries = max(1, int(max_retries))
+        self.config = config
         if (
             langfuse_handler is not None
             and hasattr(self.llm_invoker, "_langfuse_handler")
@@ -133,7 +135,9 @@ class DomainProcessor:
             prompt = render_prompt(inputs, feedback=feedback)
 
             try:
-                response = self.llm_invoker.invoke(prompt, feedback=feedback)
+                response = self.llm_invoker.invoke(
+                    prompt, feedback=feedback, config=self.config
+                )
             except Exception as exc:  # noqa: BLE001 — fatal LLM error
                 logger.error("LLM invoke raised for %s: %s", domain_id, exc)
                 raise OllamaUnreachable(str(exc)) from exc

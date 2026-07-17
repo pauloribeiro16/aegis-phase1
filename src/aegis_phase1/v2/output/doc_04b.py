@@ -376,6 +376,8 @@ def render_doc_04b(
     state: dict[str, Any],
     output_dir: str,
     llm_invoker: Any | None = None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Render AEGIS-P1-04b Security Posture Assessment (Maturity Model).
 
@@ -385,13 +387,17 @@ def render_doc_04b(
         llm_invoker: Optional LLM invoker. When ``None`` or when
             ``MOCK_LLM`` is truthy, deterministic fallback text is used
             for all per-domain Notes.
+        config: Optional Langfuse / LangChain runnable config threaded
+            through to nested LLM calls so the GENERATION span is named
+            after the LangGraph node (``run_name`` is read by
+            :class:`aegis_phase1.v2.output._narrative.render_mandatory_narrative`).
 
     Returns:
         Mapping ``AEGIS-P1-04b`` -> absolute file path.
     """
     use_llm = _should_use_llm(llm_invoker)
     frontmatter = _build_frontmatter(state)
-    body = _build_body(state, llm_invoker if use_llm else None)
+    body = _build_body(state, llm_invoker if use_llm else None, config=config)
     path = write_output(output_dir, _FILENAME, frontmatter + body)
     logger.info("render_doc_04b: wrote %s", path)
     return {"AEGIS-P1-04b": path}
@@ -402,12 +408,17 @@ def render_doc_04b(
 # ─────────────────────────────────────────────────────────────────────
 
 
-def _build_body(state: dict[str, Any], llm_invoker: Any | None) -> str:
+def _build_body(
+    state: dict[str, Any],
+    llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
+) -> str:
     parts: list[str] = []
     parts.append("# Security Posture Assessment (Maturity Model)\n")
     parts.extend(_section_purpose(state))
     parts.extend(_section_methodology(state))
-    parts.extend(_section_per_domain(state, llm_invoker))
+    parts.extend(_section_per_domain(state, llm_invoker, config=config))
     parts.extend(_section_summary(state))
     parts.extend(_section_top_gaps(state))
     parts.extend(_section_consistency(state))
@@ -469,7 +480,12 @@ def _section_methodology(state: dict[str, Any]) -> list[str]:
     return parts
 
 
-def _section_per_domain(state: dict[str, Any], llm_invoker: Any | None) -> list[str]:
+def _section_per_domain(
+    state: dict[str, Any],
+    llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
+) -> list[str]:
     parts: list[str] = []
     parts.append("## 3. Per-Domain Assessment\n")
     overrides = _overrides(state)
@@ -485,7 +501,10 @@ def _section_per_domain(state: dict[str, Any], llm_invoker: Any | None) -> list[
         parts.append("")
         parts.append(f"**Target maturity**: {target}  ")
         parts.append(f"**Gap**: {gap}  ")
-        notes = _domain_notes(domain_id, state, current, target, gap, controls, llm_invoker)
+        notes = _domain_notes(
+            domain_id, state, current, target, gap, controls, llm_invoker,
+            config=config,
+        )
         parts.append(f"**Notes**: {notes}\n")
         domain_result = domain_results.get(domain_id) or {}
         if domain_result:
@@ -789,6 +808,8 @@ def _domain_notes(
     gap: int,
     controls: list[dict[str, str]],
     llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> str:
     """Return a 2-4 sentence narrative for the given domain."""
     prompt = _domain_notes_prompt(domain_id, current, target, gap, controls, state)
@@ -797,6 +818,7 @@ def _domain_notes(
         prompt=prompt,
         section_id=f"doc_04b.section_3.domain_notes.{domain_id}",
         max_chars=_MAX_FRAGMENT_BYTES,
+        config=config,
     )
 
 

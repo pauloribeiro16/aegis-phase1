@@ -89,6 +89,8 @@ def render_doc_05(
     state: dict[str, Any],
     output_dir: str,
     llm_invoker: Any | None = None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Render document 05 (per-regulation applicability).
 
@@ -98,6 +100,9 @@ def render_doc_05(
         llm_invoker: Optional LLM invoker (``invoke(prompt) -> dict``).
             When ``None`` or when ``MOCK_LLM`` is truthy, deterministic
             fallback text is used for the §6 narrative.
+        config: Optional Langfuse / LangChain runnable config threaded
+            through to nested LLM calls so the GENERATION span is named
+            after the LangGraph node.
 
     Returns:
         Mapping ``AEGIS-P1-05`` -> absolute file path.
@@ -130,7 +135,7 @@ def render_doc_05(
     parts.extend(
         _section_5_subdomain_coverage_preliminary(subdomains, regs)
     )
-    parts.extend(_section_6_strategic_implications(state, regs, invoker))
+    parts.extend(_section_6_strategic_implications(state, regs, invoker, config=config))
     parts.append(_render_rationale_by_reg_section(state))
     parts.extend(
         _section_7_regulatory_gaps(ontology, subdomains)
@@ -386,6 +391,8 @@ def _section_6_strategic_implications(
     state: dict[str, Any],
     regs: list[Any],
     llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 6. STRATEGIC IMPLICATIONS\n")
@@ -415,6 +422,7 @@ def _section_6_strategic_implications(
         prompt=_strategic_prompt(state, rows),
         section_id="doc_05.section_6.strategic_narrative",
         max_chars=_MAX_FRAGMENT_BYTES,
+        config=config,
     )
     parts.append("### 6.1 Narrative\n")
     parts.append(narrative.rstrip() + "\n")
