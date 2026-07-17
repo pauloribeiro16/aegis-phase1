@@ -168,12 +168,15 @@ class Phase1Orchestrator:
     def map_domains(self) -> V2State:
         """Stage 1: MAP — adapt sub-domain HSOs per domain (sequential).
 
-        Iterates D-01..D-10 sequentially. Per-domain results are stored
-        in ``state["domain_results"]`` keyed by domain ID.
+        LEGACY loop body (CORR-018a S1): iterates D-01..D-10 sequentially
+        and delegates each iteration to :meth:`map_single_domain`. The
+        pre-built ``DomainProcessor`` is constructed once and passed to
+        each call. Per-domain results are stored in
+        ``state["domain_results"]`` keyed by domain ID.
 
         Raises:
-            OllamaUnreachable: Propagated from the processor when the
-                LLM is unreachable. The whole MAP stage aborts.
+            OllamaUnreachable: Propagated from ``map_single_domain`` when
+                the LLM is unreachable. The whole MAP stage aborts.
             MapPartialFailure: When ≥1 domain ends with status FAILED
                 (after retries). The state is persisted before raising.
         """
@@ -181,7 +184,6 @@ class Phase1Orchestrator:
         start = time.time()
 
         from aegis_phase1.v2.domain.processor import (
-            DOMAIN_NAMES,
             DomainProcessor,
             MapPartialFailure,
             OllamaUnreachable,
@@ -201,7 +203,7 @@ class Phase1Orchestrator:
 
         for did in domain_ids:
             try:
-                result = processor.process(did, self.state)
+                result = self.map_single_domain(did, processor=processor)
             except OllamaUnreachable as exc:
                 logger.error(
                     "MAP aborted — Ollama unreachable on %s: %s", did, exc
@@ -212,19 +214,7 @@ class Phase1Orchestrator:
                 raise
             except Exception as exc:
                 logger.exception("MAP raised for %s: %s", did, exc)
-                result = {
-                    "domain_id": did,
-                    "domain_name": DOMAIN_NAMES.get(did, did),
-                    "subdomains": [],
-                    "coverage": "NOT_ADDRESSED",
-                    "cross_regulation": [],
-                    "llm_status": "FAILED",
-                    "adapted_objective": "",
-                    "key_changes": [],
-                    "applicable_regs": [],
-                    "confidence": "LOW",
-                    "error_reason": str(exc),
-                }
+                result = self._failed_domain_result(did, exc)
 
             results[did] = result
             status = result.get("llm_status", "UNKNOWN")
@@ -254,6 +244,66 @@ class Phase1Orchestrator:
                 f"{len(failed_domains)} domain(s) failed: {failed_domains}"
             )
         return self.state
+
+    def map_single_domain(
+        self,
+        domain_id: str,
+        *,
+        processor: Any | None = None,
+    ) -> dict[str, Any]:
+        """Single-domain MAP for one D-XX.
+
+        Granular method extracted from :meth:`map_domains` (CORR-018a S1).
+        Invokes ``processor.process(domain_id, state)`` and returns the
+        ``DomainResult``-shaped dict. Does NOT catch exceptions; the
+        caller (legacy ``map_domains`` or a LangGraph node in S2) owns
+        the try/except policy and ``OllamaUnreachable`` propagation.
+
+        Args:
+            domain_id: Domain identifier (e.g. ``"D-04"``).
+            processor: Pre-built ``DomainProcessor`` for performance. When
+                ``None`` (default), a fresh processor is constructed
+                lazily from orchestrator state. The legacy
+                :meth:`map_domains` constructs one processor and passes it
+                to all 10 calls; LangGraph nodes (S2) construct per-call.
+
+        Returns:
+            A :class:`DomainResult` dict as returned by ``processor.process``.
+        """
+        if processor is None:
+            from aegis_phase1.v2.domain.processor import DomainProcessor
+
+            processor = DomainProcessor(
+                llm_invoker=self.llm_invoker,
+                log_dir=self.log_dir,
+                langfuse_handler=self._langfuse_handler,
+            )
+        return processor.process(domain_id, self.state)
+
+    def _failed_domain_result(
+        self, domain_id: str, exc: Exception
+    ) -> dict[str, Any]:
+        """Build the FAILED ``DomainResult`` dict for a domain whose processing raised.
+
+        Extracted from the inline construction in the legacy
+        :meth:`map_domains` loop body (CORR-018a S1). Mirrors the
+        original shape exactly so callers see identical output.
+        """
+        from aegis_phase1.v2.domain.processor import DOMAIN_NAMES
+
+        return {
+            "domain_id": domain_id,
+            "domain_name": DOMAIN_NAMES.get(domain_id, domain_id),
+            "subdomains": [],
+            "coverage": "NOT_ADDRESSED",
+            "cross_regulation": [],
+            "llm_status": "FAILED",
+            "adapted_objective": "",
+            "key_changes": [],
+            "applicable_regs": [],
+            "confidence": "LOW",
+            "error_reason": str(exc),
+        }
 
     def retry_failed(self, domain_ids: list[str]) -> V2State:
         """Re-run MAP for a chosen subset of domain IDs.
@@ -326,18 +376,61 @@ class Phase1Orchestrator:
     def reduce(self) -> V2State:
         """Stage 2: Reduce MAP-stage domain results into a per-sub-domain profile.
 
-        Calls the four REDUCE sub-stages in sequence:
+        LEGACY entry point (CORR-018a S1). Delegates the deterministic
+        and LLM sub-stages to granular methods:
 
-        1. :func:`concatenate` — flatten ``domain_results`` by sub-domain.
-        2. :func:`merge_requirements` — merge overlapping cross-regulation reqs.
-        3. :func:`resolve_conflicts` — apply AMBIGUITY_ANALYSIS resolutions.
-        4. :func:`apply_proportionality` — TrackB tier + 5 attrs per sub-domain.
+        1. :meth:`reduce_deterministic` — concat / merge / conflicts / proportionality.
+        2. :meth:`reduce_synthesis` — P1C-LLM-03 STRATEGIC SYNTHESIS.
+        3. :meth:`reduce_compound` — P1C-LLM-02 COMPOUND EVENTS.
 
-        All four outputs are merged into ``state["aggregated_data"]``.
+        All four deterministic outputs are merged into
+        ``state["aggregated_data"]`` (same as the pre-refactor
+        behaviour); the LLM granular methods populate
+        ``synthesis`` and ``compound_events`` from the executor result.
         """
         logger.info("=== STAGE 2: REDUCE ===")
         start = time.time()
 
+        profile = self.reduce_deterministic()
+        synthesis = self.reduce_synthesis()
+        compound_events = self.reduce_compound()
+
+        cached = getattr(self, "_phase_1c_reduce_cache", None)
+        if isinstance(cached, dict):
+            logger.info(
+                "REDUCE-LLM complete: synthesis=%s, compound_events=%s, status=%s",
+                "OK" if synthesis else "MISSING",
+                "OK" if compound_events else "MISSING",
+                cached.get("status", "?"),
+            )
+
+        elapsed = time.time() - start
+        profile_data = profile if isinstance(profile, dict) else {}
+        logger.info(
+            "REDUCE complete: %d subdomains profiled (%.2fs)",
+            len(profile_data),
+            elapsed,
+        )
+        self._persist_state()
+        return self.state
+
+    def reduce_deterministic(self) -> dict[str, Any] | None:
+        """Deterministic reduce step (concat / merge / conflicts / proportionality).
+
+        Granular method extracted from :meth:`reduce` (CORR-018a S1).
+        Runs the four deterministic reduce sub-stages and writes the
+        merged outputs into ``state["aggregated_data"]``. Sets
+        ``state["current_stage"] = "REDUCED"``. Does not touch the
+        ``synthesis`` / ``compound_events`` keys (those remain ``None``
+        until the LLM granular methods fill them in).
+
+        Returns:
+            The profile sub-dict (the value stored under
+            ``aggregated_data["profile"]``), for diagnostic logging by
+            the legacy :meth:`reduce` caller. Returns ``None`` only if
+            the deterministic stages returned ``None`` (preserved from
+            the original behaviour).
+        """
         from aegis_phase1.v2.reduce import (
             apply_proportionality,
             concatenate,
@@ -352,7 +445,9 @@ class Phase1Orchestrator:
         resolved = resolve_conflicts(merged, ambiguities)
         profile = apply_proportionality(merged, self.state.get("company_context"))
 
-        profile_data = profile.get("profile", {}) if isinstance(profile, dict) else profile
+        profile_data = (
+            profile.get("profile", {}) if isinstance(profile, dict) else profile
+        )
         self.state["aggregated_data"] = {
             "concatenated": concatenated,
             "merged": merged,
@@ -362,116 +457,133 @@ class Phase1Orchestrator:
             "compound_events": None,
         }
         self.state["current_stage"] = "REDUCED"
+        return profile_data if isinstance(profile_data, dict) else None
 
+    def reduce_synthesis(self) -> dict[str, Any] | None:
+        """P1C-LLM-03 STRATEGIC SYNTHESIS reduce step.
+
+        Granular method extracted from :meth:`reduce` (CORR-018a S1).
+        Calls the Phase1Executor's ``run_phase_1c_reduce`` (which fires
+        P1C-LLM-03 then P1C-LLM-02 internally per contract), stores the
+        P1C-LLM-03 synthesis into ``state["aggregated_data"]["synthesis"]``,
+        and caches the full executor result on ``self._phase_1c_reduce_cache``
+        so :meth:`reduce_compound` can extract P1C-LLM-02 without a second
+        executor call (avoids re-invoking ``_get_phase1_executor`` and
+        preserves the LLM-02-consumes-LLM-03 chain).
+
+        Returns:
+            The P1C-LLM-03 synthesis dict on success, ``None`` when the
+            executor is unavailable, returned an unexpected type, or
+            raised. On failure, appends to ``state["errors"]`` and sets
+            ``current_stage = "REDUCE_INDETERMINATE"`` (identical to the
+            pre-refactor fallback).
+        """
         executor = self._get_phase1_executor()
-        if executor is not None:
-            try:
-                logger.info(
-                    "REDUCE-LLM: running P1C-LLM-03 then P1C-LLM-02 "
-                    "via Phase1Executor"
-                )
-
-                lane_outputs = [
-                    {
-                        "lane_id": lane_id,
-                        "sub_domain_activations": (
-                            lane_result.get("subdomains") or []
-                            if isinstance(lane_result, dict)
-                            else []
-                        ),
-                    }
-                    for lane_id, lane_result in (
-                        self.state.get("domain_results") or {}
-                    ).items()
-                ]
-                aggregated_activations = [
-                    activation
-                    for lane_output in lane_outputs
-                    for activation in lane_output["sub_domain_activations"]
-                    if isinstance(activation, dict)
-                ]
-
-                raw_company_context = self.state.get("company_context")
-                if isinstance(raw_company_context, dict):
-                    company_context = dict(raw_company_context)
-                elif raw_company_context is not None:
-                    company_context = raw_company_context.model_dump()
-                else:
-                    company_context = {}
-
-                applicable_regs = [
-                    str(reg)
-                    for reg in company_context.get("applicable_regs", [])
-                    if reg
-                ]
-                if not applicable_regs:
-                    applicability = company_context.get("applicable_regulations", [])
-                    if isinstance(applicability, list):
-                        applicable_regs = [
-                            str(reg.get("abbreviation"))
-                            for reg in applicability
-                            if isinstance(reg, dict)
-                            and reg.get("applicable", False)
-                            and reg.get("abbreviation")
-                        ]
-
-                case_id = Path(self.state.get("case_path") or "case").name
-                run_result = executor.run_phase_1c_reduce(
-                    case_id=case_id,
-                    lane_outputs=lane_outputs,
-                    sync_result={
-                        "conflicts": self.state["aggregated_data"].get(
-                            "conflicts", []
-                        )
-                        or []
-                    },
-                    track_b_profile=self.state["aggregated_data"].get("profile", {}),
-                    applicable_regs=applicable_regs,
-                    company_facts=company_context,
-                    layer0_subdomain_refs=list(
-                        (self.state.get("subdomains") or {}).keys()
-                    ),
-                )
-
-                if isinstance(run_result, dict):
-                    synthesis = run_result.get(
-                        "P1C-LLM-03-STRATEGIC-SYNTHESIS",
-                        run_result.get("P1C-LLM-03"),
-                    )
-                    compound_events = run_result.get(
-                        "P1C-LLM-02-COMPOUND-EVENT",
-                        run_result.get("P1C-LLM-02"),
-                    )
-                    self.state["aggregated_data"]["synthesis"] = synthesis
-                    self.state["aggregated_data"]["compound_events"] = compound_events
-                    logger.info(
-                        "REDUCE-LLM complete: activations=%d, synthesis=%s, "
-                        "compound_events=%s, status=%s",
-                        len(aggregated_activations),
-                        "OK" if synthesis else "MISSING",
-                        "OK" if compound_events else "MISSING",
-                        run_result.get("status", "?"),
-                    )
-                else:
-                    logger.warning(
-                        "REDUCE-LLM: unexpected return type %s",
-                        type(run_result).__name__,
-                    )
-            except Exception as exc:
-                logger.warning("REDUCE-LLM failed (continuing): %s", exc)
-                self.state["errors"].append(f"reduce_llm: {exc}")
-                self.state["current_stage"] = "REDUCE_INDETERMINATE"
-        else:
+        if executor is None:
             logger.info("REDUCE-LLM skipped: deterministic-only or mock mode")
+            return None
 
-        elapsed = time.time() - start
-        logger.info(
-            "REDUCE complete: %d subdomains profiled (%.2fs)",
-            len(profile.get("profile", {})),
-            elapsed,
+        lane_outputs = [
+            {
+                "lane_id": lane_id,
+                "sub_domain_activations": (
+                    lane_result.get("subdomains") or []
+                    if isinstance(lane_result, dict)
+                    else []
+                ),
+            }
+            for lane_id, lane_result in (
+                self.state.get("domain_results") or {}
+            ).items()
+        ]
+
+        raw_company_context = self.state.get("company_context")
+        if isinstance(raw_company_context, dict):
+            company_context = dict(raw_company_context)
+        elif raw_company_context is not None:
+            company_context = raw_company_context.model_dump()
+        else:
+            company_context = {}
+
+        applicable_regs = [
+            str(reg)
+            for reg in company_context.get("applicable_regs", [])
+            if reg
+        ]
+        if not applicable_regs:
+            applicability = company_context.get("applicable_regulations", [])
+            if isinstance(applicability, list):
+                applicable_regs = [
+                    str(reg.get("abbreviation"))
+                    for reg in applicability
+                    if isinstance(reg, dict)
+                    and reg.get("applicable", False)
+                    and reg.get("abbreviation")
+                ]
+
+        try:
+            case_id = Path(self.state.get("case_path") or "case").name
+            run_result = executor.run_phase_1c_reduce(
+                case_id=case_id,
+                lane_outputs=lane_outputs,
+                sync_result={
+                    "conflicts": self.state["aggregated_data"].get(
+                        "conflicts", []
+                    )
+                    or []
+                },
+                track_b_profile=self.state["aggregated_data"].get("profile", {}),
+                applicable_regs=applicable_regs,
+                company_facts=company_context,
+                layer0_subdomain_refs=list(
+                    (self.state.get("subdomains") or {}).keys()
+                ),
+            )
+        except Exception as exc:
+            logger.warning("REDUCE-LLM failed (continuing): %s", exc)
+            self.state["errors"].append(f"reduce_llm: {exc}")
+            self.state["current_stage"] = "REDUCE_INDETERMINATE"
+            return None
+
+        if not isinstance(run_result, dict):
+            logger.warning(
+                "REDUCE-LLM: unexpected return type %s",
+                type(run_result).__name__,
+            )
+            return None
+
+        self._phase_1c_reduce_cache = run_result
+        synthesis = run_result.get(
+            "P1C-LLM-03-STRATEGIC-SYNTHESIS",
+            run_result.get("P1C-LLM-03"),
         )
-        self._persist_state()
-        return self.state
+        if synthesis is not None:
+            self.state["aggregated_data"]["synthesis"] = synthesis
+        return synthesis if isinstance(synthesis, dict) else None
+
+    def reduce_compound(self) -> dict[str, Any] | None:
+        """P1C-LLM-02 COMPOUND EVENTS reduce step.
+
+        Granular method extracted from :meth:`reduce` (CORR-018a S1).
+        Reads the cached executor result produced by :meth:`reduce_synthesis`
+        (no new LLM call) and writes the P1C-LLM-02 payload into
+        ``state["aggregated_data"]["compound_events"]``.
+
+        Returns:
+            The P1C-LLM-02 compound-events dict when a cached result is
+            available, ``None`` otherwise (e.g. synthesis step was
+            skipped or failed before caching).
+        """
+        run_result = getattr(self, "_phase_1c_reduce_cache", None)
+        if not isinstance(run_result, dict):
+            return None
+        compound_events = run_result.get(
+            "P1C-LLM-02-COMPOUND-EVENT",
+            run_result.get("P1C-LLM-02"),
+        )
+        if compound_events is not None:
+            self.state["aggregated_data"]["compound_events"] = compound_events
+        return compound_events if isinstance(compound_events, dict) else None
 
     def _get_phase1_executor(self) -> "Phase1Executor | None":
         """Lazy-initialize the canonical five-LLM Phase1Executor.
@@ -770,9 +882,9 @@ class Phase1Orchestrator:
     def run_phase_1b(self) -> V2State:
         """Stage 1.5: Per-regulation rationale synthesis via P1B-LLM-02.
 
-        Runs after MAP, before REDUCE. One LLM call per applicable
-        regulation (delegated to ``Phase1Executor.run_phase_1b`` which
-        also fires P1B-LLM-01 INTERPRETATION first). Output stored in
+        LEGACY entry point (CORR-018a S1). Delegates each applicable
+        regulation to :meth:`run_p1b_single` in a loop and aggregates
+        the per-reg synthesis payloads into
         ``state["aggregated_data"]["rationale_by_reg"]`` keyed by
         regulation code (e.g. ``"GDPR"`` →
         ``{synthesis: {rationale, implications, gaps}, ...}``).
@@ -836,14 +948,78 @@ class Phase1Orchestrator:
             self._persist_state()
             return self.state
 
-        # Aggregate sub-domain activations from MAP domain_results.
+        synth_by_reg: dict[str, Any] = {}
+        last_status: str = "?"
+        for reg_id in regs:
+            try:
+                per_reg_synth = self.run_p1b_single("P1B-LLM-02-RATIONALE", reg_id)
+            except Exception as exc:
+                logger.warning(
+                    "Phase 1B RATIONALE failed (continuing) for %s: %s",
+                    reg_id,
+                    exc,
+                )
+                self.state.setdefault("errors", []).append(
+                    f"phase_1b:{reg_id}: {exc}"
+                )
+                continue
+            if isinstance(per_reg_synth, dict) and per_reg_synth:
+                synth_by_reg[reg_id] = per_reg_synth
+
+        self.state["aggregated_data"]["rationale_by_reg"] = synth_by_reg
+        logger.info(
+            "Phase 1B RATIONALE complete for %d regulation(s) "
+            "(status=%s)",
+            len(synth_by_reg),
+            last_status,
+        )
+        self._persist_state()
+        return self.state
+
+    def run_p1b_single(
+        self, spec_id: str, reg_id: str
+    ) -> dict[str, Any] | None:
+        """Single Phase1B call: one spec × one regulation.
+
+        Granular method extracted from :meth:`run_phase_1b` (CORR-018a S1).
+        Computes the per-call inputs from ``self.state``, invokes
+        ``executor.run_phase_1b(applicable_regs=[reg_id])``, and returns
+        the ``aggregated_synthesis[reg_id]`` slice for that regulation
+        (i.e. the per-reg synthesis dict the executor produced).
+
+        Args:
+            spec_id: Reserved for future per-spec splitting (e.g. to call
+                P1B-LLM-01 and P1B-LLM-02 independently per spec). The
+                executor currently performs both sub-calls per reg in a
+                single ``run_phase_1b`` invocation; ``spec_id`` is
+                therefore accepted but ignored in S1.
+            reg_id: One applicable regulation code (e.g. ``"GDPR"``).
+
+        Returns:
+            The per-reg synthesis dict (the value under
+            ``aggregated_synthesis[reg_id]``) on success, ``None`` when
+            the executor is unavailable or returned an unexpected type.
+            The caller (legacy :meth:`run_phase_1b`) aggregates results
+            and persists ``state["errors"]`` on exception.
+        """
+        executor = self._get_phase1_executor()
+        if executor is None:
+            return None
+
+        cc_raw = self.state.get("company_context")
+        if hasattr(cc_raw, "model_dump"):
+            cc = cc_raw.model_dump()
+        elif isinstance(cc_raw, dict):
+            cc = dict(cc_raw)
+        else:
+            cc = {}
+
         aggregated_activations: list[Any] = []
         for lr in (self.state.get("domain_results") or {}).values():
             subs = lr.get("subdomains", []) if isinstance(lr, dict) else []
             if isinstance(subs, list):
                 aggregated_activations.extend(subs)
 
-        # Coverage matrix rows scoped to applicable regs.
         coverage_rows: list[Any] = []
         ontology = self.state.get("ontology") or {}
         cm = ontology.get("clause_mappings") or []
@@ -852,62 +1028,40 @@ class Phase1Orchestrator:
                 if not isinstance(entry, dict):
                     continue
                 regs_in_mapping = [entry.get("regulation"), entry.get("reg")]
-                if any(r in regs for r in regs_in_mapping if r):
+                if reg_id in regs_in_mapping:
                     coverage_rows.append(entry)
 
-        try:
-            case_id = Path(self.state.get("case_path") or "case").name
-            result = executor.run_phase_1b(
-                case_id=case_id,
-                applicable_regs=regs,
-                p1b_llm_01_outputs=None,
-                company_facts=cc,
-                coverage_matrix_row=coverage_rows,
-                aggregated_activations=aggregated_activations,
-                layer0_subdomain_refs=list(
-                    (self.state.get("subdomains") or {}).keys()
-                ),
-                classification={
-                    "role": cc.get("role") or cc.get("obligated_party") or "controller",
-                    "tier": cc.get("complexity_tier") or "LOW",
-                    "basis": "Doc 04 §5",
-                },
-            )
-        except Exception as exc:
-            logger.warning(
-                "Phase 1B RATIONALE failed (continuing): %s", exc
-            )
-            self.state.setdefault("errors", []).append(f"phase_1b: {exc}")
-            self.state["aggregated_data"]["rationale_by_reg"] = {}
-            self._persist_state()
-            return self.state
+        case_id = Path(self.state.get("case_path") or "case").name
+        result = executor.run_phase_1b(
+            case_id=case_id,
+            applicable_regs=[reg_id],
+            p1b_llm_01_outputs=None,
+            company_facts=cc,
+            coverage_matrix_row=coverage_rows,
+            aggregated_activations=aggregated_activations,
+            layer0_subdomain_refs=list(
+                (self.state.get("subdomains") or {}).keys()
+            ),
+            classification={
+                "role": cc.get("role") or cc.get("obligated_party") or "controller",
+                "tier": cc.get("complexity_tier") or "LOW",
+                "basis": "Doc 04 §5",
+            },
+        )
 
-        # Stored shape: {reg_code: synthesis_dict} from
-        # ``run_phase_1b``'s ``aggregated_synthesis``. We also surface
-        # the run-level status so renderers can introspect it.
-        if isinstance(result, dict):
-            synth = result.get("aggregated_synthesis")
-            if isinstance(synth, dict):
-                self.state["aggregated_data"]["rationale_by_reg"] = synth
-            elif "results" in result and isinstance(result["results"], dict):
-                self.state["aggregated_data"]["rationale_by_reg"] = result["results"]
-            else:
-                self.state["aggregated_data"]["rationale_by_reg"] = result
-            logger.info(
-                "Phase 1B RATIONALE complete for %d regulation(s) "
-                "(status=%s)",
-                len(self.state["aggregated_data"]["rationale_by_reg"]),
-                result.get("status", "?"),
-            )
-        else:
+        if not isinstance(result, dict):
             logger.warning(
-                "Phase 1B RATIONALE: unexpected return type %s",
+                "run_p1b_single(%s, %s): unexpected return type %s",
+                spec_id,
+                reg_id,
                 type(result).__name__,
             )
-            self.state["aggregated_data"]["rationale_by_reg"] = {}
+            return None
 
-        self._persist_state()
-        return self.state
+        synth = result.get("aggregated_synthesis")
+        if not isinstance(synth, dict):
+            return None
+        return synth.get(reg_id)
 
     def _init_state(self) -> V2State:
         return {
