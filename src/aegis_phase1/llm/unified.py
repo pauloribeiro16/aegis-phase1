@@ -180,7 +180,7 @@ class UnifiedInvoker:
         _heavy: Lazily-built ``Phase1LLMInvoker`` for the heavy path.
     """
 
-    DEFAULT_MODEL = "gemma4:e4b"
+    DEFAULT_MODEL = "gemma4:e2b"
     DEFAULT_BASE_URL = "http://localhost:11434"
     DEFAULT_TIMEOUT = 120
 
