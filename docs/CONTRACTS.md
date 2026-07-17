@@ -48,7 +48,8 @@ related_documents:
 | **[AEGIS-P1-CORR-015](#corr-015)** | Suppress retry-storm noise (Phase 5) | ✅ MERGED | ⚫ deleted | `2e8531f` | 360 (349 + 11 new) | Add `OllamaUnreachableError(RuntimeError)` + module-level `probe_ollama(base_url, timeout=1.5)` (stdlib urllib) in `src/aegis_phase1/llm/unified.py`; `UnifiedInvoker._ensure_ollama(source)` with per-instance probe cache (TTL 30s) calls probe at start of `invoke_raw` and `invoke_spec` — short-circuits when Ollama is down (no retry, no `python_error` spam). Same probe also added to `Phase1LLMInvoker.invoke()` before its retry loop. `v2/runner.py` catches `OllamaUnreachableError` around `run_wizard(...)` with a friendly user message (`"Start it with: ollama serve. Or run with --mock-llm for offline mode."`) and `sys.exit(2)`. **C4 of SPEC §1 fully fixed**: when Ollama is unreachable, log shows ≤1 error per spec invocation instead of the previous 788-line retry-storm. |
 | **[AEGIS-P1-CORR-016](#corr-016)** | Load `.env` + trace_id pinning in CallbackHandler (fix flat traces) | ✅ MERGED | ⚫ deleted | `f43a63b` | 356 (349 + 7 new) | Two root causes fixed: (1) `src/aegis_phase1/v2/{runner,cli/menu}.py` never imported `aegis_phase1.env`, so `.env` was never loaded (`LANGFUSE_*` empty → handler=None → 0 traces); added `import aegis_phase1.env` to both entry points. (2) `src/aegis_phase1/llm/tracing.py:39` did `CallbackHandler()` without `trace_context` — every `chat.invoke()` became a separate root trace; replaced with `CallbackHandler(trace_context={"trace_id": client.create_trace_id()})` + `handler.tags = [phase:..., case:...]` (adopted from aegis-kg/core/agent/tracing.py:163-165). Default `LANGFUSE_ENABLED` flipped `"false"` → `"true"` for downstream machines; `.env.example` updated. **Result**: all LLM calls now land under ONE root trace ID (flat structure; per-stage spans come in CORR-017). |
 | **[AEGIS-P1-CORR-017](#corr-017)** | Thin LangGraph wrapper around `Phase1Orchestrator` (5 stage spans + nested LLMs) | ✅ MERGED | ⚫ deleted | `e710df7` | 364 (356 + 8 new) | New `src/aegis_phase1/v2/trace_graph.py` (~237 LOC): linear `StateGraph(OrchestratorRunState)` with 5 nodes (`_load → _map → _phase_1b → _reduce → _output`); each node is a thin wrapper that calls the existing `Phase1Orchestrator` method — **ZERO modifications to the orchestrator internals**. `run_orchestrator_graph()` builds `run_config = {"callbacks": [handler], "metadata": {"langfuse_tags": [...]}}`; `graph.invoke(state, config=...)` establishes the root trace + creates per-stage chain spans; LLM calls inside each stage inherit the context → nested GENERATION observations with CORR-010's token extraction. New CLI flag `--run-all-traced` adds the opt-in path alongside legacy `--run-all`. **Result**: ONE Langfuse trace showing the full Phase 1 with 5 stage spans (load → map → phase_1b → reduce → output) and nested LLM generations per stage — the user's "show me Phase 1 in one trace" request. 8 new unit tests cover graph structure, callback propagation, tag propagation, exception flow, and master switch. |
-| **[AEGIS-P1-CORR-018a](#corr-018a)** | Full LangGraph migration — MAP+1B+REDUCE (18 nodes, named spans) | ✅ MERGED | ⚫ deleted | `e34b73b`+`5688323` | 365 (364 + 8 new; -legacy 7 in `trace_graph.py` shim) | **Replaces CORR-017 thin wrapper with proper 18-node `StateGraph`**. 2 atomic commits: S1 (`e34b73b`) refactors `Phase1Orchestrator` to expose 5 granular methods (`map_single_domain`, `run_p1b_single`, `reduce_deterministic`, `reduce_synthesis`, `reduce_compound`); legacy `map_domains`/`run_phase_1b`/`reduce` become thin-loop delegates with identical output. S2 (`5688323`) creates `src/aegis_phase1/v2/graph.py` (393 LOC) with the proper `StateGraph(Phase1GraphState)` containing 18 named nodes (load_baseline + map_D01..D10 + p1b_interp_{GDPR,CRA} + p1b_rat_{GDPR,CRA} + reduce_det + reduce_synthesis + reduce_compound). `run_phase1_graph()` builds `run_config = {"callbacks":[handler], "run_name":"AEGIS Phase 1", "metadata": {"langfuse_tags":[...]}}`; LangGraph auto-naming gives each span a meaningful label (e.g. `MAP D-05 Compliance` instead of `Chain`). `--run-all-traced` flag now routes through this graph. `trace_graph.py` kept as deprecated shim with `DeprecationWarning` (CORR-017 tests still pass). **Result**: per-domain and per-spec spans in the Langfuse UI — the user can finally distinguish D-01 from D-10 and P1B-LLM-01 from P1C-LLM-03. 8 new unit tests (399 + 10 skipped total). Non-blocking follow-up: `run_name` set on node config is not yet threaded into `llm_invoker.invoke()` (C7 design gap) — span names render correctly, but nested GENERATION will show `ChatOllama` until that is wired. |
+| **[AEGIS-P1-CORR-018a](#corr-018a)** | Full LangGraph migration — MAP+1B+REDUCE (18 nodes, named spans) | ✅ MERGED | ⚫ deleted | `e34b73b`+`5688323` | 365 (364 + 8 new; -legacy 7 in `trace_graph.py` shim) | **Replaces CORR-017 thin wrapper with proper 18-node `StateGraph`**. 2 atomic commits: S1 (`e34b73b`) refactors `Phase1Orchestrator` to expose 5 granular methods (`map_single_domain`, `run_p1b_single`, `reduce_deterministic`, `reduce_synthesis`, `reduce_compound`); legacy `map_domains`/`run_phase_1b`/`reduce` become thin-loop delegates with identical output. **Replaced by CORR-018b** (sub-graph hierarchy was needed for proper Langfuse nesting). | S2 (`5688323`) creates `src/aegis_phase1/v2/graph.py` (393 LOC) with the proper `StateGraph(Phase1GraphState)` containing 18 named nodes (load_baseline + map_D01..D10 + p1b_interp_{GDPR,CRA} + p1b_rat_{GDPR,CRA} + reduce_det + reduce_synthesis + reduce_compound). `run_phase1_graph()` builds `run_config = {"callbacks":[handler], "run_name":"AEGIS Phase 1", "metadata": {"langfuse_tags":[...]}}`; LangGraph auto-naming gives each span a meaningful label (e.g. `MAP D-05 Compliance` instead of `Chain`). `--run-all-traced` flag now routes through this graph. `trace_graph.py` kept as deprecated shim with `DeprecationWarning` (CORR-017 tests still pass). **Result**: per-domain and per-spec spans in the Langfuse UI — the user can finally distinguish D-01 from D-10 and P1B-LLM-01 from P1C-LLM-03. 8 new unit tests (399 + 10 skipped total). | CORR-018b reorganized as 4 sub-graphs to match the aegis-kg hierarchy (root → subphase → node → generation). |
+| **[AEGIS-P1-CORR-018b](#corr-018b)** | Sub-graph hierarchy (4 compiled sub-graphs) + 10 OUTPUT nodes + C7 `run_name` fix | ✅ MERGED | ⚫ deleted | `60ecf73` | 381 (365 + 16 new) | **3 changes in 1 atomic commit.** (1) **Sub-graph hierarchy** matching the aegis-kg trace pattern (reference `5b9faa7c...`): refactored `src/aegis_phase1/v2/graph.py` from flat 18-node `StateGraph` into a 5-node root containing 4 compiled sub-graphs (`subphase_map` 10 nodes, `subphase_1b` 4 nodes, `subphase_reduce` 3 nodes, `subphase_output` 10 nodes). Each `sub_graph.invoke(state, config=cfg)` creates a nested `CHAIN "LangGraph"` automatically. **Result**: 3-level Langfuse hierarchy (root → subphase → node → generation) identical to aegis-kg reference. (2) **10 OUTPUT nodes** in `subphase_output`: `doc_04_body`, `doc_04a..04d`, `doc_05`, `doc_06`, `doc_07`, `doc_07b`, `xlsx`; 3 deterministic + 7 LLM-narrative. New granular `render_doc_XX` methods on `Phase1Orchestrator`; legacy `generate_deterministic_docs` / `generate_enhanced_docs` loop them. (3) **C7 fix** — threads `config` through `DomainProcessor.__init__`/`process`, `Phase1Executor.run_phase_1b`/`run_phase_1c_reduce`, all 7 narrative `doc_XX.py` files. **Result**: nested GENERATION name = `"MAP D-01 Asset Management"` instead of `"ChatOllama"`. 16 new unit tests + CORR-018a tests still pass. |
 
 ---
 
@@ -738,7 +739,79 @@ TRACE "AEGIS Phase 1" [tags: phase:phase1, case:Case_01, ...]
 - **No real LLM calls made.**
 
 ### Next
-- **AEGIS-P1-CORR-018b:** add 10 OUTPUT nodes (`out_04_body`, `out_04a`, `out_04b`, `out_04c`, `out_04d`, `out_05`, `out_06`, `out_07`, `out_07b`, `out_xlsx`) to the same graph. Closes the trace with the document generation stage. Optional: include the C7 `run_name` propagation fix.
+- ✅ **AEGIS-P1-CORR-018b MERGED** (commit `60ecf73` via PR #21) — sub-graph hierarchy + 10 OUTPUT nodes + C7 `run_name` propagation fix. See CORR-018b section below.
+
+---
+
+## <a name="corr-018b"></a>AEGIS-P1-CORR-018b — Sub-Graph Hierarchy (aegis-kg pattern) + OUTPUT + C7 fix
+
+### Scope
+- **3 changes in 1 atomic commit** to align the Langfuse trace structure with the aegis-kg reference (`5b9faa7c72c27cd6a3c93048629bff43`).
+
+### Change 1 — Sub-graph hierarchy (graph.py refactored)
+- **Before:** 18 flat nodes in a single `StateGraph`.
+- **After:** 5-node root graph containing 4 compiled sub-graphs.
+  - `build_subphase_map()` — 10 nodes (`map_D01..D10`)
+  - `build_subphase_1b()` — 4 nodes (`interp_GDPR`, `interp_CRA`, `rat_GDPR`, `rat_CRA`)
+  - `build_subphase_reduce()` — 3 nodes (`deterministic`, `synthesis`, `compound`)
+  - `build_subphase_output()` — 10 nodes (NEW — see Change 2)
+- Each `sub_graph.invoke(state, config=cfg)` automatically creates a nested `CHAIN "LangGraph"` observation in Langfuse (LangGraph built-in behavior).
+- **Result:** 3-level trace hierarchy (root → subphase → node → generation) — identical structure to the aegis-kg reference trace.
+
+### Change 2 — 10 OUTPUT nodes (subphase_output)
+- `doc_04_body` (deterministic), `doc_04a` (narrative), `doc_04b`, `doc_04c`, `doc_04d`, `doc_05` (narrative), `doc_06` (deterministic), `doc_07` (narrative), `doc_07b` (narrative), `xlsx` (deterministic).
+- New granular `render_doc_XX` methods on `Phase1Orchestrator`; legacy `generate_deterministic_docs` / `generate_enhanced_docs` loop them.
+- Closes the trace with the document generation stage.
+
+### Change 3 — C7 `run_name` propagation fix
+- Threaded `config` through:
+  - `DomainProcessor.__init__(... config=None)` and `process(...)` — passes `self.config` to `llm_invoker.invoke(prompt, feedback, config=...)`.
+  - `orchestrator.map_single_domain`, `run_p1b_single`, `reduce_synthesis`, `reduce_compound` — all accept `config=`.
+  - `Phase1Executor.run_phase_1b`, `run_phase_1c_reduce` — accept `config=`.
+  - All 7 narrative `doc_XX.py` files — thread `config` to `render_mandatory_narrative`.
+- **Result:** nested GENERATION name = `"MAP D-01 Asset Management"` instead of `"ChatOllama"` (the descriptive `run_name` set by each graph node now reaches `ChatOllama.invoke()` via the propagated `config`).
+
+### Files modified
+- `src/aegis_phase1/v2/graph.py` — refactored to 5-root + 4 compiled sub-graphs
+- `src/aegis_phase1/v2/orchestrator.py` — `config` kwarg on granular methods; 10 new `render_doc_XX` methods
+- `src/aegis_phase1/v2/domain/processor.py` — accepts `config`
+- `src/aegis_phase1/prompts_v2/phase1_executor.py` — accepts `config`
+- 7 narrative `doc_XX.py` files — thread `config`
+- `tests/unit/v2/test_graph_corr018b.py` — NEW (16 tests)
+- `tests/unit/v2/test_graph_corr018a.py` — updated for 5-root-nodes assertion
+
+### Resulting Langfuse trace (post-merge)
+```
+TRACE "AEGIS Phase 1" [tags: phase:phase1, case:Case_01, subphase:map, subphase:1b, subphase:reduce, subphase:output, ...]
+└── CHAIN "LangGraph"
+    ├── SPAN "load_baseline"
+    ├── SPAN "subphase_map"  → CHAIN "LangGraph"  → map_D01..D10 → GEN "MAP D-XX ..."
+    ├── SPAN "subphase_1b"   → CHAIN "LangGraph"  → interp/rat × GDPR/CRA → GEN "P1B-LLM-XX (reg)"
+    ├── SPAN "subphase_reduce" → CHAIN "LangGraph"  → det/synth/compound → GEN "P1C-LLM-XX"
+    └── SPAN "subphase_output" → CHAIN "LangGraph"  → doc_04a..07b → GEN "doc_XX <name>"
+```
+
+### Validation
+- **16/16 new tests PASS** (`tests/unit/v2/test_graph_corr018b.py`)
+- **8/8 CORR-018a tests still PASS** (regression guard)
+- `bash scripts/test-quick.sh` → **381 passed + 10 skipped**, ALL GATES PASS
+- **No real LLM calls** (MagicMock only)
+- **No PEP-563** in `graph.py` (regex-anchored check)
+- Houdini: removing a sub-graph node → test fails; restore → pass
+
+### Merged 2026-07-17 (commit `60ecf73` via PR #21)
+
+#### Quality Log
+- `trials: 1` (deterministic; mock-based)
+- `pass@1`: 16/16 new tests + 8/8 regression + 381 + 10 skipped ALL GATES PASS
+- Test count: 365 → **381** (+16 unit tests; +5 vs spec target of 12)
+- Master switch preserved: `LANGFUSE_ENABLED=false` returns `(None, None)`
+- Legacy `--run-all` (flat) UNCHANGED; `--run-all-traced` routes through the new graph
+- **No real LLM calls made.**
+
+### Next
+- **Run-real validation** against Ollama to see the 3-level trace in the UI (deferred per user "no Ollama real" rule). Expected: root → subphase_map / subphase_1b / subphase_reduce / subphase_output, each with its own `CHAIN "LangGraph"` nested chain, and the LLM GENERATIONs named `MAP D-01 Asset Management`, `P1B-LLM-02 RATIONALE (GDPR)`, `doc_04a Technical Architecture`, etc. (NOT `ChatOllama`).
+- **No follow-up contracts** — the 8-contract observability migration (CORR-008 through CORR-018b) is complete. Any further work is polish.
 
 ---
 
