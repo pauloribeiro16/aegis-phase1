@@ -118,9 +118,23 @@ def _merge_handler_into_config(
     overwritten). Always returns a dict whose ``callbacks`` key is a
     list — empty when no handler is attached — so downstream chat
     invokers always receive a stable ``config["callbacks"]`` shape.
+
+    CORR-019: LangGraph injects a ``CallbackManager`` (not a list) into
+    ``config["callbacks"]`` when it invokes a sub-graph. We normalize to a
+    list of handlers via ``handlers`` attribute, falling back to a
+    single-item list if it's already a plain handler object.
     """
     cfg: dict[str, Any] = dict(config) if config else {}
-    existing = list(cfg.get("callbacks") or [])
+    raw = cfg.get("callbacks")
+    existing: list[Any] = []
+    if raw is None:
+        existing = []
+    elif isinstance(raw, list):
+        existing = list(raw)
+    elif hasattr(raw, "handlers"):
+        existing = list(getattr(raw, "handlers") or [])
+    else:
+        existing = [raw]
     if handler is not None and handler not in existing:
         existing.append(handler)
     cfg["callbacks"] = existing
