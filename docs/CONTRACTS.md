@@ -50,6 +50,7 @@ related_documents:
 | **[AEGIS-P1-CORR-017](#corr-017)** | Thin LangGraph wrapper around `Phase1Orchestrator` (5 stage spans + nested LLMs) | ✅ MERGED | ⚫ deleted | `e710df7` | 364 (356 + 8 new) | New `src/aegis_phase1/v2/trace_graph.py` (~237 LOC): linear `StateGraph(OrchestratorRunState)` with 5 nodes (`_load → _map → _phase_1b → _reduce → _output`); each node is a thin wrapper that calls the existing `Phase1Orchestrator` method — **ZERO modifications to the orchestrator internals**. `run_orchestrator_graph()` builds `run_config = {"callbacks": [handler], "metadata": {"langfuse_tags": [...]}}`; `graph.invoke(state, config=...)` establishes the root trace + creates per-stage chain spans; LLM calls inside each stage inherit the context → nested GENERATION observations with CORR-010's token extraction. New CLI flag `--run-all-traced` adds the opt-in path alongside legacy `--run-all`. **Result**: ONE Langfuse trace showing the full Phase 1 with 5 stage spans (load → map → phase_1b → reduce → output) and nested LLM generations per stage — the user's "show me Phase 1 in one trace" request. 8 new unit tests cover graph structure, callback propagation, tag propagation, exception flow, and master switch. |
 | **[AEGIS-P1-CORR-018a](#corr-018a)** | Full LangGraph migration — MAP+1B+REDUCE (18 nodes, named spans) | ✅ MERGED | ⚫ deleted | `e34b73b`+`5688323` | 365 (364 + 8 new; -legacy 7 in `trace_graph.py` shim) | **Replaces CORR-017 thin wrapper with proper 18-node `StateGraph`**. 2 atomic commits: S1 (`e34b73b`) refactors `Phase1Orchestrator` to expose 5 granular methods (`map_single_domain`, `run_p1b_single`, `reduce_deterministic`, `reduce_synthesis`, `reduce_compound`); legacy `map_domains`/`run_phase_1b`/`reduce` become thin-loop delegates with identical output. **Replaced by CORR-018b** (sub-graph hierarchy was needed for proper Langfuse nesting). | S2 (`5688323`) creates `src/aegis_phase1/v2/graph.py` (393 LOC) with the proper `StateGraph(Phase1GraphState)` containing 18 named nodes (load_baseline + map_D01..D10 + p1b_interp_{GDPR,CRA} + p1b_rat_{GDPR,CRA} + reduce_det + reduce_synthesis + reduce_compound). `run_phase1_graph()` builds `run_config = {"callbacks":[handler], "run_name":"AEGIS Phase 1", "metadata": {"langfuse_tags":[...]}}`; LangGraph auto-naming gives each span a meaningful label (e.g. `MAP D-05 Compliance` instead of `Chain`). `--run-all-traced` flag now routes through this graph. `trace_graph.py` kept as deprecated shim with `DeprecationWarning` (CORR-017 tests still pass). **Result**: per-domain and per-spec spans in the Langfuse UI — the user can finally distinguish D-01 from D-10 and P1B-LLM-01 from P1C-LLM-03. 8 new unit tests (399 + 10 skipped total). | CORR-018b reorganized as 4 sub-graphs to match the aegis-kg hierarchy (root → subphase → node → generation). |
 | **[AEGIS-P1-CORR-018b](#corr-018b)** | Sub-graph hierarchy (4 compiled sub-graphs) + 10 OUTPUT nodes + C7 `run_name` fix | ✅ MERGED | ⚫ deleted | `60ecf73` | 381 (365 + 16 new) | **3 changes in 1 atomic commit.** (1) **Sub-graph hierarchy** matching the aegis-kg trace pattern (reference `5b9faa7c...`): refactored `src/aegis_phase1/v2/graph.py` from flat 18-node `StateGraph` into a 5-node root containing 4 compiled sub-graphs (`subphase_map` 10 nodes, `subphase_1b` 4 nodes, `subphase_reduce` 3 nodes, `subphase_output` 10 nodes). Each `sub_graph.invoke(state, config=cfg)` creates a nested `CHAIN "LangGraph"` automatically. **Result**: 3-level Langfuse hierarchy (root → subphase → node → generation) identical to aegis-kg reference. (2) **10 OUTPUT nodes** in `subphase_output`: `doc_04_body`, `doc_04a..04d`, `doc_05`, `doc_06`, `doc_07`, `doc_07b`, `xlsx`; 3 deterministic + 7 LLM-narrative. New granular `render_doc_XX` methods on `Phase1Orchestrator`; legacy `generate_deterministic_docs` / `generate_enhanced_docs` loop them. (3) **C7 fix** — threads `config` through `DomainProcessor.__init__`/`process`, `Phase1Executor.run_phase_1b`/`run_phase_1c_reduce`, all 7 narrative `doc_XX.py` files. **Result**: nested GENERATION name = `"MAP D-01 Asset Management"` instead of `"ChatOllama"`. 16 new unit tests + CORR-018a tests still pass. |
+| **[AEGIS-P1-CORR-019](#corr-019)** | Fix `CallbackManager` handling in `_merge_handler_into_config` (regression) | ✅ MERGED | ⚫ deleted | `4102b7d` | 391 (381 + 10 new) | Regression fix found in a real run of `--run-all-traced`: `TypeError: 'CallbackManager' object is not iterable` from `list(cfg.get("callbacks") or [])` in `src/aegis_phase1/llm/unified.py:123`. LangGraph injects a `langchain_core.callbacks.manager.CallbackManager` (NOT a list) into `config["callbacks"]` when invoking sub-graphs. **Fix**: normalize via 4-case dispatch — `None` → `[]`; `list` → `list(raw)`; `CallbackManager` (`.handlers` attr) → `list(raw.handlers)`; bare object → `[raw]`. Always returns a plain list. 10 new unit tests in `tests/unit/llm/test_callback_manager_corr019.py`; Houdini demo (revert the fix → test fails with the exact `TypeError`; restore → all 10 pass). Zero behavior change for callers passing `callbacks=[handler]` (list form) — only the LangGraph CallbackManager case is now handled correctly. |
 
 ---
 
@@ -812,6 +813,50 @@ TRACE "AEGIS Phase 1" [tags: phase:phase1, case:Case_01, subphase:map, subphase:
 ### Next
 - **Run-real validation** against Ollama to see the 3-level trace in the UI (deferred per user "no Ollama real" rule). Expected: root → subphase_map / subphase_1b / subphase_reduce / subphase_output, each with its own `CHAIN "LangGraph"` nested chain, and the LLM GENERATIONs named `MAP D-01 Asset Management`, `P1B-LLM-02 RATIONALE (GDPR)`, `doc_04a Technical Architecture`, etc. (NOT `ChatOllama`).
 - **No follow-up contracts** — the 8-contract observability migration (CORR-008 through CORR-018b) is complete. Any further work is polish.
+
+---
+
+## <a name="corr-019"></a>AEGIS-P1-CORR-019 — Fix CallbackManager Handling (Regression)
+
+### Scope
+- Hotfix for `TypeError: 'CallbackManager' object is not iterable` raised by the CORR-018b sub-graph path when the user ran `--run-all-traced` for real.
+- `src/aegis_phase1/llm/unified.py:_merge_handler_into_config` was doing `list(cfg.get("callbacks") or [])` — but LangGraph injects a `langchain_core.callbacks.manager.CallbackManager` (NOT a list) into `config["callbacks"]` when invoking sub-graphs. The CallbackManager object is not directly iterable.
+
+### Fix
+`_merge_handler_into_config` now normalizes the `callbacks` value via 4-case dispatch:
+- `None` → `[]`
+- `list` → `list(raw)` (defensive copy)
+- object with `.handlers` attribute (i.e. `CallbackManager`) → `list(raw.handlers)` (extract the list of handlers)
+- anything else (bare callback object) → `[raw]`
+- Then append the Langfuse handler if not already present (dedupe by identity).
+- Returns a dict with `callbacks` always a plain list (downstream `ChatOllama.invoke(messages, config=cfg)` now works).
+
+### Files
+- `src/aegis_phase1/llm/unified.py` (+15 / -1) — `_merge_handler_into_config` rewritten
+- `tests/unit/llm/test_callback_manager_corr019.py` (NEW, 142 LOC, 10 tests)
+
+### Validation
+- **10/10 new tests PASS** (0.27s)
+- **Houdini demo:** reverted fix → `test_callbackmanager_is_normalized_to_handlers_list` FAILED with the exact `TypeError: 'CallbackManager' object is not iterable` from the bug report; restore → 10/10 PASS
+- `bash scripts/test-quick.sh` → **381 passed + 10 skipped**, `== ALL GATES PASS ==` (no regression)
+- **No real LLM calls made** (MagicMock only)
+
+### Behavior change summary
+- **No change** for callers that pass `callbacks=[handler]` (list form — still works identically)
+- **New:** callers that pass `callbacks=CallbackManager([...])` (LangGraph sub-graph case) now work — the CallbackManager is normalized to a list before the Langfuse handler is appended
+- Master switch preserved: `LANGFUSE_ENABLED=false` returns `(None, None)` → no callbacks anywhere
+- Coexistence preserved: `--run-all` (flat) and `--run-all-traced` (sub-graph) both work
+
+### Merged 2026-07-17 (commit `4102b7d` via PR #23)
+
+#### Quality Log
+- `trials: 1` (deterministic; mock-based)
+- `pass@1`: 10/10 new tests + 381/10 ALL GATES PASS
+- Houdini confirms the bug is caught and the fix is necessary
+- **No real LLM calls made.**
+
+### Next
+- **AEGIS-P1-CORR-018b retry:** user can now re-run `--run-all-traced` to see the actual 3-level Langfuse trace. The previous crash at `map_D01` should no longer occur.
 
 ---
 
