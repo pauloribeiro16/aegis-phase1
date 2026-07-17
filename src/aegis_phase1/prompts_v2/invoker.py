@@ -339,8 +339,15 @@ class Phase1LLMInvoker:
         ``total_tokens``. We read it via ``.get()`` because in practice it is
         a TypedDict / ``UsageMetadata``, NOT an object with attributes.
 
+        CORR-021: when BOTH official paths are empty (e.g. Ollama constrained
+        generation returns a malformed nested-JSON response and drops the
+        metadata — observed with P1B-LLM-02 at e2b model), fall back to a
+        character-based estimate from the response content. Guarantees the
+        user never sees ``0 tok`` in the logs for an LLM call that clearly
+        produced output.
+
         Always returns the three-key dict; never raises (mock/empty fixtures
-        must produce zeros).
+        must produce zeros unless the response has actual content).
         """
         usage: dict[str, Any] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         try:
@@ -364,4 +371,10 @@ class Phase1LLMInvoker:
                     usage["total_tokens"] = total_tokens
         except Exception:
             pass
+        if usage["total_tokens"] == 0:
+            content = getattr(response, "content", None)
+            if isinstance(content, str) and content:
+                estimated = max(1, len(content) // 4)
+                usage["completion_tokens"] = estimated
+                usage["total_tokens"] = estimated
         return usage

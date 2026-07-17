@@ -70,6 +70,19 @@ def probe_ollama(base_url: str = "http://localhost:11434", timeout: float = 1.5)
         return False
 
 
+def _estimate_tokens_by_chars(text: str) -> int:
+    """Best-effort token estimate from raw text.
+
+    ~4 chars per token for English (rule of thumb). Used as a LAST RESORT
+    fallback when both ``response_metadata`` (Ollama) and ``usage_metadata``
+    (LangChain) are empty — e.g. when Ollama constrained generation returns
+    a malformed nested-JSON response and drops the metadata.
+    """
+    if not text:
+        return 0
+    return max(1, len(text) // 4)
+
+
 def _extract_usage(response: Any) -> dict[str, int]:
     """Read Ollama-native or langchain-core token counts from a chat response.
 
@@ -80,8 +93,12 @@ def _extract_usage(response: Any) -> dict[str, int]:
     Fallback path — langchain-core canonical ``usage_metadata`` with
     ``input_tokens`` / ``output_tokens`` / ``total_tokens``.
 
-    Always returns the three-key dict; never raises (mock/empty fixtures
-    must produce zeros).
+    CORR-021: when BOTH official paths are empty (e.g. Ollama constrained
+    generation returns a malformed nested-JSON response and drops the
+    metadata — observed with P1B-LLM-02 at e2b model), fall back to a
+    character-based estimate from the response content. Guarantees the
+    user never sees ``0 tok`` in the logs for an LLM call that clearly
+    produced output.
     """
     usage: dict[str, int] = {
         "prompt_tokens": 0,
@@ -104,6 +121,11 @@ def _extract_usage(response: Any) -> dict[str, int]:
                 )
     except Exception:
         pass
+    if usage["total_tokens"] == 0:
+        content = getattr(response, "content", None)
+        if isinstance(content, str) and content:
+            usage["completion_tokens"] = _estimate_tokens_by_chars(content)
+            usage["total_tokens"] = usage["completion_tokens"]
     return usage
 
 
