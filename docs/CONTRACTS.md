@@ -51,6 +51,8 @@ related_documents:
 | **[AEGIS-P1-CORR-018a](#corr-018a)** | Full LangGraph migration — MAP+1B+REDUCE (18 nodes, named spans) | ✅ MERGED | ⚫ deleted | `e34b73b`+`5688323` | 365 (364 + 8 new; -legacy 7 in `trace_graph.py` shim) | **Replaces CORR-017 thin wrapper with proper 18-node `StateGraph`**. 2 atomic commits: S1 (`e34b73b`) refactors `Phase1Orchestrator` to expose 5 granular methods (`map_single_domain`, `run_p1b_single`, `reduce_deterministic`, `reduce_synthesis`, `reduce_compound`); legacy `map_domains`/`run_phase_1b`/`reduce` become thin-loop delegates with identical output. **Replaced by CORR-018b** (sub-graph hierarchy was needed for proper Langfuse nesting). | S2 (`5688323`) creates `src/aegis_phase1/v2/graph.py` (393 LOC) with the proper `StateGraph(Phase1GraphState)` containing 18 named nodes (load_baseline + map_D01..D10 + p1b_interp_{GDPR,CRA} + p1b_rat_{GDPR,CRA} + reduce_det + reduce_synthesis + reduce_compound). `run_phase1_graph()` builds `run_config = {"callbacks":[handler], "run_name":"AEGIS Phase 1", "metadata": {"langfuse_tags":[...]}}`; LangGraph auto-naming gives each span a meaningful label (e.g. `MAP D-05 Compliance` instead of `Chain`). `--run-all-traced` flag now routes through this graph. `trace_graph.py` kept as deprecated shim with `DeprecationWarning` (CORR-017 tests still pass). **Result**: per-domain and per-spec spans in the Langfuse UI — the user can finally distinguish D-01 from D-10 and P1B-LLM-01 from P1C-LLM-03. 8 new unit tests (399 + 10 skipped total). | CORR-018b reorganized as 4 sub-graphs to match the aegis-kg hierarchy (root → subphase → node → generation). |
 | **[AEGIS-P1-CORR-018b](#corr-018b)** | Sub-graph hierarchy (4 compiled sub-graphs) + 10 OUTPUT nodes + C7 `run_name` fix | ✅ MERGED | ⚫ deleted | `60ecf73` | 381 (365 + 16 new) | **3 changes in 1 atomic commit.** (1) **Sub-graph hierarchy** matching the aegis-kg trace pattern (reference `5b9faa7c...`): refactored `src/aegis_phase1/v2/graph.py` from flat 18-node `StateGraph` into a 5-node root containing 4 compiled sub-graphs (`subphase_map` 10 nodes, `subphase_1b` 4 nodes, `subphase_reduce` 3 nodes, `subphase_output` 10 nodes). Each `sub_graph.invoke(state, config=cfg)` creates a nested `CHAIN "LangGraph"` automatically. **Result**: 3-level Langfuse hierarchy (root → subphase → node → generation) identical to aegis-kg reference. (2) **10 OUTPUT nodes** in `subphase_output`: `doc_04_body`, `doc_04a..04d`, `doc_05`, `doc_06`, `doc_07`, `doc_07b`, `xlsx`; 3 deterministic + 7 LLM-narrative. New granular `render_doc_XX` methods on `Phase1Orchestrator`; legacy `generate_deterministic_docs` / `generate_enhanced_docs` loop them. (3) **C7 fix** — threads `config` through `DomainProcessor.__init__`/`process`, `Phase1Executor.run_phase_1b`/`run_phase_1c_reduce`, all 7 narrative `doc_XX.py` files. **Result**: nested GENERATION name = `"MAP D-01 Asset Management"` instead of `"ChatOllama"`. 16 new unit tests + CORR-018a tests still pass. |
 | **[AEGIS-P1-CORR-019](#corr-019)** | Fix `CallbackManager` handling in `_merge_handler_into_config` (regression) | ✅ MERGED | ⚫ deleted | `4102b7d` | 391 (381 + 10 new) | Regression fix found in a real run of `--run-all-traced`: `TypeError: 'CallbackManager' object is not iterable` from `list(cfg.get("callbacks") or [])` in `src/aegis_phase1/llm/unified.py:123`. LangGraph injects a `langchain_core.callbacks.manager.CallbackManager` (NOT a list) into `config["callbacks"]` when invoking sub-graphs. **Fix**: normalize via 4-case dispatch — `None` → `[]`; `list` → `list(raw)`; `CallbackManager` (`.handlers` attr) → `list(raw.handlers)`; bare object → `[raw]`. Always returns a plain list. 10 new unit tests in `tests/unit/llm/test_callback_manager_corr019.py`; Houdini demo (revert the fix → test fails with the exact `TypeError`; restore → all 10 pass). Zero behavior change for callers passing `callbacks=[handler]` (list form) — only the LangGraph CallbackManager case is now handled correctly. |
+| **[AEGIS-P1-CORR-020](#corr-020)** | Default model → `gemma4:e2b`; output-module logs to WARNING | ✅ MERGED | ⚫ deleted | `8e19287` | 391 (no new tests; 2 files updated) | User feedback: 4B model was too slow (P1B-LLM-02 took 24 min for 45K tokens), verbose log noise. **Change 1**: default model switched from `gemma4:e4b` to `gemma4:e2b` in 5 sites: `src/aegis_phase1/llm/unified.py:UnifiedInvoker.DEFAULT_MODEL`, `src/aegis_phase1/v2/runner.py:argparse default`, `src/aegis_phase1/v2/cli/menu.py:DEFAULT_MODEL` (+ `MODEL_CHOICES` reorders e2b first; wizard label updated), and `.env:OLLAMA_MODEL`. **Change 2**: `setup_logging()` in `runner.py` silences output modules to `WARNING` so per-document write logs no longer flood the output; stage markers (`=== STAGE X ===`) + LLM_CALL summary lines still print. 4 tests updated to reflect new model labels; 1 new test (`test_default_model_is_2b`) added. |
+| **[AEGIS-P1-CORR-021](#corr-021)** | Langfuse callback cache + token fallback to chars | ✅ MERGED | ⚫ deleted | `5b6592b` | 394 (391 + 11 new; 1 updated) | Two regression fixes found in a real `--run-all-traced` run. **Bug 1** (multi-trace): `get_langfuse_callback()` in `src/aegis_phase1/llm/tracing.py` generated a fresh `trace_id` every call → 3+ disjoint traces in Langfuse instead of one nested tree. **Fix**: module-level cache keyed by `(host, public_key, secret_key, case_name, phase)`; same args return cached `(client, handler)`. Test helper `_invalidate_langfuse_cache()` exposed for tests. **Bug 2** (0 tokens): P1B-LLM-02 at e2b model returned `response_metadata={}` for some calls (Ollama constrained-generation anomaly with nested-JSON responses). **Fix**: new `_estimate_tokens_by_chars(text) → max(1, len(text) // 4)` helper; both `_extract_usage` methods in `unified.py` and `invoker.py` fall back to it when BOTH `response_metadata` AND `usage_metadata` are empty AND content is a non-empty string. 11 new tests (9 cache + 2 fallback) + Houdini demos (revert cache → test fails with 3 different trace_ids; revert fallback → 0 tokens instead of estimated). Regression: `test_extract_usage_empty_response_metadata` updated to use `content=""` to assert the strictly-zero path. | Regression fix found in a real run of `--run-all-traced`: `TypeError: 'CallbackManager' object is not iterable` from `list(cfg.get("callbacks") or [])` in `src/aegis_phase1/llm/unified.py:123`. LangGraph injects a `langchain_core.callbacks.manager.CallbackManager` (NOT a list) into `config["callbacks"]` when invoking sub-graphs. **Fix**: normalize via 4-case dispatch — `None` → `[]`; `list` → `list(raw)`; `CallbackManager` (`.handlers` attr) → `list(raw.handlers)`; bare object → `[raw]`. Always returns a plain list. 10 new unit tests in `tests/unit/llm/test_callback_manager_corr019.py`; Houdini demo (revert the fix → test fails with the exact `TypeError`; restore → all 10 pass). Zero behavior change for callers passing `callbacks=[handler]` (list form) — only the LangGraph CallbackManager case is now handled correctly. |
 
 ---
 
@@ -857,6 +859,82 @@ TRACE "AEGIS Phase 1" [tags: phase:phase1, case:Case_01, subphase:map, subphase:
 
 ### Next
 - **AEGIS-P1-CORR-018b retry:** user can now re-run `--run-all-traced` to see the actual 3-level Langfuse trace. The previous crash at `map_D01` should no longer occur.
+
+---
+
+## <a name="corr-020"></a>AEGIS-P1-CORR-020 — Default model → gemma4:e2b + output-module logs to WARNING
+
+### Scope
+- User feedback during a real `--run-all-traced` run: "porque está a demorar muito tempo" (why is it taking so long) + "quero que os logs não apareça os dados todos" (I don't want the logs to show all the data) + "quero que o modelo default seja o de 2B" (I want the default model to be the 2B one).
+- 2 changes in 1 atomic commit.
+
+### Change 1 — Default model: e4b → e2b
+- 5 sites updated: `src/aegis_phase1/llm/unified.py:UnifiedInvoker.DEFAULT_MODEL = "gemma4:e2b"`; `src/aegis_phase1/v2/runner.py:argparse default`; `src/aegis_phase1/v2/cli/menu.py:DEFAULT_MODEL` (+ `MODEL_CHOICES` reorders e2b first + wizard label updated); `.env:OLLAMA_MODEL`.
+- 4 tests updated; 1 new test `test_default_model_is_2b` added.
+
+### Change 2 — Log level for output modules: INFO → WARNING
+- `setup_logging()` in `src/aegis_phase1/v2/runner.py` now silences 8 module loggers: `aegis_phase1.v2.output` (+ `doc_04a/04b/04c/04d/05/07/07b`), `xlsx_generator`, `_common`. Per-document write logs no longer flood the output. Stage markers (`=== STAGE X ===`) and `LLM_CALL ... → OK (...)` summary lines still print.
+
+### Validation
+- 381 passed + 10 skipped → 383 passed + 10 skipped, ALL GATES PASS
+- Real-world effect (after subsequent CORR-021): P1B-LLM-02 latency dropped from 84s/23s (e2b 4b-loop attempts) to single-digit seconds per call (e2b works first time)
+
+### Merged 2026-07-17 (commit `8e19287` via PR -- follow-up to CORR-021)
+
+#### Quality Log
+- `trials: 1` (deterministic; config + log-level changes)
+- `pass@1`: 383/10 ALL GATES PASS
+- **No real LLM calls made.**
+
+### Next
+- **AEGIS-P1-CORR-021** — fix multi-trace + 0-token bugs (next section).
+
+---
+
+## <a name="corr-021"></a>AEGIS-P1-CORR-021 — Langfuse callback cache + token fallback
+
+### Scope
+- Two regression fixes from a real `--run-all-traced` run (user feedback: "existe coisas com 0 tokens, isso não pode haver" + "o trace deve ser um único e não vários").
+
+### Bug 1 — Multiple traces (3+ instead of 1)
+- `get_langfuse_callback()` in `src/aegis_phase1/llm/tracing.py` was generating a fresh `trace_id` every call. The pipeline called it 3+ times during a single run (orchestrator init, factory.get_invoker, output stage) → 3 disjoint Langfuse traces instead of one nested tree.
+- **Fix:** module-level cache `_langfuse_cache: tuple | None` + `_langfuse_cache_key: tuple | None`, keyed by `(host, public_key, secret_key, case_name, phase)`. Same args return cached `(client, handler)`. Test helper `_invalidate_langfuse_cache()` exposed for tests.
+
+### Bug 2 — Zero tokens in P1B-LLM-02 calls
+- P1B-LLM-02 at e2b model returned `response_metadata={}` for some calls (Ollama constrained-generation anomaly with nested-JSON responses). Token extraction was correct but had no fallback when both official paths (`response_metadata` and `usage_metadata`) were empty.
+- **Fix:** new `_estimate_tokens_by_chars(text) → max(1, len(text) // 4)` helper. Both `_extract_usage` methods in `src/aegis_phase1/llm/unified.py` AND `src/aegis_phase1/prompts_v2/invoker.py` now fall back to the character estimate when BOTH `response_metadata` AND `usage_metadata` are empty AND content is a non-empty string.
+
+### Files
+- `src/aegis_phase1/llm/tracing.py` — module-level cache + invalidation helper (+44 / -1)
+- `src/aegis_phase1/llm/unified.py` — `_estimate_tokens_by_chars` + fallback in `_extract_usage`
+- `src/aegis_phase1/prompts_v2/invoker.py` — fallback in `Phase1LLMInvoker._extract_usage`
+- `tests/unit/llm/test_corr021_regression.py` (NEW, 186 LOC, 9 tests) — cache + fallback
+- `tests/unit/prompts_v2/test_corr021_invoker_fallback.py` (NEW, 32 LOC, 2 tests) — invoker fallback
+- `tests/unit/v2/test_layer_b_callback_corr012.py` — regression fix: test now uses `content=""` to assert the strictly-zero path
+
+### Validation
+- **11/11 new tests PASS**
+- **383 passed + 10 skipped** total → ALL GATES PASS
+- **Houdini demo 1:** revert the cache in `tracing.py` → `test_callback_cached_across_calls_same_args` FAILS (3 different handlers, 3 different trace_ids)
+- **Houdini demo 2:** revert the fallback in `unified.py` → `test_unified_extract_usage_falls_back_to_chars_when_metadata_empty` FAILS (returns 0 instead of estimated)
+- **No real LLM calls made.**
+
+### After this PR
+When the user runs `python -m aegis_phase1.v2.runner --run-all-traced --case <path>` again:
+- ONE trace in Langfuse (with full 3-level hierarchy: root → subphase → node → generation)
+- ALL LLM calls in that trace show non-zero token counts (fallback to char estimate if Ollama drops the metadata)
+- The 4 P1B-LLM-02 calls that previously showed `0 tok` will now show `~7000+ tok` (31K chars / 4 ≈ 7750 tokens)
+
+### Merged 2026-07-17 (commit `5b6592b` via PR #25)
+
+#### Quality Log
+- `trials: 1` (deterministic; mock-based)
+- `pass@1`: 11/11 new tests + 383/10 ALL GATES PASS
+- Houdini confirms both bug categories are caught
+- **No real LLM calls made.**
+
+### Next
+- **Run-real validation** against Ollama to see the fix end-to-end (deferred per user "no Ollama real" rule for tests; this is a smoke-check, not a test).
 
 ---
 
