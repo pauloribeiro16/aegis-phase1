@@ -105,10 +105,19 @@ def main() -> None:
         "--run-all-traced",
         action="store_true",
         help=(
-            "AEGIS-P1-CORR-017: run all stages through the LangGraph "
-            "tracer (one root trace, 5 stage spans, nested LLM calls). "
-            "Opt-in alternative to --run-all. Falls back to direct "
-            "orchestrator calls when Langfuse is disabled."
+            "AEGIS-P1-CORR-018a: run all stages through the full 18-node "
+            "LangGraph (one root trace, per-domain/per-spec spans, nested "
+            "LLM generations). Opt-in alternative to --run-all. Falls "
+            "back to direct orchestrator calls when Langfuse is disabled."
+        ),
+    )
+    parser.add_argument(
+        "--run-all-graph",
+        action="store_true",
+        dest="run_all_graph",
+        help=(
+            "Alias of --run-all-traced (CORR-018a). Renamed for clarity; "
+            "the legacy --run-all-traced flag still works."
         ),
     )
     parser.add_argument(
@@ -230,8 +239,10 @@ def main() -> None:
                     logger.error("Retry still failing: %s", exc)
                     sys.exit(3)
         logger.info("Pipeline complete")
-    elif args.run_all_traced:
-        logger.info("Non-interactive mode — running all stages via LangGraph tracer (CORR-017)")
+    elif args.run_all_traced or getattr(args, "run_all_graph", False):
+        logger.info(
+            "Non-interactive mode — running all stages via 18-node LangGraph (CORR-018a)"
+        )
         try:
             rc = cmd_run_all_traced(
                 orch=orch,
@@ -302,32 +313,33 @@ def cmd_run_all_traced(
     prep_path: str,
     output_path: str,
 ) -> int:
-    """AEGIS-P1-CORR-017 entry: run the pipeline through the LangGraph tracer.
+    """AEGIS-P1-CORR-018a entry: run the pipeline through the 18-node LangGraph.
 
-    Builds the 5-node trace graph, wires callbacks / tags / metadata, and
-    invokes it. The orchestrator's ``_langfuse_handler`` is forwarded (if
-    present) so every LLM call inside each stage nests under its stage
-    span. When Langfuse is disabled (``LANGFUSE_ENABLED=false``) the
-    handler is ``None`` and the graph still runs — just without spans.
+    Builds the full StateGraph (load_baseline + 10 map nodes + 4 phase 1B
+    nodes + 3 reduce nodes), wires callbacks / tags / metadata, and invokes
+    it. The orchestrator's ``_langfuse_handler`` is forwarded (if present)
+    so every LLM call inside each span nests under its named span. When
+    Langfuse is disabled (``LANGFUSE_ENABLED=false``) the handler is
+    ``None`` and the graph still runs — just without spans.
 
     Returns:
         Process-style exit code: ``0`` on success, ``2`` on
         ``OllamaUnreachableError`` (re-raised so the CLI can also map it).
     """
-    from aegis_phase1.v2.trace_graph import run_orchestrator_graph
+    from aegis_phase1.v2.graph import run_phase1_graph
 
     case_name = Path(case_path).name
     callbacks = [orch._langfuse_handler] if orch._langfuse_handler else None
 
     try:
-        run_orchestrator_graph(
+        run_phase1_graph(
             orch,
             case_path,
             prep_path,
-            output_path,
+            output_dir=output_path,
             callbacks=callbacks,
             tags=[f"phase:phase1", f"case:{case_name}"],
-            extra_metadata={"stage": "phase1"},
+            extra_metadata={"stage": "phase1", "graph": "v2.langgraph.full"},
         )
     except OllamaUnreachableError as exc:
         print(f"⚠ Ollama not reachable at {exc.base_url}.")
