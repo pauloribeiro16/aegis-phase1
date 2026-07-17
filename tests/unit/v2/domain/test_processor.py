@@ -75,7 +75,13 @@ class _ExplodingInvoker:
         self.exc = exc or ConnectionError("Ollama not reachable")
         self.calls = 0
 
-    def invoke(self, prompt: str, feedback: str = "") -> dict[str, Any]:
+    def invoke(
+        self,
+        prompt: str,
+        feedback: str = "",
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         self.calls += 1
         raise self.exc
 
@@ -86,7 +92,13 @@ class _FailingStatusInvoker:
     def __init__(self) -> None:
         self.calls = 0
 
-    def invoke(self, prompt: str, feedback: str = "") -> dict[str, Any]:
+    def invoke(
+        self,
+        prompt: str,
+        feedback: str = "",
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         self.calls += 1
         return {"raw": "", "status": "FAILED_AFTER_RETRIES", "error": "boom"}
 

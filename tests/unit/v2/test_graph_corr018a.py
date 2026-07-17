@@ -1,23 +1,34 @@
-"""Tests for AEGIS-P1-CORR-018a S2 (18-node LangGraph + runner integration).
+"""Tests for AEGIS-P1-CORR-018a S2 (root LangGraph API surface + runner).
 
 Reference: ``execution/CONTRACT-018a.md`` §"Files to change".
 
 Behaviour contract:
 
-  1. ``build_phase1_graph()`` returns a StateGraph with exactly 18 nodes
-     whose names match the trace-hierarchy outline in the contract.
+  1. ``build_phase1_graph()`` returns a StateGraph whose root nodes are
+     consistent with the sub-graph-hierarchy introduced in CORR-018b
+     (5 root nodes: ``load_baseline`` + 4 sub-phase nodes). The
+     sub-graph topology itself is verified in
+     ``test_graph_corr018b.py``.
   2. ``compile_phase1_graph()`` returns a compiled graph with ``.invoke``.
   3. The ``load_baseline`` node delegates to ``orchestrator.load``.
   4. Each ``map_DNN`` node delegates to ``orchestrator.map_single_domain``
-     for the matching ``D-NN`` identifier (10 of them).
+     for the matching ``D-NN`` identifier (10 of them — fired via the
+     ``subphase_map`` sub-graph invocation).
   5. ``run_phase1_graph(orch, ..., callbacks=[handler])`` threads the
      handler through ``run_config["callbacks"]``.
-  6. ``tags=[...]`` is materialised as ``run_config["metadata"]["langfuse_tags"]``.
+  6. ``tags=[...]`` is materialised as ``run_config["metadata"]["langfuse_tags"]``
+     (with the four ``subphase:*`` tags added automatically).
   7. The REDUCE chain tolerates ``_get_phase1_executor`` returning ``None``
      (deterministic reduce still completes; LLM-bearing reduce nodes
      gracefully no-op).
   8. Legacy ``Phase1Orchestrator.run_all()`` still drives the four legacy
      public methods in order — regression guard for S1's refactor.
+
+NOTE: The CORR-018a "18-node flat graph" structure has been refactored
+into the 4-sub-phase hierarchy (CORR-018b). The structural test
+(``test_graph_has_5_root_nodes`` below) replaces the legacy
+``test_graph_has_18_nodes`` and lives in this file for API surface
+continuity.
 """
 
 from typing import Any
@@ -26,38 +37,34 @@ from unittest.mock import MagicMock
 import pytest
 
 
-# ─── 1. graph structure ───────────────────────────────────────────────
+# ─── 1. graph root structure (CORR-018b supersedes CORR-018a flat 18) ──
 
 
-def test_graph_has_18_nodes_with_correct_names() -> None:
-    """``build_phase1_graph`` returns a StateGraph with exactly 18 nodes."""
+def test_graph_has_5_root_nodes_with_subphase_names() -> None:
+    """``build_phase1_graph`` returns a StateGraph with exactly 5 root nodes.
+
+    Replaces the CORR-018a "18-node flat graph" assertion. After
+    CORR-018b, the root graph contains ``load_baseline`` + 4 sub-phase
+    wrapper nodes; per-domain/per-spec/per-doc nodes live inside the
+    compiled sub-graphs (verified separately in
+    ``test_graph_corr018b.py``).
+    """
     from aegis_phase1.v2.graph import build_phase1_graph
 
     g = build_phase1_graph()
     names = list(g.nodes.keys())
-    assert len(names) == 18, f"expected 18 nodes, got {len(names)}: {names!r}"
+    assert len(names) == 5, f"expected 5 root nodes, got {len(names)}: {names!r}"
 
     expected = {
         "load_baseline",
-        "map_D01",
-        "map_D02",
-        "map_D03",
-        "map_D04",
-        "map_D05",
-        "map_D06",
-        "map_D07",
-        "map_D08",
-        "map_D09",
-        "map_D10",
-        "p1b_interp_GDPR",
-        "p1b_interp_CRA",
-        "p1b_rat_GDPR",
-        "p1b_rat_CRA",
-        "reduce_det",
-        "reduce_synthesis",
-        "reduce_compound",
+        "subphase_map",
+        "subphase_1b",
+        "subphase_reduce",
+        "subphase_output",
     }
-    assert set(names) == expected, f"missing={expected - set(names)} extra={set(names) - expected}"
+    assert set(names) == expected, (
+        f"missing={expected - set(names)} extra={set(names) - expected}"
+    )
 
 
 # ─── 2. compile returns CompiledStateGraph ────────────────────────────
@@ -102,7 +109,13 @@ def test_load_baseline_calls_orchestrator_load() -> None:
 
 
 def test_map_node_calls_map_single_domain_for_each_domain() -> None:
-    """All 10 ``map_DNN`` nodes fire ``orch.map_single_domain("D-NN")`` once."""
+    """All 10 ``map_DNN`` nodes fire ``orch.map_single_domain("D-NN", config=...)`` once.
+
+    After CORR-018b, ``map_single_domain`` is invoked with a ``config=``
+    kwarg carrying the per-node ``run_name`` so the nested LLM
+    GENERATION span is named (C7 fix). We assert each call was made
+    with the matching positional ``domain_id`` regardless of kwargs.
+    """
     from aegis_phase1.v2.graph import compile_phase1_graph
 
     orch = MagicMock(name="orchestrator")
@@ -119,15 +132,18 @@ def test_map_node_calls_map_single_domain_for_each_domain() -> None:
     )
 
     orch.load.assert_called_once()
+
+    seen_domain_ids = {
+        call.args[0]
+        for call in orch.map_single_domain.call_args_list
+        if call.args
+    }
     for i in range(1, 11):
         did = f"D-{i:02d}"
-        try:
-            orch.map_single_domain.assert_any_call(did)
-        except AssertionError:
-            pytest.fail(
-                f"orch.map_single_domain was not called with {did!r}; "
-                f"calls={orch.map_single_domain.call_args_list!r}"
-            )
+        assert did in seen_domain_ids, (
+            f"orch.map_single_domain was not called with {did!r}; "
+            f"seen={sorted(seen_domain_ids)!r}"
+        )
 
 
 # ─── 5. callbacks propagate through run_config ────────────────────────
@@ -213,7 +229,13 @@ def test_run_phase1_graph_propagates_tags() -> None:
 
     cfg = captured["config"]
     assert "metadata" in cfg, f"metadata missing from run_config: {cfg!r}"
-    assert cfg["metadata"]["langfuse_tags"] == ["phase:test", "case:x"]
+    tags = cfg["metadata"]["langfuse_tags"]
+    # CORR-018b: run_phase1_graph auto-appends subphase:* tags.
+    assert tags[:2] == ["phase:test", "case:x"]
+    assert "subphase:map" in tags
+    assert "subphase:1b" in tags
+    assert "subphase:reduce" in tags
+    assert "subphase:output" in tags
 
 
 # ─── 7. reduce chain tolerates executor=None ─────────────────────────

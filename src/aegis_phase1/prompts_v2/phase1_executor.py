@@ -159,6 +159,8 @@ class Phase1Executor:
         self,
         case_id: str,
         applicable_regs: list[str],
+        *,
+        config: dict[str, Any] | None = None,
         **inputs: Any,
     ) -> dict[str, Any]:
         """For each applicable regulation, call P1B-LLM-01 then P1B-LLM-02.
@@ -187,6 +189,7 @@ class Phase1Executor:
                     "lane_id": reg,
                     "applicable_regs": [reg],
                 },
+                config=config,
             )
             out_02 = self.invoker.invoke(
                 SPEC_RATIONALE,
@@ -196,6 +199,7 @@ class Phase1Executor:
                     "lane_id": reg,
                     "applicable_regs": [reg],
                 },
+                config=config,
             )
 
             per_reg[reg] = {SPEC_INTERPRETATION: out_01, SPEC_RATIONALE: out_02}
@@ -339,6 +343,8 @@ class Phase1Executor:
         lane_outputs: list[dict[str, Any]],
         sync_result: dict[str, Any],
         track_b_profile: dict[str, Any] | None = None,
+        *,
+        config: dict[str, Any] | None = None,
         **inputs: Any,
     ) -> dict[str, Any]:
         """Reduce stage: P1C-LLM-03 first, then P1C-LLM-02 (per contract).
@@ -373,6 +379,7 @@ class Phase1Executor:
                 "doc07b_profile": track_b_profile or {},
                 "sync_conflicts": (sync_result or {}).get("conflicts", []),
             },
+            config=config,
         )
 
         # LLM-02 (COMPOUND EVENT) runs SECOND, consuming LLM-03 output.
@@ -387,6 +394,7 @@ class Phase1Executor:
                 "c03_strategic_synthesis": (out_03.get("parsed_output") or {}),
                 "sync_conflicts": (sync_result or {}).get("conflicts", []),
             },
+            config=config,
         )
 
         statuses = [out_03.get("status"), out_02.get("status")]

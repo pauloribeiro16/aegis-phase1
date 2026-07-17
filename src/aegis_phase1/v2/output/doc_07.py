@@ -59,6 +59,8 @@ def render_doc_07(
     state: dict[str, Any],
     output_dir: str,
     llm_invoker: Any | None = None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Render document 07 (structured compliance matrix).
 
@@ -68,6 +70,9 @@ def render_doc_07(
         llm_invoker: Optional LLM invoker for the §6 strategic
             narrative. Falls back to deterministic prose when None or
             ``MOCK_LLM`` is truthy.
+        config: Optional Langfuse / LangChain runnable config threaded
+            through to nested LLM calls so the GENERATION span is named
+            after the LangGraph node.
 
     Returns:
         Mapping ``AEGIS-P1-07`` -> absolute file path.
@@ -89,7 +94,7 @@ def render_doc_07(
     parts.extend(_section_3_coverage_matrix(subdomains, clauses, regs))
     parts.extend(_section_4_summary(subdomains, clauses, regs, coverage_summary))
     parts.extend(_section_5_complementarity(overlaps, state))
-    parts.extend(_section_6_strategic_implications(state, regs, invoker))
+    parts.extend(_section_6_strategic_implications(state, regs, invoker, config=config))
     parts.extend(_section_7_gaps(ontology, subdomains))
     parts.extend(_section_8_gate_checklist(state, ontology))
 
@@ -327,6 +332,8 @@ def _section_6_strategic_implications(
     state: dict[str, Any],
     regs: list[Any],
     llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 6. STRATEGIC IMPLICATIONS\n")
@@ -350,6 +357,7 @@ def _section_6_strategic_implications(
         prompt=_strategic_prompt(state, rows),
         section_id="doc_07.section_6.strategic_narrative",
         max_chars=_MAX_FRAGMENT_BYTES,
+        config=config,
     )
     parts.append("### 6.1 Narrative\n")
     parts.append(narrative.rstrip() + "\n")

@@ -49,6 +49,8 @@ def render_doc_07b(
     state: dict[str, Any],
     output_dir: str,
     llm_invoker: Any | None = None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Render document 07b (Proportionality Profile).
 
@@ -58,6 +60,9 @@ def render_doc_07b(
         llm_invoker: Optional LLM invoker for the §5 cross-check
             narrative. Falls back to deterministic prose when ``None``
             or ``MOCK_LLM`` is truthy.
+        config: Optional Langfuse / LangChain runnable config threaded
+            through to nested LLM calls so the GENERATION span is named
+            after the LangGraph node.
 
     Returns:
         Mapping ``AEGIS-P1-07b`` -> absolute file path.
@@ -74,7 +79,7 @@ def render_doc_07b(
     parts.extend(_section_2_company_profile(state))
     parts.extend(_section_3_tier_summary(profile, not_covered))
     parts.extend(_section_4_per_subdomain_table(profile, not_covered))
-    parts.extend(_section_5_cross_check(state, profile, invoker))
+    parts.extend(_section_5_cross_check(state, profile, invoker, config=config))
     parts.extend(_section_6_key_adjustments(profile))
     parts.extend(_section_7_gate_p_readiness(state, profile, not_covered))
     parts.extend(_section_8_version_history())
@@ -247,6 +252,8 @@ def _section_5_cross_check(
     state: dict[str, Any],
     profile: Mapping[str, Mapping[str, Any]],
     llm_invoker: Any | None,
+    *,
+    config: dict[str, Any] | None = None,
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. CROSS-CHECK VS CRITICAL ANALYSIS\n")
@@ -271,6 +278,7 @@ def _section_5_cross_check(
         prompt=_cross_check_prompt(state, cross_rows),
         section_id="doc_07b.section_5.cross_check_narrative",
         max_chars=_MAX_FRAGMENT_BYTES,
+        config=config,
     )
     parts.append("### 5.1 Narrative\n")
     parts.append(narrative.rstrip() + "\n")

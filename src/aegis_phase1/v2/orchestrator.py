@@ -250,6 +250,7 @@ class Phase1Orchestrator:
         domain_id: str,
         *,
         processor: Any | None = None,
+        config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Single-domain MAP for one D-XX.
 
@@ -266,6 +267,9 @@ class Phase1Orchestrator:
                 lazily from orchestrator state. The legacy
                 :meth:`map_domains` constructs one processor and passes it
                 to all 10 calls; LangGraph nodes (S2) construct per-call.
+            config: Optional LangChain ``RunnableConfig`` threaded into
+                the LLM invocation so the GENERATION span in Langfuse is
+                named after the LangGraph node (CORR-018b C7 fix).
 
         Returns:
             A :class:`DomainResult` dict as returned by ``processor.process``.
@@ -277,7 +281,10 @@ class Phase1Orchestrator:
                 llm_invoker=self.llm_invoker,
                 log_dir=self.log_dir,
                 langfuse_handler=self._langfuse_handler,
+                config=config,
             )
+        elif config is not None:
+            processor.config = config
         return processor.process(domain_id, self.state)
 
     def _failed_domain_result(
@@ -459,7 +466,9 @@ class Phase1Orchestrator:
         self.state["current_stage"] = "REDUCED"
         return profile_data if isinstance(profile_data, dict) else None
 
-    def reduce_synthesis(self) -> dict[str, Any] | None:
+    def reduce_synthesis(
+        self, *, config: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """P1C-LLM-03 STRATEGIC SYNTHESIS reduce step.
 
         Granular method extracted from :meth:`reduce` (CORR-018a S1).
@@ -470,6 +479,10 @@ class Phase1Orchestrator:
         so :meth:`reduce_compound` can extract P1C-LLM-02 without a second
         executor call (avoids re-invoking ``_get_phase1_executor`` and
         preserves the LLM-02-consumes-LLM-03 chain).
+
+        Args:
+            config: Optional LangChain ``RunnableConfig`` threaded into
+                the executor's invoker (CORR-018b C7 fix).
 
         Returns:
             The P1C-LLM-03 synthesis dict on success, ``None`` when the
@@ -538,6 +551,7 @@ class Phase1Orchestrator:
                 layer0_subdomain_refs=list(
                     (self.state.get("subdomains") or {}).keys()
                 ),
+                config=config,
             )
         except Exception as exc:
             logger.warning("REDUCE-LLM failed (continuing): %s", exc)
@@ -561,13 +575,21 @@ class Phase1Orchestrator:
             self.state["aggregated_data"]["synthesis"] = synthesis
         return synthesis if isinstance(synthesis, dict) else None
 
-    def reduce_compound(self) -> dict[str, Any] | None:
+    def reduce_compound(
+        self, *, config: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         """P1C-LLM-02 COMPOUND EVENTS reduce step.
 
         Granular method extracted from :meth:`reduce` (CORR-018a S1).
         Reads the cached executor result produced by :meth:`reduce_synthesis`
         (no new LLM call) and writes the P1C-LLM-02 payload into
         ``state["aggregated_data"]["compound_events"]``.
+
+        Args:
+            config: Reserved for forward-compat — this step currently
+                reads from cache and does not invoke the LLM directly,
+                but the signature mirrors :meth:`reduce_synthesis` so
+                the LangGraph nodes can pass a uniform ``config``.
 
         Returns:
             The P1C-LLM-02 compound-events dict when a cached result is
@@ -686,23 +708,16 @@ class Phase1Orchestrator:
         logger.info("=== STAGE 3a: OUTPUT (DETERMINISTIC) ===")
         start = time.time()
 
-        from aegis_phase1.v2.output.doc_04 import render_doc_04_body
-        from aegis_phase1.v2.output.doc_05 import render_doc_05
-        from aegis_phase1.v2.output.doc_06 import render_doc_06
-        from aegis_phase1.v2.output.doc_07 import render_doc_07
-        from aegis_phase1.v2.output.doc_07b import render_doc_07b
-        from aegis_phase1.v2.output.xlsx_generator import generate_xlsx
-
         paths: dict[str, str] = dict(self.state.get("output_paths") or {})
-        for label, fn, args in (
-            ("04_body", render_doc_04_body, (self.state, output_dir)),
-            ("05", render_doc_05, (self.state, output_dir, self.llm_invoker)),
-            ("06", render_doc_06, (self.state, output_dir)),
-            ("07", render_doc_07, (self.state, output_dir, self.llm_invoker)),
-            ("07b", render_doc_07b, (self.state, output_dir, self.llm_invoker)),
+        for label, fn in (
+            ("04_body", self.render_doc_04_body),
+            ("05", self.render_doc_05),
+            ("06", self.render_doc_06),
+            ("07", self.render_doc_07),
+            ("07b", self.render_doc_07b),
         ):
             try:
-                result = fn(*args)
+                result = fn(self.state, output_dir)
             except Exception as exc:
                 logger.exception("OUTPUT (deterministic): renderer %s failed", label)
                 self.state.setdefault("errors", []).append(
@@ -713,7 +728,7 @@ class Phase1Orchestrator:
                 paths.update(result)
 
         try:
-            xlsx_paths = generate_xlsx(self.state, output_dir)
+            xlsx_paths = self.generate_xlsx_workbook(self.state, output_dir)
         except Exception as exc:
             logger.exception("OUTPUT (deterministic): xlsx generator failed")
             self.state.setdefault("errors", []).append(f"output:xlsx: {exc!s}")
@@ -776,20 +791,15 @@ class Phase1Orchestrator:
         logger.info("=== STAGE 3b: OUTPUT (ENHANCED) ===")
         start = time.time()
 
-        from aegis_phase1.v2.output.doc_04a import render_doc_04a
-        from aegis_phase1.v2.output.doc_04b import render_doc_04b
-        from aegis_phase1.v2.output.doc_04c import render_doc_04c
-        from aegis_phase1.v2.output.doc_04d import render_doc_04d
-
         paths: dict[str, str] = dict(self.state.get("output_paths") or {})
-        for label, fn, args in (
-            ("04a", render_doc_04a, (self.state, output_dir, self.llm_invoker)),
-            ("04b", render_doc_04b, (self.state, output_dir, self.llm_invoker)),
-            ("04c", render_doc_04c, (self.state, output_dir, self.llm_invoker)),
-            ("04d", render_doc_04d, (self.state, output_dir, self.llm_invoker)),
+        for label, fn in (
+            ("04a", self.render_doc_04a),
+            ("04b", self.render_doc_04b),
+            ("04c", self.render_doc_04c),
+            ("04d", self.render_doc_04d),
         ):
             try:
-                result = fn(*args)
+                result = fn(self.state, output_dir)
             except Exception as exc:
                 logger.exception("OUTPUT (enhanced): renderer %s failed", label)
                 self.state.setdefault("errors", []).append(
@@ -811,6 +821,134 @@ class Phase1Orchestrator:
         )
         self._persist_state()
         return self.state
+
+    # ─── Granular render methods (CORR-018b) ────────────────────────────
+    #
+    # Each render_doc_XX method delegates to the underlying doc_XX module
+    # function. Granular methods are the LangGraph node entry points;
+    # legacy :meth:`generate_deterministic_docs` and
+    # :meth:`generate_enhanced_docs` now call these in a loop so the
+    # behaviour is identical to the previous direct invocation.
+
+    def render_doc_04_body(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render the 04 body (deterministic)."""
+        from aegis_phase1.v2.output.doc_04 import render_doc_04_body
+
+        return render_doc_04_body(state, output_dir)
+
+    def render_doc_04a(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render 04a (architecture & data inventory)."""
+        from aegis_phase1.v2.output.doc_04a import render_doc_04a
+
+        return render_doc_04a(state, output_dir, self.llm_invoker, config=config)
+
+    def render_doc_04b(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render 04b (security posture)."""
+        from aegis_phase1.v2.output.doc_04b import render_doc_04b
+
+        return render_doc_04b(state, output_dir, self.llm_invoker, config=config)
+
+    def render_doc_04c(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render 04c (third-party landscape)."""
+        from aegis_phase1.v2.output.doc_04c import render_doc_04c
+
+        return render_doc_04c(state, output_dir, self.llm_invoker, config=config)
+
+    def render_doc_04d(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render 04d (roles & RACI)."""
+        from aegis_phase1.v2.output.doc_04d import render_doc_04d
+
+        return render_doc_04d(state, output_dir, self.llm_invoker, config=config)
+
+    def render_doc_05(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render 05 (regulatory applicability)."""
+        from aegis_phase1.v2.output.doc_05 import render_doc_05
+
+        return render_doc_05(state, output_dir, self.llm_invoker, config=config)
+
+    def render_doc_06(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render 06 (clause mapping matrix, deterministic)."""
+        from aegis_phase1.v2.output.doc_06 import render_doc_06
+
+        return render_doc_06(state, output_dir)
+
+    def render_doc_07(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render 07 (structured compliance matrix)."""
+        from aegis_phase1.v2.output.doc_07 import render_doc_07
+
+        return render_doc_07(state, output_dir, self.llm_invoker, config=config)
+
+    def render_doc_07b(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render 07b (proportionality profile)."""
+        from aegis_phase1.v2.output.doc_07b import render_doc_07b
+
+        return render_doc_07b(state, output_dir, self.llm_invoker, config=config)
+
+    def generate_xlsx_workbook(
+        self,
+        state: dict[str, Any],
+        output_dir: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, str]:
+        """Render the consolidated xlsx workbook (deterministic)."""
+        from aegis_phase1.v2.output.xlsx_generator import generate_xlsx
+
+        return generate_xlsx(state, output_dir)
 
     def generate_outputs(self, output_dir: str = "output/phase1") -> V2State:
         """Legacy single-shot: generate all docs (deterministic + enhanced).
@@ -977,7 +1115,11 @@ class Phase1Orchestrator:
         return self.state
 
     def run_p1b_single(
-        self, spec_id: str, reg_id: str
+        self,
+        spec_id: str,
+        reg_id: str,
+        *,
+        config: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         """Single Phase1B call: one spec × one regulation.
 
@@ -994,6 +1136,9 @@ class Phase1Orchestrator:
                 single ``run_phase_1b`` invocation; ``spec_id`` is
                 therefore accepted but ignored in S1.
             reg_id: One applicable regulation code (e.g. ``"GDPR"``).
+            config: Optional LangChain ``RunnableConfig`` threaded into
+                the executor's invoker so the GENERATION span in Langfuse
+                is named after the LangGraph node (CORR-018b C7 fix).
 
         Returns:
             The per-reg synthesis dict (the value under
@@ -1047,6 +1192,7 @@ class Phase1Orchestrator:
                 "tier": cc.get("complexity_tier") or "LOW",
                 "basis": "Doc 04 §5",
             },
+            config=config,
         )
 
         if not isinstance(result, dict):
