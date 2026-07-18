@@ -27,6 +27,7 @@ def test_intersects_with_applicable_regs(mock_state: V2State) -> None:
             "source_regulations": ["GDPR", "NIS2"],
         }
     )
+    assert mock_state["company_context"] is not None
     mock_state["company_context"].applicable_regs = ["GDPR", "CRA"]
 
     result = filter_regs(mock_state, "D-04")
@@ -41,8 +42,16 @@ def test_returns_all_when_no_company_context(mock_state: V2State) -> None:
     assert result == ["CRA", "GDPR"]
 
 
-def test_returns_empty_for_unknown_domain(mock_state: V2State) -> None:
-    assert filter_regs(mock_state, "D-99") == []
+def test_unknown_domain_falls_back_to_company_applicability(mock_state: V2State) -> None:
+    """Unknown domain: ontology has no source_regulations, but company context does.
+
+    Behaviour change (intentional): when the ontology lacks
+    ``source_regulations`` for the requested domain but the company
+    context declares ``applicable_regs``, fall back to the company
+    context rather than returning ``[]``. This is documented in
+    ``regs.filter_regs``.
+    """
+    assert filter_regs(mock_state, "D-99") == ["CRA", "GDPR"]
 
 
 def test_returns_empty_when_ontology_missing() -> None:

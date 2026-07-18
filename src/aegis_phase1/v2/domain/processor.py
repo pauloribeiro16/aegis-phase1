@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from aegis_phase1.v2.domain.inputs import assemble_inputs
-from aegis_phase1.v2.domain.parser import OutputParser
+from aegis_phase1.v2.domain.parser import OutputParser, OutputParserV2, OutputParserV3
 from aegis_phase1.v2.domain.prompt import render_prompt
 from aegis_phase1.v2.state import DomainResult, V2State
 
@@ -89,6 +89,8 @@ class DomainProcessor:
         self.llm_invoker = llm_invoker
         self.log_dir = Path(log_dir) if log_dir else None
         self.parser = OutputParser()
+        self.parser_v2 = OutputParserV2()
+        self.parser_v3 = OutputParserV3()
         self.max_retries = max(1, int(max_retries))
         self.config = config
         if (
@@ -97,7 +99,7 @@ class DomainProcessor:
         ):
             try:
                 self.llm_invoker._langfuse_handler = langfuse_handler
-            except Exception:  # noqa: BLE001 — handler attachment is best-effort
+            except Exception:
                 logger.debug(
                     "Could not attach langfuse_handler to %s",
                     type(self.llm_invoker).__name__,
@@ -124,7 +126,7 @@ class DomainProcessor:
 
         try:
             inputs = assemble_inputs(state, domain_id)
-        except Exception as exc:  # noqa: BLE001 — input assembly is recoverable
+        except Exception as exc:
             logger.exception("Input assembly failed for %s", domain_id)
             return self._failed_result(domain_id, f"Input assembly: {exc}")
 
@@ -138,7 +140,7 @@ class DomainProcessor:
                 response = self.llm_invoker.invoke(
                     prompt, feedback=feedback, config=self.config
                 )
-            except Exception as exc:  # noqa: BLE001 — fatal LLM error
+            except Exception as exc:
                 logger.error("LLM invoke raised for %s: %s", domain_id, exc)
                 raise OllamaUnreachable(str(exc)) from exc
 
@@ -149,15 +151,28 @@ class DomainProcessor:
                 feedback = f"LLM returned status={status}. Try again."
                 continue
 
-            parsed = self.parser.parse(last_raw)
-
-            if parsed.success:
+            # Try V3 first (v1.3 spec is canonical for CORR-022 Phase 3).
+            parsed_v3 = self.parser_v3.parse(last_raw)
+            if parsed_v3.success:
                 self._write_log(
-                    domain_id, prompt, last_raw, parsed, attempt + 1
+                    domain_id, prompt, last_raw,
+                    {"v3_parsed": True, "parsed": parsed_v3},
+                    attempt + 1,
                 )
-                return self._ok_result(domain_id, parsed, inputs)
+                return self._ok_result_v3(domain_id, parsed_v3, inputs)
 
-            feedback = parsed.error_feedback or "Output format invalid."
+            # Fallback to V2 (legacy per-sub-domain compat).
+            parsed_v2 = self.parser_v2.parse(last_raw)
+            if parsed_v2.success:
+                self._write_log(
+                    domain_id, prompt, last_raw,
+                    {"v2_parsed": True, "v3_failed": parsed_v3.error_feedback,
+                     "parsed": parsed_v2},
+                    attempt + 1,
+                )
+                return self._ok_result(domain_id, parsed_v2, inputs)
+
+            feedback = parsed_v3.error_feedback or parsed_v2.error_feedback or "Output format invalid."
 
         # All retries exhausted — log the last attempt and return FAILED.
         try:
@@ -168,7 +183,7 @@ class DomainProcessor:
                 None,
                 self.max_retries,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("Failed to write exhausted-retry log for %s", domain_id)
         return self._failed_result(
             domain_id, f"Parse failed after {self.max_retries} retries"
@@ -176,12 +191,14 @@ class DomainProcessor:
 
     # ── Result builders ────────────────────────────────────────────────
 
-    def _ok_result(
+    def _ok_result_v3(
         self,
         domain_id: str,
-        parsed: Any,
+        parsed: Any,  # ParseResultV3
         inputs: dict[str, Any],
     ) -> DomainResult:
+        adapted_subdomains_v3 = [s.as_dict() for s in parsed.subdomains]
+        legacy_ao = parsed.legacy_adapted_objective
         return {
             "domain_id": domain_id,
             "domain_name": DOMAIN_NAMES.get(domain_id, domain_id),
@@ -189,10 +206,35 @@ class DomainProcessor:
             "coverage": _coverage_from_inputs(inputs),
             "cross_regulation": inputs.get("cross_reg_analysis", []),
             "llm_status": "OK",
-            "adapted_objective": parsed.adapted_objective,
-            "key_changes": list(parsed.key_adjustments),
+            "adapted_objective": legacy_ao,
+            "adapted_subdomains": [],
+            "adapted_subdomains_v3": adapted_subdomains_v3,
+            "key_changes": [],
             "applicable_regs": list(inputs.get("applicable_regs", [])),
-            "confidence": parsed.confidence,
+            "confidence": "UNKNOWN",
+        }
+
+    def _ok_result(
+        self,
+        domain_id: str,
+        parsed: Any,  # ParseResultV2
+        inputs: dict[str, Any],
+    ) -> DomainResult:
+        adapted_subdomains = [s.as_dict() for s in parsed.subdomains]
+        legacy_ao = parsed.legacy_adapted_objective
+        return {
+            "domain_id": domain_id,
+            "domain_name": DOMAIN_NAMES.get(domain_id, domain_id),
+            "subdomains": inputs.get("subdomains", []),
+            "coverage": _coverage_from_inputs(inputs),
+            "cross_regulation": inputs.get("cross_reg_analysis", []),
+            "llm_status": "OK",
+            "adapted_objective": legacy_ao,
+            "adapted_subdomains": adapted_subdomains,
+            "adapted_subdomains_v3": [],
+            "key_changes": [],
+            "applicable_regs": list(inputs.get("applicable_regs", [])),
+            "confidence": "UNKNOWN",  # v1.2 spec doesn't include CONFIDENCE
         }
 
     def _failed_result(self, domain_id: str, reason: str) -> DomainResult:
@@ -204,6 +246,8 @@ class DomainProcessor:
             "cross_regulation": [],
             "llm_status": "FAILED",
             "adapted_objective": "",
+            "adapted_subdomains": [],
+            "adapted_subdomains_v3": [],
             "key_changes": [],
             "applicable_regs": [],
             "confidence": "LOW",
@@ -225,26 +269,95 @@ class DomainProcessor:
             return
         try:
             self.log_dir.mkdir(parents=True, exist_ok=True)
+            parsed_dict: dict[str, Any] | None
+            v3_parsed = False
+            v2_parsed = False
+            adapted_subdomains: list[dict[str, Any]] = []
+            adapted_subdomains_v3: list[dict[str, Any]] = []
+            # Wrapper dict from the retry loop (V3-first): carries v3_parsed/v2_parsed
+            if isinstance(parsed, dict) and (
+                "v3_parsed" in parsed or "v2_parsed" in parsed
+            ):
+                v3_parsed = bool(parsed.get("v3_parsed"))
+                v2_parsed = bool(parsed.get("v2_parsed"))
+                inner = parsed.get("parsed")
+                legacy_ao = (
+                    getattr(inner, "legacy_adapted_objective", "")
+                    if inner is not None else ""
+                )
+                if v3_parsed and inner is not None and hasattr(inner, "subdomains"):
+                    adapted_subdomains_v3 = [
+                        s.as_dict() for s in getattr(inner, "subdomains", [])
+                    ]
+                elif v2_parsed and inner is not None and hasattr(inner, "subdomains"):
+                    adapted_subdomains = [
+                        s.as_dict() if hasattr(s, "as_dict") else s
+                        for s in getattr(inner, "subdomains", [])
+                    ]
+                parsed_dict = {
+                    "parser_version": "v3" if v3_parsed else "v2",
+                    "adapted_objective": legacy_ao,
+                    "key_adjustments": [],
+                    "confidence": "UNKNOWN",
+                    "adapted_subdomains": adapted_subdomains,
+                    "adapted_subdomains_v3": adapted_subdomains_v3,
+                    "v3_failed_feedback": parsed.get("v3_failed", ""),
+                }
+            elif parsed is None:
+                parsed_dict = None
+            elif hasattr(parsed, "subdomains") and hasattr(parsed, "blocks"):
+                # Direct ParseResultV3 (defensive — call path uses wrapper)
+                adapted_subdomains_v3 = [
+                    s.as_dict() for s in getattr(parsed, "subdomains", [])
+                ]
+                parsed_dict = {
+                    "parser_version": "v3",
+                    "adapted_objective": getattr(parsed, "legacy_adapted_objective", ""),
+                    "key_adjustments": [],
+                    "confidence": "UNKNOWN",
+                    "adapted_subdomains": [],
+                    "adapted_subdomains_v3": adapted_subdomains_v3,
+                }
+                v3_parsed = True
+            elif hasattr(parsed, "subdomains"):
+                # ParseResultV2: per-sub-domain (hl + directed)
+                adapted_subdomains = [
+                    s.as_dict() if hasattr(s, "as_dict") else s
+                    for s in getattr(parsed, "subdomains", [])
+                ]
+                parsed_dict = {
+                    "parser_version": "v2",
+                    "adapted_objective": getattr(parsed, "legacy_adapted_objective", ""),
+                    "key_adjustments": [],
+                    "confidence": "UNKNOWN",
+                    "adapted_subdomains": adapted_subdomains,
+                    "adapted_subdomains_v3": [],
+                }
+                v2_parsed = True
+            else:
+                # Legacy ParseResult (NamedTuple)
+                parsed_dict = {
+                    "parser_version": "legacy",
+                    "adapted_objective": getattr(parsed, "adapted_objective", ""),
+                    "key_adjustments": list(getattr(parsed, "key_adjustments", []) or []),
+                    "confidence": getattr(parsed, "confidence", "LOW"),
+                }
             entry = {
                 "timestamp": datetime.now(UTC).isoformat(),
                 "domain_id": domain_id,
                 "prompt_length": len(prompt),
                 "raw_response_preview": (raw or "")[:1000],
-                "parsed": (
-                    {
-                        "adapted_objective": parsed.adapted_objective,
-                        "key_adjustments": list(parsed.key_adjustments),
-                        "confidence": parsed.confidence,
-                    }
-                    if parsed is not None
-                    else None
-                ),
+                "parsed": parsed_dict,
+                "adapted_subdomains": adapted_subdomains,
+                "adapted_subdomains_v3": adapted_subdomains_v3,
+                "v3_parsed": v3_parsed,
+                "v2_parsed": v2_parsed,
                 "attempts": attempts,
             }
             log_path = self.log_dir / f"{domain_id}.jsonl"
             with log_path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:  # noqa: BLE001 — logging must never break the pipeline
+        except Exception:
             logger.exception("Failed to write domain log for %s", domain_id)
 
 

@@ -8,8 +8,15 @@ build/
 
 # Environment
 .env
+.venv
 .venv/
 venv/
+
+# Agent session data
+.zcode/
+
+# Scratch / ad-hoc test state
+work_test/
 
 # IDE
 .vscode/

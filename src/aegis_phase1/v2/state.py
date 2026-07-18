@@ -9,7 +9,7 @@ References:
 """
 
 import logging
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -68,7 +68,7 @@ class SubDomainDef(BaseModel):
     frontmatter: dict = Field(default_factory=dict)
 
 
-class DomainResult(TypedDict):
+class DomainResult(TypedDict, total=False):
     """Result of the MAP stage for a single domain (D-XX).
 
     Attributes:
@@ -78,9 +78,8 @@ class DomainResult(TypedDict):
         coverage: Coverage level from CoverageLevel enum.
         cross_regulation: List of cross-regulation overlap analyses.
         llm_status: LLM processing status — OK/FAILED/SKIPPED.
-        adapted_objective: LLM-adapted narrative paragraph (3-6 sentences)
-            tailoring HSOs to company reality. Empty string when
-            ``llm_status`` is ``FAILED``.
+        adapted_objective: Concat of HLs (verbatim) for downstream rendering.
+        adapted_subdomains: Per-sub-domain adaptation (v1.2 spec).
         key_changes: Bullet list of concrete deltas vs. raw HSOs (may be
             empty when no changes were needed or on parse failure).
         confidence: LLM self-rated confidence — HIGH / MEDIUM / LOW.
@@ -92,10 +91,14 @@ class DomainResult(TypedDict):
     subdomains: list[dict]
     coverage: str
     cross_regulation: list[dict]
+    applicable_regs: list[str]
     llm_status: str
-    adapted_objective: str
+    adapted_objective: str  # concat of HLs (for downstream verbatim rendering)
+    adapted_subdomains: list[dict]  # NEW: per-sub-domain adaptation (v1.2)
+    adapted_subdomains_v3: list[dict]  # NEW: per-sub-domain 3-blocks x 5-fields (v1.3)
     key_changes: list[str]
     confidence: str
+    error_reason: NotRequired[str]  # populated only when llm_status == "FAILED"
 
 
 class V2State(TypedDict):

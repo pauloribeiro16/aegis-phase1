@@ -205,6 +205,7 @@ class UnifiedInvoker:
     DEFAULT_MODEL = "gemma4:e2b"
     DEFAULT_BASE_URL = "http://localhost:11434"
     DEFAULT_TIMEOUT = 120
+    DEFAULT_NUM_CTX = 32768  # AEGIS-P1-CORR-022: match spec (docs/LLM_ARCHITECTURE_DECISION.md)
 
     def __init__(
         self,
@@ -212,6 +213,7 @@ class UnifiedInvoker:
         model: str | None = None,
         base_url: str | None = None,
         timeout: int | None = None,
+        num_ctx: int | None = None,
         langfuse_handler: Any | None = None,
         prompt_loader: Any | None = None,
         catalog_loader: Any | None = None,
@@ -225,6 +227,7 @@ class UnifiedInvoker:
         self.model = model or self.DEFAULT_MODEL
         self.base_url = base_url or self.DEFAULT_BASE_URL
         self.timeout = timeout or self.DEFAULT_TIMEOUT
+        self.num_ctx = num_ctx or self.DEFAULT_NUM_CTX
         self._langfuse_handler = langfuse_handler
 
         self.prompts = prompt_loader
@@ -238,9 +241,9 @@ class UnifiedInvoker:
             model=self.model,
             base_url=self.base_url,
             timeout=self.timeout,
+            num_ctx=self.num_ctx,
         )
         self._heavy: Any | None = None
-
         self._ollama_reachable: bool | None = None
         self._ollama_probe_ts: float = 0.0
 

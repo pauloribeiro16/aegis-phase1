@@ -53,18 +53,27 @@ def _make_empty_state() -> dict:
 
 
 VALID_OUTPUT = (
-    "ADAPTED_OBJECTIVE: Adapted objective text spanning three sentences. "
-    "It references the company reality. It is bounded by proportionality.\n"
-    "KEY_ADJUSTMENTS:\n"
-    "- adjustment 1\n"
-    "- adjustment 2\n"
-    "- adjustment 3\n"
-    "CONFIDENCE: HIGH"
+    "### D-04.1 — Incident Response Planning\n"
+    "**Objective.** Maintain a documented incident response plan tailored "
+    "to TinyTask scope.\n\n"
+    "**Directed objectives.**\n"
+    "- **GDPR**: Art. 33 requires breach notification within 72 hours to "
+    "the supervisory authority.\n"
+    "- **CRA**: Annex I Part I requires incident handling and disclosure "
+    "aligned with EN ISO/IEC 30111.\n\n"
+    "### D-04.2 — Detection and Triage\n"
+    "**Objective.** Establish detection capabilities with documented "
+    "triage steps and thresholds.\n\n"
+    "**Directed objectives.**\n"
+    "- **GDPR**: Art. 32(1)(d) requires regular testing of effectiveness.\n"
+    "- **CRA**: Annex I Part II requires handling of vulnerabilities.\n"
 )
 
-INVALID_OUTPUT_NO_OBJECTIVE = "KEY_ADJUSTMENTS:\n- one\nCONFIDENCE: HIGH"
-INVALID_OUTPUT_NO_ADJUSTMENTS = (
-    "ADAPTED_OBJECTIVE: Just an objective.\nCONFIDENCE: HIGH"
+INVALID_OUTPUT_NO_OBJECTIVE = "**Directed objectives.**\n- **GDPR**: just a directive"
+INVALID_OUTPUT_NO_HEADINGS = (
+    "**Objective.** Objective text without proper heading.\n"
+    "**Directed objectives.**\n"
+    "- **GDPR**: x\n"
 )
 
 
@@ -116,21 +125,27 @@ def test_ok_first_try(mock_state) -> None:
     assert result["llm_status"] == "OK"
     assert result["domain_id"] == "D-04"
     assert result["domain_name"] == DOMAIN_NAMES["D-04"]
-    assert "Adapted objective text" in result["adapted_objective"]
-    assert len(result["key_changes"]) == 3
-    assert result["confidence"] == "HIGH"
+    assert "**Objective.**" in result["adapted_objective"]
+    assert len(result["key_changes"]) == 0
+    assert result["confidence"] == "UNKNOWN"  # v1.2 spec doesn't include CONFIDENCE
     assert invoker.call_count == 1
 
 
 def test_ok_response_with_default_script(mock_state) -> None:
-    """An empty script → the MockInvoker returns a default OK response."""
+    """An empty script → the MockInvoker returns a default OK response.
+
+    Note: the default mock response is the legacy ``ADAPTED_OBJECTIVE:``
+    format, which the v2 parser does not recognize (no ``### D-XX.Y``
+    headings). Expectation is FAILED with parse-related error.
+    """
     invoker = MockInvoker()
     proc = DomainProcessor(llm_invoker=invoker, log_dir=None, max_retries=3)
 
     result = proc.process("D-04", mock_state)
 
-    assert result["llm_status"] == "OK"
-    assert result["adapted_objective"]
+    # Default mock LLM emits legacy format → parser v2 fails → result FAILED
+    assert result["llm_status"] == "FAILED"
+    assert "Parse failed" in result["error_reason"]
 
 
 def test_parse_fail_retry_with_feedback(mock_state) -> None:
@@ -155,7 +170,7 @@ def test_parse_fail_status_fail_then_success(mock_state) -> None:
     invoker = MockInvoker(
         script=[
             {"raw": "", "status": "FAILED_AFTER_RETRIES"},
-            {"raw": INVALID_OUTPUT_NO_ADJUSTMENTS, "status": "OK"},
+            {"raw": "not parseable at all", "status": "OK"},
             {"raw": VALID_OUTPUT, "status": "OK"},
         ]
     )
@@ -298,7 +313,10 @@ def test_log_writes_jsonl(tmp_path: Path, mock_state) -> None:
     entry = entries[0]
     assert entry["domain_id"] == "D-04"
     assert entry["attempts"] == 1
-    assert entry["parsed"]["confidence"] == "HIGH"
+    # v1.2 spec doesn't include CONFIDENCE → "UNKNOWN"
+    assert entry["parsed"]["confidence"] == "UNKNOWN"
+    assert isinstance(entry["adapted_subdomains"], list)
+    assert len(entry["adapted_subdomains"]) == 2
 
 
 def test_log_writes_on_exhausted_retries(tmp_path: Path, mock_state) -> None:
@@ -336,3 +354,152 @@ def test_map_partial_failure_is_an_exception() -> None:
     """MapPartialFailure can be raised and caught as a regular Exception."""
     with pytest.raises(MapPartialFailure):
         raise MapPartialFailure("3 domain(s) failed: ['D-04', 'D-07', 'D-09']")
+
+
+# ─── v1.2 per-sub-domain handling ──────────────────────────────────────
+
+
+def test_processor_passes_adapted_subdomains(mock_state) -> None:
+    """result["adapted_subdomains"] is populated from the parser."""
+    invoker = MockInvoker(script=[{"raw": VALID_OUTPUT, "status": "OK"}])
+    proc = DomainProcessor(llm_invoker=invoker, log_dir=None, max_retries=3)
+
+    result = proc.process("D-04", mock_state)
+
+    assert "adapted_subdomains" in result
+    adapted = result["adapted_subdomains"]
+    assert isinstance(adapted, list)
+    assert len(adapted) == 2
+    ids = {s["subdomain_id"] for s in adapted}
+    assert ids == {"D-04.1", "D-04.2"}
+    for s in adapted:
+        assert s["title"]
+        assert s["hl_objective"].startswith("**Objective.**")
+        assert isinstance(s["directed"], list)
+        assert len(s["directed"]) >= 1
+
+
+def test_processor_legacy_adapted_objective_is_concatenated_hls(mock_state) -> None:
+    """result["adapted_objective"] is the HL paragraphs joined by ``\\n\\n``."""
+    invoker = MockInvoker(script=[{"raw": VALID_OUTPUT, "status": "OK"}])
+    proc = DomainProcessor(llm_invoker=invoker, log_dir=None, max_retries=3)
+
+    result = proc.process("D-04", mock_state)
+
+    ao = result["adapted_objective"]
+    assert "Maintain a documented incident response plan" in ao
+    assert "Establish detection capabilities" in ao
+    assert "\n\n" in ao  # joined with double-newline
+    # First half ends before the second half starts
+    assert ao.find("incident response plan") < ao.find("**Objective.** Establish")
+
+
+# ─── v1.3: per-sub-domain 3 blocks x 5 fields ──────────────────────────
+
+
+VALID_V3_OUTPUT = (
+    "### D-04.1 — Incident Response Planning\n\n"
+    "**Generic Objective.**\n"
+    "- Original: Maintain a documented incident response plan tailored to "
+    "TinyTask scope.\n"
+    "- Adapted: Maintain a documented incident response plan scaled to a "
+    "micro-entity with limited security FTE.\n"
+    "- Rationale: Source HL already addresses the in-scope perimeter; "
+    "adaptation adds operationalisation for micro-scale.\n"
+    "- Adjustments needed: Define IR roles explicitly. Document breach "
+    "notification timing (24h CRA / 72h GDPR).\n"
+    "**Considerations.**\n"
+    "- GDPR Art. 33(1) 72h clock and CRA early-warning 24h clock are the "
+    "two timing anchors.\n"
+    "- Records include incident logs, root-cause analyses, post-mortems.\n\n"
+    "**GDPR Objective.**\n"
+    "- Original: Personal-data breach notification to the supervisory "
+    "authority within 72 hours (Art. 33 GDPR).\n"
+    "- Adapted: Personal-data breach notification to the supervisory "
+    "authority within 72 hours, with documented internal escalation "
+    "timeline.\n"
+    "- Rationale: Original is already applicable (GDPR in scope); adaptation "
+    "adds internal escalation step for a small team.\n"
+    "- Adjustments needed: Document internal escalation procedure. Define "
+    "DPO notification trigger.\n"
+    "**Considerations.**\n"
+    "- Art. 33(1) 72h clock starts from awareness.\n"
+    "- Documentation must be sufficient to demonstrate compliance.\n\n"
+    "**CRA Objective.**\n"
+    "- Original: Manufacturer handles vulnerabilities and discloses them "
+    "(Annex I Part II §(7) + §(8) CRA).\n"
+    "- Adapted: Manufacturer handles vulnerabilities and discloses them, "
+    "with a documented CVD policy published via security.txt.\n"
+    "- Rationale: Original is already applicable (CRA in scope); adaptation "
+    "adds publishable CVD channel for the product.\n"
+    "- Adjustments needed: Publish security.txt. Document coordinated "
+    "disclosure procedure.\n"
+    "**Considerations.**\n"
+    "- CRA Annex I Part II §(7) handles vulnerabilities.\n"
+    "- Annex I Part II §(8) requires active dissemination of disclosed "
+    "fixes.\n"
+)
+
+
+def test_processor_passes_adapted_subdomains_v3(mock_state) -> None:
+    """When the LLM emits a v1.3-compliant output, the result carries
+    ``adapted_subdomains_v3`` with 3 blocks per sub-domain and ``adapted_subdomains``
+    is empty.
+    """
+    invoker = MockInvoker(script=[{"raw": VALID_V3_OUTPUT, "status": "OK"}])
+    proc = DomainProcessor(llm_invoker=invoker, log_dir=None, max_retries=3)
+
+    result = proc.process("D-04", mock_state)
+
+    assert result["llm_status"] == "OK"
+    assert "adapted_subdomains_v3" in result
+    assert isinstance(result["adapted_subdomains_v3"], list)
+    assert len(result["adapted_subdomains_v3"]) == 1
+    sub = result["adapted_subdomains_v3"][0]
+    assert sub["subdomain_id"] == "D-04.1"
+    assert sub["title"] == "Incident Response Planning"
+    assert len(sub["blocks"]) == 3
+    labels = [b["label"] for b in sub["blocks"]]
+    assert labels == ["Generic Objective.", "GDPR Objective.", "CRA Objective."]
+    for block in sub["blocks"]:
+        assert block["original"]
+        assert block["adapted"]
+        assert block["rationale"]
+        assert block["adjustments"]
+        assert isinstance(block["considerations"], list)
+        assert len(block["considerations"]) >= 1
+    # V2 path is not taken when V3 succeeds
+    assert result["adapted_subdomains"] == []
+
+
+def test_processor_falls_back_to_v2_when_v3_fails(mock_state) -> None:
+    """If the LLM output does not match v1.3 (no 'Generic Objective' header),
+    the processor falls back to the v1.2 parser.
+    """
+    invoker = MockInvoker(script=[{"raw": VALID_OUTPUT, "status": "OK"}])
+    proc = DomainProcessor(llm_invoker=invoker, log_dir=None, max_retries=3)
+
+    result = proc.process("D-04", mock_state)
+
+    assert result["llm_status"] == "OK"
+    # V3 path produces no blocks (output has only "**Objective.**" not "Generic Objective.")
+    assert result["adapted_subdomains_v3"] == []
+    # V2 fallback populates adapted_subdomains
+    assert len(result["adapted_subdomains"]) == 2
+
+
+def test_processor_v3_failed_result_includes_empty_v3(mock_state) -> None:
+    """When all retries fail, the result still has ``adapted_subdomains_v3 == []``."""
+    invoker = MockInvoker(
+        script=[
+            {"raw": INVALID_OUTPUT_NO_OBJECTIVE, "status": "OK"},
+            {"raw": INVALID_OUTPUT_NO_OBJECTIVE, "status": "OK"},
+            {"raw": INVALID_OUTPUT_NO_OBJECTIVE, "status": "OK"},
+        ]
+    )
+    proc = DomainProcessor(llm_invoker=invoker, log_dir=None, max_retries=3)
+
+    result = proc.process("D-04", mock_state)
+
+    assert result["llm_status"] == "FAILED"
+    assert result["adapted_subdomains_v3"] == []
