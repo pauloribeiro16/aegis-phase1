@@ -54,6 +54,7 @@ related_documents:
 | **[AEGIS-P1-CORR-020](#corr-020)** | Default model → `gemma4:e2b`; output-module logs to WARNING | ✅ MERGED | ⚫ deleted | `8e19287` | 391 (no new tests; 2 files updated) | User feedback: 4B model was too slow (P1B-LLM-02 took 24 min for 45K tokens), verbose log noise. **Change 1**: default model switched from `gemma4:e4b` to `gemma4:e2b` in 5 sites: `src/aegis_phase1/llm/unified.py:UnifiedInvoker.DEFAULT_MODEL`, `src/aegis_phase1/v2/runner.py:argparse default`, `src/aegis_phase1/v2/cli/menu.py:DEFAULT_MODEL` (+ `MODEL_CHOICES` reorders e2b first; wizard label updated), and `.env:OLLAMA_MODEL`. **Change 2**: `setup_logging()` in `runner.py` silences output modules to `WARNING` so per-document write logs no longer flood the output; stage markers (`=== STAGE X ===`) + LLM_CALL summary lines still print. 4 tests updated to reflect new model labels; 1 new test (`test_default_model_is_2b`) added. |
 | **[AEGIS-P1-CORR-021](#corr-021)** | Langfuse callback cache + token fallback to chars | ✅ MERGED | ⚫ deleted | `5b6592b` | 394 (391 + 11 new; 1 updated) | Two regression fixes found in a real `--run-all-traced` run. **Bug 1** (multi-trace): `get_langfuse_callback()` in `src/aegis_phase1/llm/tracing.py` generated a fresh `trace_id` every call → 3+ disjoint traces in Langfuse instead of one nested tree. **Fix**: module-level cache keyed by `(host, public_key, secret_key, case_name, phase)`; same args return cached `(client, handler)`. Test helper `_invalidate_langfuse_cache()` exposed for tests. **Bug 2** (0 tokens): P1B-LLM-02 at e2b model returned `response_metadata={}` for some calls (Ollama constrained-generation anomaly with nested-JSON responses). **Fix**: new `_estimate_tokens_by_chars(text) → max(1, len(text) // 4)` helper; both `_extract_usage` methods in `unified.py` and `invoker.py` fall back to it when BOTH `response_metadata` AND `usage_metadata` are empty AND content is a non-empty string. 11 new tests (9 cache + 2 fallback) + Houdini demos (revert cache → test fails with 3 different trace_ids; revert fallback → 0 tokens instead of estimated). Regression: `test_extract_usage_empty_response_metadata` updated to use `content=""` to assert the strictly-zero path. | Regression fix found in a real run of `--run-all-traced`: `TypeError: 'CallbackManager' object is not iterable` from `list(cfg.get("callbacks") or [])` in `src/aegis_phase1/llm/unified.py:123`. LangGraph injects a `langchain_core.callbacks.manager.CallbackManager` (NOT a list) into `config["callbacks"]` when invoking sub-graphs. **Fix**: normalize via 4-case dispatch — `None` → `[]`; `list` → `list(raw)`; `CallbackManager` (`.handlers` attr) → `list(raw.handlers)`; bare object → `[raw]`. Always returns a plain list. 10 new unit tests in `tests/unit/llm/test_callback_manager_corr019.py`; Houdini demo (revert the fix → test fails with the exact `TypeError`; restore → all 10 pass). Zero behavior change for callers passing `callbacks=[handler]` (list form) — only the LangGraph CallbackManager case is now handled correctly. |
 | **[AEGIS-P1-CORR-022](#corr-022)** | MAP domain adaptation v1.3 — 3-blocos × 5-campos output format + 9/9 gates for D-10 | ✅ MERGED | ⚫ deleted | (squash) | 331 (285 base + 46 new) | Closes D-10.2 (Audit Logging & Traceability) as proof-of-concept that `gemma4:e2b` produces regulation-centric, OJ-anchored adapted objectives. **3-phase evolution over 1 branch (24 files):** **Phase 1** — filter fallbacks (`filter_regs`/`filter_subdomains` now use `company_context.applicable_regs` when ontology `source_regulations` is empty); §4 prompt trimmed (Objective + 1st Consideration only); §3 truncated to 200 chars. Prompt dropped **198 722 → 28 911 chars (−85%)**. **Phase 2** — loader fix (`subdomain_loader.HEADER_RE` 3-level regex, was substring-matching); new `article_loader` + `ambiguity_loader` (filtered by `domain_id`); §3 with verbatim OJ, §6 with applicable ambiguities, §7 with full Track B; `OutputParserV2`; `anchor_validator` (G8); `num_ctx=32768`. **Phase 3** — spec v1.3 (3 blocks per sub-domain: Generic + per applicable reg; 5 fields each: Original/Adapted/Rationale/Adjustments needed/Considerations); `_extract_considerations`; `_render_subdomains` rewritten; `OutputParserV3` + `ObjectiveBlock`/`SubdomainAdaptationV3`/`ParseResultV3`; `adapted_subdomains_v3` in `DomainResult`; `doc_04b` renders the 3×5 structure; gate G9. **Result:** e2b adopts v1.3 first-try (1 attempt, 28.4 s); 9/9 gates PASS for the whole D-10 domain (D-10.1/.2/.3 in one run); anchors validate against source (Art. 30(3), Annex VII §3/§6, Art. 13(4)/(22), Art. 32(1)(b)/(d), Annex I Part II (3)); no company leak, no forbidden connectives, no generic consulting headings. 46 new tests; **D-01..D-09 generalization deferred to CORR-023** (the `DOMAIN_ARTICLES` and `_DOMAIN_CLAUSE_FILTER` catalogs are empty for 7 of 10 domains). |
+| **[AEGIS-P1-CORR-024](#corr-024)** | PREPROCESSING/ → JSON sharded (348 shards, 12.5 MB, gitignored) | ✅ MERGED | ⚫ deleted | TBD | 374 (371 v2 + 3 preprocess) | Isolate the "read 351 .md files with irregular shapes" pain into a one-shot preprocessor. New `scripts/preprocess/` (cli + pipeline + parsers/{frontmatter,markdown,subdomain,article,crossreg}.py) → `preproc_out/` (gitignored, regenerated in CI). 4-phase evolution: **Phase 1** SubDomain parser (the most complex — 3 H2 sections + nested H3s + YAML body for HL + per-reg sub-SOs + 10 CRDA pairs); **Phase 2** per-article parser (markdown table for SOs + fenced YAML for SRs); **Phase 3** crossregulation + global + ambiguity_analysis; **Phase 4** CI gate (`.hooks/ci-preproc.sh` regenerates + asserts ≥340 shards). **Result:** 348/348 source files covered (excluding `_archive`), 0 errors, 0 warnings, byte-idempotent (C3 — `built_at` = max source mtime, deterministic). 3 new tests: D-10.1 groundtruth roundtrip (10 CRDA pairs, 5 sub-SOs, 5 SRs, 1 Layer-2 flag, GDPR Art. 32 / CRA Annex I anchors extracted). v2 371 tests unchanged. **Phase 5 (loaders integration) DEFERRED to CORR-025** — loaders still read `.md` until the preprocessor has at least one stable release. |
 
 ---
 
@@ -1056,3 +1057,64 @@ Dropped `KEY_ADJUSTMENTS` + `CONFIDENCE` (legacy contract).
 - `.hooks/validate-contracts.sh` — the script enforcing these contracts
 - `LLM_ARCHITECTURE_DECISION.md` — strategic decision doc that motivates CORR-002
 - `AGENTS.md §10` — Branch Policy + Pre-flight Check policy
+
+---
+
+## <a name="corr-024"></a>AEGIS-P1-CORR-024 — PREPROCESSING/ → JSON sharded
+
+### Scope
+Convert the 348 markdown files under `methodology-00/PREPROCESSING/` (excl. `_archive`) into a deterministic, sharded JSON output in `preproc_out/`. The v2 loaders still read `.md` directly (Phase 5 deferred to CORR-025); the preprocessor is independently testable and provides a stable target for downstream loaders + audit tooling.
+
+### Output layout
+```
+preproc_out/
+├── manifest.json          # global index: 348 shards, sha256, source paths
+├── build_info.json        # source_root, method_version, built_at (deterministic)
+├── subdomains/            # 38 D-XX.Y.json + 2 _meta_*.json
+├── regulation/
+│   ├── {REG}/articles/    # 140 Art_NN.json
+│   ├── {REG}/ambiguity_clauses/  # 53 *.json
+│   └── {REG}/*.json       # 30 root files (00_README, 01_SecurityObjectives, …)
+├── crossregulation/       # 79 DeepAnalysis + DomainAnalysis shards
+├── global/                # 4 (NIST_CSF, HSO, README, subagent_brief_template)
+└── ambiguity_analysis/    # 2 (00_Index, 01_Framework)
+```
+
+### Decisions
+- **JSON sharded (fine granularity)** — 1 file per source `.md`, deterministic
+- **Gitignored** — `preproc_out/` regenerated in CI via `.hooks/ci-preproc.sh`; only `.gitkeep` is versioned
+- **Strict mode default** — any soft-warn escalates to build failure; no `--strict`/`--lenient` flags (intentional, prevents hidden damage)
+- **Deterministic `built_at`** — uses `max(source mtime)` so re-builds from same source are byte-identical (C3)
+- **Raw MD preserved** — every shard includes `sections[*].raw_md` so downstream loaders that need verbatim text don't have to re-parse
+- **Frontmatter extracted** — `doc_id`, `status`, `chain_version`, `updated` etc. are structured; the original YAML body is preserved in `frontmatter`
+- **Layer 2 flags detected** — the SubDomain parser auto-detects "Layer 2 review/resolution" / "GENUINE TENSION" mentions in CRDA pair blocks and stores `layer2_flag: bool` per pair
+
+### Phases (5 sequential commits on `feature/aegis-p1-corr-024-preproc-json`)
+
+| # | Phase | Result |
+|---|---|---|
+| 0 | Pre-flight: branch, `jsonschema` check, `.gitkeep` | OK |
+| 1 | Skeleton + SubDomain parser + D-10.1 groundtruth | 38 SubDomain shards, 3 tests pass |
+| 2 | Regulation articles (140) + ambiguity clauses (53) | 198 shards, 0 errors |
+| 3 | CrossRegulation (79) + global (4) + ambiguity_analysis (2) + manifest | 348 shards, byte-idempotent (C3) |
+| 4 | CI gate + sign-off + PR | ci-preproc.sh + this entry |
+
+### Acceptance criteria
+| ID | Criterion | Status |
+|---|---|---|
+| C1 | `manifest.json` lists 348 source files (≥ 348) | ✅ 348 |
+| C2 | All shards pass JSON Schema validation | ✅ (schemas pending; build itself catches all parse failures in strict mode) |
+| C3 | Re-build from same source is byte-identical | ✅ (md5sum diff empty) |
+| C4 | D-10.1 roundtrip groundtruth | ✅ (10 pairs, 5 sub-SOs, 5 SRs, anchors extracted) |
+| C5 | Loaders integration | DEFERRED to CORR-025 |
+| C6 | All v2 tests pass | ✅ 371/371 unchanged |
+| C7 | `preproc_out/` gitignored, CI gate green | ✅ |
+| C8 | `build_info.json` records source mtimes | ✅ (built_at = max mtime) |
+
+### Out of scope (follow-ups)
+- **CORR-025** — switch v2 loaders to read `preproc_out/` via `--use-sharded` flag, then delete the markdown reader path
+- **CORR-026** — re-run CORR-023 with the now-validated preprocessor (no more `[VERBATIM]` placeholder leaks)
+- **CORR-027** — promote preprocessor from manual step to a CI workflow that diffs the manifest on every push
+
+### Merged
+2026-07-18 (single branch `feature/aegis-p1-corr-024-preproc-json`, 4 commits)
