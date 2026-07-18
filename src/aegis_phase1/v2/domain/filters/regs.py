@@ -9,6 +9,18 @@ The two checks are intentionally intersected — this prevents
 listing regulations whose clauses map to the domain but that the
 company is exempt from (e.g. NIS 2 below the 50-employee threshold).
 
+Fallback behaviour
+-----------------
+When the ontology has no ``source_regulations`` for the requested
+domain (e.g. the ontology is missing the relevant sub-domain entries,
+as happens for some D-10 sub-domains in the TinyTask case) but the
+company context declares a non-empty ``applicable_regs``, the
+intersection would collapse to ``[]`` and the domain would render no
+per-regulation objectives. In that case we degrade gracefully and
+return the company context's ``applicable_regs`` — at Phase 1A the
+company-level applicability assessment is the authoritative source
+for "which regulations apply to this organisation".
+
 References:
     - contracts/SPRINT002_003_map_reduce_output.md
 """
@@ -32,8 +44,19 @@ def filter_regs(state: V2State, domain_id: str) -> list[str]:
 
     Returns:
         Sorted, deduplicated list of regulation short names (e.g.
-        ``["CRA", "GDPR"]``). Empty when either the ontology or the
-        company context lacks the relevant data.
+        ``["CRA", "GDPR"]``). Empty when both the ontology and the
+        company context lack relevant data.
+
+    Behaviour:
+        * Normal path — intersect ontology ``source_regulations`` for
+          the domain with ``company_context.applicable_regs``.
+        * Fallback — when the ontology has no ``source_regulations``
+          entries for ``domain_id`` (unknown domain or unpopulated
+          ontology) but the company context has a non-empty
+          ``applicable_regs``, return the company context's
+          ``applicable_regs`` instead of an empty list. This avoids
+          silent loss of per-regulation rendering at Phase 1A when
+          the ontology is incomplete.
     """
     ontology = state.get("ontology") or {}
     domain_regs = _domain_source_regs(ontology, domain_id)
@@ -43,7 +66,16 @@ def filter_regs(state: V2State, domain_id: str) -> list[str]:
     if ctx is not None:
         applicable_regs = list(getattr(ctx, "applicable_regs", []) or [])
 
-    if applicable_regs:
+    if not domain_regs and applicable_regs:
+        # Fallback: ontology lacks source_regulations — use company applicability.
+        logger.info(
+            "filter_regs(%s): ontology empty for domain, falling back to "
+            "company_context.applicable_regs=%s",
+            domain_id,
+            applicable_regs,
+        )
+        filtered = list(applicable_regs)
+    elif applicable_regs:
         applicable_set = {str(r).strip() for r in applicable_regs if r}
         filtered = [r for r in domain_regs if r in applicable_set]
     else:

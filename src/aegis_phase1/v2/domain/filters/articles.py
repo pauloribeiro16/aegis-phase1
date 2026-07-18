@@ -1,98 +1,66 @@
-"""articles — Filter clause-mappings (ontology articles) for a domain.
-
-Reads ``state["ontology"]["clause_mappings"]`` and returns truncated
-``ArticleSnippet`` dicts for clauses whose ``maps_to_subdomain``
-starts with the domain prefix. Each snippet includes the regulation
-short name (parsed from ``regulation_id``, e.g. ``"REG-GDPR"`` →
-``"GDPR"``), the article label, the description, and a truncated
-text body.
-
-Truncation: each article text is capped at 2000 characters (~500
-tokens) so the prompt builder does not blow context windows.
-
-References:
-    - contracts/SPRINT002_003_map_reduce_output.md
-"""
+"""Filter complete OJ article bodies for a domain."""
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+from pathlib import Path
 
+from aegis_phase1.v2.domain.filters.regs import filter_regs
+from aegis_phase1.v2.loader.article_loader import load_articles_for_domain
 from aegis_phase1.v2.state import V2State
 
 logger = logging.getLogger(__name__)
 
-# 2000 chars ≈ 500 tokens (OpenAI/Anthropic rule of thumb for English).
-_MAX_ARTICLE_CHARS = 2000
+_OJ_BASE_PATH = Path(
+    "/home/epmq-cyber/Área de Trabalho/projects/Methodology-main/" "00_METHODOLOGY/PREPROCESSING"
+)
 
 
 def filter_articles(state: V2State, domain_id: str) -> list[dict[str, str]]:
-    """Return article snippets for clauses mapped to ``domain_id``.
+    """Return complete OJ article text applicable to a domain.
 
-    Args:
-        state: Pipeline V2State (uses ``ontology.clause_mappings``).
-        domain_id: Domain identifier (e.g. ``"D-04"``).
-
-    Returns:
-        Sorted list of ``ArticleSnippet`` dicts (deduplicated by
-        ``(regulation, article)``). Empty when the ontology has no
-        clause_mappings.
+    Regulation applicability is taken from the domain filter first and from
+    ``company_context.applicable_regs`` when the domain filter has no result.
+    Article source bodies are returned without prompt-size truncation.
     """
-    ontology = state.get("ontology") or {}
-    mappings = ontology.get("clause_mappings") or []
-    if not isinstance(mappings, list):
+    regs = filter_regs(state, domain_id)
+    if not regs:
+        ctx = state.get("company_context")
+        if ctx is not None:
+            regs = list(getattr(ctx, "applicable_regs", []) or [])
+    if not regs:
         return []
 
-    prefix = domain_id + "."
-    seen: set[tuple[str, str]] = set()
-    snippets: list[dict[str, str]] = []
-
-    for clause in mappings:
-        if not isinstance(clause, dict):
-            continue
-        target = str(clause.get("maps_to_subdomain") or "").strip()
-        if not target.startswith(prefix):
-            continue
-
-        regulation_id = str(clause.get("regulation_id") or "").strip()
-        short_name = _short_name(regulation_id)
-        article = str(clause.get("article") or "").strip()
-        key = (short_name, article)
-        if key in seen or not article:
-            continue
-        seen.add(key)
-
-        title = str(clause.get("description") or "").strip()
-        text_source = clause.get("text") or clause.get("article_text") or title
-        truncated = _truncate(str(text_source))
-
-        snippets.append({
-            "regulation": short_name,
-            "article": article,
-            "title": title,
-            "text": truncated,
-        })
-
-    snippets.sort(key=lambda s: (s["regulation"], s["article"]))
-    logger.debug("filter_articles(%s): %d snippets", domain_id, len(snippets))
-    return snippets
+    applicable_subdomains = _applicable_subdomains(state, domain_id)
+    articles = load_articles_for_domain(
+        domain_id, regs, _OJ_BASE_PATH, applicable_subdomains=applicable_subdomains
+    )
+    result = [
+        {
+            "regulation": article["regulation"],
+            "article": article["article"],
+            "title": article["title"],
+            "text": article["text"],
+            "source_file": article.get("source_file", ""),
+        }
+        for article in articles
+    ]
+    logger.debug(
+        "filter_articles(%s): %d articles (subs=%s)",
+        domain_id,
+        len(result),
+        applicable_subdomains,
+    )
+    return result
 
 
-def _short_name(regulation_id: str) -> str:
-    """Convert ``"REG-GDPR"`` → ``"GDPR"``; fall back to input."""
-    if not regulation_id:
-        return ""
-    if regulation_id.startswith("REG-"):
-        return regulation_id[4:]
-    return regulation_id
-
-
-def _truncate(text: str) -> str:
-    """Trim to ``_MAX_ARTICLE_CHARS`` characters, appending a marker."""
-    if len(text) <= _MAX_ARTICLE_CHARS:
-        return text
-    return text[: _MAX_ARTICLE_CHARS].rstrip() + " […]"
+def _applicable_subdomains(state: V2State, domain_id: str) -> list[str]:
+    """Return the sub-domain IDs under ``domain_id`` for sub-domain filtering."""
+    subdomains = state.get("subdomains") or {}
+    if not subdomains:
+        return []
+    prefix = f"{domain_id.strip().upper()}."
+    return sorted(sid for sid in subdomains if sid.upper().startswith(prefix))
 
 
 __all__ = ["filter_articles"]

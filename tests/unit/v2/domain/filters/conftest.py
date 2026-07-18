@@ -32,8 +32,11 @@ def _make_subdomain(sid: str, title: str, regs: list[str]) -> SubDomainDef:
         section2_hso={
             "hl_objective": f"High-level objective for {sid}.",
             "per_reg_sos": [
-                {"id": f"### {sid}.1", "text": f"GDPR-oriented text for {sid}."},
-                {"id": f"### {sid}.2", "text": f"CRA-oriented text for {sid}."},
+                {
+                    "id": f"{sid}.{i + 1} — Sub-SO for {reg}",
+                    "text": f"Per-regulation text for {sid} under {reg}.",
+                }
+                for i, reg in enumerate(regs)
             ],
             "emergent_tensions": [],
         },

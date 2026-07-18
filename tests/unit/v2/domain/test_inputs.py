@@ -73,29 +73,32 @@ def test_assemble_inputs_returns_applicable_regs_intersected(mock_state: V2State
     assert set(result["applicable_regs"]) == {"CRA", "GDPR"}
 
 
-def test_assemble_inputs_includes_articles_with_truncation(mock_state: V2State) -> None:
+def test_assemble_inputs_includes_verbatim_articles(mock_state: V2State) -> None:
     result = assemble_inputs(mock_state, "D-04")
     arts = result["applicable_articles"]
     assert arts, "expected at least one article"
     for art in arts:
         assert {"regulation", "article", "title", "text"} <= set(art.keys())
+        assert art["text"]
 
 
-def test_assemble_inputs_returns_ambiguities_for_domain(mock_state: V2State) -> None:
-    """TC-001 targets D-04.3 → must surface for D-04."""
+def test_assemble_inputs_returns_regulation_ambiguities(mock_state: V2State) -> None:
+    mock_state["company_context"].applicable_regs = ["GDPR"]
+
     result = assemble_inputs(mock_state, "D-04")
-    ids = {a["id"] for a in result["ambiguities"]}
-    assert ids == {"TC-001"}
-    assert result["ambiguities"][0]["resolution"].startswith("Use 24h")
+
+    assert result["ambiguities"]
+    assert {entry["regulation"] for entry in result["ambiguities"]} == {"GDPR"}
 
 
-def test_assemble_inputs_excludes_ambiguities_for_other_domains(
+def test_assemble_inputs_excludes_non_applicable_regulation_ambiguities(
     mock_state: V2State,
 ) -> None:
-    """TC-002 targets D-06.1 → must NOT appear for D-04."""
+    mock_state["company_context"].applicable_regs = ["GDPR"]
+
     result = assemble_inputs(mock_state, "D-04")
-    ids = {a["id"] for a in result["ambiguities"]}
-    assert "TC-002" not in ids
+
+    assert all(entry["regulation"] == "GDPR" for entry in result["ambiguities"])
 
 
 def test_assemble_inputs_returns_cross_reg(mock_state: V2State) -> None:
@@ -182,12 +185,19 @@ def test_assemble_inputs_returns_empty_lists_when_no_data(mock_state: V2State) -
     Implementations depend on tech_stack (not sub-domain presence), so
     they may still be returned; we verify the per-subdomain fields are
     empty.
+
+    Note: ``applicable_regs`` now reflects the fallback in
+    ``filter_regs`` — when the ontology has no ``source_regulations``
+    for the requested domain, ``filter_regs`` returns the company
+    context's ``applicable_regs`` rather than ``[]`` (intentional
+    behaviour change documented in ``regs.filter_regs``).
     """
     result = assemble_inputs(mock_state, "D-99")
     assert result["subdomains"] == []
-    assert result["applicable_regs"] == []
+    assert result["applicable_regs"] == ["CRA", "GDPR"]
     assert result["applicable_articles"] == []
-    assert result["ambiguities"] == []
+    assert result["ambiguities"]
+    assert {entry["regulation"] for entry in result["ambiguities"]} == {"CRA", "GDPR"}
     assert result["cross_reg_analysis"] == []
     # Implementations are tech-stack driven, not subdomain-driven,
     # so they may still be present for any domain the company uses.

@@ -20,6 +20,9 @@ from aegis_phase1.v2.state import SubDomainDef
 logger = logging.getLogger(__name__)
 
 
+HEADER_RE = re.compile(r"^###\s+D-(\d+)\.(\d+)\.(\d+)\b")
+
+
 class SubDomainLoader:
     """Loader for sub-domain preprocessing files.
 
@@ -144,50 +147,25 @@ class SubDomainLoader:
 
         for line in lines:
             stripped = line.strip()
-            if stripped.startswith("### D-") and ".0" in stripped:
-                hl_objective = "\n".join(current_sub_lines) if current_sub_lines else stripped
-                current_sub_lines = [stripped]
-            elif stripped.startswith("### D-") and ".1" in stripped:
-                if current_sub_lines:
-                    text_block = "\n".join(current_sub_lines)
-                    if current_sub:
-                        per_reg_sos.append({
-                            "id": current_sub,
-                            "text": text_block,
-                        })
-                current_sub = stripped.replace("### ", "").strip()
-                current_sub_lines = [stripped]
-            elif stripped.startswith("### D-") and ".2" in stripped:
-                if current_sub_lines:
-                    text_block = "\n".join(current_sub_lines)
-                    if current_sub:
-                        per_reg_sos.append({
-                            "id": current_sub,
-                            "text": text_block,
-                        })
-                current_sub = stripped.replace("### ", "").strip()
-                current_sub_lines = [stripped]
-            elif stripped.startswith("### D-") and ".3" in stripped:
-                if current_sub_lines:
-                    text_block = "\n".join(current_sub_lines)
-                    if current_sub:
-                        per_reg_sos.append({
-                            "id": current_sub,
-                            "text": text_block,
-                        })
-                current_sub = stripped.replace("### ", "").strip()
-                current_sub_lines = [stripped]
-            elif stripped.startswith("### D-") and ".4" in stripped:
-                if current_sub_lines:
-                    text_block = "\n".join(current_sub_lines)
-                    if current_sub:
-                        per_reg_sos.append({
-                            "id": current_sub,
-                            "text": text_block,
-                        })
-                current_sub = stripped.replace("### ", "").strip()
-                current_sub_lines = [stripped]
-            elif "Emergent tensions" in stripped or "emergent tensions" in stripped:
+            header_match = HEADER_RE.match(stripped) if stripped.startswith("### D-") else None
+            if header_match:
+                suffix = header_match.group(3)
+                if suffix == "0":
+                    hl_objective = "\n".join(current_sub_lines) if current_sub_lines else stripped
+                    current_sub_lines = [stripped]
+                else:
+                    if current_sub_lines:
+                        text_block = "\n".join(current_sub_lines)
+                        if current_sub:
+                            per_reg_sos.append({
+                                "id": current_sub,
+                                "text": text_block,
+                            })
+                    current_sub = stripped.replace("### ", "").strip()
+                    current_sub_lines = [stripped]
+            elif stripped.startswith("### ") and (
+                "Emergent tensions" in stripped or "emergent tensions" in stripped
+            ):
                 in_emergent = True
                 if current_sub_lines:
                     text_block = "\n".join(current_sub_lines)

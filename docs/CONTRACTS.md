@@ -53,6 +53,7 @@ related_documents:
 | **[AEGIS-P1-CORR-019](#corr-019)** | Fix `CallbackManager` handling in `_merge_handler_into_config` (regression) | ✅ MERGED | ⚫ deleted | `4102b7d` | 391 (381 + 10 new) | Regression fix found in a real run of `--run-all-traced`: `TypeError: 'CallbackManager' object is not iterable` from `list(cfg.get("callbacks") or [])` in `src/aegis_phase1/llm/unified.py:123`. LangGraph injects a `langchain_core.callbacks.manager.CallbackManager` (NOT a list) into `config["callbacks"]` when invoking sub-graphs. **Fix**: normalize via 4-case dispatch — `None` → `[]`; `list` → `list(raw)`; `CallbackManager` (`.handlers` attr) → `list(raw.handlers)`; bare object → `[raw]`. Always returns a plain list. 10 new unit tests in `tests/unit/llm/test_callback_manager_corr019.py`; Houdini demo (revert the fix → test fails with the exact `TypeError`; restore → all 10 pass). Zero behavior change for callers passing `callbacks=[handler]` (list form) — only the LangGraph CallbackManager case is now handled correctly. |
 | **[AEGIS-P1-CORR-020](#corr-020)** | Default model → `gemma4:e2b`; output-module logs to WARNING | ✅ MERGED | ⚫ deleted | `8e19287` | 391 (no new tests; 2 files updated) | User feedback: 4B model was too slow (P1B-LLM-02 took 24 min for 45K tokens), verbose log noise. **Change 1**: default model switched from `gemma4:e4b` to `gemma4:e2b` in 5 sites: `src/aegis_phase1/llm/unified.py:UnifiedInvoker.DEFAULT_MODEL`, `src/aegis_phase1/v2/runner.py:argparse default`, `src/aegis_phase1/v2/cli/menu.py:DEFAULT_MODEL` (+ `MODEL_CHOICES` reorders e2b first; wizard label updated), and `.env:OLLAMA_MODEL`. **Change 2**: `setup_logging()` in `runner.py` silences output modules to `WARNING` so per-document write logs no longer flood the output; stage markers (`=== STAGE X ===`) + LLM_CALL summary lines still print. 4 tests updated to reflect new model labels; 1 new test (`test_default_model_is_2b`) added. |
 | **[AEGIS-P1-CORR-021](#corr-021)** | Langfuse callback cache + token fallback to chars | ✅ MERGED | ⚫ deleted | `5b6592b` | 394 (391 + 11 new; 1 updated) | Two regression fixes found in a real `--run-all-traced` run. **Bug 1** (multi-trace): `get_langfuse_callback()` in `src/aegis_phase1/llm/tracing.py` generated a fresh `trace_id` every call → 3+ disjoint traces in Langfuse instead of one nested tree. **Fix**: module-level cache keyed by `(host, public_key, secret_key, case_name, phase)`; same args return cached `(client, handler)`. Test helper `_invalidate_langfuse_cache()` exposed for tests. **Bug 2** (0 tokens): P1B-LLM-02 at e2b model returned `response_metadata={}` for some calls (Ollama constrained-generation anomaly with nested-JSON responses). **Fix**: new `_estimate_tokens_by_chars(text) → max(1, len(text) // 4)` helper; both `_extract_usage` methods in `unified.py` and `invoker.py` fall back to it when BOTH `response_metadata` AND `usage_metadata` are empty AND content is a non-empty string. 11 new tests (9 cache + 2 fallback) + Houdini demos (revert cache → test fails with 3 different trace_ids; revert fallback → 0 tokens instead of estimated). Regression: `test_extract_usage_empty_response_metadata` updated to use `content=""` to assert the strictly-zero path. | Regression fix found in a real run of `--run-all-traced`: `TypeError: 'CallbackManager' object is not iterable` from `list(cfg.get("callbacks") or [])` in `src/aegis_phase1/llm/unified.py:123`. LangGraph injects a `langchain_core.callbacks.manager.CallbackManager` (NOT a list) into `config["callbacks"]` when invoking sub-graphs. **Fix**: normalize via 4-case dispatch — `None` → `[]`; `list` → `list(raw)`; `CallbackManager` (`.handlers` attr) → `list(raw.handlers)`; bare object → `[raw]`. Always returns a plain list. 10 new unit tests in `tests/unit/llm/test_callback_manager_corr019.py`; Houdini demo (revert the fix → test fails with the exact `TypeError`; restore → all 10 pass). Zero behavior change for callers passing `callbacks=[handler]` (list form) — only the LangGraph CallbackManager case is now handled correctly. |
+| **[AEGIS-P1-CORR-022](#corr-022)** | MAP domain adaptation v1.3 — 3-blocos × 5-campos output format + 9/9 gates for D-10 | ✅ MERGED | ⚫ deleted | (squash) | 331 (285 base + 46 new) | Closes D-10.2 (Audit Logging & Traceability) as proof-of-concept that `gemma4:e2b` produces regulation-centric, OJ-anchored adapted objectives. **3-phase evolution over 1 branch (24 files):** **Phase 1** — filter fallbacks (`filter_regs`/`filter_subdomains` now use `company_context.applicable_regs` when ontology `source_regulations` is empty); §4 prompt trimmed (Objective + 1st Consideration only); §3 truncated to 200 chars. Prompt dropped **198 722 → 28 911 chars (−85%)**. **Phase 2** — loader fix (`subdomain_loader.HEADER_RE` 3-level regex, was substring-matching); new `article_loader` + `ambiguity_loader` (filtered by `domain_id`); §3 with verbatim OJ, §6 with applicable ambiguities, §7 with full Track B; `OutputParserV2`; `anchor_validator` (G8); `num_ctx=32768`. **Phase 3** — spec v1.3 (3 blocks per sub-domain: Generic + per applicable reg; 5 fields each: Original/Adapted/Rationale/Adjustments needed/Considerations); `_extract_considerations`; `_render_subdomains` rewritten; `OutputParserV3` + `ObjectiveBlock`/`SubdomainAdaptationV3`/`ParseResultV3`; `adapted_subdomains_v3` in `DomainResult`; `doc_04b` renders the 3×5 structure; gate G9. **Result:** e2b adopts v1.3 first-try (1 attempt, 28.4 s); 9/9 gates PASS for the whole D-10 domain (D-10.1/.2/.3 in one run); anchors validate against source (Art. 30(3), Annex VII §3/§6, Art. 13(4)/(22), Art. 32(1)(b)/(d), Annex I Part II (3)); no company leak, no forbidden connectives, no generic consulting headings. 46 new tests; **D-01..D-09 generalization deferred to CORR-023** (the `DOMAIN_ARTICLES` and `_DOMAIN_CLAUSE_FILTER` catalogs are empty for 7 of 10 domains). |
 
 ---
 
@@ -935,6 +936,88 @@ When the user runs `python -m aegis_phase1.v2.runner --run-all-traced --case <pa
 
 ### Next
 - **Run-real validation** against Ollama to see the fix end-to-end (deferred per user "no Ollama real" rule for tests; this is a smoke-check, not a test).
+
+---
+
+## <a name="corr-022"></a>AEGIS-P1-CORR-022 — MAP domain adaptation v1.3 (3-blocos × 5-campos)
+
+### Scope
+Close D-10.2 (Audit Logging & Traceability) as proof-of-concept that `gemma4:e2b` produces regulation-centric, OJ-anchored adapted objectives for the TinyTask case (MICRO SaaS, 8 employees, GDPR + CRA applicable). Single branch, 3 sequential contract phases, 24 files (20 modified + 9 new).
+
+### Diagnosis (evolving across 3 phases)
+The MAP stage was producing low-quality output: filter functions returned empty lists (TinyTask ontology `phase1_ontology.yaml` has no `source_regulations` field), the prompt ballooned to 198 722 chars (e2b hallucinated), and the output format mixed all regulations into a single paragraph per sub-domain.
+
+### Phase 1 — Filter fallbacks + prompt trim
+- `filter_regs` / `filter_subdomains`: graceful fallback to `company_context.applicable_regs` when the ontology has no `source_regulations`. TinyTask's applicable regs (GDPR + CRA) now flow through.
+- §4 prompt trimmed to Objective + 1st Consideration per HSO; §3 truncated to 200 chars.
+- **Prompt size: 198 722 → ~30 K chars.** HL + per-reg objectives populated with only applicable regs.
+
+### Phase 2 — Loaders verbatim + parser V2 + anchor validator
+- **Loader bug fix**: `subdomain_loader._parse_section2` was substring-matching; replaced with `HEADER_RE = re.compile(r"^###\s+D-(\d+)\.(\d+)\.(\d+)\b")` (3-level regex). Was returning `text_len=30` for every block.
+- New `article_loader` + `ambiguity_loader`, filtered by `domain_id` (§3 verbatim OJ, §6 applicable ambiguities, §7 full Track B).
+- `OutputParserV2` (per-sub-domain structure), `anchor_validator` (G8 — every cited anchor must exist in source).
+- `num_ctx` fixed to 32768.
+
+### Phase 3 — Output v1.3 (3 blocos × 5 campos)
+Conceptual reframing: instead of one paragraph per sub-domain mixing all regulations, emit **3 independent blocks per sub-domain** (Generic/HL + GDPR + CRA), each with 5 fields:
+1. **Original** — verbatim source Objective paragraph
+2. **Adapted** — adjusted to applicable regulatory perimeter + scale/capability, no company name
+3. **Rationale** — why (perimeter + scale)
+4. **Adjustments needed** — high-level strategic actions, NOT Phase 2 implementation
+5. **Considerations** — verbatim source bullets
+
+Dropped `KEY_ADJUSTMENTS` + `CONFIDENCE` (legacy contract).
+
+- Spec v1.3 (`MAP-DOMAIN-ADAPT.md`) with worked example D-10.2.
+- `_extract_considerations`; `_render_subdomains` rewritten.
+- `OutputParserV3` + `ObjectiveBlock` / `SubdomainAdaptationV3` / `ParseResultV3`.
+- `adapted_subdomains_v3` field on `DomainResult`; `doc_04b` renders the 3 × 5 structure.
+- Gate G9 (3 blocks × 5 fields per sub-domain).
+
+### Result
+`gemma4:e2b` adopts v1.3 first-try: **1 attempt, 28.4 s latency, 9/9 gates PASS** for the whole D-10 domain (D-10.1/.2/.3 in one run). Legal anchors (Art. 30(3), Annex VII §3/§6, Art. 13(4)/(22), Art. 32(1)(b)/(d), Annex I Part II (3), Art. 35(11)) all validate against source. No company leak, no forbidden connectives, no generic consulting headings.
+
+### Files (24 total: 20 modified + 9 new)
+**Modified (src):**
+- `src/aegis_phase1/llm/unified.py`
+- `src/aegis_phase1/v2/domain/filters/{ambiguities,articles,regs,subdomains}.py`
+- `src/aegis_phase1/v2/domain/{parser,processor,prompt}.py`
+- `src/aegis_phase1/v2/domain/prompts/MAP-DOMAIN-ADAPT.md` (spec → v1.3)
+- `src/aegis_phase1/v2/loader/subdomain_loader.py` (HEADER_RE fix)
+- `src/aegis_phase1/v2/output/doc_04b.py`
+- `src/aegis_phase1/v2/state.py`
+
+**New (src):**
+- `src/aegis_phase1/v2/domain/anchor_validator.py`
+- `src/aegis_phase1/v2/loader/{ambiguity_loader,article_loader}.py`
+
+**Tests (modified + new):** `tests/unit/v2/domain/filters/conftest.py` + 4 filter test files + `test_inputs.py`/`test_parser.py`/`test_processor.py`; new `test_anchor_validator.py`, `test_prompt.py`, `tests/unit/v2/loader/test_{ambiguity,article}_loader.py`, `tests/unit/v2/output/test_doc_04b.py`.
+
+**Scripts (new):** `scripts/d10_2_experiment.py` (9-gate benchmark), `scripts/validate_d10_adaptation.py` (D-10 prompt-budget validator).
+
+**Contract:** `execution/CONTRACT-022.md` (3-phase stacked contract).
+
+### Validation
+- 331 passed (285 base + 46 new), 0 failures, 0 collection errors.
+- D-10 smoke (`scripts/d10_2_experiment.py --model gemma4:e2b`): 9/9 gates PASS, run `gemma4_e2b_20260718T170725Z`.
+
+### Merged 2026-07-18 (squash commit via PR)
+
+#### Quality Log
+- `trials: 1` (real Ollama run; deterministic at temperature 0.0)
+- `pass@1`: 9/9 gates (G1 audit-theme, G2 no-company, G3 GDPR+CRA, G4 anchors, G5 no-forbidden-connectives, G6 no-generic-headings, G7 parse-V3, G8 anchor-validation, G9 v3-structure)
+- Model: `gemma4:e2b`, 28.4 s latency, 1 attempt (no retry)
+- Prompt: 28 911 chars / response: 10 039 chars / adapted: 1 959 chars
+
+### Known limitations (deferred to CORR-023)
+- **D-01..D-09 not generalized.** `DOMAIN_ARTICLES` (article_loader.py) and `_DOMAIN_CLAUSE_FILTER` (ambiguity_loader.py) are empty for 7 of 10 domains → §3 renders empty and §6 bloats (>160 KB) for D-02/03/05/06/07/08/09.
+- **W1 — anchors dropped from Adapted prose.** The worked example keeps `(Art. 30(3) + Art. 5(2) + Art. 31 GDPR)` in the Adapted; the actual output strips them. Spec/prompt-precision fix needed.
+- **W2 — CRDA-stats leak into Generic Original for D-10.1/.3.** Upstream HSO data issue (HL Objective slot in `Methodology-main` SubDomains corpus contains pairwise-analysis header text, not an objective statement). Not an LLM/prompt bug.
+- **Hardcoded preprocessing path** in `filters/articles.py` + `filters/ambiguities.py` (`/home/.../Methodology-main/...`). Portability blocker for other machines.
+- **Gates G1/G3/G9 are D-10-specific** in `d10_2_experiment.py` (hardcoded audit keywords, GDPR∧CRA check, `len(blocks) < 3`). Need parameterization before CORR-023 smoke runs.
+
+### Next
+- **AEGIS-P1-CORR-023** — generalize MAP adaptation from D-10 to D-01..D-09: curate `DOMAIN_ARTICLES` + `_DOMAIN_CLAUSE_FILTER` for the 7 empty domains, de-hardcode the preprocessing path (read from `state["preprocessing_path"]`), parameterize gates (drop G1; G3 → all-applicable-regs; G9 → `len(applicable_regs)+1`), per-domain smoke test.
 
 ---
 

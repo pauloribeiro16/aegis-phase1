@@ -458,7 +458,7 @@ def _section_methodology(state: dict[str, Any]) -> list[str]:
         + " using managed-cloud infrastructure. Current maturity measures "
         + "what exists today, not the target state. Target maturity is "
         + "proportional to the company profile but aligned with active "
-        + f"GDPR/CRA SubDomains fit criteria (applicable_regs = "
+        + "GDPR/CRA SubDomains fit criteria (applicable_regs = "
         + f"{applicable_text}).\n"
     )
     parts.append(
@@ -520,14 +520,15 @@ def _section_adapted_objective(
 ) -> str:
     """Render the per-domain Adapted Objective subsection.
 
-    Reads ``domain_result["adapted_objective"]`` and combines it with the
-    matching human-review entry (when present) to produce markdown
-    suitable for inclusion in §3 of the Doc 04b output.
+    Reads ``domain_result["adapted_objective"]`` (the legacy HL-concat)
+    OR ``domain_result["adapted_subdomains"]`` (per-sub-domain v1.2 spec)
+    and combines with the matching human-review entry (when present) to
+    produce markdown suitable for inclusion in §3 of the Doc 04b output.
 
     Priority for the rendered narrative:
 
     1. ``status == "EDITED"`` with non-empty ``edited_text`` →
-       use the human rewrite.
+       use the human rewrite for the whole section.
     2. ``status == "REJECTED"`` → LLM proposal prefixed with
        ``[RE-GENERATION REQUIRED]``.
     3. ``status == "APPROVED"`` → LLM proposal unmodified.
@@ -537,8 +538,9 @@ def _section_adapted_objective(
     Args:
         domain_id: The domain identifier (e.g. ``"D-01"``).
         domain_result: One entry from ``state["domain_results"]``
-            (carrying ``adapted_objective``, ``key_changes``,
-            ``confidence``, ``llm_status``, ``domain_name``).
+            (carrying ``adapted_objective``, ``adapted_subdomains``,
+            ``key_changes``, ``confidence``, ``llm_status``,
+            ``domain_name``).
         review_entry: Optional entry from
             ``review/adapted_objectives.yaml`` keyed by ``domain_id``.
 
@@ -547,18 +549,34 @@ def _section_adapted_objective(
         the surrounding section).
     """
     raw = domain_result.get("adapted_objective", "") or ""
+    adapted_v3_raw = domain_result.get("adapted_subdomains_v3")
+    adapted_v3: list[dict[str, Any]] = (
+        list(adapted_v3_raw) if isinstance(adapted_v3_raw, list) else []
+    )
+    adapted_subdomains_raw = domain_result.get("adapted_subdomains")
+    adapted_subdomains: list[dict[str, Any]] = (
+        list(adapted_subdomains_raw) if isinstance(adapted_subdomains_raw, list) else []
+    )
+
     if not review_entry:
         review_entry = {"status": "PENDING", "edited_text": "", "notes": ""}
     status = str(review_entry.get("status", "PENDING") or "PENDING")
 
+    # Build the review narrative (used for the whole section when EDITED,
+    # otherwise injected as a banner for each sub-domain block).
     if status == "EDITED" and (review_entry.get("edited_text") or "").strip():
-        narrative = str(review_entry.get("edited_text", ""))
+        review_narrative: str = str(review_entry.get("edited_text", ""))
     elif status == "REJECTED":
-        narrative = f"[RE-GENERATION REQUIRED]\n{raw}" if raw else "[RE-GENERATION REQUIRED]"
+        review_narrative = (
+            f"[RE-GENERATION REQUIRED]\n{raw}" if raw else "[RE-GENERATION REQUIRED]"
+        )
     elif status == "APPROVED":
-        narrative = raw
+        review_narrative = raw
+    elif status == "EDITED":
+        # EDITED with empty edited_text → fall back to PENDING marker.
+        review_narrative = f"[PENDING REVIEW]\n{raw}" if raw else "[PENDING REVIEW]"
     else:
-        narrative = f"[PENDING REVIEW]\n{raw}" if raw else "[PENDING REVIEW]"
+        review_narrative = f"[PENDING REVIEW]\n{raw}" if raw else "[PENDING REVIEW]"
 
     tier = domain_result.get("tier", "UNKNOWN")
     if not isinstance(tier, str):
@@ -574,8 +592,104 @@ def _section_adapted_objective(
         f"**Confidence**: {confidence} | **Status**: {status}"
     )
     lines.append("")
-    lines.append(narrative)
-    lines.append("")
+
+    if adapted_v3:
+        # v1.3 rendering: 3 blocks x 5 fields per sub-domain.
+        if status == "EDITED" and (review_entry.get("edited_text") or "").strip():
+            lines.append(review_narrative)
+            lines.append("")
+        else:
+            for sub in adapted_v3:
+                if not isinstance(sub, Mapping):
+                    continue
+                sid = str(sub.get("subdomain_id", "?") or "?")
+                title = str(sub.get("title", "?") or "?")
+                blocks_raw = sub.get("blocks") or []
+                blocks: list[dict[str, Any]] = (
+                    list(blocks_raw) if isinstance(blocks_raw, list) else []
+                )
+
+                lines.append(f"##### {sid} — {title}")
+                lines.append("")
+
+                for blk in blocks:
+                    label = str(blk.get("label", "?") or "?")
+                    lines.append(f"**{label}**")
+                    lines.append("")
+                    lines.append(f"- Original: {blk.get('original', '(missing)')}")
+                    lines.append("")
+                    lines.append(f"- Adapted: {blk.get('adapted', '(missing)')}")
+                    lines.append("")
+                    lines.append(f"- Rationale: {blk.get('rationale', '(missing)')}")
+                    lines.append("")
+                    lines.append(
+                        f"- Adjustments needed: {blk.get('adjustments', '(missing)')}"
+                    )
+                    lines.append("")
+                    considerations_raw = blk.get("considerations") or []
+                    considerations: list[Any] = (
+                        list(considerations_raw)
+                        if isinstance(considerations_raw, list)
+                        else []
+                    )
+                    if considerations:
+                        lines.append("**Considerations.**")
+                        lines.append("")
+                        for c in considerations:
+                            lines.append(f"- {c}")
+                        lines.append("")
+                lines.append("")
+    elif adapted_subdomains:
+        # v1.2 format: per-sub-domain rendering.
+        if status == "EDITED" and (review_entry.get("edited_text") or "").strip():
+            # Human rewrite applies to the whole block (single narrative).
+            lines.append(review_narrative)
+            lines.append("")
+        else:
+            for sub in adapted_subdomains:
+                if not isinstance(sub, Mapping):
+                    continue
+                sid = str(sub.get("subdomain_id", "?") or "?")
+                title = str(sub.get("title", "?") or "?")
+                hl = str(sub.get("hl_objective", "") or "")
+                directed_raw = sub.get("directed") or []
+                directed: list[dict[str, Any]] = (
+                    list(directed_raw) if isinstance(directed_raw, list) else []
+                )
+
+                lines.append(f"##### {sid} — {title}")
+                lines.append("")
+                # Inject the review-marker-prefixed HL when one applies.
+                if status == "REJECTED" and hl:
+                    lines.append(f"[RE-GENERATION REQUIRED]\n{hl}")
+                elif status == "APPROVED" and hl:
+                    lines.append(hl)
+                elif status == "PENDING" and hl:
+                    lines.append(f"[PENDING REVIEW]\n{hl}")
+                elif hl:
+                    lines.append(hl)
+                lines.append("")
+
+                if directed:
+                    lines.append("**Directed objectives.**")
+                    lines.append("")
+                    for d in directed:
+                        if not isinstance(d, Mapping):
+                            continue
+                        reg = str(d.get("regulation", "?") or "?")
+                        obj = str(d.get("objective", "") or "")
+                        lines.append(f"- **{reg}**: {obj}")
+                    lines.append("")
+    else:
+        # Legacy: render adapted_objective verbatim.
+        # ``review_narrative`` already encodes the EDITED/REJECTED/APPROVED/
+        # PENDING preference (falls back to ``raw`` when empty).
+        if review_narrative:
+            lines.append(review_narrative)
+        elif raw:
+            lines.append(raw)
+        lines.append("")
+
     if key_changes:
         lines.append("**Key changes**:")
         for kc in key_changes:
@@ -986,11 +1100,7 @@ def _controls_for(domain_id: str, state: dict[str, Any]) -> list[dict[str, str]]
             continue
         new_refs: list[str] = []
         for ref in refs:
-            if ref.startswith("SYS-") and ref in sys_ids:
-                new_refs.append(ref)
-            elif ref.startswith("STORE-") and ref in store_ids:
-                new_refs.append(ref)
-            elif ref.startswith("FLOW-") and ref in flow_ids:
+            if (ref.startswith("SYS-") and ref in sys_ids) or (ref.startswith("STORE-") and ref in store_ids) or (ref.startswith("FLOW-") and ref in flow_ids):
                 new_refs.append(ref)
             else:
                 new_refs.append(ref)
