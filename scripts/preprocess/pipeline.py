@@ -16,7 +16,18 @@ from typing import Any
 from .parsers.aggregated.security_objectives import parse_security_objectives
 from .parsers.aggregated.security_rules import parse_security_rules
 from .parsers.diagram import parse_diagram
-from .parsers.entities.csf import parse_csf, parse_csf_d_subdomain_hints
+from .parsers.entities.csf import (
+    parse_csf,
+    parse_csf_authority_note,
+    parse_csf_authority_note_full,
+    parse_csf_crossref_full,
+    parse_csf_d_subdomain_hints,
+    parse_csf_end_of_reference,
+    parse_csf_function_structure,
+    parse_csf_h1_title,
+    parse_csf_special_tokens,
+    parse_csf_special_tokens_full,
+)
 from .parsers.entities.clause import parse_ambiguity_file
 from .parsers.entities.subdomain import parse_subdomain
 from .parsers.frontmatter import parse_frontmatter
@@ -143,38 +154,60 @@ def build(source_root: Path, output_root: Path) -> dict[str, Any]:
 def _process_csf(
     src_root: Path, out_root: Path, idx: EntityIndex, shards: list[dict[str, Any]]
 ) -> dict[str, list[str]]:
-    """Parse NIST_CSF_2.0_subcategories.md → 1 JSON per subcategory + D-XX hint table."""
+    """Parse NIST_CSF_2.0_subcategories.md → 1 JSON per subcategory.
+
+    Each CSF subcategory is a structured entity with full source metadata:
+    id, function, function_name, category, category_id, category_name, number,
+    title, source_locus, source_document, authority_note (full), aegis_subdomain_back_refs.
+
+    All ``source_locus`` values are **source-file line numbers** (1-indexed).
+    The D-XX hint table is returned for downstream use by SubDomain parsing.
+    """
     csf_path = src_root / "PREPROCESSING" / "NIST_CSF_2.0_subcategories.md"
     if not csf_path.is_file():
         idx.add_warning(str(csf_path), "CSF reference file missing")
         return {}
+    # Compute source-relative offset for body loci.
+    text = csf_path.read_text(encoding="utf-8")
+    fm, body = parse_frontmatter(text)
+    body_start_in_source = text[: len(text) - len(body)].count("\n") + 1
+
+    def shift_locus(locus: dict[str, int]) -> dict[str, int]:
+        return {
+            "start_line": locus["start_line"] + body_start_in_source - 1
+            if locus.get("start_line", 0) > 0
+            else 0,
+            "end_line": locus["end_line"] + body_start_in_source - 1
+            if locus.get("end_line", 0) > 0
+            else 0,
+        }
+
     subcats = parse_csf(csf_path)
     hint = parse_csf_d_subdomain_hints(csf_path)
+
     for sc in subcats:
+        sc["schema_version"] = "1.1"
+        sc["kind"] = "csf"
+        sc["doc_id"] = sc.get("source_document", {}).get(
+            "document_id", "AEGIS-PREPROC-CSF-REF"
+        )
+        # Shift body-relative loci to source-relative
+        sc["source_locus"] = shift_locus(sc["source_locus"])
+        if sc.get("authority_note_locus"):
+            sc["authority_note_locus"] = shift_locus(sc["authority_note_locus"])
         eid = sc["id"]
-        shard_path = f"entities/csfs/{eid.replace('.', '_')}.json"
+        fname = eid.replace(".", "_").replace("-", "_")
+        shard_path = f"entities/csfs/{fname}.json"
         idx.add(eid, sc, shard_path)
-    for eid, entity in list(idx.entities.items()):
-        if entity.get("id", "").startswith("GV.") or "/" in str(entity):
-            continue
-    # Write shards
-    for eid, entity in list(idx.entities.items()):
-        if entity.get("schema_version") != "1.0":
-            continue
-        if not (entity.get("id", "").count(".") == 2 and len(entity.get("id", "")) == 7):
-            continue
-        if entity.get("id", "").startswith("SO-") or entity.get("id", "").startswith("SR-"):
-            continue
-        shard_path = f"entities/csfs/{entity['id'].replace('.', '_')}.json"
-        bytes_written, sha = _write_json(out_root / shard_path, entity)
+        bytes_written, sha = _write_json(out_root / shard_path, sc)
         shards.append(
             {
                 "path": shard_path,
-                "source_path": entity["source"],
+                "source_path": sc["source"],
                 "sha256": sha,
                 "bytes": bytes_written,
                 "kind": "csf",
-                "entity_ids": [entity["id"]],
+                "entity_ids": [eid],
             }
         )
     return hint
@@ -579,7 +612,13 @@ def _process_global_and_ambiguity_analysis(
     for src in sorted((src_root / "PREPROCESSING").glob("*.md")):
         shard_path = f"global/{src.stem}.json"
         try:
-            parsed = parse_root_md(src)
+            # Special-case: NIST_CSF_2.0_subcategories.md is fully structured
+            # (per-entity shards already written in _process_csf). The aggregated
+            # top-level view must NOT carry raw_md.
+            if src.name == "NIST_CSF_2.0_subcategories.md":
+                parsed = parse_root_csf_structured(src)
+            else:
+                parsed = parse_root_md(src)
             bytes_written, sha = _write_json(out_root / shard_path, parsed)
             shards.append(
                 {
@@ -631,6 +670,146 @@ def parse_root_md(path: Path) -> dict[str, Any]:
         "chain_version": fm.get("chain_version", ""),
         "frontmatter": fm,
         "raw_md": body.strip(),
+    }
+
+
+def parse_root_csf_structured(path: Path) -> dict[str, Any]:
+    """Structured (no raw_md) aggregate of NIST_CSF_2.0_subcategories.md.
+
+    Maps every element of the source to a typed field. The per-subcategory
+    shards are written by ``_process_csf``. All ``source_locus`` values are
+    **source-file line numbers** (1-indexed) — the frontmatter offset is
+    added on top of the body-relative indices returned by the parsers.
+    """
+    text = path.read_text(encoding="utf-8")
+    fm, body = parse_frontmatter(text)
+    # The body starts with the first character after the closing `---`
+    # fence + a single newline. We need the 1-indexed line where body
+    # starts in the source file so we can shift body-relative loci.
+    body_start_in_source = text[: len(text) - len(body)].count("\n") + 1
+    h1_title = parse_csf_h1_title(path)
+    fn_struct = parse_csf_function_structure(path)
+    crossref = parse_csf_crossref_full(path)
+    special = parse_csf_special_tokens_full(path)
+    authority = parse_csf_authority_note_full(path)
+    end_ref = parse_csf_end_of_reference(path)
+    subcats = parse_csf(path)
+
+    def shift_locus(locus: dict[str, int]) -> dict[str, int]:
+        return {
+            "start_line": locus["start_line"] + body_start_in_source - 1
+            if locus.get("start_line", 0) > 0
+            else 0,
+            "end_line": locus["end_line"] + body_start_in_source - 1
+            if locus.get("end_line", 0) > 0
+            else 0,
+        }
+
+    # Cross-reference loci (table_rows) are body-relative; shift to source.
+    crossref_rows_shifted: list[dict[str, Any]] = []
+    for row in crossref["rows"]:
+        row = dict(row)
+        row["source_locus"] = shift_locus(row["source_locus"])
+        crossref_rows_shifted.append(row)
+
+    # Advisory blockquote line is body-relative; shift.
+    adv_bq = crossref["advisory_blockquote"]
+    if adv_bq:
+        adv_bq = dict(adv_bq)
+        adv_bq["line"] = adv_bq["line"] + body_start_in_source - 1
+
+    # Function structure locus
+    fn_struct_shifted = dict(fn_struct)
+    fn_struct_shifted["source_locus"] = shift_locus(fn_struct["source_locus"])
+
+    # Special tokens locus
+    special_shifted = dict(special)
+    special_shifted["source_locus"] = shift_locus(special["source_locus"])
+
+    # End-of-reference line is body-relative; shift.
+    if end_ref:
+        end_ref_shifted = dict(end_ref)
+        end_ref_shifted["line"] = end_ref["line"] + body_start_in_source - 1
+    else:
+        end_ref_shifted = None
+
+    return {
+        "schema_version": "1.1",
+        "source": str(path),
+        "doc_id": fm.get("document_id", "AEGIS-PREPROC-CSF-REF"),
+        "title": fm.get("title", "NIST CSF 2.0 Subcategory Reference (Frozen List)"),
+        "status": fm.get("status", ""),
+        "chain_version": fm.get("chain_version", ""),
+        "kind": "csf_reference",
+        # YAML frontmatter — every key, parsed by PyYAML
+        "frontmatter": fm,
+        # H1 title (line 18 in source)
+        "h1_title": h1_title,
+        # Authority blockquote (line 20) — full text + source-relative locus
+        "authority_note": {
+            "text": authority["text"],
+            "source_locus": shift_locus(
+                {
+                    "start_line": authority["start_line"],
+                    "end_line": authority["end_line"],
+                }
+            ),
+        },
+        # Function structure table (source lines 24-36) — title + summary + table
+        "function_structure": fn_struct_shifted,
+        # Per-subcategory — 98 rows mapped 1:1 to source rows
+        "subcategories": [
+            {
+                "id": s["id"],
+                "function": s["function"],
+                "function_name": s["function_name"],
+                "category_id": s["category_id"],
+                "category_name": s["category_name"],
+                "number": s["number"],
+                "title": s["title"],
+                "source_locus": shift_locus(s["source_locus"]),
+                "aegis_subdomain_back_refs": s.get("aegis_subdomain_back_refs", []),
+            }
+            for s in subcats
+        ],
+        # Per-category — H3 headers from source (deduplicated)
+        "categories": sorted(
+            {
+                (
+                    s["category_id"],
+                    s["function"],
+                    s["function_name"],
+                    s["category_name"],
+                ): {
+                    "id": s["category_id"],
+                    "function": s["function"],
+                    "function_name": s["function_name"],
+                    "name": s["category_name"],
+                }
+                for s in subcats
+            }.values(),
+            key=lambda c: c["id"],
+        ),
+        # Cross-reference table (source lines 267-310) — full H2 + table + advisory
+        "cross_reference_aegis_subdomains": {
+            "title": crossref["title"],
+            "table_header": crossref["table_header"],
+            "rows": crossref_rows_shifted,
+            "csf_ids_by_d": crossref["csf_ids_by_d"],
+            "advisory_blockquote": adv_bq,
+            "source_locus": shift_locus(crossref["source_locus"]),
+        },
+        "cross_reference_aegis_subdomains_advisory_only": True,
+        # Special tokens table — H2 + table header + rows
+        "special_tokens": special_shifted,
+        # Closing line "**End of reference.**" (source-relative line)
+        "end_of_reference": end_ref_shifted,
+        # Aggregate counts
+        "counts": {
+            "subcategories": len(subcats),
+            "categories": len({s["category_id"] for s in subcats}),
+            "functions": len({s["function"] for s in subcats}),
+        },
     }
 
 
