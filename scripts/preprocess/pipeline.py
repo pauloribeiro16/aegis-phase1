@@ -17,7 +17,7 @@ from .parsers.aggregated.security_objectives import parse_security_objectives
 from .parsers.aggregated.security_rules import parse_security_rules
 from .parsers.diagram import parse_diagram
 from .parsers.entities.csf import parse_csf, parse_csf_d_subdomain_hints
-from .parsers.entities.clause import parse_clause_file
+from .parsers.entities.clause import parse_ambiguity_file
 from .parsers.entities.subdomain import parse_subdomain
 from .parsers.frontmatter import parse_frontmatter
 from .parsers.markdown import extract_fenced_blocks
@@ -275,7 +275,7 @@ def _process_subdomains(
 
 
 def _process_regulation(
-    src_root: Path, out_root: Path, idx: EntityIndex, shards: list[dict[str, Any]]
+    src_root: Path, out_root: Path, idx: EntityIndex, manifest_shards: list[dict[str, Any]]
 ) -> None:
     reg_dir = src_root / "PREPROCESSING" / "Regulation"
     if not reg_dir.is_dir():
@@ -295,7 +295,7 @@ def _process_regulation(
             except Exception as exc:
                 idx.errors.append({"file": str(src), "error": f"unhandled: {exc!r}"})
                 continue
-            shards.append(
+            manifest_shards.append(
                 {
                     "path": shard_path,
                     "source_path": str(src),
@@ -322,7 +322,7 @@ def _process_regulation(
                 except Exception as exc:
                     idx.errors.append({"file": str(src), "error": f"unhandled: {exc!r}"})
                     continue
-                shards.append(
+                manifest_shards.append(
                     {
                         "path": shard_path,
                         "source_path": str(src),
@@ -374,7 +374,7 @@ def _process_regulation(
             except Exception as exc:
                 idx.errors.append({"file": str(src), "error": f"unhandled: {exc!r}"})
                 continue
-            shards.append(
+            manifest_shards.append(
                 {
                     "path": shard_path,
                     "source_path": str(src),
@@ -385,7 +385,7 @@ def _process_regulation(
                 }
             )
 
-        # Per-clause (Ambiguity/{REG}-CLxx_*.md)
+        # Per-clause (Ambiguity/{REG}/*.md) — universal v2 parser
         ambig_dir = reg_dir_entry / "Ambiguity"
         if ambig_dir.is_dir():
             reg_norm = regulation.replace("_", "")
@@ -393,24 +393,88 @@ def _process_regulation(
                 stem_norm = src.stem.replace("_", "")
                 if reg_norm not in stem_norm:
                     continue
-                shard_path = (
+                # Per-file shard (always)
+                file_shard_path = (
                     f"regulation/{regulation}/ambiguity_clauses/{src.stem}.json"
                 )
                 try:
-                    clauses = parse_clause_file(src, regulation)
-                    for c in clauses:
-                        for w in c.get("warnings", []):
-                            idx.add_warning(str(src), w)
-                        eid = c["id"]
-                        c.pop("_id", None)
-                        idx.add(eid, c, f"entities/clauses/{eid}.json")
-                    bytes_written, sha = _write_json(
-                        out_root / shard_path, {"clauses": clauses}
-                    )
+                    parsed = parse_ambiguity_file(src, regulation)
+                    clauses = parsed.get("clauses", [])
                 except Exception as exc:
                     idx.errors.append({"file": str(src), "error": f"unhandled: {exc!r}"})
                     continue
-                shards.append(
+                # For AI_Act, the cross-article file 06_AI_Act.md (v0.1) is
+                # **superseded by the per-article files 01..08 (v0.2)** —
+                # skip its clause-shard generation to avoid duplicating every
+                # AIA-Cxx shard. The file-shard itself is still written so
+                # the v0.1 content is preserved for traceability.
+                skip_clause_shards = (
+                    regulation == "AI_Act" and src.stem == "06_AI_Act"
+                )
+                # Write per-clause shards (1 JSON per clause_id) — only if
+                # the file yielded per-clause entities. Cross-article v0.1
+                # files (e.g. 06_AI_Act.md) overlap with v0.2 per-article
+                # files; we dedup by ID so per-article wins.
+                for clause in parsed.get("clauses", []):
+                    eid = clause.get("id")
+                    if not eid:
+                        continue
+                    if skip_clause_shards:
+                        continue
+                    # If the per-article source has already registered this
+                    # clause (and this is a cross-article v0.1 overlap), skip
+                    # to avoid duplicate clause shards.
+                    if eid in idx.entities and parsed["kind"] == "cross_article":
+                        continue
+                    clause_shard = (
+                        f"entities/clauses/{eid.replace('-', '_')}.json"
+                    )
+                    # Don't overwrite the file-shard with a clause-shard
+                    if clause_shard == file_shard_path:
+                        continue
+                    try:
+                        bytes_written, sha = _write_json(
+                            out_root / clause_shard, clause
+                        )
+                        manifest_shards.append(
+                            {
+                                "path": clause_shard,
+                                "source_path": str(src),
+                                "sha256": sha,
+                                "bytes": bytes_written,
+                                "kind": "clause",
+                                "entity_ids": [eid],
+                            }
+                        )
+                        idx.add(eid, clause, clause_shard)
+                    except Exception as exc:
+                        idx.errors.append(
+                            {"file": str(src), "error": f"clause shard {eid}: {exc!r}"}
+                        )
+                # Per-file shard
+                try:
+                    file_entity = parsed["file"]
+                    file_entity["kind"] = parsed["kind"]
+                    file_entity["clause_ids"] = [c["id"] for c in parsed.get("clauses", [])]
+                    bytes_written, sha = _write_json(
+                        out_root / file_shard_path, file_entity
+                    )
+                    manifest_shards.append(
+                        {
+                            "path": file_shard_path,
+                            "source_path": str(src),
+                            "sha256": sha,
+                            "bytes": bytes_written,
+                            "kind": f"ambiguity_{parsed['kind']}",
+                            "entity_ids": [],
+                        }
+                    )
+                    logger.info("wrote %s (%d bytes)", file_shard_path, bytes_written)
+                except Exception as exc:
+                    idx.errors.append(
+                        {"file": str(src), "error": f"file shard: {exc!r}"}
+                    )
+                manifest_shards.append(
                     {
                         "path": shard_path,
                         "source_path": str(src),
