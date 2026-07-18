@@ -40,11 +40,22 @@ _READING_LINE_RE = re.compile(
 # Hard-coded map: domain_id → list of ``(regulation, clause_id_prefix,
 # article_ref_token, locus_only)`` tuples used to keep only clauses
 # relevant to the domain. ``clause_id_prefix`` is matched
-# case-insensitively at the start of the clause id; ``article_ref_token``
-# is matched as a case-insensitive substring of the card body.
-# ``locus_only`` marks entries that should be matched purely by the
-# article-ref token (used when the clause-id prefix matches many clauses
-# but only a few of them cite the relevant article).
+# case-insensitively at the start of the clause id (``None`` = any prefix);
+# ``article_ref_token`` is matched as a case-insensitive substring of the
+# card body. ``locus_only`` marks entries that should be matched purely by
+# the article-ref token (used when the clause-id prefix matches many
+# clauses but only a few of them cite the relevant article).
+#
+# Curation strategy (CORR-023): for each domain we list one rule per
+# applicable regulation, with ``prefix=None`` and ``article_ref_tokens``
+# taken from the corresponding ``DOMAIN_ARTICLES`` entry. The article-token
+# match is robust to the corpus's mixed CL/CP/AIA-/heading conventions
+# (the ambiguity loader recognises GDPR-CL*, GDPR-CP*, CRA-CL*, NIS2-CL*;
+# DORA and AI_Act files have no clause markers in a parseable form and
+# therefore contribute 0 ambiguity entries regardless of this filter).
+# D-10 and D-04 retain their original clause-ID entries (already validated
+# against the corpus); D-01 retains its prefix+token form. D-02/03/05/06/
+# 07/08/09 use the article-token form curated in CORR-023.
 _DOMAIN_CLAUSE_FILTER: dict[str, list[tuple[str, str | None, list[str], bool]]] = {
     "D-10": [
         # GDPR: Art. 30 records, Art. 5(2) accountability, Art. 31 supervisory
@@ -92,6 +103,244 @@ _DOMAIN_CLAUSE_FILTER: dict[str, list[tuple[str, str | None, list[str], bool]]] 
     "D-01": [
         ("GDPR", "GDPR-CP", ["Art. 32", "Art. 5"], False),
         ("CRA", "CRA-CL", ["Annex I Part I", "Art. 13(1)", "Art. 13(5)"], False),
+    ],
+    # ─── CORR-023 (article-token form, applicable regs only) ───────────
+    "D-02": [
+        # GDPR: testing (Art. 32(1)(d)) + DPIA review (Art. 35(11))
+        ("GDPR", None, ["Art. 32", "Art. 35"], True),
+        # CRA: vuln handling, patching, testing, disclosure
+        (
+            "CRA",
+            None,
+            [
+                "Annex I Part I (2)(a)",
+                "Annex I Part I (2)(c)",
+                "Annex I Part II (1)",
+                "Annex I Part II (2)",
+                "Annex I Part II (3)",
+                "Annex I Part II (4)",
+                "Annex I Part II (5)",
+                "Annex I Part II (6)",
+                "Annex I Part II (7)",
+                "Annex I Part II (8)",
+                "Annex VII §3",
+                "Annex VII §6",
+                "Art. 13(3)",
+                "Art. 13(7)",
+                "Art. 13(8)",
+                "Art. 13(9)",
+                "Art. 13(17)",
+                "Art. 13(18)",
+            ],
+            True,
+        ),
+        ("NIS2", None, ["Art. 21(2)(e)"], True),
+    ],
+    "D-03": [
+        # GDPR: Art. 11/12 identity + Art. 28 processor + Art. 29 + Art. 32(4) + Art. 25
+        (
+            "GDPR",
+            None,
+            [
+                "Art. 11",
+                "Art. 12",
+                "Art. 25",
+                "Art. 28",
+                "Art. 29",
+                "Art. 32",
+            ],
+            True,
+        ),
+        (
+            "CRA",
+            None,
+            [
+                "Annex I Part I (2)(b)",
+                "Annex I Part I (2)(d)",
+                "Annex I Part I (2)(j)",
+                "Annex II §3",
+                "Art. 13(15)",
+                "Art. 13(17)",
+            ],
+            True,
+        ),
+        ("NIS2", None, ["Art. 21(2)(i)", "Art. 21(2)(j)"], True),
+    ],
+    "D-05": [
+        (
+            "GDPR",
+            None,
+            [
+                "Art. 5(1)(c)",
+                "Art. 5(1)(e)",
+                "Art. 6(1)",
+                "Art. 6(4)",
+                "Art. 8",
+                "Art. 9",
+                "Art. 12(3)",
+                "Art. 12(5)",
+                "Art. 15(3)",
+                "Art. 17",
+                "Art. 19",
+                "Art. 20",
+                "Art. 25",
+                "Art. 28(3)",
+                "Art. 30(1)(f)",
+                "Art. 35",
+                "Art. 89(1)",
+            ],
+            True,
+        ),
+        (
+            "CRA",
+            None,
+            [
+                "Annex I Part I (2)(g)",
+                "Annex I Part I (2)(m)",
+                "Annex I Part II (7)",
+                "Annex I Part II (8)",
+                "Annex II §7",
+                "Annex II §8",
+                "Art. 3(23)",
+                "Art. 13(2)",
+                "Art. 13(3)",
+                "Art. 13(8)",
+                "Art. 13(9)",
+                "Art. 13(18)",
+                "Art. 13(19)",
+            ],
+            True,
+        ),
+    ],
+    "D-06": [
+        (
+            "GDPR",
+            None,
+            [
+                "Art. 3(2)",
+                "Art. 27",
+                "Art. 28",
+                "Art. 46",
+                "Art. 48",
+            ],
+            True,
+        ),
+        (
+            "CRA",
+            None,
+            [
+                "Annex I Part II (1)",
+                "Annex II §9",
+                "Annex VII §2",
+                "Annex VII §8",
+                "Art. 3(23)",
+                "Art. 3(39)",
+                "Art. 3(48)",
+                "Art. 13(5)",
+                "Art. 13(6)",
+                "Art. 22",
+                "Art. 23",
+            ],
+            True,
+        ),
+        (
+            "NIS2",
+            None,
+            ["Art. 21(2)(d)", "Art. 21(3)", "Art. 22"],
+            True,
+        ),
+    ],
+    "D-07": [
+        ("GDPR", None, ["Art. 25"], True),
+        (
+            "CRA",
+            None,
+            [
+                "Annex I Part I (2)(b)",
+                "Annex I Part I (2)(c)",
+                "Annex I Part I (2)(j)",
+                "Annex I Part I (2)(k)",
+                "Annex I Part II (7)",
+                "Annex I Part II (8)",
+                "Annex VII §2",
+                "Annex VII §3",
+                "Art. 13(1)",
+                "Art. 13(2)",
+                "Art. 13(3)",
+                "Art. 13(7)",
+                "Art. 13(8)",
+                "Art. 13(10)",
+                "Art. 13(14)",
+                "Art. 13(21)",
+            ],
+            True,
+        ),
+        ("NIS2", None, ["Art. 21(2)(e)"], True),
+    ],
+    "D-08": [
+        ("GDPR", None, ["Art. 5(2)", "Art. 39"], True),
+        (
+            "CRA",
+            None,
+            ["Annex II §8", "Annex VII", "Art. 13(18)"],
+            True,
+        ),
+        ("NIS2", None, ["Art. 20(2)", "Art. 21(2)(g)"], True),
+    ],
+    "D-09": [
+        (
+            "GDPR",
+            None,
+            [
+                "Art. 5(2)",
+                "Art. 24",
+                "Art. 30",
+                "Art. 35",
+                "Art. 36",
+                "Art. 37",
+                "Art. 38",
+                "Art. 39",
+            ],
+            True,
+        ),
+        (
+            "CRA",
+            None,
+            [
+                "Annex I Part I (2)",
+                "Annex VII §1",
+                "Annex VII §2",
+                "Annex VII §3",
+                "Annex VII §8",
+                "Art. 13(2)",
+                "Art. 13(3)",
+                "Art. 13(4)",
+                "Art. 13(8)",
+                "Art. 13(12)",
+                "Art. 13(13)",
+                "Art. 13(19)",
+                "Art. 24(1)",
+                "Art. 28",
+                "Art. 30",
+                "Art. 31",
+                "Art. 32",
+            ],
+            True,
+        ),
+        (
+            "NIS2",
+            None,
+            [
+                "Art. 20(1)",
+                "Art. 21(2)(a)",
+                "Art. 21(2)(f)",
+                "Art. 21(2)(i)",
+                "Art. 21(3)",
+                "Art. 22(1)",
+                "Art. 24",
+            ],
+            True,
+        ),
     ],
 }
 

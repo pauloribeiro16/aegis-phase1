@@ -11,16 +11,29 @@ disk. They cover:
 Tests that need to exercise edge cases (empty state, missing
 ontology, etc.) override individual fields rather than redefining
 the whole state.
+
+The article/ambiguity filters read ``state["preprocessing_path"]``
+and resolve article/ambiguity files from the Methodology-main
+preprocessing tree; ``PREPROCESSING_PATH`` below is the canonical
+path for that tree on this machine.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from aegis_phase1.models import ComplexityTier
 from aegis_phase1.v2.state import CompanyContext, SubDomainDef, V2State
+
+PREPROCESSING_PATH = str(
+    Path(
+        "/home/epmq-cyber/Área de Trabalho/projects/Methodology-main/"
+        "00_METHODOLOGY/PREPROCESSING"
+    )
+)
 
 
 def _make_subdomain(sid: str, title: str, regs: list[str]) -> SubDomainDef:
@@ -216,7 +229,7 @@ def mock_state(
     state: V2State = {
         "current_stage": "LOADED",
         "case_path": "/tmp/mock_case",
-        "preprocessing_path": "/tmp/mock_preproc",
+        "preprocessing_path": PREPROCESSING_PATH,
         "company_context": mock_company_context,
         "taxonomy_entries": [],
         "ontology": mock_ontology,

@@ -11,9 +11,26 @@ from aegis_phase1.v2.state import V2State
 
 logger = logging.getLogger(__name__)
 
-_AMBIGUITY_BASE_PATH = Path(
+# Fallback only — the canonical source is ``state["preprocessing_path"]``
+# (set by ``Phase1Orchestrator.load`` from the case loader). Kept so the
+# filter does not crash if a caller constructs a minimal state without the
+# preprocessing path (e.g. legacy tests).
+_FALLBACK_AMBIGUITY_BASE_PATH = Path(
     "/home/epmq-cyber/Área de Trabalho/projects/Methodology-main/" "00_METHODOLOGY/PREPROCESSING"
 )
+
+
+def _resolve_base_path(state: V2State) -> Path:
+    """Return the preprocessing base path from state, falling back to the
+    historical constant when the state key is absent."""
+    raw = state.get("preprocessing_path") or state.get("regulatory_baseline_path")
+    if raw:
+        return Path(raw)
+    logger.debug(
+        "state has no preprocessing_path/regulatory_baseline_path; using fallback %s",
+        _FALLBACK_AMBIGUITY_BASE_PATH,
+    )
+    return _FALLBACK_AMBIGUITY_BASE_PATH
 
 
 def filter_ambiguities(state: V2State, domain_id: str) -> list[dict[str, str]]:
@@ -37,7 +54,8 @@ def filter_ambiguities(state: V2State, domain_id: str) -> list[dict[str, str]]:
     if not regs:
         return []
 
-    result = load_ambiguities_for_regs(regs, _AMBIGUITY_BASE_PATH, domain_id=domain_id)
+    base_path = _resolve_base_path(state)
+    result = load_ambiguities_for_regs(regs, base_path, domain_id=domain_id)
     logger.debug(
         "filter_ambiguities(%s): %d entries (filtered)", domain_id, len(result)
     )

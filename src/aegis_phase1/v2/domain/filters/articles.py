@@ -11,9 +11,26 @@ from aegis_phase1.v2.state import V2State
 
 logger = logging.getLogger(__name__)
 
-_OJ_BASE_PATH = Path(
+# Fallback only — the canonical source is ``state["preprocessing_path"]``
+# (set by ``Phase1Orchestrator.load`` from the case loader). Kept so the
+# filter does not crash if a caller constructs a minimal state without the
+# preprocessing path (e.g. legacy tests).
+_FALLBACK_OJ_BASE_PATH = Path(
     "/home/epmq-cyber/Área de Trabalho/projects/Methodology-main/" "00_METHODOLOGY/PREPROCESSING"
 )
+
+
+def _resolve_base_path(state: V2State) -> Path:
+    """Return the preprocessing base path from state, falling back to the
+    historical constant when the state key is absent."""
+    raw = state.get("preprocessing_path") or state.get("regulatory_baseline_path")
+    if raw:
+        return Path(raw)
+    logger.debug(
+        "state has no preprocessing_path/regulatory_baseline_path; using fallback %s",
+        _FALLBACK_OJ_BASE_PATH,
+    )
+    return _FALLBACK_OJ_BASE_PATH
 
 
 def filter_articles(state: V2State, domain_id: str) -> list[dict[str, str]]:
@@ -31,9 +48,10 @@ def filter_articles(state: V2State, domain_id: str) -> list[dict[str, str]]:
     if not regs:
         return []
 
+    base_path = _resolve_base_path(state)
     applicable_subdomains = _applicable_subdomains(state, domain_id)
     articles = load_articles_for_domain(
-        domain_id, regs, _OJ_BASE_PATH, applicable_subdomains=applicable_subdomains
+        domain_id, regs, base_path, applicable_subdomains=applicable_subdomains
     )
     result = [
         {
