@@ -1,10 +1,4 @@
-"""CLI entry: ``python -m scripts.preprocess build``.
-
-Usage:
-    python -m scripts.preprocess build --source <path> --output <path>
-
-Default source = ``methodology-00/PREPROCESSING``, default output = ``preproc_out``.
-"""
+"""CLI entry: ``python -m scripts.preprocess build``."""
 from __future__ import annotations
 
 import argparse
@@ -16,21 +10,23 @@ from .pipeline import build
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SOURCE = REPO_ROOT / "methodology-00" / "PREPROCESSING"
+# Diagrams live one level up from PREPROCESSING (under methodology-00/diagrams)
+DEFAULT_SOURCE_ROOT = REPO_ROOT / "methodology-00"
 DEFAULT_OUTPUT = REPO_ROOT / "preproc_out"
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m scripts.preprocess",
-        description="CORR-024 preprocessor: PREPROCESSING/ markdown → JSON shards",
+        description="CORR-024 preprocessor v2: PREPROCESSING/ + diagrams/ → JSON shards",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build", help="build all shards from source")
     b.add_argument(
         "--source",
         type=Path,
-        default=DEFAULT_SOURCE,
-        help=f"source PREPROCESSING root (default: {DEFAULT_SOURCE})",
+        default=DEFAULT_SOURCE_ROOT,
+        help=f"methodology-00 root (default: {DEFAULT_SOURCE_ROOT})",
     )
     b.add_argument(
         "--output",
