@@ -44,6 +44,22 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _copy_preproc_readme(output_root: Path) -> None:
+    """Copy scripts/preprocess/PREPROC_OUT_README.md → output_root/README.md.
+
+    Keeps the preproc_out/ tree self-describing even when the output dir
+    is gitignored. The source README lives next to the pipeline code so
+    it is versioned with the rest of the preprocessing logic.
+    """
+    import shutil
+
+    # __file__ = scripts/preprocess/pipeline.py → README is one level up + sibling
+    src_readme = Path(__file__).parent / "PREPROC_OUT_README.md"
+    dst_readme = output_root / "README.md"
+    if src_readme.is_file():
+        shutil.copy2(src_readme, dst_readme)
+
+
 def _json_default(o: Any) -> Any:
     if isinstance(o, (_dt.date, _dt.datetime)):
         return o.isoformat()
@@ -113,6 +129,9 @@ def build(source_root: Path, output_root: Path) -> dict[str, Any]:
     returns the manifest; callers check ``manifest["errors"]``.
     """
     output_root.mkdir(parents=True, exist_ok=True)
+    # v9: copy the README.md to the output root so the tree is
+    # self-describing even when preproc_out/ is gitignored.
+    _copy_preproc_readme(output_root)
     # v8: pre-create the entity subdirs.
     # "ambiguities" (proper plural — not "ambiguitys") is the v8 spelling.
     for kind in ("subdomain", "article", "clause", "so", "sr", "pair", "ambiguity", "csf"):
@@ -454,10 +473,14 @@ def _process_regulation(
 
         # Roots (00_README, 01_SO, 02_SR_NIST, 03_validation, 04_deduction)
         # v8: under regulation/{reg}/_root/ instead of mixed at the root
+        # v9: drop raw_md (the body content is also in
+        # regulation/{reg}/aggregated/ for 01_SO/02_SR; for 00_README/
+        # 03_validation/04_deduction the body is purely narrative and
+        # not duplicated elsewhere — but frontmatter is enough for audit)
         for src in sorted(reg_dir_entry.glob("*.md")):
             shard_path = f"regulation/{regulation}/_root/{src.stem}.json"
             try:
-                parsed = parse_root_md(src)
+                parsed = parse_root_md(src, include_raw_md=False)
                 bytes_written, sha = _write_json(out_root / shard_path, parsed)
             except Exception as exc:
                 idx.errors.append({"file": str(src), "error": f"unhandled: {exc!r}"})
@@ -790,10 +813,22 @@ def _process_global_and_ambiguity_analysis(
 # ─── helpers (parsers reused from raw_md) ──────────────────────────────
 
 
-def parse_root_md(path: Path) -> dict[str, Any]:
+def parse_root_md(path: Path, include_raw_md: bool = True) -> dict[str, Any]:
+    """Parse a top-level ``.md`` into a structured dict (no full extraction).
+
+    Used as a catch-all for narrative .md files where the body is not
+    further parsed (regulation root files, global templates, etc.).
+
+    **CORR-024 v9:** callers that have a structured counterpart for the
+    body (e.g. ``regulation/{REG}/aggregated/``) should pass
+    ``include_raw_md=False`` to drop the raw_md field — the body content
+    is then only kept in frontmatter (for traceability) and the
+    counterpart (for the structured form). This shrinks preproc_out by
+    ~1.7 MB for regulation/_root/ (25 files) without losing audit info.
+    """
     text = path.read_text(encoding="utf-8")
     fm, body = parse_frontmatter(text)
-    return {
+    out: dict[str, Any] = {
         "schema_version": "1.0",
         "source": str(path),
         "doc_id": fm.get("document_id", f"AEGIS-PREPROC-{path.stem}"),
@@ -801,8 +836,10 @@ def parse_root_md(path: Path) -> dict[str, Any]:
         "status": fm.get("status", ""),
         "chain_version": fm.get("chain_version", ""),
         "frontmatter": fm,
-        "raw_md": body.strip(),
     }
+    if include_raw_md:
+        out["raw_md"] = body.strip()
+    return out
 
 
 def parse_root_csf_xlsx_structured(xlsx_path: Path, md_path: Path | None) -> dict[str, Any]:
