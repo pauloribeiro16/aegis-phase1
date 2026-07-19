@@ -31,6 +31,14 @@ from .parsers.entities.csf import (
 from .parsers.entities.csf_xlsx import build_shard, parse_csf2
 from .parsers.entities.subdomain import parse_subdomain
 from .parsers.frontmatter import parse_frontmatter
+from .parsers.narrative import (
+    parse_ambiguity_framework,
+    parse_ambiguity_index,
+    parse_crossregulation_brief_template,
+    parse_crossregulation_index,
+    parse_preproc_readme,
+    parse_subagent_brief_template,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -693,23 +701,36 @@ def _process_crossregulation(
                     for r in __import__("re").split(r"[,/]", participants_m.group(1))
                     if r.strip()
                 ]
-            parsed = {
-                "schema_version": "1.0",
-                "source": str(src),
-                "doc_id": fm.get("document_id", f"AEGIS-PREPROC-CRDA-{rel}"),
-                "sub_kind": "domain_analysis"
+            # v10: structured parsers for the 3 special filenames
+            sub_kind = (
+                "domain_analysis"
                 if "DomainAnalysis" in rel.parts
                 else "deep_analysis"
                 if "DeepAnalysis" in rel.parts
-                else "index",
-                "macro_domain": fm.get("macro_domain", ""),
-                "sub_domain": fm.get("sub_domain", ""),
-                "title": fm.get("title", src.stem),
-                "status": fm.get("status", ""),
-                "frontmatter": fm,
-                "participants": participants,
-                "raw_md": body.strip(),
-            }
+                else "index"
+            )
+            if src.name == "index.md" and sub_kind in ("domain_analysis", "deep_analysis"):
+                parsed = parse_crossregulation_index(src)
+                parsed["sub_kind"] = sub_kind
+            elif src.name == "TEMPLATE_crossreg_brief.md":
+                parsed = parse_crossregulation_brief_template(src)
+                parsed["sub_kind"] = "template"
+            else:
+                # Per-subdomain files (D-XX_*) — keep the v8 form for Fase 2
+                parsed = {
+                    "schema_version": "1.0",
+                    "source": str(src),
+                    "doc_id": fm.get("document_id", f"AEGIS-PREPROC-CRDA-{rel}"),
+                    "sub_kind": sub_kind,
+                    "macro_domain": fm.get("macro_domain", ""),
+                    "sub_domain": fm.get("sub_domain", ""),
+                    "title": fm.get("title", src.stem),
+                    "status": fm.get("status", ""),
+                    "frontmatter": fm,
+                    "participants": participants,
+                    "raw_md": body.strip(),
+                }
+            bytes_written, sha = _write_json(out_root / shard_path, parsed)
             bytes_written, sha = _write_json(out_root / shard_path, parsed)
             shards.append(
                 {
@@ -772,6 +793,17 @@ def _process_global_and_ambiguity_analysis(
                     parsed = parse_root_csf_xlsx_structured(xlsx_path, src)
                 else:
                     parsed = parse_root_csf_structured(src)
+            elif src.name == "TEMPLATE_subagent_brief.md":
+                # v10: structured parse (constraints[], bullet_lists[]) + raw_md
+                parsed = parse_subagent_brief_template(src)
+            elif src.name == "README.md":
+                # v10: structured parse (sections[]) + raw_md
+                parsed = parse_preproc_readme(src)
+            elif src.name == "00_Hierarchical_SecurityObjectives.md":
+                # v10: HSO is purely design rationale — keep parse_root_md
+                # but the body is preserved verbatim (no info loss)
+                parsed = parse_root_md(src)
+                parsed["raw_md_kept_reason"] = "narrative_design_rationale_no_structured_form"
             else:
                 parsed = parse_root_md(src)
             bytes_written, sha = _write_json(out_root / shard_path, parsed)
@@ -794,7 +826,13 @@ def _process_global_and_ambiguity_analysis(
         for src in sorted(ambig_dir.glob("*.md")):
             shard_path = f"ambiguity_analysis/{src.stem}.json"
             try:
-                parsed = parse_root_md(src)
+                # v10: structured parsers per filename
+                if src.name == "00_Index.md":
+                    parsed = parse_ambiguity_index(src)
+                elif src.name == "01_Framework.md":
+                    parsed = parse_ambiguity_framework(src)
+                else:
+                    parsed = parse_root_md(src)
                 bytes_written, sha = _write_json(out_root / shard_path, parsed)
                 shards.append(
                     {

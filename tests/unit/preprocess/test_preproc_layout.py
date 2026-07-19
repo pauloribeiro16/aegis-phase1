@@ -160,3 +160,104 @@ def test_raw_md_count_below_v8_baseline() -> None:
         f"raw_md count {n_with} too high — expected ~84 after dropping "
         f"regulation/_root/ (25 files)"
     )
+
+
+# ─── v10 invariants: zero-loss + structured extraction ────────────────
+
+
+@pytest.mark.parametrize(
+    "shard_path",
+    [
+        "ambiguity_analysis/00_Index.json",
+        "ambiguity_analysis/01_Framework.json",
+        "global/TEMPLATE_subagent_brief.json",
+        "global/README.json",
+        "crossregulation/DomainAnalysis/index.json",
+        "crossregulation/DeepAnalysis/index.json",
+        "crossregulation/_templates/TEMPLATE_crossreg_brief.json",
+    ],
+)
+def test_v10_shard_has_structured_fields(shard_path: str) -> None:
+    """Each Fase 1 file must have BOTH the raw_md (verbatim) AND
+    structured fields extracted by the typed parser."""
+    p = PREPROC_OUT / shard_path
+    if not p.is_file():
+        pytest.skip(f"{shard_path} not built")
+    d = json.loads(p.read_text())
+    # raw_md must be present (zero-loss invariant)
+    assert "raw_md" in d, f"{shard_path} lost raw_md"
+    assert d["raw_md"], f"{shard_path} raw_md is empty"
+    # At least 1 structured field beyond the catch-all schema
+    structured_keys = {
+        "regulations", "scope", "lens", "layer", "sections",
+        "constraints", "mission", "supporting_files", "source_lens",
+        "relationship_taxonomy", "preserved_tags", "workflow_steps",
+    }
+    found = structured_keys & set(d.keys())
+    assert found, (
+        f"{shard_path} has no structured fields beyond the catch-all schema"
+    )
+
+
+def test_v10_zero_loss_invariant() -> None:
+    """Zero-loss invariant: every Fase 1 file's raw_md is preserved
+    verbatim in the structured fields (or as the raw_md itself).
+
+    This test reads the SOURCE .md from methodology-00 and compares
+    the body to the raw_md field in the JSON. They MUST match.
+    """
+    pairs = [
+        (
+            PREPROC_OUT / "ambiguity_analysis/00_Index.json",
+            "methodology-00/PREPROCESSING/AMBIGUITY_ANALYSIS/00_Index.md",
+        ),
+        (
+            PREPROC_OUT / "ambiguity_analysis/01_Framework.json",
+            "methodology-00/PREPROCESSING/AMBIGUITY_ANALYSIS/01_Framework.md",
+        ),
+        (
+            PREPROC_OUT / "global/TEMPLATE_subagent_brief.json",
+            "methodology-00/PREPROCESSING/TEMPLATE_subagent_brief.md",
+        ),
+        (
+            PREPROC_OUT / "global/README.json",
+            "methodology-00/PREPROCESSING/README.md",
+        ),
+        (
+            PREPROC_OUT / "crossregulation/DomainAnalysis/index.json",
+            "methodology-00/PREPROCESSING/CrossRegulation/DomainAnalysis/index.md",
+        ),
+        (
+            PREPROC_OUT / "crossregulation/DeepAnalysis/index.json",
+            "methodology-00/PREPROCESSING/CrossRegulation/DeepAnalysis/index.md",
+        ),
+        (
+            PREPROC_OUT / "crossregulation/_templates/TEMPLATE_crossreg_brief.json",
+            "methodology-00/PREPROCESSING/CrossRegulation/TEMPLATE_crossreg_brief.md",
+        ),
+    ]
+    for json_p, src_p in pairs:
+        if not (json_p.is_file() and Path(src_p).is_file()):
+            continue
+        d = json.loads(json_p.read_text())
+        text = Path(src_p).read_text(encoding="utf-8")
+        from scripts.preprocess.parsers.frontmatter import parse_frontmatter
+        _, src_body = parse_frontmatter(text)
+        json_raw = d.get("raw_md", "")
+        assert src_body.strip() == json_raw.strip(), (
+            f"{json_p.name}: raw_md in JSON does not match source body. "
+            f"DIFF: source len={len(src_body)}, json len={len(json_raw)}"
+        )
+
+
+def test_v10_hso_keeps_raw_md_with_reason() -> None:
+    """The HSO file is the only global/ file that keeps raw_md with
+    an explicit reason (it's pure design rationale)."""
+    p = PREPROC_OUT / "global/00_Hierarchical_SecurityObjectives.json"
+    if not p.is_file():
+        pytest.skip("HSO file missing")
+    d = json.loads(p.read_text())
+    assert "raw_md" in d, "HSO should keep raw_md (no structured form)"
+    assert d.get("raw_md_kept_reason") == "narrative_design_rationale_no_structured_form", (
+        f"HSO must declare why raw_md is kept: {d.get('raw_md_kept_reason')}"
+    )
