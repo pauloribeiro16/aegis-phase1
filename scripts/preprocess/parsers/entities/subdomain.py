@@ -65,7 +65,10 @@ _CONSIDERATIONS_RE = re.compile(
     r"\*\*Considerations\.\*\*\s*\n(?P<bullets>(?:-\s+[^\n]+\n?)+)",
 )
 _PARTICIPANTS_RE = re.compile(
-    r"\*\*Participants\s+\(from\s+CRDA[^*]*\)\*\*:\s*(?P<regs>[^\n]+)",
+    # Either bold form: **Participants (from CRDA):** GDPR, NIS2, ...
+    r"\*\*Participants\s+\(from\s+CRDA[^*]*\)\*\*:\s*(?P<regs>[^\n]+)"
+    # OR HTML-comment form: <!-- participants: GDPR, NIS2, ...; AI_Act absent -->
+    r"|<!--\s*participants:\s*(?P<regs_c>[^>]+?)\s*-->",
 )
 _CLASSIFIED_RE = re.compile(
     r"Verified relationship[^:]*:\s*\*\*([^*]+)\*\*",
@@ -85,7 +88,7 @@ _SCOPE_OVERLAP_RE = re.compile(
 _ART_RE = re.compile(r"\bArt(?:\.|icle)?\s*[\dIVX]+(?:\([^)]+\))?")
 _ANNEX_RE = re.compile(r"\bAnnex\s+[IVX]+(?:\s+Part\s+[IVX]+)?(?:\s*\([^\)]+\))?")
 _SECTION_RE = re.compile(r"§\s*\d+")
-_CSF_RE = re.compile(r"\b([A-Z]{2}\.[A-Z]{2}-\d{2})\b")
+_CSF_RE = re.compile(r"\b([A-Z]{2}\.[A-Z]{2,3}-\d{2})\b")
 
 _REG_NORMALIZE = {
     "GDPR": "GDPR",
@@ -249,6 +252,11 @@ def _parse_security_requirements(body: str, domain_id: str) -> list[dict[str, An
         block = body[m.end() : end]
         yaml_meta = _parse_yaml_block(block)
         sr_id = f"{domain_id}.{m.group('id').strip()}"
+        # v11: prefer explicit `nist_csf_mapping` from YAML body; fall
+        # back to scanning the prose for CSF ID mentions.
+        explicit_mapping = yaml_meta.get("nist_csf_mapping") or []
+        csf_scanned = _extract_csf(block)
+        csf_final = list(explicit_mapping) if explicit_mapping else csf_scanned
         srs.append(
             {
                 "id": sr_id,
@@ -256,7 +264,8 @@ def _parse_security_requirements(body: str, domain_id: str) -> list[dict[str, An
                 "title": m.group("title").strip(),
                 "yaml_body": yaml_meta,
                 "anchors": _extract_anchors(block),
-                "csf": _extract_csf(block),
+                "csf": csf_final,
+                "nist_csf_mapping": csf_final,  # canonical field name
             }
         )
     return srs
@@ -326,14 +335,17 @@ def parse_subdomain(path: Path) -> dict[str, Any]:
         sr_raw = sr_section[1].strip()
         srs = _parse_security_requirements(sr_section[1], domain_id)
 
-    # Participating regulations
+    # Participating regulations (two forms supported: bold
+    # "**Participants (from CRDA):** ..." OR HTML-comment
+    # "<!-- participants: ... -->")
     participants: list[str] = []
     parts_m = _PARTICIPANTS_RE.search(cross_reg_raw)
     if parts_m:
+        regs_str = parts_m.group("regs") or parts_m.group("regs_c") or ""
+        # Strip qualifier like "; AI_Act absent" — keep only regulations
+        regs_str = re.split(r"[;|]", regs_str)[0]
         participants = [
-            _normalize_reg(r.strip().rstrip(","))
-            for r in re.split(r"[,/]", parts_m.group("regs"))
-            if r.strip()
+            _normalize_reg(r.strip().rstrip(",")) for r in re.split(r"[,/]", regs_str) if r.strip()
         ]
 
     return {
