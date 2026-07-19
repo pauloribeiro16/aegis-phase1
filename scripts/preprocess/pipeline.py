@@ -223,8 +223,11 @@ def _process_csf_xlsx(
             continue
         shard_entity = build_shard(sc, intro, xlsx_path)
         eid = shard_entity["id"]
+        # CORR-024 v7: organize shards by Function (GV, ID, PR, DE, RS, RC)
+        # → entities/csfs/{FUNCTION}/{FUNC}_{CAT}_{NUM}.json
+        fn = shard_entity["function"]
         fname = eid.replace(".", "_").replace("-", "_")
-        shard_path = f"entities/csfs/{fname}.json"
+        shard_path = f"entities/csfs/{fn}/{fname}.json"
         idx.add(eid, shard_entity, shard_path)
         bytes_written, sha = _write_json(out_root / shard_path, shard_entity)
         shards.append(
@@ -239,6 +242,42 @@ def _process_csf_xlsx(
         )
         n_written += 1
     logger.info("csf2.xlsx: wrote %d active shards, skipped %d withdrawn", n_written, n_skipped)
+
+    # CORR-024 v7: write a retro-compat _index.json at entities/csfs/
+    # mapping id → path. The v6 layout had flat files at
+    # entities/csfs/<FUNC>_<CAT>_<NUM>.json; the v7 layout uses per-Function
+    # subfolders. The index lets any consumer resolve a CSF id without
+    # knowing the function code.
+    id_to_path: dict[str, str] = {}
+    for s in parsed["subcategories"]:
+        if s["withdrawn"]:
+            continue
+        eid = s["id"]
+        fn = s["function"]
+        fname = eid.replace(".", "_").replace("-", "_")
+        id_to_path[eid] = f"entities/csfs/{fn}/{fname}.json"
+    per_function: dict[str, list[str]] = {}
+    for s in parsed["subcategories"]:
+        if s["withdrawn"]:
+            continue
+        per_function.setdefault(s["function"], []).append(s["id"])
+    _write_json(
+        out_root / "entities" / "csfs" / "_index.json",
+        {
+            "schema_version": "1.0",
+            "kind": "csf_shard_index",
+            "source": "csf2.xlsx",
+            "layout": "per_function_subfolders",
+            "function_order": ["GV", "ID", "PR", "DE", "RS", "RC"],
+            "active_subcategory_count": len(id_to_path),
+            "by_function": {
+                fn: {"count": len(ids), "ids": sorted(ids)}
+                for fn, ids in sorted(per_function.items())
+            },
+            "by_id": dict(sorted(id_to_path.items())),
+        },
+    )
+    logger.info("csf2.xlsx: wrote _index.json with %d active subcategories", len(id_to_path))
 
     # Hint table: prefer the .md cross-reference if available (more
     # authoritative for AEGIS sub-domain → CSF mapping). The xlsx doesn't
@@ -1167,7 +1206,16 @@ def _build_indices(idx: EntityIndex, out_root: Path, shards: list[dict[str, Any]
         if sub is None:
             continue
         fname = eid.replace(".", "_").replace("-", "_")
-        entity_path = out_root / "entities" / sub / f"{fname}.json"
+        # CORR-024 v7: CSF shards live in per-Function subfolders
+        # entities/csfs/{FUNC}/{FUNC}_{CAT}_{NUM}.json
+        if kind == "csf":
+            fn = entity.get("function")
+            if fn:
+                entity_path = out_root / "entities" / sub / fn / f"{fname}.json"
+            else:
+                entity_path = out_root / "entities" / sub / f"{fname}.json"
+        else:
+            entity_path = out_root / "entities" / sub / f"{fname}.json"
         if entity_path.exists():
             continue  # already written by a per-section processor
         try:

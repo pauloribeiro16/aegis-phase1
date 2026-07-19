@@ -31,6 +31,21 @@ SHARDS_DIR = REPO_ROOT / "preproc_out" / "entities" / "csfs"
 
 SUBCAT_ID_RE = re.compile(r"^([A-Z]{2})\.([A-Z]{2,3})-(\d{2})$")
 
+# Expected layout: 6 subfolders (GV, ID, PR, DE, RS, RC) — one per Function.
+# CORR-024 v7: shards are organized per Function rather than flat in
+# entities/csfs/. The _index.json at the root is the canonical map.
+EXPECTED_FUNCTIONS = ["GV", "ID", "PR", "DE", "RS", "RC"]
+
+
+def _all_csf_shards() -> list[Path]:
+    """Recursively find all CSF shards under entities/csfs/ (v7 layout)."""
+    return [
+        p
+        for p in SHARDS_DIR.rglob("*.json")
+        # Skip the _index.json and any other non-shard files at the root
+        if p.name != "_index.json"
+    ]
+
 
 # ─── Source must exist ─────────────────────────────────────────────────
 
@@ -192,8 +207,53 @@ def test_xlsx_shards_106() -> None:
     """
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
-    files = list(SHARDS_DIR.glob("*.json"))
+    files = _all_csf_shards()
     assert len(files) == 106, f"expected 106 active shards, got {len(files)}"
+
+
+def test_xlsx_shards_layout_per_function() -> None:
+    """CORR-024 v7: shards are organized in 6 per-Function subfolders.
+
+    Layout: entities/csfs/{GV,ID,PR,DE,RS,RC}/{FUNC}_{CAT}_{NUM}.json
+    """
+    if not SHARDS_DIR.is_dir():
+        pytest.skip("preproc_out not built")
+    # Each expected function must have a subfolder
+    for fn in EXPECTED_FUNCTIONS:
+        sub = SHARDS_DIR / fn
+        assert sub.is_dir(), f"missing subfolder: {sub}"
+    # _index.json must exist at the root
+    assert (SHARDS_DIR / "_index.json").is_file(), "missing _index.json"
+    # No flat shard files at the root (only _index.json + the 6 subdirs)
+    root_files = [p for p in SHARDS_DIR.iterdir() if p.is_file()]
+    assert [p.name for p in root_files] == [
+        "_index.json"
+    ], f"unexpected root files: {[p.name for p in root_files]}"
+
+
+def test_xlsx_shards_index_consistent() -> None:
+    """_index.json must list all 106 active subcategories and match the
+    shards on disk (same set of IDs)."""
+    if not (SHARDS_DIR / "_index.json").is_file():
+        pytest.skip("preproc_out not built")
+    idx = json.loads((SHARDS_DIR / "_index.json").read_text())
+    indexed_ids = set(idx["by_id"].keys())
+    # On-disk IDs
+    disk_ids = set()
+    for p in _all_csf_shards():
+        d = json.loads(p.read_text())
+        disk_ids.add(d["id"])
+    assert indexed_ids == disk_ids, (
+        f"index/disk mismatch: only in index={indexed_ids - disk_ids}, "
+        f"only on disk={disk_ids - indexed_ids}"
+    )
+    # Per-function counts in _index.json must match the actual subfolder sizes
+    for fn, info in idx["by_function"].items():
+        sub = SHARDS_DIR / fn
+        actual = len(list(sub.glob("*.json")))
+        assert (
+            actual == info["count"]
+        ), f"{fn}: index says {info['count']} but subfolder has {actual}"
 
 
 def test_xlsx_shards_no_withdrawn() -> None:
@@ -201,7 +261,7 @@ def test_xlsx_shards_no_withdrawn() -> None:
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
     bad = []
-    for p in SHARDS_DIR.glob("*.json"):
+    for p in _all_csf_shards():
         d = json.loads(p.read_text())
         if d.get("withdrawn"):
             bad.append(p.name)
@@ -212,7 +272,7 @@ def test_xlsx_shards_no_legacy_id() -> None:
     """The legacy-only ID PR.DS-12 (renamed in CSF 2.0) must NOT be present."""
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
-    files = {p.stem for p in SHARDS_DIR.glob("*.json")}
+    files = {p.stem for p in _all_csf_shards()}
     assert "PR_DS_12" not in files, "legacy PR.DS-12 shard still present (renamed in CSF 2.0)"
 
 
@@ -226,7 +286,7 @@ def test_xlsx_shards_have_implementation_examples() -> None:
         pytest.skip("preproc_out not built")
     without = []
     total = 0
-    for p in SHARDS_DIR.glob("*.json"):
+    for p in _all_csf_shards():
         d = json.loads(p.read_text())
         total += 1
         if not d.get("implementation_examples"):
@@ -241,7 +301,7 @@ def test_xlsx_shards_have_informative_references() -> None:
         pytest.skip("preproc_out not built")
     without = []
     total = 0
-    for p in SHARDS_DIR.glob("*.json"):
+    for p in _all_csf_shards():
         d = json.loads(p.read_text())
         total += 1
         if not d.get("informative_references"):
@@ -365,7 +425,7 @@ def test_xlsx_shard_gv_oc_01_full() -> None:
     """Spot-check the GV.OC-01 shard has the expected xlsx-derived structure."""
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
-    p = SHARDS_DIR / "GV_OC_01.json"
+    p = SHARDS_DIR / "GV" / "GV_OC_01.json"
     if not p.is_file():
         pytest.skip("shard not present")
     d = json.loads(p.read_text())
@@ -397,7 +457,7 @@ def test_xlsx_withdrawn_not_as_shard() -> None:
     """
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
-    p = SHARDS_DIR / "PR_DS_03.json"
+    p = SHARDS_DIR / "PR" / "PR_DS_03.json"
     assert not p.is_file(), "PR.DS-03 is withdrawn — should NOT have a shard"
     # But it should appear in the aggregated file
     if not AGGREGATED.is_file():
