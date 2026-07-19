@@ -36,6 +36,7 @@ from .parsers.narrative import (
     parse_ambiguity_index,
     parse_crossregulation_brief_template,
     parse_crossregulation_index,
+    parse_crossregulation_subdomain,
     parse_preproc_readme,
     parse_subagent_brief_template,
 )
@@ -176,6 +177,12 @@ def build(source_root: Path, output_root: Path) -> dict[str, Any]:
 
     # 6. Global + ambiguity_analysis
     _process_global_and_ambiguity_analysis(source_root, output_root, idx, manifest_shards)
+
+    # 6.5. v10 Fase 2: enrich entities/pairs/ with crossregulation data
+    # (matches each pair entity against the corresponding pair block in
+    # crossregulation/D-XX/ — the raw_md from crossregulation is preserved
+    # in cr_pair_source_files)
+    _enrich_pair_entities_from_crossregulation(output_root, manifest_shards)
 
     # 7. Build global indices
     _build_indices(idx, output_root, manifest_shards)
@@ -715,6 +722,11 @@ def _process_crossregulation(
             elif src.name == "TEMPLATE_crossreg_brief.md":
                 parsed = parse_crossregulation_brief_template(src)
                 parsed["sub_kind"] = "template"
+            elif sub_kind in ("domain_analysis", "deep_analysis"):
+                # v10: per-subdomain files (D-XX_*) get structured parse
+                # (participants_table, pairs[], emergent_tensions,
+                # sr_cross_references) + raw_md verbatim (zero-loss)
+                parsed = parse_crossregulation_subdomain(src, sub_kind=sub_kind)
             else:
                 # Per-subdomain files (D-XX_*) — keep the v8 form for Fase 2
                 parsed = {
@@ -846,6 +858,90 @@ def _process_global_and_ambiguity_analysis(
                 )
             except Exception as exc:
                 idx.errors.append({"file": str(src), "error": f"unhandled: {exc!r}"})
+
+
+def _enrich_pair_entities_from_crossregulation(
+    out_root: Path, manifest_shards: list[dict[str, Any]]
+) -> None:
+    """v10 Fase 2: enrich each entities/pairs/*.json with matched pair
+    data from crossregulation/D-XX/DomainAnalysis + DeepAnalysis.
+
+    The crossregulation raw_md is **preserved verbatim** inside the
+    enriched pair entity (in fields ``cr_domain_pair.block_text_raw``
+    and ``cr_deep_pair.block_text_raw``) — this satisfies the
+    zero-loss invariant: nothing from the crossregulation source is
+    discarded.
+    """
+    from .parsers.narrative import enrich_pair_entity
+
+    pairs_dir = out_root / "entities" / "pairs"
+    if not pairs_dir.is_dir():
+        return
+
+    # Index the crossregulation files by subdomain_id (D-XX.Y) → parsed
+    # The sub_domain field in the crossregulation file is like
+    # "D-10.1 Continuous Security Monitoring" — we extract just the
+    # code (D-10.1) for matching against the pair entity's subdomain_id.
+    cr_index: dict[str, dict[str, Any]] = {}
+    for sub_kind_dir in ("DomainAnalysis", "DeepAnalysis"):
+        sub_dir = out_root / "crossregulation" / sub_kind_dir
+        if not sub_dir.is_dir():
+            continue
+        for p in sub_dir.rglob("*.json"):
+            if p.name == "index.json":
+                continue
+            try:
+                d = json.loads(p.read_text())
+            except Exception:
+                continue
+            sd_full = d.get("sub_domain", "")
+            # Extract just the code (D-XX.Y or D-XX.YY) — strip the
+            # name suffix if present
+            import re as _re
+
+            sd_code_m = _re.match(r"^(D-\d{2}(?:\.\d+)?)", sd_full)
+            if not sd_code_m:
+                continue
+            sd_code = sd_code_m.group(1)
+            key = f"{sub_kind_dir}:{sd_code}"
+            cr_index[key] = d
+
+    # Walk each pair entity, enrich, re-write
+    n_enriched = 0
+    n_unmatched = 0
+    for p in sorted(pairs_dir.glob("*.json")):
+        try:
+            pair = json.loads(p.read_text())
+        except Exception:
+            continue
+        # The pair entity id is e.g. "D-10.1_NIS2-AI_Act" → subdomain is D-10.1
+        eid = pair.get("id", "")
+        sd = pair.get("subdomain_id") or pair.get("source_subdomain", "")
+        if not sd:
+            n_unmatched += 1
+            continue
+        domain_file = cr_index.get(f"DomainAnalysis:{sd}")
+        deep_file = cr_index.get(f"DeepAnalysis:{sd}")
+        enriched = enrich_pair_entity(pair, domain_file, deep_file)
+        if "cr_domain_pair" in enriched or "cr_deep_pair" in enriched:
+            n_enriched += 1
+        # Re-write the shard with the enriched content
+        bytes_written, sha = _write_json(p, enriched)
+        manifest_shards.append(
+            {
+                "path": f"entities/pairs/{p.stem}.json",
+                "source_path": enriched.get("source", "?"),
+                "sha256": sha,
+                "bytes": bytes_written,
+                "kind": "pair_enrichment",
+                "entity_ids": [eid],
+            }
+        )
+    logger.info(
+        "v10 Fase 2: enriched %d pair entities (out of %d total)",
+        n_enriched,
+        len(list(pairs_dir.glob("*.json"))),
+    )
 
 
 # ─── helpers (parsers reused from raw_md) ──────────────────────────────

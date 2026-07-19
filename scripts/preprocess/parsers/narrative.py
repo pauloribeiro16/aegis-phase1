@@ -784,3 +784,265 @@ def _extract_table_rows_from_block(table_block_text: str) -> list[list[str]]:
             continue
         rows.append(row)
     return rows
+
+
+# ─── Fase 2: crossregulation/D-XX_*/ per-subdomain ───────────────────
+
+
+def parse_crossregulation_subdomain(
+    path: Path, sub_kind: str = "domain_analysis"
+) -> dict[str, Any]:
+    """Parse a crossregulation per-subdomain file (DomainAnalysis or
+    DeepAnalysis for one D-XX.Y).
+
+    Structure of the raw_md:
+      - blockquote with a link to the sibling deep-analysis file
+      - H3 "D-XX.Y Name"
+      - HTML comment `<!-- participants: REG1, REG2, ... -->`
+      - H4 "Participants" + table (Regulation | SO ID | summary | scope)
+      - H4 "Pairwise matrix"
+      - For each pair:
+          `<!-- pair: REG_A,REG_B -->` ...
+          table with REG_A row + REG_B row + Why paragraph
+          `<!-- /pair -->`
+      - Optional H4 "Emergent tensions" with `<!-- emergent: ... -->`
+      - Optional H4 "Cross-validation" with SR cross-refs
+
+    Output adds:
+      - participants[]: rows of the participants table
+      - pairs[]: one entry per `<!-- pair: -->` block, with
+        {reg_a, reg_b, classification, why, oj_quotes[],
+        table_block_raw} (the verbatim table for audit)
+      - emergent_tensions[]: from `<!-- emergent: -->` markers
+      - sr_cross_references[]: extracted SR-XXX-NNN references
+
+    **Zero-loss:** raw_md is preserved verbatim AND all extracted
+    fields contain the verbatim text from the source.
+    """
+    text = path.read_text(encoding="utf-8")
+    fm, body = _parse_frontmatter(text)
+    blocks = _split_into_blocks(body)
+
+    # Extract title_h3 (the first H3)
+    title = ""
+    for kind, content in blocks:
+        if kind == "h3":
+            title = content
+            break
+
+    # Extract participants from the "<!-- participants: ... -->" comment
+    participants_meta: list[str] = []
+    m_part = re.search(r"<!--\s*participants:\s*([^>]+?)\s*-->", body)
+    if m_part:
+        participants_meta = [r.strip() for r in m_part.group(1).split(",")]
+
+    # Extract participants table (after H4 "Participants")
+    participants_table: list[dict[str, str]] = []
+    in_participants_table = False
+    for kind, content in blocks:
+        if kind == "h4" and "participant" in content.lower():
+            in_participants_table = True
+            continue
+        if in_participants_table:
+            if kind in ("h2", "h3", "h4"):
+                in_participants_table = False
+            elif kind == "table":
+                rows = _extract_table_rows_from_block(content)
+                if len(rows) >= 2:
+                    for r in rows[1:]:  # skip header
+                        if len(r) < 2:
+                            continue
+                        participants_table.append(
+                            {
+                                "regulation": r[0],
+                                "so_id": r[1] if len(r) > 1 else "",
+                                "summary": r[2] if len(r) > 2 else "",
+                                "scope": r[3] if len(r) > 3 else "",
+                            }
+                        )
+
+    # Extract pair blocks (split body by `<!-- pair: REG_A,REG_B -->` ... `<!-- /pair -->`)
+    pairs: list[dict[str, Any]] = []
+    # Use a stateful scan: find each <!-- pair: --> and matching <!-- /pair -->
+    pair_open_re = re.compile(r"<!--\s*pair:\s*([\w,\s]+?)\s*-->")
+    pair_close_re = re.compile(r"<!--\s*/pair\s*-->")
+    pos = 0
+    while pos < len(body):
+        open_m = pair_open_re.search(body, pos)
+        if not open_m:
+            break
+        regs = [r.strip() for r in open_m.group(1).split(",")]
+        if len(regs) != 2:
+            pos = open_m.end()
+            continue
+        close_m = pair_close_re.search(body, open_m.end())
+        if not close_m:
+            break
+        block_text = body[open_m.end() : close_m.start()].strip()
+        # Extract classification (first ** word after the table)
+        classification = ""
+        m_class = re.search(
+            r"\*\*\s*(\w[\w\-]*)\s*\*\*",
+            block_text,
+        )
+        if m_class:
+            classification = m_class.group(1).strip()
+        # Extract "Why" paragraph
+        why = ""
+        m_why = re.search(
+            r"\*\*Why\s+[^*]+\*\*\s*:\s*([^\n]+(?:\n(?!\s*<!--)[^\n]+)*)",
+            block_text,
+        )
+        if m_why:
+            why = m_why.group(1).strip()
+        # Extract OJ quotes — patterns like "SR-XXX-NNN, Art. NN" or "Annex II §8"
+        oj_quotes: list[dict[str, str]] = []
+        # Match **REG** (citation) — citation can contain balanced parens
+        # by using a non-greedy match that handles nested parens
+        for m_oj in re.finditer(
+            r"\*\*\s*(\w+)\*\*\s*\(((?:[^()]|\([^)]*\))+)\)",
+            block_text,
+        ):
+            regulation = m_oj.group(1).strip()
+            citation = m_oj.group(2).strip()
+            # Parse citation into {article, sr_id}
+            sr_m = re.search(r"(SR-[\w\-]+)", citation)
+            # Article: "Art. NN(N)(letter)" or "Art. NN(N)" — handle nested
+            art_m = re.search(
+                r"(Art(?:icle)?\.?\s*\d+(?:\([^)]+\))*)",
+                citation,
+            )
+            annex_m = re.search(r"(Annex\s+[IVX]+)", citation)
+            oj_quotes.append(
+                {
+                    "regulation": regulation,
+                    "citation_raw": citation,
+                    "sr_id": sr_m.group(1) if sr_m else None,
+                    "article": art_m.group(1).strip() if art_m else None,
+                    "annex": annex_m.group(1) if annex_m else None,
+                }
+            )
+        # Extract the table block raw
+        table_block_raw = ""
+        sub_blocks = _split_into_blocks(block_text)
+        for bk, bv in sub_blocks:
+            if bk == "table":
+                table_block_raw = bv
+                break
+        pairs.append(
+            {
+                "reg_a": regs[0],
+                "reg_b": regs[1],
+                "classification": classification,
+                "why": why,
+                "oj_quotes": oj_quotes,
+                "table_block_raw": table_block_raw,
+                "block_text_raw": block_text,
+            }
+        )
+        pos = close_m.end()
+
+    # Extract emergent tensions from `<!-- emergent: REG1,REG2,REG3 -->`
+    emergent_tensions: list[dict[str, Any]] = []
+    for m_em in re.finditer(r"<!--\s*emergent:\s*([^>]+?)\s*-->", body):
+        regs = [r.strip() for r in m_em.group(1).split(",")]
+        emergent_tensions.append(
+            {
+                "regulations": regs,
+                "verbatim": m_em.group(0),
+            }
+        )
+
+    # Extract SR-XXX-NNN cross-references
+    sr_cross_references: list[str] = []
+    for m_sr in re.finditer(r"SR-[A-Z_]+-\d{3}", body):
+        sr_id = m_sr.group(0)
+        if sr_id not in sr_cross_references:
+            sr_cross_references.append(sr_id)
+
+    return {
+        "schema_version": "1.0",
+        "source": str(path),
+        "doc_id": fm.get("document_id", f"AEGIS-PREPROC-CRDA-{path.stem}"),
+        "sub_kind": sub_kind,
+        "macro_domain": fm.get("macro_domain", ""),
+        "sub_domain": fm.get("sub_domain", ""),
+        "title": fm.get("title", path.stem),
+        "status": fm.get("status", ""),
+        "frontmatter": fm,
+        "title_h3": title,
+        "participants_meta": participants_meta,
+        "participants_table": participants_table,
+        "participant_count": len(participants_table),
+        "pairs": pairs,
+        "pair_count": len(pairs),
+        "emergent_tensions": emergent_tensions,
+        "sr_cross_references": sr_cross_references,
+        "sr_cross_reference_count": len(sr_cross_references),
+        "raw_md": body,  # zero-loss
+        "raw_md_kept_reason": "audit_fallback_for_zero_loss_invariant",
+    }
+
+
+# ─── Fase 2: enrich entities/pairs/ from crossregulation ──────────────
+
+
+def enrich_pair_entity(
+    pair_entity: dict[str, Any],
+    cr_domain_file: dict[str, Any] | None,
+    cr_deep_file: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Enrich a single pair entity with data from crossregulation files.
+
+    Adds (or overwrites) these fields on the pair entity:
+      - cr_domain_pair: matched pair data from the DomainAnalysis file
+        (why, oj_quotes, table_block_raw, block_text_raw)
+      - cr_deep_pair: matched pair data from the DeepAnalysis file (if any)
+      - cr_pair_source_files: list of source paths used
+      - cr_pair_last_enriched: ISO timestamp
+
+    **Zero-loss:** the enriched fields contain VERBATIM text from the
+    source. The pair entity's own fields (id, pair, reg_a, reg_b, etc.)
+    are NOT modified.
+    """
+    import datetime as _dt
+
+    enriched = dict(pair_entity)
+    sources: list[str] = []
+
+    if cr_domain_file is not None:
+        sources.append(cr_domain_file.get("source", ""))
+        for p in cr_domain_file.get("pairs", []):
+            pa = p.get("reg_a")
+            pb = p.get("reg_b")
+            # Match against pair entity's reg_a / reg_b (order-insensitive)
+            if {pa, pb} == {enriched["reg_a"], enriched["reg_b"]}:
+                enriched["cr_domain_pair"] = {
+                    "classification": p.get("classification", ""),
+                    "why": p.get("why", ""),
+                    "oj_quotes": p.get("oj_quotes", []),
+                    "table_block_raw": p.get("table_block_raw", ""),
+                    "block_text_raw": p.get("block_text_raw", ""),
+                }
+                break
+
+    if cr_deep_file is not None:
+        sources.append(cr_deep_file.get("source", ""))
+        for p in cr_deep_file.get("pairs", []):
+            pa = p.get("reg_a")
+            pb = p.get("reg_b")
+            if {pa, pb} == {enriched["reg_a"], enriched["reg_b"]}:
+                enriched["cr_deep_pair"] = {
+                    "classification": p.get("classification", ""),
+                    "why": p.get("why", ""),
+                    "oj_quotes": p.get("oj_quotes", []),
+                    "table_block_raw": p.get("table_block_raw", ""),
+                    "block_text_raw": p.get("block_text_raw", ""),
+                }
+                break
+
+    if sources:
+        enriched["cr_pair_source_files"] = sources
+        enriched["cr_pair_last_enriched"] = _dt.datetime.now(_dt.UTC).isoformat()
+
+    return enriched

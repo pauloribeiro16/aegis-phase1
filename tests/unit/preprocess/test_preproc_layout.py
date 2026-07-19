@@ -189,14 +189,21 @@ def test_v10_shard_has_structured_fields(shard_path: str) -> None:
     assert d["raw_md"], f"{shard_path} raw_md is empty"
     # At least 1 structured field beyond the catch-all schema
     structured_keys = {
-        "regulations", "scope", "lens", "layer", "sections",
-        "constraints", "mission", "supporting_files", "source_lens",
-        "relationship_taxonomy", "preserved_tags", "workflow_steps",
+        "regulations",
+        "scope",
+        "lens",
+        "layer",
+        "sections",
+        "constraints",
+        "mission",
+        "supporting_files",
+        "source_lens",
+        "relationship_taxonomy",
+        "preserved_tags",
+        "workflow_steps",
     }
     found = structured_keys & set(d.keys())
-    assert found, (
-        f"{shard_path} has no structured fields beyond the catch-all schema"
-    )
+    assert found, f"{shard_path} has no structured fields beyond the catch-all schema"
 
 
 def test_v10_zero_loss_invariant() -> None:
@@ -242,6 +249,7 @@ def test_v10_zero_loss_invariant() -> None:
         d = json.loads(json_p.read_text())
         text = Path(src_p).read_text(encoding="utf-8")
         from scripts.preprocess.parsers.frontmatter import parse_frontmatter
+
         _, src_body = parse_frontmatter(text)
         json_raw = d.get("raw_md", "")
         assert src_body.strip() == json_raw.strip(), (
@@ -258,6 +266,98 @@ def test_v10_hso_keeps_raw_md_with_reason() -> None:
         pytest.skip("HSO file missing")
     d = json.loads(p.read_text())
     assert "raw_md" in d, "HSO should keep raw_md (no structured form)"
-    assert d.get("raw_md_kept_reason") == "narrative_design_rationale_no_structured_form", (
-        f"HSO must declare why raw_md is kept: {d.get('raw_md_kept_reason')}"
+    assert (
+        d.get("raw_md_kept_reason") == "narrative_design_rationale_no_structured_form"
+    ), f"HSO must declare why raw_md is kept: {d.get('raw_md_kept_reason')}"
+
+
+# ─── v10 Fase 2: pair entity enrichment ───────────────────────────────
+
+
+def test_v10_pair_enrichment_coverage() -> None:
+    """All 196 pair entities must be enriched with cr_domain_pair data.
+
+    Per-subdomain crossregulation files (D-XX.Y) cover 10 pairs each (one
+    per regulation pair), and there are 38 subdomains × 10 pairs = 380
+    pair entries. Some pairs are not covered in every subdomain (smaller
+    pair counts), so the total is 196 distinct (id) entities.
+    """
+    if not (PREPROC_OUT / "entities/pairs").is_dir():
+        pytest.skip("preproc_out not built")
+    pair_files = list((PREPROC_OUT / "entities/pairs").glob("*.json"))
+    assert len(pair_files) == 196, f"expected 196 pair entities, got {len(pair_files)}"
+    with_enrichment = 0
+    for p in pair_files:
+        d = json.loads(p.read_text())
+        if "cr_domain_pair" in d or "cr_deep_pair" in d:
+            with_enrichment += 1
+    assert (
+        with_enrichment == 196
+    ), f"expected all 196 pair entities enriched, got {with_enrichment}/196"
+
+
+def test_v10_pair_enrichment_keeps_raw_md() -> None:
+    """Enrichment must add fields but NOT remove raw_md text. The
+    block_text_raw field preserves the crossregulation source verbatim.
+    """
+    p = PREPROC_OUT / "entities/pairs/D_10_1_NIS2_AI_Act.json"
+    if not p.is_file():
+        pytest.skip("pair shard missing")
+    d = json.loads(p.read_text())
+    assert "cr_domain_pair" in d
+    assert d["cr_domain_pair"].get("block_text_raw"), "block_text_raw must be non-empty"
+    assert d["cr_domain_pair"].get("oj_quotes"), "oj_quotes must be non-empty"
+    # The original pair fields are still there (not overwritten)
+    assert d["id"] == "D-10.1_NIS2-AI_Act"
+    assert d["reg_a"] == "NIS2"
+    assert d["reg_b"] == "AI_Act"
+
+
+def test_v10_crossregulation_subdomain_files_have_pairs() -> None:
+    """Each crossregulation/D-XX/*.json (DomainAnalysis + DeepAnalysis)
+    must have structured pairs[] with oj_quotes and why.
+    """
+    for sub_kind in ("DomainAnalysis", "DeepAnalysis"):
+        sub_dir = PREPROC_OUT / "crossregulation" / sub_kind
+        if not sub_dir.is_dir():
+            continue
+        files = [p for p in sub_dir.rglob("*.json") if p.name != "index.json"]
+        assert files, f"no {sub_kind} subdomain files"
+        for p in files:
+            d = json.loads(p.read_text())
+            assert "pairs" in d, f"{p.name}: missing pairs[]"
+            assert "raw_md" in d, f"{p.name}: missing raw_md (zero-loss)"
+            assert d["raw_md_kept_reason"] == "audit_fallback_for_zero_loss_invariant"
+            if d["pairs"]:
+                # First pair should have why + oj_quotes
+                first = d["pairs"][0]
+                assert "reg_a" in first and "reg_b" in first
+                assert "why" in first, f"{p.name}: pair missing why"
+                assert "oj_quotes" in first, f"{p.name}: pair missing oj_quotes"
+                assert (
+                    "block_text_raw" in first
+                ), f"{p.name}: pair missing block_text_raw (zero-loss)"
+
+
+def test_v10_zero_loss_pair_block_text_matches_source() -> None:
+    """For the 2 crossregulation source files, the block_text_raw in the
+    enriched pair entity should appear verbatim in the source .md.
+    """
+    # Check a known pair
+    p = PREPROC_OUT / "entities/pairs/D_10_1_NIS2_AI_Act.json"
+    if not p.is_file():
+        pytest.skip("pair shard missing")
+    d = json.loads(p.read_text())
+    block_raw = d["cr_domain_pair"].get("block_text_raw", "")
+    # Source .md
+    src_path = (
+        PREPROC_OUT.parent / "methodology-00/PREPROCESSING/CrossRegulation/"
+        "DomainAnalysis/D-09_Governance-Documentation/D-10.1.md"
     )
+    if not src_path.is_file():
+        pytest.skip("source .md not found")
+    src_text = src_path.read_text(encoding="utf-8")
+    # block_raw should appear verbatim in source
+    assert (
+        block_raw in src_text
+    ), f"block_text_raw in pair entity does not appear verbatim in source {src_path}"
