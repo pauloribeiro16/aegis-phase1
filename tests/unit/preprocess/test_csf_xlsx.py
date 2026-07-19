@@ -33,16 +33,17 @@ SUBCAT_ID_RE = re.compile(r"^([A-Z]{2})\.([A-Z]{2,3})-(\d{2})$")
 
 # Expected layout: 6 subfolders (GV, ID, PR, DE, RS, RC) — one per Function.
 # CORR-024 v7: shards are organized per Function rather than flat in
-# entities/csfs/. The _index.json at the root is the canonical map.
+# entities/csfs/. The _meta/_index.json is the canonical map.
 EXPECTED_FUNCTIONS = ["GV", "ID", "PR", "DE", "RS", "RC"]
+CSF_INDEX_PATH = SHARDS_DIR / "_meta" / "_index.json"
 
 
 def _all_csf_shards() -> list[Path]:
-    """Recursively find all CSF shards under entities/csfs/ (v7 layout)."""
+    """Recursively find all CSF shards under entities/csfs/ (v7/v8 layout)."""
     return [
         p
         for p in SHARDS_DIR.rglob("*.json")
-        # Skip the _index.json and any other non-shard files at the root
+        # Skip the _index.json (lives in _meta/) and any other meta files
         if p.name != "_index.json"
     ]
 
@@ -212,9 +213,11 @@ def test_xlsx_shards_106() -> None:
 
 
 def test_xlsx_shards_layout_per_function() -> None:
-    """CORR-024 v7: shards are organized in 6 per-Function subfolders.
+    """CORR-024 v7/v8: shards are organized in 6 per-Function subfolders.
 
-    Layout: entities/csfs/{GV,ID,PR,DE,RS,RC}/{FUNC}_{CAT}_{NUM}.json
+    Layout: entities/csfs/{_meta/,GV/,ID/,PR/,DE/,RS/,RC/}
+    Shards:  entities/csfs/{FUNC}/{FUNC}_{CAT}_{NUM}.json
+    Index:   entities/csfs/_meta/_index.json
     """
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
@@ -222,21 +225,21 @@ def test_xlsx_shards_layout_per_function() -> None:
     for fn in EXPECTED_FUNCTIONS:
         sub = SHARDS_DIR / fn
         assert sub.is_dir(), f"missing subfolder: {sub}"
-    # _index.json must exist at the root
-    assert (SHARDS_DIR / "_index.json").is_file(), "missing _index.json"
-    # No flat shard files at the root (only _index.json + the 6 subdirs)
+    # _meta/ subfolder with _index.json
+    assert CSF_INDEX_PATH.is_file(), f"missing {CSF_INDEX_PATH}"
+    # _meta/ subfolder must exist
+    assert (SHARDS_DIR / "_meta").is_dir(), "missing _meta/ subfolder"
+    # No flat shard files at the root (only _meta/ + the 6 subdirs)
     root_files = [p for p in SHARDS_DIR.iterdir() if p.is_file()]
-    assert [p.name for p in root_files] == [
-        "_index.json"
-    ], f"unexpected root files: {[p.name for p in root_files]}"
+    assert root_files == [], f"unexpected root files: {[p.name for p in root_files]}"
 
 
 def test_xlsx_shards_index_consistent() -> None:
-    """_index.json must list all 106 active subcategories and match the
-    shards on disk (same set of IDs)."""
-    if not (SHARDS_DIR / "_index.json").is_file():
+    """_meta/_index.json must list all 106 active subcategories and match
+    the shards on disk (same set of IDs)."""
+    if not CSF_INDEX_PATH.is_file():
         pytest.skip("preproc_out not built")
-    idx = json.loads((SHARDS_DIR / "_index.json").read_text())
+    idx = json.loads(CSF_INDEX_PATH.read_text())
     indexed_ids = set(idx["by_id"].keys())
     # On-disk IDs
     disk_ids = set()

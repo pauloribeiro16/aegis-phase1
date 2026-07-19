@@ -2,35 +2,61 @@
 
 Scope (per user decision 2026-07-18): PREPROCESSING/ + diagrams/.
 
-Output structure (preproc_out/):
-  entities/
-    subdomains/D-XX.Y.json
-    articles/Art_NN.json
-    clauses/{REG}-CLxx.json
-    sos/SO-{REG}-NNN.json
-    srs/SR-{REG}-NNN.json
-    pairs/{D-XX.Y}_{a}-{b}.json
-    ambiguities/{REG}-CLxx.json
-    csf/{FUNCTION}.{CAT}-{NN}.json
-  regulation/
+Output structure (preproc_out/, v8 layout):
+  meta/                              build metadata
+    manifest.json                    (full shard inventory + errors)
+    build_info.json                  (counts + summary)
+
+  README.md                          (this layout, human-readable)
+
+  global/                            top-level aggregated references
+    NIST_CSF_2.0_subcategories.json  (185 × CSF 2.0 official, schema 1.3)
+    00_Hierarchical_SecurityObjectives.json
+    README.json
+    TEMPLATE_subagent_brief.json
+
+  index/                             lookup indices
+    entities.json                    (entity_id → shard_path)
+    by_regulation.json               (regulation → entity lists)
+    by_subdomain.json                (D-XX.Y → entity lists)
+    cross_references.json            (entity_id → {points_to, pointed_by})
+
+  entities/                          ALL entity shards (8 kinds)
+    csfs/                            NIST CSF 2.0 subcategories (106 active)
+      _meta/_index.json              (id → path map)
+      GV/  (31 shards — Govern)
+      ID/  (21 shards — Identify)
+      PR/  (22 shards — Protect)
+      DE/  (11 shards — Detect)
+      RS/  (13 shards — Respond)
+      RC/  ( 8 shards — Recover)
+    subdomains/  D-XX.Y.json         (38 subdomains)
+    articles/    {REG}_Art_NN.json   (per-article splits, 140)
+    clauses/     {REG}-CLxx.json     (per-clause entities, 578)
+    sos/         SO-{REG}-NNN.json   (per-SO entities, 338)
+    srs/         SR-{REG}-NNN.json   (per-SR entities, 282)
+    pairs/       {D-XX.Y}_{a}-{b}.json (per-pair entities, 196)
+    ambiguities/                     (reserved; v8 spelling)
+
+  regulation/                        per-regulation tree
     {REG}/
-      articles/Art_NN.json          (root + per-article split)
-      aggregated/01_SecurityObjectives.json  (full SO list)
-      aggregated/02_SecurityRules_NIST.json  (full SR list)
-      clauses/{REG}-CLxx.json
-      ambiguity_clauses/{REG}-*.json
-      roots/{00_README,01_SO,02_SR_NIST,03_validation,04_deduction}.json
-  crossregulation/  (DeepAnalysis + DomainAnalysis shards)
-  diagrams/  (per-flux-diagram steps list)
-  global/  (NIST_CSF, HSO, README, subagent_brief)
-  ambiguity_analysis/  (00_Index, 01_Framework)
-  index/
-    entities.json         (entity_id → shard_path)
-    by_regulation.json    (regulation → {articles, sos, srs, clauses, ambiguities})
-    by_subdomain.json     (D-XX.Y → {hl, sub_sos, pairs, applicable_*})
-    cross_references.json (entity_id → {points_to, pointed_by})
-  manifest.json
-  build_info.json
+      _root/                         (00_README, 01_SO, 02_SR, 03_validation, 04_deduction)
+      articles/                      (per-article splits)
+      clauses/                       (per-Ambiguity clause files)
+      aggregated/                    (full SO + SR lists per regulation)
+
+  crossregulation/                   cross-regulation analysis
+    _templates/                      (TEMPLATE_crossreg_brief.json, etc.)
+    DomainAnalysis/D-XX_*/           (per-domain analysis)
+    DeepAnalysis/D-XX_*/             (per-domain deep analysis)
+
+  diagrams/                          flux + class diagrams
+    Class_Models/
+    fluxdiagram/{phase1,phase2,phase3}/
+
+  ambiguity_analysis/                ambiguity framework (top-level)
+    00_Index.json
+    01_Framework.json
 """
 
 from __future__ import annotations

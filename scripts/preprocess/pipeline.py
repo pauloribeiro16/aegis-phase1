@@ -113,9 +113,19 @@ def build(source_root: Path, output_root: Path) -> dict[str, Any]:
     returns the manifest; callers check ``manifest["errors"]``.
     """
     output_root.mkdir(parents=True, exist_ok=True)
-    # Pre-create the entity subdirs so we can sanity-check the layout
+    # v8: pre-create the entity subdirs.
+    # "ambiguities" (proper plural — not "ambiguitys") is the v8 spelling.
     for kind in ("subdomain", "article", "clause", "so", "sr", "pair", "ambiguity", "csf"):
-        (output_root / "entities" / f"{kind}s").mkdir(parents=True, exist_ok=True)
+        dirname = "ambiguities" if kind == "ambiguity" else f"{kind}s"
+        (output_root / "entities" / dirname).mkdir(parents=True, exist_ok=True)
+    # CSF per-Function subfolders + _meta/
+    for fn in ("GV", "ID", "PR", "DE", "RS", "RC"):
+        (output_root / "entities" / "csfs" / fn).mkdir(parents=True, exist_ok=True)
+    (output_root / "entities" / "csfs" / "_meta").mkdir(parents=True, exist_ok=True)
+    # meta/ for manifest + build_info
+    (output_root / "meta").mkdir(parents=True, exist_ok=True)
+    # crossregulation/_templates/
+    (output_root / "crossregulation" / "_templates").mkdir(parents=True, exist_ok=True)
 
     idx = EntityIndex()
     manifest_shards: list[dict[str, Any]] = []
@@ -207,8 +217,7 @@ def _process_csf_xlsx(
         informative_references)
     """
     logger.info(
-        "csf2.xlsx detected → 185 subcategories (79 withdrawn + 106 active)"
-        " (CORR-024 v6)"
+        "csf2.xlsx detected → 185 subcategories (79 withdrawn + 106 active)" " (CORR-024 v6)"
     )
     parsed = parse_csf2(xlsx_path)
     intro = parsed["introduction"]
@@ -262,7 +271,7 @@ def _process_csf_xlsx(
             continue
         per_function.setdefault(s["function"], []).append(s["id"])
     _write_json(
-        out_root / "entities" / "csfs" / "_index.json",
+        out_root / "entities" / "csfs" / "_meta" / "_index.json",
         {
             "schema_version": "1.0",
             "kind": "csf_shard_index",
@@ -319,7 +328,9 @@ def _process_csf_md(
             sc["authority_note_locus"] = shift_locus(sc["authority_note_locus"])
         eid = sc["id"]
         fname = eid.replace(".", "_").replace("-", "_")
-        shard_path = f"entities/csfs/{fname}.json"
+        # v8: per-Function subfolders
+        fn = sc.get("function", "")
+        shard_path = f"entities/csfs/{fn}/{fname}.json" if fn else f"entities/csfs/{fname}.json"
         idx.add(eid, sc, shard_path)
         bytes_written, sha = _write_json(out_root / shard_path, sc)
         shards.append(
@@ -370,7 +381,7 @@ def _process_subdomains(
 
             # Add SubDomain entity
             sd_id = parsed["id"]
-            sd_shard = f"subdomains/{sd_id}.json"
+            sd_shard = f"entities/subdomains/{sd_id}.json"
             idx.add(sd_id, parsed, sd_shard)
 
             # Extract HL SO entity (if any)
@@ -442,8 +453,9 @@ def _process_regulation(
         regulation = reg_dir_entry.name
 
         # Roots (00_README, 01_SO, 02_SR_NIST, 03_validation, 04_deduction)
+        # v8: under regulation/{reg}/_root/ instead of mixed at the root
         for src in sorted(reg_dir_entry.glob("*.md")):
-            shard_path = f"regulation/{regulation}/{src.stem}.json"
+            shard_path = f"regulation/{regulation}/_root/{src.stem}.json"
             try:
                 parsed = parse_root_md(src)
                 bytes_written, sha = _write_json(out_root / shard_path, parsed)
@@ -541,6 +553,7 @@ def _process_regulation(
             )
 
         # Per-clause (Ambiguity/{REG}/*.md) — universal v2 parser
+        # v8: regulation/{reg}/clauses/ (was: ambiguity_clauses/)
         ambig_dir = reg_dir_entry / "Ambiguity"
         if ambig_dir.is_dir():
             reg_norm = regulation.replace("_", "")
@@ -549,7 +562,7 @@ def _process_regulation(
                 if reg_norm not in stem_norm:
                     continue
                 # Per-file shard (always)
-                file_shard_path = f"regulation/{regulation}/ambiguity_clauses/{src.stem}.json"
+                file_shard_path = f"regulation/{regulation}/clauses/{src.stem}.json"
                 try:
                     parsed = parse_ambiguity_file(src, regulation)
                     clauses = parsed.get("clauses", [])
@@ -639,7 +652,11 @@ def _process_crossregulation(
         if "_archive" in src.parts:
             continue
         rel = src.relative_to(cr_dir)
-        shard_path = f"crossregulation/{rel.with_suffix('.json')}"
+        # v8: root-level templates go to _templates/
+        if rel.parent == Path("."):
+            shard_path = f"crossregulation/_templates/{rel.with_suffix('.json').name}"
+        else:
+            shard_path = f"crossregulation/{rel.with_suffix('.json')}"
         try:
             text = src.read_text(encoding="utf-8")
             fm, body = parse_frontmatter(text)
@@ -806,7 +823,6 @@ def parse_root_csf_xlsx_structured(xlsx_path: Path, md_path: Path | None) -> dic
 
     # Pull the D-XX cross-reference from the legacy .md if present — it's
     # the only place AEGIS sub-domain → CSF mapping lives.
-    crossref_md = None
     crossref_block = None
     if md_path is not None and md_path.is_file():
         try:
@@ -883,9 +899,7 @@ def parse_root_csf_xlsx_structured(xlsx_path: Path, md_path: Path | None) -> dic
         "withdrawn_subcategories": [
             {
                 **w,
-                "withdrawal_target_ids": _extract_withdrawal_targets(
-                    w.get("withdrawal_note", "")
-                ),
+                "withdrawal_target_ids": _extract_withdrawal_targets(w.get("withdrawal_note", "")),
             }
             for w in parsed["withdrawn_subcategories"]
         ],
@@ -1396,9 +1410,10 @@ def _write_manifest(
         "shards": shards,
         "errors": errors,
     }
-    _write_json(out_root / "manifest.json", manifest)
+    # v8: manifest + build_info live under meta/
+    _write_json(out_root / "meta" / "manifest.json", manifest)
     _write_json(
-        out_root / "build_info.json",
+        out_root / "meta" / "build_info.json",
         {
             "schema_version": SCHEMA_VERSION,
             "built_at": built_at,
