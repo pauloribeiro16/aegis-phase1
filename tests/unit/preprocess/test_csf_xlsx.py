@@ -182,12 +182,30 @@ def test_xlsx_categories_count() -> None:
 # ─── Per-subcategory shards on disk ────────────────────────────────────
 
 
-def test_xlsx_shards_185() -> None:
-    """preproc_out/entities/csfs/ must contain exactly 185 shards."""
+def test_xlsx_shards_106() -> None:
+    """preproc_out/entities/csfs/ must contain exactly 106 shards.
+
+    185 - 79 withdrawn = 106 active subcategories. Withdrawn subs are
+    NOT materialized as shards (they have no actionable content in the
+    official xlsx) and are kept only in the aggregated
+    ``withdrawn_subcategories`` section for audit traceability.
+    """
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
     files = list(SHARDS_DIR.glob("*.json"))
-    assert len(files) == 185, f"expected 185 shards, got {len(files)}"
+    assert len(files) == 106, f"expected 106 active shards, got {len(files)}"
+
+
+def test_xlsx_shards_no_withdrawn() -> None:
+    """No shard on disk may be marked withdrawn=True (those don't get shards)."""
+    if not SHARDS_DIR.is_dir():
+        pytest.skip("preproc_out not built")
+    bad = []
+    for p in SHARDS_DIR.glob("*.json"):
+        d = json.loads(p.read_text())
+        if d.get("withdrawn"):
+            bad.append(p.name)
+    assert not bad, f"withdrawn shards present (should be skipped): {bad[:5]}"
 
 
 def test_xlsx_shards_no_legacy_id() -> None:
@@ -199,46 +217,37 @@ def test_xlsx_shards_no_legacy_id() -> None:
 
 
 def test_xlsx_shards_have_implementation_examples() -> None:
-    """At least 50% of shards carry non-empty implementation_examples.
+    """All active shards carry non-empty implementation_examples.
 
-    Withdrawn subcategories (79 of 185) often have no examples, so the
-    real-world coverage is ~57% (106/185). 50% is a safe lower bound.
+    Since withdrawn subs (with empty examples) are no longer shards, the
+    106 active shards should ALL have examples.
     """
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
-    with_ex = 0
+    without = []
     total = 0
     for p in SHARDS_DIR.glob("*.json"):
         d = json.loads(p.read_text())
         total += 1
-        if d.get("implementation_examples"):
-            with_ex += 1
-    assert with_ex / total > 0.5, f"only {with_ex}/{total} shards have implementation_examples"
+        if not d.get("implementation_examples"):
+            without.append(d["id"])
+    assert not without, f"active shards without implementation_examples: {without[:5]}"
+    assert total == 106, f"test expects 106 shards, found {total}"
 
 
 def test_xlsx_shards_have_informative_references() -> None:
-    """All withdrawn subcategories lack references (79/185 = 42.7%);
-    every non-withdrawn subcategory must have at least one reference.
-
-    The official NIST xlsx is consistent: withdrawn rows have empty
-    Refs column, active rows always have ≥1 reference.
-    """
+    """Every active shard has at least one informative_reference."""
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
-    active_without = []
-    total_active = 0
+    without = []
+    total = 0
     for p in SHARDS_DIR.glob("*.json"):
         d = json.loads(p.read_text())
-        if d.get("withdrawn"):
-            continue
-        total_active += 1
+        total += 1
         if not d.get("informative_references"):
-            active_without.append(d["id"])
-    assert (
-        not active_without
-    ), f"active (non-withdrawn) shards without references: {active_without[:5]}"
-    # Sanity: there should be plenty of active subs
-    assert total_active > 100, f"only {total_active} active subs — test stale"
+            without.append(d["id"])
+    assert not without, f"active shards without informative_references: {without[:5]}"
+    assert total == 106
 
 
 # ─── Aggregated top-level file ─────────────────────────────────────────
@@ -251,8 +260,22 @@ def test_xlsx_aggregated_no_raw_md() -> None:
     parsed = json.loads(AGGREGATED.read_text())
     assert "raw_md" not in parsed, "raw_md leaked into aggregated"
     assert parsed["kind"] == "csf_reference"
-    assert parsed["schema_version"] == "1.2"
+    assert parsed["schema_version"] == "1.3"
+    # Total subcategories in xlsx (active + withdrawn) is 185
     assert parsed["counts"]["subcategories"] == 185
+    # Only 106 are non-withdrawn (active) — they appear in the
+    # ``subcategories`` list and have shards on disk.
+    assert len(parsed["subcategories"]) == 106
+    # All 185 (active + withdrawn) are listed in ``all_subcategories`` for
+    # audit traceability.
+    assert len(parsed["all_subcategories"]) == 185
+    # The 79 withdrawn are listed in their own section, each with parsed
+    # ``withdrawal_target_ids``.
+    assert len(parsed["withdrawn_subcategories"]) == 79
+    for w in parsed["withdrawn_subcategories"][:3]:
+        assert w["id"]
+        assert w["withdrawal_note"]
+        assert isinstance(w["withdrawal_target_ids"], list)
     assert parsed["counts"]["functions"] == 6
     assert parsed["counts"]["withdrawn"] == 79
     assert parsed["counts"]["reference_families"] >= 17
@@ -270,15 +293,23 @@ def test_xlsx_aggregated_source_is_xlsx() -> None:
 
 
 def test_xlsx_aggregated_subcategory_coverage() -> None:
-    """All 185 subcategory IDs are present in the aggregated file."""
+    """All 106 active subcategory IDs are present in the aggregated file's
+    main ``subcategories`` list. The 79 withdrawn are kept separately in
+    ``all_subcategories`` + ``withdrawn_subcategories`` for audit."""
     if not AGGREGATED.is_file():
         pytest.skip(f"aggregated file missing: {AGGREGATED}")
     parsed = json.loads(AGGREGATED.read_text())
-    ids = {s["id"] for s in parsed["subcategories"]}
-    assert len(ids) == 185
-    # A few canonical IDs must be present
+    active_ids = {s["id"] for s in parsed["subcategories"]}
+    assert len(active_ids) == 106, f"expected 106 active subs, got {len(active_ids)}"
+    all_ids = {s["id"] for s in parsed["all_subcategories"]}
+    assert len(all_ids) == 185
+    # A few canonical active IDs must be present
     for sid in ("GV.OC-01", "RC.RP-06", "DE.CM-09", "PR.DS-11", "ID.AM-08"):
-        assert sid in ids, f"missing canonical ID: {sid}"
+        assert sid in active_ids, f"missing canonical active ID: {sid}"
+    # The withdrawn IDs are in all_subcategories and withdrawn_subcategories
+    for sid in ("PR.DS-03", "ID.AM-06", "RC.IM-01"):
+        assert sid in all_ids, f"missing canonical withdrawn ID: {sid}"
+        assert sid not in active_ids, f"withdrawn ID leaked into active list: {sid}"
 
 
 def test_xlsx_aggregated_contains_categories() -> None:
@@ -297,16 +328,24 @@ def test_xlsx_aggregated_contains_categories() -> None:
 
 
 def test_xlsx_aggregated_withdrawn_section() -> None:
-    """Withdrawn subcategories are listed in a dedicated section."""
+    """Withdrawn subcategories are listed in a dedicated section, each
+    with parsed ``withdrawal_target_ids`` (the active IDs that absorbed it)."""
     if not AGGREGATED.is_file():
         pytest.skip(f"aggregated file missing: {AGGREGATED}")
     parsed = json.loads(AGGREGATED.read_text())
     wd = parsed["withdrawn_subcategories"]
     assert len(wd) == 79
-    # Each withdrawn entry has id + withdrawal_note
+    # Each withdrawn entry has id + withdrawal_note + withdrawal_target_ids
     for w in wd[:5]:
         assert w["id"]
         assert w["withdrawal_note"]
+        assert isinstance(w["withdrawal_target_ids"], list)
+        # At least one target ID must be parseable (the source text is like
+        # "Incorporated into ID.AM-08, PR.PS-03")
+        if "Incorporated into" in w["withdrawal_note"] or "Moved to" in w["withdrawal_note"]:
+            assert (
+                len(w["withdrawal_target_ids"]) >= 1
+            ), f"{w['id']} note {w['withdrawal_note']!r} should have target IDs"
 
 
 def test_xlsx_aggregated_introduction_section() -> None:
@@ -351,16 +390,26 @@ def test_xlsx_shard_gv_oc_01_full() -> None:
     assert d["source_locus"]["sheet"] == "CSF 2.0"
 
 
-def test_xlsx_shard_withdrawn_pr_ds_03() -> None:
-    """Spot-check the withdrawn PR.DS-03 shard."""
+def test_xlsx_withdrawn_not_as_shard() -> None:
+    """Withdrawn subcategories (e.g. PR.DS-03) are NOT materialized as
+    per-subcategory shards. Their metadata is in the aggregated file's
+    ``withdrawn_subcategories`` section.
+    """
     if not SHARDS_DIR.is_dir():
         pytest.skip("preproc_out not built")
     p = SHARDS_DIR / "PR_DS_03.json"
-    if not p.is_file():
-        pytest.skip("shard not present")
-    d = json.loads(p.read_text())
-    assert d["withdrawn"] is True
-    assert "Incorporated into" in d["withdrawal_note"]
+    assert not p.is_file(), "PR.DS-03 is withdrawn — should NOT have a shard"
+    # But it should appear in the aggregated file
+    if not AGGREGATED.is_file():
+        pytest.skip(f"aggregated file missing: {AGGREGATED}")
+    parsed = json.loads(AGGREGATED.read_text())
+    pr_ds_03 = next(
+        (w for w in parsed["withdrawn_subcategories"] if w["id"] == "PR.DS-03"),
+        None,
+    )
+    assert pr_ds_03 is not None, "PR.DS-03 must be in aggregated withdrawn_subcategories"
+    assert "Incorporated into" in pr_ds_03["withdrawal_note"]
+    assert len(pr_ds_03["withdrawal_target_ids"]) >= 1
 
 
 # ─── Reference family clustering ───────────────────────────────────────

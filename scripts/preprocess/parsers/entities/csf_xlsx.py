@@ -475,7 +475,7 @@ def build_shard(
 ) -> dict[str, Any]:
     """Build the per-subcategory entity shard (no raw_md)."""
     return {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
         "kind": "csf",
         "source": "csf2.xlsx",
         "source_path": str(xlsx_path),

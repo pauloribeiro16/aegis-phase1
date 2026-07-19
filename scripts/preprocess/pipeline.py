@@ -190,12 +190,37 @@ def _process_csf_xlsx(
     idx: EntityIndex,
     shards: list[dict[str, Any]],
 ) -> dict[str, list[str]]:
-    """Parse csf2.xlsx (NIST CSF 2.0 Reference Tool) → 185 per-subcategory shards."""
-    logger.info("csf2.xlsx detected → 185-subcategory source of truth (CORR-024 v5)")
+    """Parse csf2.xlsx (NIST CSF 2.0 Reference Tool) → 1 shard per **active**
+    subcategory (CORR-024 v6).
+
+    **Withdrawn subcategories (79 in the official CSF 2.0) are NOT
+    materialized as per-subcategory shards.** They appear only in the
+    aggregated ``global/NIST_CSF_2.0_subcategories.json`` under
+    ``withdrawn_subcategories`` for audit traceability. Reason: a withdrawn
+    subcategory has no Implementation Examples, no Informative References,
+    and no actionable content — it is a historical marker, not a control.
+
+    Counts after filtering:
+      - 185 subcategories in xlsx
+      - 79 withdrawn (skip per-subcategory shard, list in aggregated only)
+      - 106 active (1 shard each, with full implementation_examples +
+        informative_references)
+    """
+    logger.info(
+        "csf2.xlsx detected → 185 subcategories (79 withdrawn + 106 active)"
+        " (CORR-024 v6)"
+    )
     parsed = parse_csf2(xlsx_path)
     intro = parsed["introduction"]
 
+    n_written = 0
+    n_skipped = 0
     for sc in parsed["subcategories"]:
+        if sc["withdrawn"]:
+            # Skip per-subcategory shard — withdrawn subs have no actionable
+            # content. Their IDs are kept in the aggregated file for audit.
+            n_skipped += 1
+            continue
         shard_entity = build_shard(sc, intro, xlsx_path)
         eid = shard_entity["id"]
         fname = eid.replace(".", "_").replace("-", "_")
@@ -212,6 +237,8 @@ def _process_csf_xlsx(
                 "entity_ids": [eid],
             }
         )
+        n_written += 1
+    logger.info("csf2.xlsx: wrote %d active shards, skipped %d withdrawn", n_written, n_skipped)
 
     # Hint table: prefer the .md cross-reference if available (more
     # authoritative for AEGIS sub-domain → CSF mapping). The xlsx doesn't
@@ -749,7 +776,7 @@ def parse_root_csf_xlsx_structured(xlsx_path: Path, md_path: Path | None) -> dic
             crossref_block = None
 
     return {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
         "source": str(xlsx_path),
         "source_md_legacy": str(md_path) if md_path else None,
         "doc_id": "AEGIS-PREPROC-CSF-2.0-REFTOOL",
@@ -792,9 +819,37 @@ def parse_root_csf_xlsx_structured(xlsx_path: Path, md_path: Path | None) -> dic
                 "source_locus": s["source_locus"],
             }
             for s in parsed["subcategories"]
+            if not s["withdrawn"]  # active subs only in the main list
+        ],
+        # All 185 subcategories (active + withdrawn) — full audit trail
+        "all_subcategories": [
+            {
+                "id": s["id"],
+                "function": s["function"],
+                "category_id": s["category_id_resolved"],
+                "title": s["title"],
+                "withdrawn": s["withdrawn"],
+                "withdrawal_note": s["withdrawal_note"],
+            }
+            for s in parsed["subcategories"]
         ],
         "reference_families": parsed["reference_families"],
-        "withdrawn_subcategories": parsed["withdrawn_subcategories"],
+        # Withdrawn subcategories are KEPT HERE for audit traceability,
+        # but they are NOT materialized as per-subcategory shards (they
+        # have no actionable content in the official xlsx).
+        # Each entry has the parsed ``withdrawal_target_ids`` (the active
+        # subcategories that absorbed the withdrawn one) extracted from
+        # the withdrawal_note ("Incorporated into ID.AM-08, PR.PS-03"
+        # → ["ID.AM-08", "PR.PS-03"]).
+        "withdrawn_subcategories": [
+            {
+                **w,
+                "withdrawal_target_ids": _extract_withdrawal_targets(
+                    w.get("withdrawal_note", "")
+                ),
+            }
+            for w in parsed["withdrawn_subcategories"]
+        ],
         # Cross-reference is taken from the .md (advisory, AEGIS sub-domain
         # mapping is not in the xlsx).
         "cross_reference_aegis_subdomains": (
@@ -818,10 +873,23 @@ def _category_name_only(text: str) -> str:
     """Strip ``(FUNC.CAT)`` and trailing description from a Category cell."""
     import re as _re
 
-    txt = _re.sub(r"\s*\([A-Z]{2}\.[A-Z]{2}\)\s*", " ", text)
+    txt = _re.sub(r"\s*\([A-Z]{2}\.[A-Z]{2,3}\)\s*", " ", text)
     if ":" in txt:
         txt = txt.rsplit(":", 1)[0]
     return txt.strip()
+
+
+def _extract_withdrawal_targets(note: str) -> list[str]:
+    """Extract target subcategory IDs from a withdrawal note.
+
+    Example:
+        ``"Incorporated into ID.AM-08, PR.PS-03"`` → ``["ID.AM-08", "PR.PS-03"]``
+        ``"Moved to PR.IR-04"`` → ``["PR.IR-04"]``
+        ``"Incorporated into ID.IM-03, ID.IM-04"`` → ``["ID.IM-03", "ID.IM-04"]``
+    """
+    import re as _re
+
+    return _re.findall(r"[A-Z]{2}\.[A-Z]{2,3}-\d{2}", note or "")
 
 
 def parse_root_csf_structured(path: Path) -> dict[str, Any]:
