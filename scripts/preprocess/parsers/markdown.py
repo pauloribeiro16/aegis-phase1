@@ -1,4 +1,5 @@
 """Markdown structural utilities."""
+
 from __future__ import annotations
 
 import re
@@ -48,7 +49,7 @@ def heading_with_text(text: str, level: int, predicate) -> tuple[str, str] | Non
         title = m.group(1)
         if predicate(title):
             end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-            return title, text[m.end():end]
+            return title, text[m.end() : end]
     return None
 
 

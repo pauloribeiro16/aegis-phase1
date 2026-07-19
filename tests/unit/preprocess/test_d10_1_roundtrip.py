@@ -1,4 +1,5 @@
 """CORR-024 groundtruth test: D-10.1 must round-trip to the expected v2 shape."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -56,9 +57,16 @@ def test_d10_1_v2_shape() -> None:
     assert len(pairs) == 10
     pair_labels = {p["pair"] for p in pairs}
     expected_pairs = {
-        "GDPR ↔ NIS2", "GDPR ↔ CRA", "GDPR ↔ DORA", "GDPR ↔ AI_Act",
-        "NIS2 ↔ CRA", "NIS2 ↔ DORA", "NIS2 ↔ AI_Act",
-        "CRA ↔ DORA", "CRA ↔ AI_Act", "DORA ↔ AI_Act",
+        "GDPR ↔ NIS2",
+        "GDPR ↔ CRA",
+        "GDPR ↔ DORA",
+        "GDPR ↔ AI_Act",
+        "NIS2 ↔ CRA",
+        "NIS2 ↔ DORA",
+        "NIS2 ↔ AI_Act",
+        "CRA ↔ DORA",
+        "CRA ↔ AI_Act",
+        "DORA ↔ AI_Act",
     }
     assert pair_labels == expected_pairs
 

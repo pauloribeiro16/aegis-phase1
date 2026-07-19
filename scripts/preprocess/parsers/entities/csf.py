@@ -24,6 +24,7 @@ structured fields in the JSON output (no raw_md dumping):
    - table with 2 rows: ``| Token | Use |``
 10. Closing line: "**End of reference.**" (line 323)
 """
+
 from __future__ import annotations
 
 import re
@@ -121,9 +122,7 @@ def _category_name_for(cat_id: str, sections: list[Any]) -> str | None:
     return None
 
 
-def _function_summary_for(
-    function_id: str, sections: list[Any]
-) -> dict[str, int] | None:
+def _function_summary_for(function_id: str, sections: list[Any]) -> dict[str, int] | None:
     """Parse the ``## FUNC — Name (X categories, Y subcategories)`` header."""
     for sec in sections:
         m = _H2_FN_RE.match(sec.title.strip())
@@ -371,9 +370,7 @@ def parse_csf_special_tokens_full(path: Path) -> dict[str, Any]:
             if len(row) < 2:
                 continue
             cells = [c.strip() for c in row]
-            if not header_row and all(
-                re.match(r"^[A-Za-z ]+$", c) for c in cells
-            ):
+            if not header_row and all(re.match(r"^[A-Za-z ]+$", c) for c in cells):
                 header_row = cells
                 continue
             token = cells[0].strip("`")
@@ -424,11 +421,7 @@ def parse_csf_function_structure(path: Path) -> dict[str, Any]:
 
         for line in sec.body.splitlines():
             stripped = line.strip()
-            if (
-                stripped
-                and not stripped.startswith("|")
-                and not stripped.startswith("#")
-            ):
+            if stripped and not stripped.startswith("|") and not stripped.startswith("#"):
                 out["summary_text"] = stripped
                 break
 
@@ -440,19 +433,11 @@ def parse_csf_function_structure(path: Path) -> dict[str, Any]:
                 try:
                     out["totals_row"] = {
                         "function_label": cells[0],
-                        "category_count": int(
-                            cells[2].replace(",", "").replace("*", "")
-                        ),
-                        "subcategory_count": int(
-                            cells[3].replace(",", "").replace("*", "")
-                        ),
+                        "category_count": int(cells[2].replace(",", "").replace("*", "")),
+                        "subcategory_count": int(cells[3].replace(",", "").replace("*", "")),
                     }
-                    out["totals"]["category_count"] = out["totals_row"][
-                        "category_count"
-                    ]
-                    out["totals"]["subcategory_count"] = out["totals_row"][
-                        "subcategory_count"
-                    ]
+                    out["totals"]["category_count"] = out["totals_row"]["category_count"]
+                    out["totals"]["subcategory_count"] = out["totals_row"]["subcategory_count"]
                 except (ValueError, IndexError):
                     pass
                 continue
@@ -560,9 +545,7 @@ def _extract_crossref_table(body: str) -> dict[str, Any]:
 
     for r_idx, row in enumerate(rows_table):
         cells = [c.strip() for c in row]
-        if r_idx == 0 and all(
-            re.match(r"^[A-Za-z .]+$", c) for c in cells
-        ):
+        if r_idx == 0 and all(re.match(r"^[A-Za-z .]+$", c) for c in cells):
             # Header row — capture column names, skip data processing.
             table_header = cells
             continue
@@ -596,9 +579,7 @@ def _extract_crossref_table(body: str) -> dict[str, Any]:
                 num_part = ref_m.group(2)  # e.g. "01" or None
                 if num_part:
                     full_id = f"{cat_part}-{num_part}"
-                    csf_refs.append(
-                        {"ref": full_id, "kind": "subcategory"}
-                    )
+                    csf_refs.append({"ref": full_id, "kind": "subcategory"})
                     csf_ids.append(full_id)
                 else:
                     csf_refs.append({"ref": cat_part, "kind": "category"})

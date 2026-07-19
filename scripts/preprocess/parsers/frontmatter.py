@@ -1,4 +1,5 @@
 """Markdown frontmatter extraction."""
+
 from __future__ import annotations
 
 import re
@@ -15,7 +16,7 @@ def parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     if not m:
         return {}, text
     raw = m.group(1)
-    body = text[m.end():]
+    body = text[m.end() :]
     try:
         parsed = yaml.safe_load(raw) or {}
         if not isinstance(parsed, dict):

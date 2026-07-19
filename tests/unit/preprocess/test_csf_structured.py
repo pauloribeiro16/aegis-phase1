@@ -8,12 +8,10 @@ per-function H2 sections, 22 per-category H3 sections, 98 subcategory
 rows, cross-reference table + advisory blockquote, special-tokens table,
 "End of reference" closing line) and this test ensures none is dropped.
 """
+
 from __future__ import annotations
 
-import json
 from pathlib import Path
-
-import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SOURCE = REPO_ROOT / "methodology-00" / "PREPROCESSING" / "NIST_CSF_2.0_subcategories.md"
@@ -54,10 +52,20 @@ def test_csf_parse_required_fields() -> None:
 
     subs = parse_csf(SOURCE)
     required = {
-        "id", "function", "category", "number", "title",
-        "function_name", "category_id", "category_name",
-        "function_summary", "source_locus", "source",
-        "source_document", "authority_note", "authority_note_locus",
+        "id",
+        "function",
+        "category",
+        "number",
+        "title",
+        "function_name",
+        "category_id",
+        "category_name",
+        "function_summary",
+        "source_locus",
+        "source",
+        "source_document",
+        "authority_note",
+        "authority_note_locus",
         "aegis_subdomain_back_refs",
         "aegis_subdomain_back_refs_advisory_only",
     }
@@ -105,9 +113,7 @@ def test_csf_function_structure_full() -> None:
     assert fs["title"] == "Function structure"
     assert "6 Functions" in fs["summary_text"]
     assert "22 Categories" in fs["summary_text"]
-    assert fs["table_header"] == [
-        "Function ID", "Function Name", "Cat. Count", "Subcat. Count"
-    ]
+    assert fs["table_header"] == ["Function ID", "Function Name", "Cat. Count", "Subcat. Count"]
     assert len(fs["functions"]) == 6
     fn_names = {f["id"] for f in fs["functions"]}
     assert fn_names == {"GV", "ID", "PR", "DE", "RS", "RC"}

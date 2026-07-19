@@ -25,6 +25,7 @@ Output entity shape (one SubDomain = one entity):
     "csf_hint": [ "DE.CM-01", ... ]  (looked up from NIST_CSF_2.0_subcategories.md D-XX table)
   }
 """
+
 from __future__ import annotations
 
 import re
@@ -235,7 +236,7 @@ def _parse_cross_reg_pairs(body: str, subdomain_id: str) -> list[dict[str, Any]]
         a = m.group("a")
         b = m.group("b")
         end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
-        block = body[m.end():end]
+        block = body[m.end() : end]
         pairs.append(_parse_pair(block, subdomain_id, a, b))
     return pairs
 
@@ -245,7 +246,7 @@ def _parse_security_requirements(body: str, domain_id: str) -> list[dict[str, An
     matches = list(_SR_H3_RE.finditer(body))
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
-        block = body[m.end():end]
+        block = body[m.end() : end]
         yaml_meta = _parse_yaml_block(block)
         sr_id = f"{domain_id}.{m.group('id').strip()}"
         srs.append(

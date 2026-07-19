@@ -9,6 +9,7 @@ parse into structured ``source_clauses`` with ``clause_id`` + ``article_ref``.
 The cross-references in column 2 (e.g. ``SO-GDPR-001 (cross-ref)``) are
 extracted as ``cross_ref_of`` so the pipeline can resolve the indirection.
 """
+
 from __future__ import annotations
 
 import re
@@ -16,12 +17,11 @@ from pathlib import Path
 from typing import Any
 
 from ..frontmatter import parse_frontmatter
-from ..markdown import extract_table_rows, split_by_headings
+from ..markdown import extract_table_rows
 
 # ``GDPR-CL05`` (Art. 5(1)(e)) → ("GDPR-CL05", "Art. 5(1)(e)")
 _CLAUSE_REF_RE = re.compile(
-    r"`?\b((?:GDPR|NIS2|CRA|DORA|AI_Act|AIACT)-CL\d+)`?\s*"
-    r"(?:\(([^)]+)\))?",
+    r"`?\b((?:GDPR|NIS2|CRA|DORA|AI_Act|AIACT)-CL\d+)`?\s*" r"(?:\(([^)]+)\))?",
 )
 # ``SO-GDPR-001 (cross-ref)`` → ("SO-GDPR-001", True)
 _CROSS_REF_RE = re.compile(

@@ -14,6 +14,7 @@ We extract:
 
 The parsed shape is a list of steps + the raw mermaid as a side field.
 """
+
 from __future__ import annotations
 
 import re
@@ -50,9 +51,7 @@ def _row_to_step(row: list[str], headers: list[str], diagram_id: str) -> dict[st
     if not n:
         return None
     label = row[hmap.get("name", 1) if hmap.get("name", 1) < len(row) else 1].strip()
-    type_cell = (
-        row[hmap["type"]].strip() if "type" in hmap and hmap["type"] < len(row) else ""
-    )
+    type_cell = row[hmap["type"]].strip() if "type" in hmap and hmap["type"] < len(row) else ""
     deterministic = type_cell.lower() in {"deterministic", "decision", "process", "dispatch"}
     is_llm = "llm" in type_cell.lower() or "llm" in label.lower()
     llm_cell = row[hmap["llm"]].strip() if "llm" in hmap and hmap["llm"] < len(row) else ""
@@ -93,10 +92,8 @@ def _extract_steps_from_table(
     """
     out: list[dict[str, Any]] = []
     # Find each "### Step Reference" block
-    for ref_m in re.finditer(
-        r"###\s+Step\s+Reference[^\n]*\n+", text, re.MULTILINE
-    ):
-        after = text[ref_m.end():]
+    for ref_m in re.finditer(r"###\s+Step\s+Reference[^\n]*\n+", text, re.MULTILINE):
+        after = text[ref_m.end() :]
         # Each Step Reference may have a sub-section; the table is the
         # next block of rows starting with "|"
         # Limit to next ### boundary
@@ -117,7 +114,7 @@ def _extract_steps_from_table(
         else:
             header_idx = 0
         headers = rows[header_idx]
-        for row in rows[header_idx + 1:]:
+        for row in rows[header_idx + 1 :]:
             step = _row_to_step(row, headers, diagram_id)
             if step:
                 out.append(step)
@@ -132,7 +129,7 @@ def _extract_llm_annotations(text: str) -> list[dict[str, str]]:
     m = _LLM_ANN_H3_RE.search(text)
     if not m:
         return []
-    after = text[m.end():]
+    after = text[m.end() :]
     nxt = re.search(r"^##\s+", after, re.MULTILINE)
     block = after[: nxt.start()] if nxt else after
     annotations: list[dict[str, str]] = []

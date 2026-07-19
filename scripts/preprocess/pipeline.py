@@ -2,6 +2,7 @@
 
 Walk → parse → write shards → build global indices → write manifest.
 """
+
 from __future__ import annotations
 
 import datetime as _dt
@@ -16,22 +17,20 @@ from typing import Any
 from .parsers.aggregated.security_objectives import parse_security_objectives
 from .parsers.aggregated.security_rules import parse_security_rules
 from .parsers.diagram import parse_diagram
+from .parsers.entities.clause import parse_ambiguity_file
 from .parsers.entities.csf import (
     parse_csf,
-    parse_csf_authority_note,
     parse_csf_authority_note_full,
     parse_csf_crossref_full,
     parse_csf_d_subdomain_hints,
     parse_csf_end_of_reference,
     parse_csf_function_structure,
     parse_csf_h1_title,
-    parse_csf_special_tokens,
     parse_csf_special_tokens_full,
 )
-from .parsers.entities.clause import parse_ambiguity_file
+from .parsers.entities.csf_xlsx import build_shard, parse_csf2
 from .parsers.entities.subdomain import parse_subdomain
 from .parsers.frontmatter import parse_frontmatter
-from .parsers.markdown import extract_fenced_blocks
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +88,11 @@ class EntityIndex:
             # SubDomain hso_per_reg blocks) are NOT duplicates — they are
             # different occurrences of the same canonical ID. We track them
             # as references rather than warnings.
-            self.sources[entity_id + "::ref::" + str(len([k for k in self.sources if k.startswith(entity_id + "::ref::")]))] = entity.get("source", "?")
+            self.sources[
+                entity_id
+                + "::ref::"
+                + str(len([k for k in self.sources if k.startswith(entity_id + "::ref::")]))
+            ] = entity.get("source", "?")
             return
         entity["_id"] = entity_id
         self.entities[entity_id] = entity
@@ -111,9 +114,7 @@ def build(source_root: Path, output_root: Path) -> dict[str, Any]:
     """
     output_root.mkdir(parents=True, exist_ok=True)
     # Pre-create the entity subdirs so we can sanity-check the layout
-    for kind in (
-        "subdomain", "article", "clause", "so", "sr", "pair", "ambiguity", "csf"
-    ):
+    for kind in ("subdomain", "article", "clause", "so", "sr", "pair", "ambiguity", "csf"):
         (output_root / "entities" / f"{kind}s").mkdir(parents=True, exist_ok=True)
 
     idx = EntityIndex()
@@ -143,9 +144,7 @@ def build(source_root: Path, output_root: Path) -> dict[str, Any]:
     _build_indices(idx, output_root, manifest_shards)
 
     # 8. Manifest + build_info
-    return _write_manifest(
-        source_root, output_root, manifest_shards, idx.errors, idx.warnings
-    )
+    return _write_manifest(source_root, output_root, manifest_shards, idx.errors, idx.warnings)
 
 
 # ─── section processors ────────────────────────────────────────────────
@@ -154,20 +153,80 @@ def build(source_root: Path, output_root: Path) -> dict[str, Any]:
 def _process_csf(
     src_root: Path, out_root: Path, idx: EntityIndex, shards: list[dict[str, Any]]
 ) -> dict[str, list[str]]:
-    """Parse NIST_CSF_2.0_subcategories.md → 1 JSON per subcategory.
+    """Parse CSF 2.0 → 1 JSON per subcategory.
 
-    Each CSF subcategory is a structured entity with full source metadata:
-    id, function, function_name, category, category_id, category_name, number,
-    title, source_locus, source_document, authority_note (full), aegis_subdomain_back_refs.
+    **Source priority (CORR-024 v5):**
 
-    All ``source_locus`` values are **source-file line numbers** (1-indexed).
-    The D-XX hint table is returned for downstream use by SubDomain parsing.
+    1. ``csf2.xlsx`` (NIST CSF 2.0 Reference Tool) at the aegis-phase1 repo
+       root — the **official** CSF 2.0 with 185 subcategories, Implementation
+       Examples, and Informative References.
+    2. ``PREPROCESSING/NIST_CSF_2.0_subcategories.md`` — legacy frozen list
+       (98 edited subcategories; kept for traceability but NOT the source
+       of truth).
+
+    If the xlsx is present, it **replaces** the .md-derived shards entirely.
+    The D-XX hint table is rebuilt from the xlsx by inverting the
+    implementation_example / informative_reference content (the legacy
+    .md cross-reference table is more authoritative for D-XX hints; for
+    the v5 release we still derive hints from the .md file when present).
     """
-    csf_path = src_root / "PREPROCESSING" / "NIST_CSF_2.0_subcategories.md"
-    if not csf_path.is_file():
-        idx.add_warning(str(csf_path), "CSF reference file missing")
-        return {}
-    # Compute source-relative offset for body loci.
+    # The aegis-phase1 repo root is two levels above scripts/preprocess/.
+    repo_root = Path(__file__).resolve().parents[2]
+    xlsx_path = repo_root / "csf2.xlsx"
+    csf_md_path = src_root / "PREPROCESSING" / "NIST_CSF_2.0_subcategories.md"
+
+    if xlsx_path.is_file():
+        return _process_csf_xlsx(xlsx_path, csf_md_path, out_root, idx, shards)
+    if csf_md_path.is_file():
+        return _process_csf_md(csf_md_path, out_root, idx, shards)
+    idx.add_warning(str(csf_md_path), "CSF reference missing (neither csf2.xlsx nor .md)")
+    return {}
+
+
+def _process_csf_xlsx(
+    xlsx_path: Path,
+    csf_md_path: Path,
+    out_root: Path,
+    idx: EntityIndex,
+    shards: list[dict[str, Any]],
+) -> dict[str, list[str]]:
+    """Parse csf2.xlsx (NIST CSF 2.0 Reference Tool) → 185 per-subcategory shards."""
+    logger.info("csf2.xlsx detected → 185-subcategory source of truth (CORR-024 v5)")
+    parsed = parse_csf2(xlsx_path)
+    intro = parsed["introduction"]
+
+    for sc in parsed["subcategories"]:
+        shard_entity = build_shard(sc, intro, xlsx_path)
+        eid = shard_entity["id"]
+        fname = eid.replace(".", "_").replace("-", "_")
+        shard_path = f"entities/csfs/{fname}.json"
+        idx.add(eid, shard_entity, shard_path)
+        bytes_written, sha = _write_json(out_root / shard_path, shard_entity)
+        shards.append(
+            {
+                "path": shard_path,
+                "source_path": str(xlsx_path),
+                "sha256": sha,
+                "bytes": bytes_written,
+                "kind": "csf",
+                "entity_ids": [eid],
+            }
+        )
+
+    # Hint table: prefer the .md cross-reference if available (more
+    # authoritative for AEGIS sub-domain → CSF mapping). The xlsx doesn't
+    # carry a D-XX cross-reference.
+    hint: dict[str, list[str]] = {}
+    if csf_md_path.is_file():
+        hint = parse_csf_d_subdomain_hints(csf_md_path)
+    return hint
+
+
+def _process_csf_md(
+    csf_path: Path, out_root: Path, idx: EntityIndex, shards: list[dict[str, Any]]
+) -> dict[str, list[str]]:
+    """Legacy .md parser (98 subcategories). Used only if csf2.xlsx is absent."""
+    logger.warning("csf2.xlsx NOT found; falling back to legacy .md (98 subcategories)")
     text = csf_path.read_text(encoding="utf-8")
     fm, body = parse_frontmatter(text)
     body_start_in_source = text[: len(text) - len(body)].count("\n") + 1
@@ -188,10 +247,7 @@ def _process_csf(
     for sc in subcats:
         sc["schema_version"] = "1.1"
         sc["kind"] = "csf"
-        sc["doc_id"] = sc.get("source_document", {}).get(
-            "document_id", "AEGIS-PREPROC-CSF-REF"
-        )
-        # Shift body-relative loci to source-relative
+        sc["doc_id"] = sc.get("source_document", {}).get("document_id", "AEGIS-PREPROC-CSF-REF")
         sc["source_locus"] = shift_locus(sc["source_locus"])
         if sc.get("authority_note_locus"):
             sc["authority_note_locus"] = shift_locus(sc["authority_note_locus"])
@@ -427,9 +483,7 @@ def _process_regulation(
                 if reg_norm not in stem_norm:
                     continue
                 # Per-file shard (always)
-                file_shard_path = (
-                    f"regulation/{regulation}/ambiguity_clauses/{src.stem}.json"
-                )
+                file_shard_path = f"regulation/{regulation}/ambiguity_clauses/{src.stem}.json"
                 try:
                     parsed = parse_ambiguity_file(src, regulation)
                     clauses = parsed.get("clauses", [])
@@ -441,9 +495,7 @@ def _process_regulation(
                 # skip its clause-shard generation to avoid duplicating every
                 # AIA-Cxx shard. The file-shard itself is still written so
                 # the v0.1 content is preserved for traceability.
-                skip_clause_shards = (
-                    regulation == "AI_Act" and src.stem == "06_AI_Act"
-                )
+                skip_clause_shards = regulation == "AI_Act" and src.stem == "06_AI_Act"
                 # Write per-clause shards (1 JSON per clause_id) — only if
                 # the file yielded per-clause entities. Cross-article v0.1
                 # files (e.g. 06_AI_Act.md) overlap with v0.2 per-article
@@ -459,16 +511,12 @@ def _process_regulation(
                     # to avoid duplicate clause shards.
                     if eid in idx.entities and parsed["kind"] == "cross_article":
                         continue
-                    clause_shard = (
-                        f"entities/clauses/{eid.replace('-', '_')}.json"
-                    )
+                    clause_shard = f"entities/clauses/{eid.replace('-', '_')}.json"
                     # Don't overwrite the file-shard with a clause-shard
                     if clause_shard == file_shard_path:
                         continue
                     try:
-                        bytes_written, sha = _write_json(
-                            out_root / clause_shard, clause
-                        )
+                        bytes_written, sha = _write_json(out_root / clause_shard, clause)
                         manifest_shards.append(
                             {
                                 "path": clause_shard,
@@ -489,9 +537,7 @@ def _process_regulation(
                     file_entity = parsed["file"]
                     file_entity["kind"] = parsed["kind"]
                     file_entity["clause_ids"] = [c["id"] for c in parsed.get("clauses", [])]
-                    bytes_written, sha = _write_json(
-                        out_root / file_shard_path, file_entity
-                    )
+                    bytes_written, sha = _write_json(out_root / file_shard_path, file_entity)
                     manifest_shards.append(
                         {
                             "path": file_shard_path,
@@ -504,9 +550,7 @@ def _process_regulation(
                     )
                     logger.info("wrote %s (%d bytes)", file_shard_path, bytes_written)
                 except Exception as exc:
-                    idx.errors.append(
-                        {"file": str(src), "error": f"file shard: {exc!r}"}
-                    )
+                    idx.errors.append({"file": str(src), "error": f"file shard: {exc!r}"})
                 manifest_shards.append(
                     {
                         "path": shard_path,
@@ -608,6 +652,8 @@ def _process_diagrams(
 def _process_global_and_ambiguity_analysis(
     src_root: Path, out_root: Path, idx: EntityIndex, shards: list[dict[str, Any]]
 ) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    xlsx_path = repo_root / "csf2.xlsx"
     # Top-level global files
     for src in sorted((src_root / "PREPROCESSING").glob("*.md")):
         shard_path = f"global/{src.stem}.json"
@@ -616,7 +662,10 @@ def _process_global_and_ambiguity_analysis(
             # (per-entity shards already written in _process_csf). The aggregated
             # top-level view must NOT carry raw_md.
             if src.name == "NIST_CSF_2.0_subcategories.md":
-                parsed = parse_root_csf_structured(src)
+                if xlsx_path.is_file():
+                    parsed = parse_root_csf_xlsx_structured(xlsx_path, src)
+                else:
+                    parsed = parse_root_csf_structured(src)
             else:
                 parsed = parse_root_md(src)
             bytes_written, sha = _write_json(out_root / shard_path, parsed)
@@ -671,6 +720,108 @@ def parse_root_md(path: Path) -> dict[str, Any]:
         "frontmatter": fm,
         "raw_md": body.strip(),
     }
+
+
+def parse_root_csf_xlsx_structured(xlsx_path: Path, md_path: Path | None) -> dict[str, Any]:
+    """Aggregated top-level view of csf2.xlsx (CORR-024 v5 source of truth).
+
+    The xlsx doesn't carry the D-XX cross-reference table — that comes from
+    the legacy .md (still authoritative for AEGIS sub-domain mapping). All
+    other fields are sourced from the xlsx:
+      - introduction (Title, Read Me, Change Log, Generated Date)
+      - function_structure (6 functions, with category + subcategory counts)
+      - subcategories (185, with implementation_examples + informative_references)
+      - categories (34 — function-grouped, with subcategory counts)
+      - reference_families (21 families, sorted by count desc)
+      - withdrawn_subcategories (79)
+    """
+    parsed = parse_csf2(xlsx_path)
+    intro = parsed["introduction"]
+
+    # Pull the D-XX cross-reference from the legacy .md if present — it's
+    # the only place AEGIS sub-domain → CSF mapping lives.
+    crossref_md = None
+    crossref_block = None
+    if md_path is not None and md_path.is_file():
+        try:
+            crossref_block = parse_csf_crossref_full(md_path)
+        except Exception:
+            crossref_block = None
+
+    return {
+        "schema_version": "1.2",
+        "source": str(xlsx_path),
+        "source_md_legacy": str(md_path) if md_path else None,
+        "doc_id": "AEGIS-PREPROC-CSF-2.0-REFTOOL",
+        "title": intro.get("title", "NIST CSF 2.0 (Reference Tool export)"),
+        "status": intro.get("change_log", ""),
+        "kind": "csf_reference",
+        "tool_metadata": {
+            "title": intro.get("title", ""),
+            "read_me": intro.get("read_me", ""),
+            "change_log": intro.get("change_log", ""),
+            "generated_date": intro.get("generated_date", ""),
+        },
+        "introduction": intro,
+        "function_structure": {
+            "title": "Function structure",
+            "source": "csf2.xlsx (column A merged-cell aggregation)",
+            "functions": parsed["functions"],
+            "totals": {
+                "function_count": len(parsed["functions"]),
+                "category_count": sum(f["category_count"] for f in parsed["functions"]),
+                "subcategory_count": sum(f["subcategory_count"] for f in parsed["functions"]),
+                "withdrawn_count": sum(f["withdrawn_count"] for f in parsed["functions"]),
+            },
+        },
+        "categories": parsed["categories"],
+        "subcategories": [
+            {
+                "id": s["id"],
+                "function": s["function"],
+                "function_name": s["function_name"],
+                "category_id": s["category_id_resolved"],
+                "category_name": _category_name_only(s["category_name_text"]),
+                "number": s["number"],
+                "title": s["title"],
+                "withdrawn": s["withdrawn"],
+                "withdrawal_note": s["withdrawal_note"],
+                "implementation_example_count": len(s["implementation_examples"]),
+                "informative_reference_count": len(s["informative_references"]),
+                "reference_families": s["reference_families"],
+                "source_locus": s["source_locus"],
+            }
+            for s in parsed["subcategories"]
+        ],
+        "reference_families": parsed["reference_families"],
+        "withdrawn_subcategories": parsed["withdrawn_subcategories"],
+        # Cross-reference is taken from the .md (advisory, AEGIS sub-domain
+        # mapping is not in the xlsx).
+        "cross_reference_aegis_subdomains": (
+            {
+                "title": crossref_block.get("title", "Cross-reference"),
+                "table_header": crossref_block.get("table_header", []),
+                "rows": crossref_block.get("rows", []),
+                "csf_ids_by_d": crossref_block.get("csf_ids_by_d", {}),
+                "advisory_blockquote": crossref_block.get("advisory_blockquote"),
+                "source_locus": crossref_block.get("source_locus", {}),
+            }
+            if crossref_block
+            else None
+        ),
+        "cross_reference_aegis_subdomains_advisory_only": True,
+        "counts": parsed["counts"],
+    }
+
+
+def _category_name_only(text: str) -> str:
+    """Strip ``(FUNC.CAT)`` and trailing description from a Category cell."""
+    import re as _re
+
+    txt = _re.sub(r"\s*\([A-Z]{2}\.[A-Z]{2}\)\s*", " ", text)
+    if ":" in txt:
+        txt = txt.rsplit(":", 1)[0]
+    return txt.strip()
 
 
 def parse_root_csf_structured(path: Path) -> dict[str, Any]:
@@ -839,12 +990,8 @@ def parse_article_split(path: Path, regulation: str) -> dict[str, Any]:
                 {
                     "so_id": so_id,
                     "description": row[1].strip(),
-                    "source_clauses": [
-                        s.strip() for s in row[2].split(";") if s.strip()
-                    ],
-                    "sub_domains": [
-                        s.strip() for s in row[3].split(",") if s.strip()
-                    ],
+                    "source_clauses": [s.strip() for s in row[2].split(";") if s.strip()],
+                    "sub_domains": [s.strip() for s in row[3].split(",") if s.strip()],
                 }
             )
 
@@ -863,7 +1010,7 @@ def parse_article_split(path: Path, regulation: str) -> dict[str, Any]:
         sr_body = sr_section_m.group("body")
         for h_m in re.finditer(r"###\s+(.+)", sr_body):
             heading = h_m.group(1).strip()
-            after = sr_body[h_m.end():]
+            after = sr_body[h_m.end() :]
             nxt = re.search(r"^###\s+", after, re.MULTILINE)
             block = after[: nxt.start()] if nxt else after
             for lang, yaml_body in extract_fenced_blocks(block, lang="yaml"):
@@ -872,7 +1019,11 @@ def parse_article_split(path: Path, regulation: str) -> dict[str, Any]:
                 except _yaml.YAMLError:
                     continue
                 items = (
-                    parsed if isinstance(parsed, list) else [parsed] if isinstance(parsed, dict) else []
+                    parsed
+                    if isinstance(parsed, list)
+                    else [parsed]
+                    if isinstance(parsed, dict)
+                    else []
                 )
                 for it in items:
                     if not isinstance(it, dict):
@@ -897,9 +1048,7 @@ def parse_article_split(path: Path, regulation: str) -> dict[str, Any]:
                             "security_rationale": str(
                                 it.get("security_rationale", "") or ""
                             ).strip(),
-                            "ambiguity_notes": str(
-                                it.get("ambiguity_notes", "") or ""
-                            ).strip(),
+                            "ambiguity_notes": str(it.get("ambiguity_notes", "") or "").strip(),
                         }
                     )
 
@@ -920,13 +1069,10 @@ def parse_article_split(path: Path, regulation: str) -> dict[str, Any]:
 
 import re  # for the crossregulation regex
 
-
 # ─── global indices ────────────────────────────────────────────────────
 
 
-def _build_indices(
-    idx: EntityIndex, out_root: Path, shards: list[dict[str, Any]]
-) -> None:
+def _build_indices(idx: EntityIndex, out_root: Path, shards: list[dict[str, Any]]) -> None:
     entities_index: dict[str, str] = {}  # id → shard path
     for shard_path, ids in idx.shard_contents.items():
         for eid in ids:
@@ -940,7 +1086,8 @@ def _build_indices(
         kind = _entity_kind(entity)
         subdir_map = {
             "subdomain": "subdomains",
-            "so": "sos", "so_hl": "sos",
+            "so": "sos",
+            "so_hl": "sos",
             "sr": "srs",
             "pair": "pairs",
             "clause": "clauses",
@@ -967,13 +1114,11 @@ def _build_indices(
                     "entity_ids": [eid],
                 }
             )
-        except Exception as exc:  # pragma: no cover — defensive
+        except Exception:  # pragma: no cover — defensive
             pass
 
     # by_regulation
-    by_reg: dict[str, dict[str, list[str]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
+    by_reg: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     for eid, entity in idx.entities.items():
         reg = entity.get("regulation")
         kind = _entity_kind(entity)
@@ -981,9 +1126,7 @@ def _build_indices(
             by_reg[reg][kind].append(eid)
 
     # by_subdomain
-    by_sd: dict[str, dict[str, list[str]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
+    by_sd: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     for eid, entity in idx.entities.items():
         sd = entity.get("subdomain_id") or entity.get("source_subdomain")
         if not sd:
@@ -1091,10 +1234,13 @@ def _entity_kind(entity: dict[str, Any]) -> str:
         return "so"
     if eid.startswith("SR-"):
         return "sr"
-    if eid.startswith("GDPR-CL") or eid.startswith("NIS2-CL") or eid.startswith(
-        "CRA-CL"
-    ) or eid.startswith("DORA-CL") or eid.startswith("AI_Act-CL") or eid.startswith(
-        "AIACT-CL"
+    if (
+        eid.startswith("GDPR-CL")
+        or eid.startswith("NIS2-CL")
+        or eid.startswith("CRA-CL")
+        or eid.startswith("DORA-CL")
+        or eid.startswith("AI_Act-CL")
+        or eid.startswith("AIACT-CL")
     ):
         return "clause"
     if re.match(r"^[A-Z]{2}\.[A-Z]{2}-\d{2}$", eid):

@@ -1,4 +1,5 @@
 """CLI entry: ``python -m scripts.preprocess build``."""
+
 from __future__ import annotations
 
 import argparse

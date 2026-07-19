@@ -34,6 +34,7 @@ Output entity (one per clause_id):
     "source_path": "..."
   }
 """
+
 from __future__ import annotations
 
 import re
@@ -44,7 +45,7 @@ import yaml
 
 # Re-used from the frontmatter + markdown utilities
 from ..frontmatter import parse_frontmatter
-from ..markdown import extract_fenced_blocks, extract_table_rows, split_by_headings
+from ..markdown import extract_fenced_blocks, extract_table_rows
 
 # ─── Clause-level extraction ─────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ def _extract_one_instance(block: str) -> dict[str, Any] | None:
     severity = "S" + m.group("sev")
     token = m.group("token").strip()
     # Body: from end of label to end of block (or to next Instance / next H3 / end)
-    body = block[m.end():]
+    body = block[m.end() :]
     next_inst = _INSTANCE_RE.search(body)
     if next_inst:
         body = body[: next_inst.start()]
@@ -205,7 +206,9 @@ def _extract_one_instance(block: str) -> dict[str, Any] | None:
         readings_by_label.setdefault(r["reading"], {}).update(r)
     # Preserve R1, R2, R3, R4 order
     readings = []
-    for label in sorted(readings_by_label.keys(), key=lambda k: int(k[1:]) if k[1:].isdigit() else 999):
+    for label in sorted(
+        readings_by_label.keys(), key=lambda k: int(k[1:]) if k[1:].isdigit() else 999
+    ):
         readings.append(readings_by_label[label])
     # Severity rationale: text after the variant table until next *Berry* / end
     berry_m = _BERRY_ITALIC_RE.search(body)
@@ -223,7 +226,7 @@ def _extract_one_instance(block: str) -> dict[str, Any] | None:
         # everything after the last Berry anchor line
         last_berry_m = list(re.finditer(r"\*?\*?Berry\s+anchor:?\*?\*?\s*[^\n]+", body))
         if last_berry_m:
-            tail = body[last_berry_m[-1].end():].strip()
+            tail = body[last_berry_m[-1].end() :].strip()
             # Strip the --- separator if present
             tail = re.sub(r"^---\s*", "", tail).strip()
             if tail and not tail.startswith("---"):
@@ -365,7 +368,11 @@ def _extract_clauses_h3_style(
             0,
         )
         col_locus = next(
-            (i for i, h in enumerate(h_lower) if h in ("locus", "article", "article / annex", "article/annex")),
+            (
+                i
+                for i, h in enumerate(h_lower)
+                if h in ("locus", "article", "article / annex", "article/annex")
+            ),
             1,
         )
         col_type = next(
@@ -394,7 +401,9 @@ def _extract_clauses_h3_style(
             if not cid or cid in existing_ids:
                 continue
             locus = row[col_locus].strip() if col_locus < len(row) else ""
-            type_cell = row[col_type].strip() if col_type is not None and col_type < len(row) else ""
+            type_cell = (
+                row[col_type].strip() if col_type is not None and col_type < len(row) else ""
+            )
             sev_cell = row[col_sev].strip() if col_sev is not None and col_sev < len(row) else ""
             gist = row[col_gist].strip() if col_gist is not None and col_gist < len(row) else ""
             subdomain = (
@@ -497,9 +506,19 @@ def _extract_clauses_v01(body: str, regulation: str) -> list[dict[str, Any]]:
         rows = acm_table["rows"]
         h_lower = [h.strip().lower() for h in headers]
         col_id = next((i for i, h in enumerate(h_lower) if h in ("clause id", "#", "id")), 0)
-        col_locus = next((i for i, h in enumerate(h_lower) if h in ("locus", "article", "article / annex", "article/annex")), 1)
+        col_locus = next(
+            (
+                i
+                for i, h in enumerate(h_lower)
+                if h in ("locus", "article", "article / annex", "article/annex")
+            ),
+            1,
+        )
         col_type = next((i for i, h in enumerate(h_lower) if h in ("type", "types found")), None)
-        col_sev = next((i for i, h in enumerate(h_lower) if h in ("highest sev.", "highest sev", "severity")), None)
+        col_sev = next(
+            (i for i, h in enumerate(h_lower) if h in ("highest sev.", "highest sev", "severity")),
+            None,
+        )
         col_gist = next((i for i, h in enumerate(h_lower) if h == "gist"), None)
         col_subdomain = next((i for i, h in enumerate(h_lower) if h == "sub-domain"), None)
         existing_ids = {c["id"] for c in clauses}
@@ -510,7 +529,9 @@ def _extract_clauses_v01(body: str, regulation: str) -> list[dict[str, Any]]:
             if not cid or cid in existing_ids:
                 continue
             locus = row[col_locus].strip() if col_locus < len(row) else ""
-            type_cell = row[col_type].strip() if col_type is not None and col_type < len(row) else ""
+            type_cell = (
+                row[col_type].strip() if col_type is not None and col_type < len(row) else ""
+            )
             sev_cell = row[col_sev].strip() if col_sev is not None and col_sev < len(row) else ""
             gist = row[col_gist].strip() if col_gist is not None and col_gist < len(row) else ""
             subdomain = (
@@ -612,8 +633,10 @@ def _extract_atomic_clause_map_table(body: str) -> dict[str, Any] | None:
     """Find the ``## 2. Atomic clause map`` table (or ``## 1. Summary table`` for
     cross-article v0.1 files).
     """
-    for h2_m in re.finditer(r"^##\s+\d+\.\s+(Atomic clause map|Summary table)\b", body, re.MULTILINE):
-        after = body[h2_m.end():]
+    for h2_m in re.finditer(
+        r"^##\s+\d+\.\s+(Atomic clause map|Summary table)\b", body, re.MULTILINE
+    ):
+        after = body[h2_m.end() :]
         # Limit to next H2
         nxt = re.search(r"^##\s+", after, re.MULTILINE)
         block = after[: nxt.start()] if nxt else after
@@ -638,7 +661,7 @@ def _extract_verbatim_text(body: str) -> str:
         body,
         re.MULTILINE,
     ):
-        after = body[h2_m.end():]
+        after = body[h2_m.end() :]
         nxt = re.search(r"^##\s+", after, re.MULTILINE)
         block = after[: nxt.start()] if nxt else after
         # Take only the blockquote content
@@ -670,7 +693,7 @@ def _extract_intra_clause_sections(body: str) -> list[dict[str, str]]:
         if re.search(r"^Article\s+\d+", title):
             continue
         # Otherwise it's an intra-clause section
-        after = body[h3_m.end():]
+        after = body[h3_m.end() :]
         nxt = re.search(r"^###\s+", after, re.MULTILINE)
         block = after[: nxt.start()] if nxt else after
         out.append({"number": num, "title": title, "raw": block.strip()})
@@ -686,7 +709,7 @@ def _extract_index_file(path: Path, body: str, fm: dict[str, Any]) -> dict[str, 
     # The first table is usually a Status / Files / Chapter navigation table
     tables: list[dict[str, Any]] = []
     for h2_m in re.finditer(r"^##\s+", body, re.MULTILINE):
-        after = body[h2_m.end():]
+        after = body[h2_m.end() :]
         nxt = re.search(r"^##\s+", after, re.MULTILINE)
         block = after[: nxt.start()] if nxt else after
         for row in extract_table_rows(block):
@@ -715,7 +738,7 @@ def _extract_synthesis_file(path: Path, body: str, fm: dict[str, Any]) -> dict[s
     """
     tables: list[dict[str, Any]] = []
     for h2_m in re.finditer(r"^##\s+(?P<num>\d+\.\s+[^—\n]+)", body, re.MULTILINE):
-        after = body[h2_m.end():]
+        after = body[h2_m.end() :]
         nxt = re.search(r"^##\s+", after, re.MULTILINE)
         block = after[: nxt.start()] if nxt else after
         rows = extract_table_rows(block)
@@ -804,9 +827,7 @@ def _extract_h1_title(body: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-def _extract_clauses_for_kind(
-    body: str, regulation: str, kind: str
-) -> list[dict[str, Any]]:
+def _extract_clauses_for_kind(body: str, regulation: str, kind: str) -> list[dict[str, Any]]:
     """Dispatch clause extraction to the right format handler based on the
     file kind + regulation.
 

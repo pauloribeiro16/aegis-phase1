@@ -18,6 +18,7 @@ We extract:
   - ``ambiguity_notes``: full multiline string
   - ``heading_under`` (the H3 the rule is grouped under, e.g. ``SO-GDPR-001/014``)
 """
+
 from __future__ import annotations
 
 import re
@@ -27,7 +28,7 @@ from typing import Any
 import yaml
 
 from ..frontmatter import parse_frontmatter
-from ..markdown import extract_fenced_blocks, split_by_headings
+from ..markdown import extract_fenced_blocks
 
 _HEADING_RE = re.compile(r"^###\s+(?P<heading>.+?)\s*$", re.MULTILINE)
 
@@ -107,7 +108,7 @@ def parse_security_rules(path: Path, regulation: str) -> list[dict[str, Any]]:
     for i, m in enumerate(matches):
         heading = m.group("heading").strip()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
-        block = body[m.end():end]
+        block = body[m.end() : end]
         for lang, yaml_body in extract_fenced_blocks(block, lang="yaml"):
             try:
                 parsed = yaml.safe_load(yaml_body)
