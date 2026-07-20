@@ -184,21 +184,25 @@ def test_no_orphan_in_ok_rows(report: dict) -> None:
             assert r["orphan_csf_in_hint"] == []
 
 
-# ─── Real-world regression: known v1.1 IDs that leaked into csf_hint ─
+# ─── CORR-028 cleanup validation: known legacy IDs are NO LONGER orphans ─
 
 
-def test_known_legacy_ids_appear_as_orphans(report: dict) -> None:
-    """PR.DS-12 and RS.CO-04 are in the source .md cross-reference for
-    D-05.* and D-04.3 respectively — but are NOT in the official CSF 2.0
-    106. The audit must surface them.
+def test_known_legacy_ids_no_longer_orphans(report: dict) -> None:
+    """PR.DS-12 and RS.CO-04 were in the source .md cross-reference for
+    D-05.* and D-04.3 respectively. They were NEVER in the official CSF 2.0
+    106. CORR-028 removes them from all subdomains' csf_hint and from the
+    cross-reference table in the .md.
 
-    This is the **expected finding** of CORR-027 — these are the legacy
-    CSF 1.1 / draft IDs that should be cleaned up in CORR-028.
+    The audit must now report zero orphans.
     """
-    orphan_ids = set()
+    orphan_ids: set[str] = set()
     for r in report["rows"]:
         orphan_ids.update(r["orphan_csf_in_hint"])
-    # At least one of these legacy IDs must be flagged
-    assert orphan_ids & {"PR.DS-12", "RS.CO-04"}, (
-        f"audit must flag legacy v1.1/draft IDs; saw: {orphan_ids}"
+    assert orphan_ids == set(), (
+        f"CORR-028 cleanup: expected zero orphans, saw: {orphan_ids}"
+    )
+    # And specifically, these known-legacy IDs must not appear
+    legacy = {"PR.DS-12", "RS.CO-04"}
+    assert not (orphan_ids & legacy), (
+        f"CORR-028 cleanup: legacy IDs {legacy & orphan_ids} still flagged"
     )

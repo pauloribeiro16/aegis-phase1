@@ -1,24 +1,17 @@
 {
   "schema_version": "1.0",
-  "built_at": "2026-07-20T08:59:40Z",
+  "built_at": "2026-07-20T10:17:52Z",
   "frozen_list_source": "preproc_out/global/NIST_CSF_2.0_subcategories.json",
   "frozen_list_id_count": 106,
   "subdomain_count": 38,
   "summary": {
     "subdomains_with_empty_csf_hint": [],
     "subdomains_with_empty_sr_csf_mapping": [],
-    "orphan_csf_in_hint_total": 5,
-    "subdomains_with_orphan": [
-      "D-04.3",
-      "D-05.1",
-      "D-05.2",
-      "D-05.3",
-      "D-05.4"
-    ],
+    "orphan_csf_in_hint_total": 0,
+    "subdomains_with_orphan": [],
     "verdict_counts": {
-      "OK": 1,
-      "SPARSE": 32,
-      "BROKEN": 5
+      "OK": 2,
+      "SPARSE": 36
     }
   },
   "rows": [
@@ -327,21 +320,18 @@
       "subdomain_id": "D-04.3",
       "title": "D-04.3 Incident Notification & Reporting",
       "participating_regulations": [],
-      "csf_hint_count": 2,
+      "csf_hint_count": 1,
       "csf_hint_ids": [
-        "RS.CO-02",
-        "RS.CO-04"
+        "RS.CO-02"
       ],
       "sr_csf_mapping_total": 5,
       "sr_csf_mapping_empty": 0,
-      "orphan_csf_in_hint": [
-        "RS.CO-04"
-      ],
+      "orphan_csf_in_hint": [],
       "expected_families": [
         "RS.CO"
       ],
       "expected_families_missing": [],
-      "audit_verdict": "BROKEN"
+      "audit_verdict": "SPARSE"
     },
     {
       "subdomain_id": "D-04.4",
@@ -370,22 +360,18 @@
         "CRA",
         "AI_Act"
       ],
-      "csf_hint_count": 2,
+      "csf_hint_count": 1,
       "csf_hint_ids": [
-        "PR.DS-12",
         "ID.AM-03"
       ],
       "sr_csf_mapping_total": 3,
       "sr_csf_mapping_empty": 0,
-      "orphan_csf_in_hint": [
-        "PR.DS-12"
-      ],
+      "orphan_csf_in_hint": [],
       "expected_families": [
-        "ID.AM",
-        "PR.DS"
+        "ID.AM"
       ],
       "expected_families_missing": [],
-      "audit_verdict": "BROKEN"
+      "audit_verdict": "SPARSE"
     },
     {
       "subdomain_id": "D-05.2",
@@ -395,20 +381,27 @@
         "CRA",
         "AI_Act"
       ],
-      "csf_hint_count": 1,
+      "csf_hint_count": 6,
       "csf_hint_ids": [
-        "PR.DS-12"
+        "ID.AM-03",
+        "PR.PS-02",
+        "PR.PS-04",
+        "GV.PO-02",
+        "GV.OV-02",
+        "GV.OC-04"
       ],
       "sr_csf_mapping_total": 3,
       "sr_csf_mapping_empty": 0,
-      "orphan_csf_in_hint": [
-        "PR.DS-12"
-      ],
+      "orphan_csf_in_hint": [],
       "expected_families": [
-        "PR.DS"
+        "GV.OC",
+        "GV.OV",
+        "GV.PO",
+        "ID.AM",
+        "PR.PS"
       ],
       "expected_families_missing": [],
-      "audit_verdict": "BROKEN"
+      "audit_verdict": "OK"
     },
     {
       "subdomain_id": "D-05.3",
@@ -419,19 +412,18 @@
       ],
       "csf_hint_count": 2,
       "csf_hint_ids": [
-        "PR.DS-12",
-        "PR.DS-10"
+        "PR.DS-10",
+        "GV.SC-04"
       ],
       "sr_csf_mapping_total": 2,
       "sr_csf_mapping_empty": 0,
-      "orphan_csf_in_hint": [
-        "PR.DS-12"
-      ],
+      "orphan_csf_in_hint": [],
       "expected_families": [
+        "GV.SC",
         "PR.DS"
       ],
       "expected_families_missing": [],
-      "audit_verdict": "BROKEN"
+      "audit_verdict": "SPARSE"
     },
     {
       "subdomain_id": "D-05.4",
@@ -441,18 +433,16 @@
       ],
       "csf_hint_count": 1,
       "csf_hint_ids": [
-        "PR.DS-12"
+        "PR.DS-10"
       ],
       "sr_csf_mapping_total": 1,
       "sr_csf_mapping_empty": 0,
-      "orphan_csf_in_hint": [
-        "PR.DS-12"
-      ],
+      "orphan_csf_in_hint": [],
       "expected_families": [
         "PR.DS"
       ],
       "expected_families_missing": [],
-      "audit_verdict": "BROKEN"
+      "audit_verdict": "SPARSE"
     },
     {
       "subdomain_id": "D-06.1",

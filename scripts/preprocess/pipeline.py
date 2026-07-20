@@ -29,7 +29,10 @@ from .parsers.entities.csf import (
     parse_csf_special_tokens_full,
 )
 from .parsers.entities.csf_xlsx import build_shard, parse_csf2
-from .parsers.entities.csf_mapping import build_v11_to_v20_mapping
+# ARCHIVED in CORR-028 (2026-07-20): CSF 1.1 → 2.0 lineage mapping is no longer
+# emitted. The mapping is preserved as a snapshot in archive/csf_v11_v20_mapping/
+# for audit. Restore by re-enabling the import and the block in _process_csf_xlsx.
+# from .parsers.entities.csf_mapping import build_v11_to_v20_mapping
 from .parsers.entities.subdomain import parse_subdomain
 from .parsers.frontmatter import parse_frontmatter
 from .parsers.narrative import (
@@ -257,30 +260,28 @@ def _process_csf_xlsx(
     parsed = parse_csf2(xlsx_path)
     intro = parsed["introduction"]
 
-    # CORR-027: also extract v1.1 IDs cited at the category-header level
-    # (e.g. row 169 DE.AE category header cites "CSF v1.1: DE.DP-2").
-    # We walk the raw sheet to capture those citations.
-    category_v11_refs = _extract_category_v11_refs(xlsx_path)
-
-    # CORR-027: emit the v1.1 → v2.0 mapping JSON (108 v1.1 subcats)
-    v11_mapping = build_v11_to_v20_mapping(xlsx_path, category_v11_refs=category_v11_refs)
-    v11_mapping_path = out_root / "global" / "csf_1_1_to_2_0_mapping.json"
-    bytes_w, sha = _write_json(v11_mapping_path, v11_mapping)
-    shards.append(
-        {
-            "path": "global/csf_1_1_to_2_0_mapping.json",
-            "source_path": str(xlsx_path),
-            "sha256": sha,
-            "bytes": bytes_w,
-            "kind": "csf_v11_to_v20_mapping",
-            "entity_ids": [],
-        }
-    )
-    logger.info(
-        "csf2.xlsx: wrote csf_1_1_to_2_0_mapping.json (%d v1.1 IDs, %d mappings)",
-        v11_mapping["csf_1_1_total"],
-        len(v11_mapping["mappings"]),
-    )
+    # ARCHIVED in CORR-028 (2026-07-20): CSF 1.1 → 2.0 lineage mapping emission.
+    # The mapping is preserved as a snapshot in archive/csf_v11_v20_mapping/
+    # for audit. Restore by uncommenting the block below + the import at top.
+    # category_v11_refs = _extract_category_v11_refs(xlsx_path)
+    # v11_mapping = build_v11_to_v20_mapping(xlsx_path, category_v11_refs=category_v11_refs)
+    # v11_mapping_path = out_root / "global" / "csf_1_1_to_2_0_mapping.json"
+    # bytes_w, sha = _write_json(v11_mapping_path, v11_mapping)
+    # shards.append(
+    #     {
+    #         "path": "global/csf_1_1_to_2_0_mapping.json",
+    #         "source_path": str(xlsx_path),
+    #         "sha256": sha,
+    #         "bytes": bytes_w,
+    #         "kind": "csf_v11_to_v20_mapping",
+    #         "entity_ids": [],
+    #     }
+    # )
+    # logger.info(
+    #     "csf2.xlsx: wrote csf_1_1_to_2_0_mapping.json (%d v1.1 IDs, %d mappings)",
+    #     v11_mapping["csf_1_1_total"],
+    #     len(v11_mapping["mappings"]),
+    # )
 
     n_written = 0
     n_skipped = 0
@@ -360,6 +361,17 @@ def _process_csf_xlsx(
 def _extract_category_v11_refs(
     xlsx_path: Path,
 ) -> dict[str, list[tuple[int, str, list[str]]]]:
+    """ARCHIVED in CORR-028 (2026-07-20).
+
+    Originally a CORR-027 helper: scan the xlsx sheet for category header
+    rows that cite v1.1 IDs in their informative references. Used only
+    by the (now-archived) v1.1→v2.0 mapping emission in _process_csf_xlsx.
+    Preserved here as a comment for future reference; uncomment + re-enable
+    the caller block to restore.
+    """
+    # ARCHIVED in CORR-028: see docstring above.
+    return {}
+    # --- ORIGINAL IMPLEMENTATION (preserved for restoration) ---
     """CORR-027 helper: scan the xlsx sheet for category header rows that
     cite v1.1 IDs in their informative references.
 

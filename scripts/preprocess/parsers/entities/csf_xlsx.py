@@ -384,12 +384,20 @@ def parse_csf2(xlsx_path: Path) -> dict[str, Any]:
         seen_fn[fid]["subcategory_count"] += 1
         if sc["withdrawn"]:
             seen_fn[fid]["withdrawn_count"] += 1
-    # Count categories per function
+    # Count categories per function.
+    # CORR-028: report both totals. `category_count` = all categories that
+    # have at least one subcategory under this function (including
+    # withdrawn-only ones); `active_category_count` = categories with at
+    # least one ACTIVE subcategory under this function.
     fn_cats: dict[str, set[str]] = {}
+    fn_cats_active: dict[str, set[str]] = {}
     for sc in subcats:
         fn_cats.setdefault(sc["function"], set()).add(sc["category_id_resolved"])
+        if not sc["withdrawn"]:
+            fn_cats_active.setdefault(sc["function"], set()).add(sc["category_id_resolved"])
     for fid, info in seen_fn.items():
         info["category_count"] = len(fn_cats.get(fid, set()))
+        info["active_category_count"] = len(fn_cats_active.get(fid, set()))
     functions = sorted(seen_fn.values(), key=lambda f: f["id"])
 
     categories: list[dict[str, Any]] = []
@@ -409,7 +417,14 @@ def parse_csf2(xlsx_path: Path) -> dict[str, Any]:
         seen_cat[cid]["subcategory_count"] += 1
         if sc["withdrawn"]:
             seen_cat[cid]["withdrawn_count"] += 1
-    categories = sorted(seen_cat.values(), key=lambda c: c["id"])
+    # CORR-028: keep only categories that have at least 1 active subcategory.
+    # Categories where every subcategory was withdrawn (e.g. CSF 1.1 PR.AC,
+    # ID.BE, DE.DP, etc.) are dropped from the active catalogue. The full
+    # withdrawn list is still available under "withdrawn_subcategories".
+    categories = sorted(
+        (c for c in seen_cat.values() if c["withdrawn_count"] < c["subcategory_count"]),
+        key=lambda c: c["id"],
+    )
 
     # Reference families
     from collections import Counter
