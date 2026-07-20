@@ -438,13 +438,14 @@ def parse_subdomain(path: Path) -> dict[str, Any]:
             "hso": {"raw_md": hso_raw},
             "security_requirements": {"raw_md": sr_raw},
         },
-        "orphan_sr_justifications": _parse_orphan_justifications(body),
+        "orphan_sr_justifications": _parse_orphan_justifications(body, "SR"),
+        "orphan_so_justifications": _parse_orphan_justifications(body, "SO"),
         "warnings": warnings,
     }
 
 
-# CORR-029: extract orphan-SR justifications from a `## Decisions (CORR-029)`
-# block. Format:
+# CORR-029: extract orphan justifications (SR or SO) from a
+# `## Decisions (CORR-029)` block. Format:
 #
 #   ## Decisions (CORR-029)
 #
@@ -453,10 +454,18 @@ def parse_subdomain(path: Path) -> dict[str, Any]:
 #   **CRA**: Justification text...
 #   **AI_Act**: Justification text...
 #
-# Returns a {regulation: justification_text} dict.
+#   ### Orphan SO justifications
+#
+#   **CRA**: Justification text...
+#
+# Returns a {regulation: justification_text} dict for the requested kind
+# (SR or SO).
 _DECISIONS_BLOCK_RE = re.compile(
     r"^##\s+Decisions\s+\(CORR-\d+\)\s*$(?P<body>.*?)(?=^##\s|\Z)",
     re.MULTILINE | re.DOTALL,
+)
+_ORPHAN_SECTION_RE_TEMPLATE = (
+    r"^###\s+Orphan\s+(?P<kind>{kind})\s+justifications\s*$(?P<body>.*?)(?=^###\s|^##\s|\Z)"
 )
 _ORPHAN_JUSTIFICATION_RE = re.compile(
     r"^\*\*(?P<reg>[A-Za-z_0-9]+)\*\*:\s*(?P<text>.+?)(?=\n\n\*\*[A-Za-z_0-9]+\*\*:|\n###|\n##|\Z)",
@@ -464,18 +473,28 @@ _ORPHAN_JUSTIFICATION_RE = re.compile(
 )
 
 
-def _parse_orphan_justifications(body: str) -> dict[str, str]:
-    """CORR-029: parse the `## Decisions (CORR-029) → ### Orphan SR justifications`
-    block. Returns a {regulation: justification} dict.
+def _parse_orphan_justifications(body: str, kind: str = "SR") -> dict[str, str]:
+    """CORR-029: parse the `## Decisions (CORR-029) → ### Orphan {kind} justifications`
+    block. Returns a {regulation: justification} dict for the requested kind.
+
+    kind: "SR" or "SO" — selects the section to parse.
     """
     out: dict[str, str] = {}
+    if kind not in ("SR", "SO"):
+        return out
     m = _DECISIONS_BLOCK_RE.search(body)
     if not m:
         return out
     block_body = m.group("body")
-    if "Orphan SR justifications" not in block_body:
+    section_re = re.compile(
+        _ORPHAN_SECTION_RE_TEMPLATE.format(kind=kind),
+        re.MULTILINE | re.DOTALL,
+    )
+    sm = section_re.search(block_body)
+    if not sm:
         return out
-    for jm in _ORPHAN_JUSTIFICATION_RE.finditer(block_body):
+    section_body = sm.group("body")
+    for jm in _ORPHAN_JUSTIFICATION_RE.finditer(section_body):
         reg = jm.group("reg")
         text = jm.group("text").strip()
         if reg and text:

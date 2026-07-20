@@ -104,15 +104,21 @@ def test_no_silent_orphan_creation(audit_report: dict) -> None:
     ), f"expected ≥4 justified orphans, got {sr_no_so.get('justified_count', 0)}"
 
 
-def test_known_so_without_sr_deferred(audit_report: dict) -> None:
-    """8 SOs without SRs are deferred to CORR-030 and must be documented."""
+def test_known_so_without_sr_justified(audit_report: dict) -> None:
+    """The 8 SOs without SRs are documented with per-regulation justifications
+    in the source MDs (CORR-029).
+
+    The 8 (reg, sub) pairs were:
+      D-03.2 GDPR, D-03.2 CRA, D-07.2 DORA, D-07.3 NIS2, D-07.3 CRA,
+      D-09.3 CRA, D-09.4 DORA, D-09.4 AI_Act
+    """
     so_no_sr = audit_report["so_without_sr"]
-    known = audit_report["known_gaps"]
-    # The 8 known items
-    expected_count = 8
-    assert so_no_sr["count"] == expected_count, (
-        f"expected {expected_count} SO-without-SR items, got {so_no_sr['count']}. "
-        f"Either the orphans grew (need new contract) or shrank (good — they got SRs)."
+    # Raw un-justified orphans should be 0
+    assert so_no_sr["count"] == 0, (
+        f"unexpected un-justified SO-without-SR pairs: "
+        f"{[(i['regulation'], i['subdomain']) for i in so_no_sr['items']]}"
     )
-    # The known_gaps section must reference CORR-030
-    assert known.get("deferred_to") == "CORR-030"
+    # The justified list should have exactly 8 (the 8 known)
+    assert so_no_sr.get("justified_count", 0) == 8, (
+        f"expected 8 justified SO-without-SR pairs, got {so_no_sr.get('justified_count', 0)}"
+    )

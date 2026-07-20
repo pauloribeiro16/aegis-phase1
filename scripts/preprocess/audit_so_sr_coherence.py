@@ -114,19 +114,32 @@ def _audit() -> dict:
 
     # 1. SO→SR direction
     so_no_sr: list[dict] = []
+    so_no_sr_justified: list[dict] = []
     for sid, sd in subdomains.items():
         for hso in sd.get("hso_per_reg", []):
             reg = hso.get("regulation", "?")
             n_srs_in_sub = sum(1 for r, sr in srs if r == reg and sid in sr.get("sub_domain", []))
             if n_srs_in_sub == 0:
-                so_no_sr.append(
-                    {
+                # CORR-029: if the subdomain has a justification for this
+                # (reg, sub) SO-orphan, classify as justified (intentional
+                # partial / cross-ref / inheritance from primary SO) rather
+                # than as a real orphan.
+                so_justifications = sd.get("orphan_so_justifications", {})
+                if reg in so_justifications:
+                    so_no_sr_justified.append({
                         "subdomain": sid,
                         "regulation": reg,
                         "so_id": hso.get("id"),
                         "inherits_from": hso.get("inherits_from"),
-                    }
-                )
+                        "justification": so_justifications[reg],
+                    })
+                else:
+                    so_no_sr.append({
+                        "subdomain": sid,
+                        "regulation": reg,
+                        "so_id": hso.get("id"),
+                        "inherits_from": hso.get("inherits_from"),
+                    })
 
     # 2. SR→SO direction
     sr_no_so: list[dict] = []
@@ -203,6 +216,8 @@ def _audit() -> dict:
         "so_without_sr": {
             "count": len(so_no_sr),
             "items": so_no_sr,
+            "justified_count": len(so_no_sr_justified),
+            "justified_items": so_no_sr_justified,
         },
         "sr_without_so": {
             "count": len(sr_no_so),
