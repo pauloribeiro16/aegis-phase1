@@ -942,6 +942,82 @@ def parse_crossregulation_subdomain(
         )
         pos = close_m.end()
 
+    # ─── DeepAnalysis pair extraction (legacy format) ───────────────
+    # DeepAnalysis files use H4 headings like ``#### Pair: GDPR ↔ NIS2``
+    # without the ``<!-- pair: ... --><!-- /pair -->`` markers. We extract
+    # them by scanning H4 blocks and treating the body until the next
+    # H2/H3/H4 as the pair body. The set of pairs we extract this way
+    # augments the comment-marker set above; duplicates are deduped by
+    # (reg_a, reg_b) at the end of the function.
+    h4_pair_re = re.compile(r"^#{4}\s+Pair:\s+(.+?)\s*$", re.MULTILINE)
+    h2_h3_re = re.compile(r"^#{2,3}\s+", re.MULTILINE)
+    for h4_m in h4_pair_re.finditer(body):
+        header_text = h4_m.group(1).strip()
+        # Parse "REG_A ↔ REG_B" (or "REG_A vs REG_B", or comma-separated)
+        regs: list[str] = []
+        if "↔" in header_text:
+            regs = [r.strip() for r in header_text.split("↔")]
+        elif " vs " in header_text.lower():
+            regs = [r.strip() for r in re.split(r"\s+vs\s+", header_text, flags=re.IGNORECASE)]
+        elif "," in header_text and len(header_text.split(",")) == 2:
+            regs = [r.strip() for r in header_text.split(",")]
+        if len(regs) != 2:
+            continue
+        # Determine block end: next H2/H3/H4 or EOF
+        next_boundary = h2_h3_re.search(body, h4_m.end())
+        block_end = next_boundary.start() if next_boundary else len(body)
+        block_text = body[h4_m.end():block_end].strip()
+        # Extract classification (first ** word) — DeepAnalysis uses phrases
+        # like **COMPLEMENTARY**, **SAME — COMPLEMENTARY**, **TENSION** etc.
+        classification = ""
+        m_class = re.search(r"\*\*\s*(\w[\w\-]*(?:\s*[—-]\s*\w[\w\-]*)*)\s*\*\*", block_text)
+        if m_class:
+            classification = m_class.group(1).strip()
+        # Extract "Why" / "Reasoning" paragraph (DeepAnalysis may have either)
+        why = ""
+        m_why = re.search(
+            r"\*\*Why\s+[^*]+\*\*\s*:\s*([^\n]+(?:\n(?!\s*\*\*)[^\n]+)*)",
+            block_text,
+        )
+        if not m_why:
+            m_why = re.search(
+                r"\*\*Reasoning\*\*\s*:\s*([^\n]+(?:\n(?!\s*\*\*)[^\n]+)*)",
+                block_text,
+            )
+        if m_why:
+            why = m_why.group(1).strip()
+        # Extract OJ quotes (same pattern as comment-marker pairs)
+        oj_quotes = []
+        for m_oj in re.finditer(
+            r"\*\*\s*(\w+)\*\*\s*\(((?:[^()]|\([^)]*\))+)\)",
+            block_text,
+        ):
+            regulation = m_oj.group(1).strip()
+            citation = m_oj.group(2).strip()
+            sr_m = re.search(r"(SR-[\w\-]+)", citation)
+            art_m = re.search(r"(Art(?:icle)?\.?\s*\d+(?:\([^)]+\))*)", citation)
+            annex_m = re.search(r"(Annex\s+[IVX]+)", citation)
+            oj_quotes.append(
+                {
+                    "regulation": regulation,
+                    "citation_raw": citation,
+                    "sr_id": sr_m.group(1) if sr_m else None,
+                    "article": art_m.group(1).strip() if art_m else None,
+                    "annex": annex_m.group(1) if annex_m else None,
+                }
+            )
+        pairs.append(
+            {
+                "reg_a": regs[0],
+                "reg_b": regs[1],
+                "classification": classification,
+                "why": why,
+                "oj_quotes": oj_quotes,
+                "table_block_raw": "",
+                "block_text_raw": block_text,
+            }
+        )
+
     # Extract emergent tensions from `<!-- emergent: REG1,REG2,REG3 -->`
     emergent_tensions: list[dict[str, Any]] = []
     for m_em in re.finditer(r"<!--\s*emergent:\s*([^>]+?)\s*-->", body):
@@ -974,14 +1050,36 @@ def parse_crossregulation_subdomain(
         "participants_meta": participants_meta,
         "participants_table": participants_table,
         "participant_count": len(participants_table),
-        "pairs": pairs,
-        "pair_count": len(pairs),
+        # Dedup pairs by (reg_a, reg_b) — symmetric so we sort the tuple
+        "pairs": _dedup_pairs(pairs),
+        "pair_count": len(_dedup_pairs(pairs)),
         "emergent_tensions": emergent_tensions,
         "sr_cross_references": sr_cross_references,
         "sr_cross_reference_count": len(sr_cross_references),
         "raw_md": body,  # zero-loss
         "raw_md_kept_reason": "audit_fallback_for_zero_loss_invariant",
     }
+
+
+def _dedup_pairs(pairs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Deduplicate pairs by the unordered (reg_a, reg_b) key.
+
+    The same pair can appear in two forms in the source:
+      * ``<!-- pair: GDPR, NIS2 -->`` markers (DomainAnalysis)
+      * ``#### Pair: GDPR ↔ NIS2`` headings (DeepAnalysis)
+
+    We merge them and keep the **first** occurrence (in document order)
+    so the comment-marker version wins when both are present.
+    """
+    seen: set[tuple[str, str]] = set()
+    out: list[dict[str, Any]] = []
+    for p in pairs:
+        key = tuple(sorted([p.get("reg_a", ""), p.get("reg_b", "")]))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+    return out
 
 
 # ─── Fase 2: enrich entities/pairs/ from crossregulation ──────────────
