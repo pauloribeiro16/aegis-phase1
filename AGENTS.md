@@ -5,6 +5,23 @@
 
 ---
 
+## 0. Framework policy — NIST CSF 2.0 ONLY
+
+> **This project uses NIST CSF 2.0 as the sole control framework.**
+> No other control framework (ISO 27001, NIST 800-53, OWASP, CSF 1.1, etc.)
+> is used as a source of control identifiers or control families.
+
+- **Canonical declaration:** [`docs/NIST_CSF_2.0_ONLY.md`](docs/NIST_CSF_2.0_ONLY.md)
+- **Source catalogue:** `preproc_out/global/NIST_CSF_2.0_subcategories.json`
+  (106 active subcategories, 22 active categories — NIST CSWP 29, 2024-02-26)
+- **Audit:** `python -m scripts.preprocess.audit_csf_mapping` must report `BROKEN == 0`
+- **CI gate:** `bash .hooks/ci-frameworks.sh` (rejects unannotated references to other control frameworks)
+
+When in doubt: pick the CSF 2.0 subcategory. If a regulation cannot be mapped to any
+of the 106, mark the rule as `UNMAPPED_CSF` per `methodology-00/PREPROCESSING/NIST_CSF_2.0_subcategories.md`.
+
+---
+
 ## 1. Architecture
 
 ```

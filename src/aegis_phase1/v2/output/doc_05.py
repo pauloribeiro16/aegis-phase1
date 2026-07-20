@@ -309,6 +309,8 @@ def _section_4_native_vs_inherited(
         "company implements the control itself; INHERITED means the "
         "control is satisfied through a contractual relationship with a "
         "cloud or service provider that carries its own attestation "
+        # NOTE (CORR-028, NIST_CSF_2.0_ONLY.md §2): "ISO 27001 / SOC 2"
+        # below is a vendor attestation pattern, NOT a control framework.
         "(for example, an ISO 27001 or SOC 2 Type II report).\n"
     )
     rows = _native_inherited_rows(regs, cloud_services, inventory_systems)

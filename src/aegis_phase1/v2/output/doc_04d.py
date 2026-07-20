@@ -484,6 +484,9 @@ def _section_training_status(state: dict[str, Any]) -> list[str]:
         ),
         (
             "Developers (incl. Lead)",
+            # NOTE (CORR-028, NIST_CSF_2.0_ONLY.md §2): "OWASP Top 10" below
+            # is implementation guidance, NOT a control framework. The control
+            # is PR.PS-06 (Secure software development practices are integrated).
             "Secure coding (OWASP Top 10; SAST/DAST feedback loop)",
             "NOT STARTED — informal ad-hoc only",
             "2026-12-31 (target)",
