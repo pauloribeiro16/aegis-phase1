@@ -54,6 +54,7 @@ related_documents:
 | **[AEGIS-P1-CORR-020](#corr-020)** | Default model → `gemma4:e2b`; output-module logs to WARNING | ✅ MERGED | ⚫ deleted | `8e19287` | 391 (no new tests; 2 files updated) | User feedback: 4B model was too slow (P1B-LLM-02 took 24 min for 45K tokens), verbose log noise. **Change 1**: default model switched from `gemma4:e4b` to `gemma4:e2b` in 5 sites: `src/aegis_phase1/llm/unified.py:UnifiedInvoker.DEFAULT_MODEL`, `src/aegis_phase1/v2/runner.py:argparse default`, `src/aegis_phase1/v2/cli/menu.py:DEFAULT_MODEL` (+ `MODEL_CHOICES` reorders e2b first; wizard label updated), and `.env:OLLAMA_MODEL`. **Change 2**: `setup_logging()` in `runner.py` silences output modules to `WARNING` so per-document write logs no longer flood the output; stage markers (`=== STAGE X ===`) + LLM_CALL summary lines still print. 4 tests updated to reflect new model labels; 1 new test (`test_default_model_is_2b`) added. |
 | **[AEGIS-P1-CORR-021](#corr-021)** | Langfuse callback cache + token fallback to chars | ✅ MERGED | ⚫ deleted | `5b6592b` | 394 (391 + 11 new; 1 updated) | Two regression fixes found in a real `--run-all-traced` run. **Bug 1** (multi-trace): `get_langfuse_callback()` in `src/aegis_phase1/llm/tracing.py` generated a fresh `trace_id` every call → 3+ disjoint traces in Langfuse instead of one nested tree. **Fix**: module-level cache keyed by `(host, public_key, secret_key, case_name, phase)`; same args return cached `(client, handler)`. Test helper `_invalidate_langfuse_cache()` exposed for tests. **Bug 2** (0 tokens): P1B-LLM-02 at e2b model returned `response_metadata={}` for some calls (Ollama constrained-generation anomaly with nested-JSON responses). **Fix**: new `_estimate_tokens_by_chars(text) → max(1, len(text) // 4)` helper; both `_extract_usage` methods in `unified.py` and `invoker.py` fall back to it when BOTH `response_metadata` AND `usage_metadata` are empty AND content is a non-empty string. 11 new tests (9 cache + 2 fallback) + Houdini demos (revert cache → test fails with 3 different trace_ids; revert fallback → 0 tokens instead of estimated). Regression: `test_extract_usage_empty_response_metadata` updated to use `content=""` to assert the strictly-zero path. | Regression fix found in a real run of `--run-all-traced`: `TypeError: 'CallbackManager' object is not iterable` from `list(cfg.get("callbacks") or [])` in `src/aegis_phase1/llm/unified.py:123`. LangGraph injects a `langchain_core.callbacks.manager.CallbackManager` (NOT a list) into `config["callbacks"]` when invoking sub-graphs. **Fix**: normalize via 4-case dispatch — `None` → `[]`; `list` → `list(raw)`; `CallbackManager` (`.handlers` attr) → `list(raw.handlers)`; bare object → `[raw]`. Always returns a plain list. 10 new unit tests in `tests/unit/llm/test_callback_manager_corr019.py`; Houdini demo (revert the fix → test fails with the exact `TypeError`; restore → all 10 pass). Zero behavior change for callers passing `callbacks=[handler]` (list form) — only the LangGraph CallbackManager case is now handled correctly. |
 | **[AEGIS-P1-CORR-022](#corr-022)** | MAP domain adaptation v1.3 — 3-blocos × 5-campos output format + 9/9 gates for D-10 | ✅ MERGED | ⚫ deleted | (squash) | 331 (285 base + 46 new) | Closes D-10.2 (Audit Logging & Traceability) as proof-of-concept that `gemma4:e2b` produces regulation-centric, OJ-anchored adapted objectives. **3-phase evolution over 1 branch (24 files):** **Phase 1** — filter fallbacks (`filter_regs`/`filter_subdomains` now use `company_context.applicable_regs` when ontology `source_regulations` is empty); §4 prompt trimmed (Objective + 1st Consideration only); §3 truncated to 200 chars. Prompt dropped **198 722 → 28 911 chars (−85%)**. **Phase 2** — loader fix (`subdomain_loader.HEADER_RE` 3-level regex, was substring-matching); new `article_loader` + `ambiguity_loader` (filtered by `domain_id`); §3 with verbatim OJ, §6 with applicable ambiguities, §7 with full Track B; `OutputParserV2`; `anchor_validator` (G8); `num_ctx=32768`. **Phase 3** — spec v1.3 (3 blocks per sub-domain: Generic + per applicable reg; 5 fields each: Original/Adapted/Rationale/Adjustments needed/Considerations); `_extract_considerations`; `_render_subdomains` rewritten; `OutputParserV3` + `ObjectiveBlock`/`SubdomainAdaptationV3`/`ParseResultV3`; `adapted_subdomains_v3` in `DomainResult`; `doc_04b` renders the 3×5 structure; gate G9. **Result:** e2b adopts v1.3 first-try (1 attempt, 28.4 s); 9/9 gates PASS for the whole D-10 domain (D-10.1/.2/.3 in one run); anchors validate against source (Art. 30(3), Annex VII §3/§6, Art. 13(4)/(22), Art. 32(1)(b)/(d), Annex I Part II (3)); no company leak, no forbidden connectives, no generic consulting headings. 46 new tests; **D-01..D-09 generalization deferred to CORR-023** (the `DOMAIN_ARTICLES` and `_DOMAIN_CLAUSE_FILTER` catalogs are empty for 7 of 10 domains). |
+| **[AEGIS-P1-CORR-027](#corr-027)** | NIST CSF 2.0 frozen-list reconciliation + v1.1→v2.0 lineage capture | 🟡 DRAFT (in PR review) | 🟢 `feature/aegis-p1-corr-027-csf-frozen-list` | TBD (4 atomic commits: `c8dbbc1`, `394ea5e`, `8d9f1c5`, `a6f5fbf`) | 718 (660 baseline + 23 v11+v20 + 25 frozen-list + 10 audit) | Closes the gap that the human-edited .md (`methodology-00/PREPROCESSING/NIST_CSF_2.0_subcategories.md`) had drifted to 99 IDs while the xlsx-derived `preproc_out/global/NIST_CSF_2.0_subcategories.json` correctly had 106. **4 phases over 1 branch (7 files):** **Phase 1** — new `csf_mapping.py` parses `csf2.xlsx` and emits `preproc_out/global/csf_1_1_to_2_0_mapping.json` (108 v1.1 IDs → v2.0 destinations, 4-signal parser: active-row refs / withdrawn-row tags / withdrawn-row id-strip / category-header refs). 23 tests. **Phase 2** — reconcile the .md: 13 IDs added, 5 IDs removed (4 withdrawn + 1 draft), `## Decisions (CORR-027)` section (D1–D4) documenting each removal/addition. 25 tests + 1 xlsx gate. **Phase 3** — new `scripts/preprocess/audit_csf_mapping.py` walks all 38 SubDomain shards and produces `preproc_out/audit/csf_mapping_report.json` (per-subdomain verdict OK/ SPARSE / BROKEN). 10 tests. **Phase 4** — new `.hooks/ci-csf-frozen-list.sh` (wired into `validate-contracts.sh` as check #20) fails the build if .md ↔ preproc_out drift; `AUDIT_D-01.1_CSF_MAPPING.md` §2.1/§3/§4 closed; `AGENTS.md §2` updated. **Result:** .md ↔ preproc_out in exact parity (106 = 106, zero diff); 5 BROKEN subdomains surfaced (D-04.3 + D-05.1..4 carry legacy v1.1 / draft IDs `RS.CO-04` and `PR.DS-12` in csf_hint) — exact CORR-027 expected finding; clean-up deferred to **CORR-028**. Re-mapping all 38 subdomains' csf_hint deferred to **CORR-029** (LLM-assisted). |
 
 ---
 
@@ -1054,5 +1055,91 @@ Dropped `KEY_ADJUSTMENTS` + `CONFIDENCE` (legacy contract).
 ## See also
 
 - `.hooks/validate-contracts.sh` — the script enforcing these contracts
+- `.hooks/ci-csf-frozen-list.sh` — CORR-027 parity gate (.md ↔ preproc_out)
 - `LLM_ARCHITECTURE_DECISION.md` — strategic decision doc that motivates CORR-002
 - `AGENTS.md §10` — Branch Policy + Pre-flight Check policy
+
+---
+
+## <a name="corr-027"></a>AEGIS-P1-CORR-027 — NIST CSF 2.0 Frozen-List Reconciliation + v1.1→v2.0 Lineage
+
+### Problem
+
+The preprocessor pipeline (`scripts/preprocess/pipeline.py`) prefers `csf2.xlsx` (NIST CSF 2.0 Reference Tool, NIST CSWP 29, 2024-02-26) when present — and that file carries **106** active subcategories. But the human-edited `methodology-00/PREPROCESSING/NIST_CSF_2.0_subcategories.md` had drifted to **99** unique IDs (5 wrong / 12 missing + 1 phantom `PR.DS-12`). The audit file `execution/AUDIT_D-01.1_CSF_MAPPING.md` even claimed `PR.DS-12` was "withdrawn" — which is wrong (it was a pre-finalization draft that never made it into CSWP 29).
+
+### Scope
+
+- Reconcile the .md frozen list to match the xlsx-derived truth
+  (106 = 106).
+- Capture the full 108-row v1.1 → v2.0 mapping (4-signal parser:
+  active row refs, withdrawn row tags, withdrawn-row id-strip,
+  category-header refs) with per-mapping provenance.
+- Add a per-subdomain CSF coverage audit tool (OK / SPARSE / BROKEN
+  verdict for each of the 38 subdomains).
+- Add a CI gate that fails the build if the .md ever drifts from
+  preproc_out again.
+
+### Decisions (D1–D4)
+
+- **D1** — `PR.DS-12` DROPPED. The ID does not appear in `csf2.xlsx`
+  (neither active nor withdrawn) and the title does not match any
+  published CSF 2.0 subcategory. Likely a pre-finalization draft
+  artifact. The active PR.DS set in CSF 2.0 is **`PR.DS-01`, `PR.DS-02`,
+  `PR.DS-10`, `PR.DS-11`** — 4 subcategories, not 5.
+- **D2** — 4 v2.0-withdrawn IDs removed: `PR.AT-03`, `PR.AT-04`,
+  `RS.CO-01`, `RS.CO-04`.
+- **D3** — 13 v2.0-active IDs added: `DE.AE-07`, `GV.SC-06..10` (5),
+  `ID.AM-08`, `ID.RA-07..10` (4), `RC.CO-03`, `RC.CO-04`. Each with
+  the verbatim title from the xlsx.
+- **D4** — RC.CO category reintroduced (was a CSF 1.1 category
+  collapsed in CSF 2.0; v2.0 has 2 active subcategories).
+
+### Two known-fuzzy v1.1 IDs
+
+- `DE.DP-2` (Detection process accountability) — only a CATEGORY_LEVEL
+  mapping (entire DE.AE category absorbed it). No specific v2.0
+  subcategory captures the "process understood and followed"
+  dimension. Recommend `UNMAPPED_CSF` in chain.
+- `RC.CO-2` (Reputation repair) — withdrawn row tag cites RC.CO-04
+  but the active RC.CO-04 does NOT cite RC.CO-2 back. Flagged
+  `WITHDRAWN_DESTINATION_INCONSISTENT`. Recommend `UNMAPPED_CSF`.
+
+### Result
+
+- 718 tests pass (was 660 baseline + 23 v11+v20 + 25 frozen-list
+  + 10 audit). The 2 pre-existing unified-invoker failures
+  (tests/unit/llm/test_unified_invoker_corr013.py) are out of
+  scope and unchanged.
+- .md ↔ preproc_out in exact parity (106 = 106, zero diff).
+- 5 BROKEN subdomains surfaced by the audit (D-04.3 + D-05.1..4
+  carry legacy `RS.CO-04` and `PR.DS-12` in csf_hint) — **the
+  expected CORR-027 finding**; clean-up deferred to **CORR-028**.
+
+### Files
+
+| File | Action |
+|---|---|
+| `scripts/preprocess/parsers/entities/csf_mapping.py` | NEW (Phase 1) |
+| `scripts/preprocess/pipeline.py` | MODIFIED (Phase 1: emit v1.1→v2.0 mapping JSON) |
+| `scripts/preprocess/audit_csf_mapping.py` | NEW (Phase 3) |
+| `methodology-00/PREPROCESSING/NIST_CSF_2.0_subcategories.md` | MODIFIED (Phase 2: 13 added, 5 removed, Decisions section) |
+| `.hooks/ci-csf-frozen-list.sh` | NEW (Phase 4) |
+| `.hooks/validate-contracts.sh` | MODIFIED (Phase 4: added check #20) |
+| `execution/AUDIT_D-01.1_CSF_MAPPING.md` | MODIFIED (Phase 4: §2.1, §3, §4 closed) |
+| `AGENTS.md` | MODIFIED (Phase 4: §2 commands) |
+| `docs/CONTRACTS.md` | MODIFIED (Phase 4: new row + section) |
+| `tests/unit/preprocess/test_csf_v11_to_v20_mapping.py` | NEW (23 tests) |
+| `tests/unit/preprocess/test_csf_frozen_list_reconciliation.py` | NEW (25 tests) |
+| `tests/unit/preprocess/test_audit_csf_mapping.py` | NEW (10 tests) |
+| `preproc_out/global/csf_1_1_to_2_0_mapping.json` | NEW (108 mappings) |
+| `preproc_out/audit/csf_mapping_report.json` | NEW (38 subdomain coverage rows) |
+
+### Out of scope (follow-ups)
+
+- **CORR-028** — Clean up the 5 BROKEN subdomains (replace
+  `RS.CO-04` → `RS.MA-01` etc.) using the audit report.
+- **CORR-029** — LLM-assisted csf_hint expansion for the 32
+  SPARSE subdomains (the audit report's `expected_families_missing`
+  is the ground truth).
+- **CORR-025** (reserved) — Switch v2 loaders to read preproc_out
+  shards via `--use-sharded` flag.
