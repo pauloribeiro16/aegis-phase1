@@ -87,6 +87,122 @@ def _write_json(path: Path, data: Any) -> tuple[int, str]:
     text = json.dumps(data, indent=2, ensure_ascii=False, default=_json_default) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+    return len(text.encode("utf-8")), _sha256(text.encode("utf-8"))
+
+
+# ─── v11 — entities layout by D-XX domain ─────────────────────────────
+# Each entity kind is partitioned into a D-XX/ subfolder so that all
+# artifacts for one domain (sub-SOs, SRs, pairs, clauses referencing that
+# domain) live in the same place. Special buckets for entities that
+# don't have a clear D-XX anchor:
+#   * _no_subdomain/  — SOs loaded from aggregated 01_SecObj that
+#                        don't carry a sub_domains list (the 174-orphan
+#                        set); inferred in B.2 if possible.
+#   * _root/          — clauses have no D-XX link (per-regulatory
+#                        constructs); they live under their regulation.
+#
+# The mapping is intentionally centralised here so the on-disk layout
+# has a single source of truth.
+import re as _re_layout
+_D_XX_RE = _re_layout.compile(r"^D-(\d{2})(?:\.\d+)?$")
+
+
+def _d_xx_from_subdomain_id(sid: str | None) -> str | None:
+    """Extract the parent D-XX from a subdomain id like D-04.3 → D-04.
+
+    Returns None if the input doesn't match the D-XX[.Y] pattern.
+    """
+    if not sid:
+        return None
+    m = _D_XX_RE.match(sid)
+    return f"D-{m.group(1)}" if m else None
+
+
+def _shard_path_subdomain(sd_id: str) -> str:
+    """SubDomain entity → entities/subdomains/D-XX/D-XX.Y.json."""
+    d_xx = _d_xx_from_subdomain_id(sd_id)
+    if not d_xx:
+        # Should never happen — subdomains are always D-XX.Y — but
+        # fall back to flat to avoid a KeyError if a parser bug leaks.
+        return f"entities/subdomains/_root/{sd_id}.json"
+    return f"entities/subdomains/{d_xx}/{sd_id}.json"
+
+
+def _shard_path_pair(pair: dict[str, Any]) -> str:
+    """Pair entity → entities/pairs/D-XX/<pair_id>.json.
+
+    Pairs carry a single ``subdomain_id`` (the lane they belong to).
+    """
+    d_xx = _d_xx_from_subdomain_id(pair.get("subdomain_id"))
+    if not d_xx:
+        return f"entities/pairs/_root/{pair['id']}.json"
+    return f"entities/pairs/{d_xx}/{pair['id']}.json"
+
+
+def _shard_path_so(so: dict[str, Any]) -> str:
+    """SO entity → entities/sos/D-XX/SO-XXX.json (or _no_subdomain/).
+
+    Strategy: take the FIRST subdomain from ``sub_domains`` (the
+    user-decision 2026-07-20 "first parent" rule for multi-sub SOs).
+    SOs with no sub_domains go to ``_no_subdomain/`` (B.2 inference
+    may move them later by mutating the entity in place).
+
+    Two sources of SOs feed this function:
+      * aggregated 01_SecurityObjectives.md → SO has ``sub_domains``
+        (a list, possibly empty for orphan masters)
+      * per-subdomain MD §2 (hso_per_reg) → SO has ``subdomain_id``
+        (a single D-XX.Y string)
+
+    Both cases are handled below.
+    """
+    # 1. aggregated 01_SecObj style: list of D-XX.Y in sub_domains.
+    # The cell is sometimes dirty (e.g. "D-09.2 (primary)", "Testing
+    # for risk management", "D-06.2 (CRA sole authority per §4.1)").
+    # We extract the FIRST D-XX[.Y] token via regex rather than
+    # trusting the raw value.
+    subs = so.get("sub_domains") or []
+    if subs:
+        first_d = None
+        for cell in subs:
+            m = _re_layout.search(r"D-\d{2}(?:\.\d+)?", str(cell))
+            if m:
+                first_d = m.group(0)
+                break
+        d_xx = _d_xx_from_subdomain_id(first_d) if first_d else None
+        if d_xx:
+            return f"entities/sos/{d_xx}/{so['id'].replace('.', '_')}.json"
+    # 2. per-subdomain hso_per_reg style: single D-XX.Y in subdomain_id
+    sid = so.get("subdomain_id")
+    if sid:
+        d_xx = _d_xx_from_subdomain_id(sid)
+        if d_xx:
+            return f"entities/sos/{d_xx}/{so['id'].replace('.', '_')}.json"
+    # 3. fall-through: no D-XX link (e.g. an aggregated SO whose
+    # ``sub_domains`` cell was empty). B.2 inference may move these
+    # later by reading 01_SecObj column 4 and mutating in place.
+    return f"entities/sos/_no_subdomain/{so['id'].replace('.', '_')}.json"
+
+
+def _shard_path_sr(sr: dict[str, Any]) -> str:
+    """SR entity → entities/srs/D-XX/SR-REG-NNN.json (or _no_subdomain/).
+
+    SRs have a ``sub_domain`` list (always populated for our pipeline).
+    """
+    subs = sr.get("sub_domain") or []
+    if subs:
+        d_xx = _d_xx_from_subdomain_id(subs[0])
+        if d_xx:
+            return f"entities/srs/{d_xx}/{sr['id'].replace('.', '_')}.json"
+    return f"entities/srs/_no_subdomain/{sr['id'].replace('.', '_')}.json"
+
+
+def _shard_path_clause(clause_id: str, regulation: str) -> str:
+    """Clause entity → entities/clauses/_root/{REG}/CLAUSE_ID.json.
+
+    Clauses have no D-XX link in their entity JSON; they are organised
+    by regulation. ``_root/`` signals "no domain anchor".
+    """
+    return f"entities/clauses/_root/{regulation}/{clause_id.replace('-', '_')}.json"
     raw = text.encode("utf-8")
     return len(raw), _sha256(raw)
 
@@ -533,7 +649,7 @@ def _process_subdomains(
 
             # Add SubDomain entity
             sd_id = parsed["id"]
-            sd_shard = f"entities/subdomains/{sd_id}.json"
+            sd_shard = _shard_path_subdomain(sd_id)
             idx.add(sd_id, parsed, sd_shard)
 
             # Extract HL SO entity (if any)
@@ -543,21 +659,21 @@ def _process_subdomains(
                 so_entity = dict(parsed["hso_hl"])
                 so_entity["regulation"] = "HL"
                 so_entity["source_subdomain"] = sd_id
-                idx.add(so_id, so_entity, f"entities/sos/{so_id.replace('.', '_')}.json")
+                idx.add(so_id, so_entity, _shard_path_so(so_entity))
 
             # Extract per-reg sub-SO entities
             for so in parsed.get("hso_per_reg", []):
                 so_id = so["id"]
                 so_entity = dict(so)
                 so_entity["source_subdomain"] = sd_id
-                idx.add(so_id, so_entity, f"entities/sos/{so_id.replace('.', '_')}.json")
+                idx.add(so_id, so_entity, _shard_path_so(so_entity))
 
             # Extract pair entities
             for pair in parsed.get("pairs", []):
                 pair_id = pair["id"]
                 pair_entity = dict(pair)
                 pair_entity["source_subdomain"] = sd_id
-                idx.add(pair_id, pair_entity, f"entities/pairs/{pair_id}.json")
+                idx.add(pair_id, pair_entity, _shard_path_pair(pair_entity))
 
             # Extract SR entities (from §3)
             for sr in parsed.get("security_requirements", []):
@@ -575,7 +691,7 @@ def _process_subdomains(
                     sr_entity["regulatory_rationale"] = yb.get("regulatory_rationale") or ""
                     sr_entity["security_rationale"] = yb.get("security_rationale") or ""
                     sr_entity["ambiguity_notes"] = yb.get("ambiguity_notes") or ""
-                idx.add(sr_id, sr_entity, f"entities/srs/{sr_id.replace('.', '_')}.json")
+                idx.add(sr_id, sr_entity, _shard_path_sr(sr_entity))
 
             # Write the SubDomain shard
             bytes_written, sha = _write_json(out_root / sd_shard, parsed)
@@ -671,7 +787,7 @@ def _process_regulation(
                     # Add each SO as an entity too
                     for so in sos:
                         eid = so["id"]
-                        idx.add(eid, so, f"entities/sos/{eid.replace('-', '_')}.json")
+                        idx.add(eid, so, _shard_path_so(so))
                     parsed: dict[str, Any] = {
                         "schema_version": "1.0",
                         "source": str(src),
@@ -684,7 +800,7 @@ def _process_regulation(
                     srs = parse_security_rules(src, regulation)
                     for sr in srs:
                         eid = sr["id"]
-                        idx.add(eid, sr, f"entities/srs/{eid.replace('-', '_')}.json")
+                        idx.add(eid, sr, _shard_path_sr(sr))
                     parsed = {
                         "schema_version": "1.0",
                         "source": str(src),
@@ -746,7 +862,7 @@ def _process_regulation(
                     # to avoid duplicate clause shards.
                     if eid in idx.entities and parsed["kind"] == "cross_article":
                         continue
-                    clause_shard = f"entities/clauses/{eid.replace('-', '_')}.json"
+                    clause_shard = _shard_path_clause(eid, regulation)
                     # Don't overwrite the file-shard with a clause-shard
                     if clause_shard == file_shard_path:
                         continue
@@ -1509,14 +1625,25 @@ def _build_indices(idx: EntityIndex, out_root: Path, shards: list[dict[str, Any]
         if sub is None:
             continue
         fname = eid.replace(".", "_").replace("-", "_")
-        # CORR-024 v7: CSF shards live in per-Function subfolders
-        # entities/csfs/{FUNC}/{FUNC}_{CAT}_{NUM}.json
+        # CORR-031 v11: shard paths follow the by-D-XX layout.
+        # CSF shards keep their per-Function subfolders (CORR-024 v7).
         if kind == "csf":
             fn = entity.get("function")
             if fn:
                 entity_path = out_root / "entities" / sub / fn / f"{fname}.json"
             else:
                 entity_path = out_root / "entities" / sub / f"{fname}.json"
+        elif kind == "subdomain":
+            entity_path = out_root / _shard_path_subdomain(eid)
+        elif kind == "pair":
+            entity_path = out_root / _shard_path_pair(entity)
+        elif kind in ("so", "so_hl"):
+            entity_path = out_root / _shard_path_so(entity)
+        elif kind == "sr":
+            entity_path = out_root / _shard_path_sr(entity)
+        elif kind == "clause":
+            reg = entity.get("regulation") or "Unknown"
+            entity_path = out_root / _shard_path_clause(eid, reg)
         else:
             entity_path = out_root / "entities" / sub / f"{fname}.json"
         if entity_path.exists():

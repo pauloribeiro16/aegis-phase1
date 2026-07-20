@@ -32,12 +32,22 @@ def audit_report() -> dict:
 
 @pytest.fixture(scope="module")
 def subdomains() -> dict[str, dict]:
+    """Load all subdomain entities from the by-D-XX layout.
+
+    CORR-031 v11: shards live under ``entities/subdomains/D-XX/*.json``.
+    We recurse one level deep (the D-XX subfolders) so the fixture
+    picks up every D-XX.Y regardless of its parent. The ``_root/`` and
+    ``_archive/`` subbuckets (if present) are skipped — those are
+    pre-v11 leftovers or intentional archives.
+    """
     out: dict[str, dict] = {}
-    for p in SUBDOMAINS_DIR.glob("D-*.json"):
+    for p in SUBDOMAINS_DIR.rglob("D-*.json"):
+        if any(part in p.parts for part in ("_root", "_archive", "_no_subdomain")):
+            continue
         with p.open() as f:
-            out[p.stem.replace("D-", "D-")] = json.load(f)
-    # Wait — that's wrong. Let me fix it.
-    return {p.stem: json.loads(p.read_text()) for p in SUBDOMAINS_DIR.glob("D-*.json")}
+            d = json.load(f)
+        out[d["id"]] = d
+    return out
 
 
 def test_inherits_from_populated_in_100_percent(subdomains: dict[str, dict]) -> None:

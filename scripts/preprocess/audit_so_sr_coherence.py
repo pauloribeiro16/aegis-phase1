@@ -48,9 +48,19 @@ AUDIT_OUT = PREPROC_OUT / "audit" / "so_sr_coherence_report.json"
 
 
 def _load_subdomains() -> dict[str, dict]:
-    """Load all subdomain entities. Returns {subdomain_id: entity}."""
+    """Load all subdomain entities. Returns {subdomain_id: entity}.
+
+    The on-disk layout (CORR-031) puts subdomains under
+    ``entities/subdomains/D-XX/*.json`` (one folder per parent domain).
+    We recurse one level deep so we catch every D-XX.Y shard regardless
+    of which parent folder it lives in. The ``_root/`` and
+    ``_archive/`` subfolders (if present) are intentionally skipped.
+    """
     out: dict[str, dict] = {}
-    for p in sorted(SUBDOMAINS_DIR.glob("D-*.json")):
+    for p in sorted(SUBDOMAINS_DIR.rglob("D-*.json")):
+        # Skip non-canonical buckets
+        if any(part in p.parts for part in ("_root", "_archive", "_no_subdomain")):
+            continue
         with p.open() as f:
             d = json.load(f)
         out[d["id"]] = d

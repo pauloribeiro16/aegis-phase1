@@ -131,10 +131,15 @@ def test_corresponding_phantom_phantoms_present() -> None:
     """
     SUB_DIR = REPO_ROOT / "preproc_out" / "entities" / "subdomains"
 
+    def _load_subdomain(sid: str) -> dict:
+        # CORR-031 v11: shards live under D-XX/ subfolders
+        d_xx = "-".join(["D", sid.split(".")[0].split("-")[1]])
+        p = SUB_DIR / d_xx / f"{sid}.json"
+        assert p.is_file(), f"missing {p}"
+        return json.loads(p.read_text())
+
     # 1. AI_Act D-07.3 phantom (SO-AIACT-001 cross-ref)
-    p = SUB_DIR / "D-07.3.json"
-    assert p.is_file(), f"missing {p}"
-    d = json.loads(p.read_text())
+    d = _load_subdomain("D-07.3")
     ai_phantoms = [
         hso
         for hso in d.get("hso_per_reg", [])
@@ -145,9 +150,7 @@ def test_corresponding_phantom_phantoms_present() -> None:
     assert ai_phantoms, "no AI_Act D-07.3 phantom (inherits SO-AIACT-001) found"
 
     # 2. NIS2 D-01.2 phantom (SO-NIS2-004 partial)
-    p = SUB_DIR / "D-01.2.json"
-    assert p.is_file(), f"missing {p}"
-    d = json.loads(p.read_text())
+    d = _load_subdomain("D-01.2")
     nis2_phantoms = [
         hso
         for hso in d.get("hso_per_reg", [])
@@ -158,9 +161,7 @@ def test_corresponding_phantom_phantoms_present() -> None:
     assert nis2_phantoms, "no NIS2 D-01.2 phantom (inherits SO-NIS2-004) found"
 
     # 3. CRA D-09.4 (largest phantom count, sample one)
-    p = SUB_DIR / "D-09.4.json"
-    assert p.is_file(), f"missing {p}"
-    d = json.loads(p.read_text())
+    d = _load_subdomain("D-09.4")
     cra_phantoms = [
         hso
         for hso in d.get("hso_per_reg", [])
