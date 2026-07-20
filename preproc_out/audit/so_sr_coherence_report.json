@@ -1,0 +1,900 @@
+{
+  "schema_version": "1.0",
+  "built_at": "2026-07-20T10:42:59.327282+00:00",
+  "totals": {
+    "subdomains": 38,
+    "srs_total": 282,
+    "so_entries": 132,
+    "so_with_inherits_from": 132,
+    "so_inherits_from_pct": 100.0,
+    "sr_linked_objectives_total": 344,
+    "sr_linked_objectives_resolved": 133,
+    "sr_lo_resolution_pct": 38.7
+  },
+  "so_without_sr": {
+    "count": 8,
+    "items": [
+      {
+        "subdomain": "D-03.2",
+        "regulation": "GDPR",
+        "so_id": "SO-D-03.2.GDPR",
+        "inherits_from": "SO-GDPR-006 (cross-ref), SO-GDPR-005 (cross-ref)"
+      },
+      {
+        "subdomain": "D-03.2",
+        "regulation": "CRA",
+        "so_id": "SO-D-03.2.CRA",
+        "inherits_from": "SO-CRA-016 (partial)"
+      },
+      {
+        "subdomain": "D-07.2",
+        "regulation": "DORA",
+        "so_id": "SO-D-07.2.DORA",
+        "inherits_from": "SO-DORA-013 (partial via Art. 9(4)(e) — D-07.4 primary, D-07.2 partial by inference only)"
+      },
+      {
+        "subdomain": "D-07.3",
+        "regulation": "NIS2",
+        "so_id": "SO-D-07.3.NIS2",
+        "inherits_from": "SO-NIS2-017 (partial via the maintenance dimension — `SO-NIS2-017` routes to D-07.3 via Art. 21(2)(e) third clause)"
+      },
+      {
+        "subdomain": "D-07.3",
+        "regulation": "CRA",
+        "so_id": "SO-D-07.3.CRA",
+        "inherits_from": "SO-CRA-009 (partial cross-ref via Annex I Part II (7) — secure update distribution; SO-CRA-009 primary sub-domain is D-02.2 patch management with cross-ref to D-07.3 partial)"
+      },
+      {
+        "subdomain": "D-09.3",
+        "regulation": "CRA",
+        "so_id": "SO-D-09.3.CRA",
+        "inherits_from": "SO-CRA-061"
+      },
+      {
+        "subdomain": "D-09.4",
+        "regulation": "DORA",
+        "so_id": "SO-D-09.4.DORA",
+        "inherits_from": "(out-of-scope as RoPA-equivalent — partial via DORA Art. 9(4)(a) SO-DORA-018 cross)"
+      },
+      {
+        "subdomain": "D-09.4",
+        "regulation": "AI_Act",
+        "so_id": "SO-D-09.4.AI_Act",
+        "inherits_from": "SO-AIACT-009 + SO-AIACT-010 + SO-AIACT-008 (logs)"
+      }
+    ]
+  },
+  "sr_without_so": {
+    "count": 0,
+    "items": [],
+    "justified_count": 7,
+    "justified_items": [
+      {
+        "subdomain": "D-07.3",
+        "regulation": "AI_Act",
+        "sr_id": "SR-AIACT-023",
+        "sr_title": "Adversarial evaluation of GPAI models for systemic risk mitigation",
+        "justification": "1 SR (SR-AIACT-023) targets D-07.3 but no AI_Act SO exists. Per source MD line 109, 'AI_Act (out-of-scope). AI Act does not impose CI/CD mandate. SR-AIACT-023 (Art. 55(1)(a) GPAI evaluation with adversarial testing) has testing-and-validation dimensions but not CI/CD build-time controls'. SR-AIACT-023 is preserved as a partial-coverage cross-ref (testing-and-validation dimension touches the CI/CD pipeline evidence layer) but is not anchored to a D-07.3 AI_Act SO because AI_Act does not impose a CI/CD-pipeline obligation. CORR-030 may re-anchor SR-AIACT-023 to D-07.2 (testing dimension) or to a D-08.2 (role-specific AI competence) dimension."
+      },
+      {
+        "subdomain": "D-08.1",
+        "regulation": "CRA",
+        "sr_id": "SR-CRA-071",
+        "sr_title": "User-facing and integrator-facing secure-use instructions",
+        "justification": "4 SRs (SR-CRA-071, SR-CRA-107, SR-CRA-110, SR-CRA-111) target D-08.1 but no CRA SO exists. Per source MD line 39, CRA is 'partial coverage' (Annex II §8 user-instructions only — not workforce awareness). The CRA-side user-instructions obligation is preserved as a partial-coverage cross-ref to the D-08.1 awareness layer; the primary CRA SO is SR-CRA-048 (Annex II §8 user-instructions) which is anchored in D-08.1 for the user-audience dimension only. No standalone CRA SO for D-08.1 is needed because the workforce-awareness obligation is not in the OJ text; Annex II §8 instructions are user-facing, not workforce-facing. CORR-030 will consider whether to create an explicit partial-coverage CRA SO here or to re-anchor these SRs to a different subdomain."
+      },
+      {
+        "subdomain": "D-08.1",
+        "regulation": "CRA",
+        "sr_id": "SR-CRA-107",
+        "sr_title": "User-facing lifecycle security instructions package",
+        "justification": "4 SRs (SR-CRA-071, SR-CRA-107, SR-CRA-110, SR-CRA-111) target D-08.1 but no CRA SO exists. Per source MD line 39, CRA is 'partial coverage' (Annex II §8 user-instructions only — not workforce awareness). The CRA-side user-instructions obligation is preserved as a partial-coverage cross-ref to the D-08.1 awareness layer; the primary CRA SO is SR-CRA-048 (Annex II §8 user-instructions) which is anchored in D-08.1 for the user-audience dimension only. No standalone CRA SO for D-08.1 is needed because the workforce-awareness obligation is not in the OJ text; Annex II §8 instructions are user-facing, not workforce-facing. CORR-030 will consider whether to create an explicit partial-coverage CRA SO here or to re-anchor these SRs to a different subdomain."
+      },
+      {
+        "subdomain": "D-08.2",
+        "regulation": "CRA",
+        "sr_id": "SR-CRA-108",
+        "sr_title": "Integrator-facing upstream product information delivery",
+        "justification": "1 SR (SR-CRA-108) targets D-08.2 but no CRA SO exists. Per source MD line 41, 'CRA's role-specific dimension is integrator-facing (Annex II §8(f)) — B2B audience, not workforce'. SR-CRA-108 (integrator-facing upstream product information delivery) is a partial-coverage cross-ref to the workforce-competence layer. No standalone CRA SO for D-08.2 is needed because CRA does not impose workforce training; it imposes integrator information delivery. CORR-030 will consider whether to add a partial-coverage CRA SO for the integrator dimension."
+      },
+      {
+        "subdomain": "D-08.1",
+        "regulation": "CRA",
+        "sr_id": "SR-CRA-110",
+        "sr_title": "User-discoverable auto-update opt-out pathway",
+        "justification": "4 SRs (SR-CRA-071, SR-CRA-107, SR-CRA-110, SR-CRA-111) target D-08.1 but no CRA SO exists. Per source MD line 39, CRA is 'partial coverage' (Annex II §8 user-instructions only — not workforce awareness). The CRA-side user-instructions obligation is preserved as a partial-coverage cross-ref to the D-08.1 awareness layer; the primary CRA SO is SR-CRA-048 (Annex II §8 user-instructions) which is anchored in D-08.1 for the user-audience dimension only. No standalone CRA SO for D-08.1 is needed because the workforce-awareness obligation is not in the OJ text; Annex II §8 instructions are user-facing, not workforce-facing. CORR-030 will consider whether to create an explicit partial-coverage CRA SO here or to re-anchor these SRs to a different subdomain."
+      },
+      {
+        "subdomain": "D-08.1",
+        "regulation": "CRA",
+        "sr_id": "SR-CRA-111",
+        "sr_title": "User-facing secure decommissioning instructions",
+        "justification": "4 SRs (SR-CRA-071, SR-CRA-107, SR-CRA-110, SR-CRA-111) target D-08.1 but no CRA SO exists. Per source MD line 39, CRA is 'partial coverage' (Annex II §8 user-instructions only — not workforce awareness). The CRA-side user-instructions obligation is preserved as a partial-coverage cross-ref to the D-08.1 awareness layer; the primary CRA SO is SR-CRA-048 (Annex II §8 user-instructions) which is anchored in D-08.1 for the user-audience dimension only. No standalone CRA SO for D-08.1 is needed because the workforce-awareness obligation is not in the OJ text; Annex II §8 instructions are user-facing, not workforce-facing. CORR-030 will consider whether to create an explicit partial-coverage CRA SO here or to re-anchor these SRs to a different subdomain."
+      },
+      {
+        "subdomain": "D-01.2",
+        "regulation": "NIS2",
+        "sr_id": "SR-NIS2-007",
+        "sr_title": "Secured internal and emergency communications channels",
+        "justification": "1 SR (SR-NIS2-007) targets D-01.2 but no NIS2 SO exists. Per source MD line 38, NIS2 is 'partially present via SR-NIS2-007 on secured voice/video/text communications — flagged as out-of-scope for D-01.2 standalone by the CRDA taxonomy'. The secured-communications obligation is preserved as a partial-coverage cross-ref. No standalone NIS2 SO for D-01.2 is needed because the data-in-transit obligation does not extend to internal voice/video/text comms (those are in D-03.2 Communications Security). CORR-030 may re-anchor SR-NIS2-007 to D-03.2."
+      }
+    ]
+  },
+  "coverage_mismatches": {
+    "count": 238,
+    "items": [
+      {
+        "sr_id": "SR-AIACT-002",
+        "sub_domain_actual": [
+          "D-02.1",
+          "D-09.2"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-001"
+        ],
+        "so_covered_subdomains": [
+          "D-09.2"
+        ],
+        "extras": [
+          "D-02.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-003",
+        "sub_domain_actual": [
+          "D-02.1",
+          "D-02.4",
+          "D-10.3"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-002"
+        ],
+        "so_covered_subdomains": [
+          "D-02.4"
+        ],
+        "extras": [
+          "D-02.1",
+          "D-10.3"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-004",
+        "sub_domain_actual": [
+          "D-05.1",
+          "D-05.2"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-003"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-05.1",
+          "D-05.2"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-005",
+        "sub_domain_actual": [
+          "D-05.1",
+          "D-05.2"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-003"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-05.1",
+          "D-05.2"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-006",
+        "sub_domain_actual": [
+          "D-05.1"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-004"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-05.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-007",
+        "sub_domain_actual": [
+          "D-10.2"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-005"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-10.2"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-008",
+        "sub_domain_actual": [
+          "D-05.2",
+          "D-10.2"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-006"
+        ],
+        "so_covered_subdomains": [
+          "D-05.2"
+        ],
+        "extras": [
+          "D-10.2"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-009",
+        "sub_domain_actual": [
+          "D-10.2"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-006"
+        ],
+        "so_covered_subdomains": [
+          "D-05.2"
+        ],
+        "extras": [
+          "D-10.2"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-010",
+        "sub_domain_actual": [
+          "D-09.1"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-007"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-09.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-011",
+        "sub_domain_actual": [
+          "D-09.1"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-007"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-09.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-012",
+        "sub_domain_actual": [
+          "D-07.1",
+          "D-08.2"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-008"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-07.1",
+          "D-08.2"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-013",
+        "sub_domain_actual": [
+          "D-08.2"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-008"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-08.2"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-014",
+        "sub_domain_actual": [
+          "D-02.1",
+          "D-07.1"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-009"
+        ],
+        "so_covered_subdomains": [
+          "D-01.4"
+        ],
+        "extras": [
+          "D-02.1",
+          "D-07.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-015",
+        "sub_domain_actual": [
+          "D-01.4",
+          "D-02.1"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-009"
+        ],
+        "so_covered_subdomains": [
+          "D-01.4"
+        ],
+        "extras": [
+          "D-02.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-016",
+        "sub_domain_actual": [
+          "D-02.1",
+          "D-07.2"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-009"
+        ],
+        "so_covered_subdomains": [
+          "D-01.4"
+        ],
+        "extras": [
+          "D-02.1",
+          "D-07.2"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-017",
+        "sub_domain_actual": [
+          "D-09.1"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-010"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-09.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-018",
+        "sub_domain_actual": [
+          "D-07.1"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-010"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-07.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-019",
+        "sub_domain_actual": [
+          "D-09.1"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-011"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-09.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-020",
+        "sub_domain_actual": [
+          "D-08.2",
+          "D-09.1"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-011"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-08.2",
+          "D-09.1"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-023",
+        "sub_domain_actual": [
+          "D-02.1",
+          "D-07.3"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-014"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.1",
+          "D-07.3"
+        ]
+      },
+      {
+        "sr_id": "SR-AIACT-024",
+        "sub_domain_actual": [
+          "D-04.3"
+        ],
+        "linked_objectives": [
+          "SO-AIACT-014"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-04.3"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-001",
+        "sub_domain_actual": [
+          "D-01.1",
+          "D-01.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-001",
+          "SO-CRA-045"
+        ],
+        "so_covered_subdomains": [
+          "D-07.1"
+        ],
+        "extras": [
+          "D-01.1",
+          "D-01.2"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-004",
+        "sub_domain_actual": [
+          "D-01.1",
+          "D-01.3",
+          "D-03.3"
+        ],
+        "linked_objectives": [
+          "SO-CRA-004"
+        ],
+        "so_covered_subdomains": [
+          "D-01.3"
+        ],
+        "extras": [
+          "D-01.1",
+          "D-03.3"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-005",
+        "sub_domain_actual": [
+          "D-01.4",
+          "D-10.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-005"
+        ],
+        "so_covered_subdomains": [
+          "D-01.4"
+        ],
+        "extras": [
+          "D-10.2"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-006",
+        "sub_domain_actual": [
+          "D-02.1",
+          "D-02.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-006",
+          "SO-CRA-008"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.1",
+          "D-02.2"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-007",
+        "sub_domain_actual": [
+          "D-02.1"
+        ],
+        "linked_objectives": [
+          "SO-CRA-006",
+          "SO-CRA-007"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.1"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-008",
+        "sub_domain_actual": [
+          "D-02.1",
+          "D-06.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-007",
+          "SO-CRA-038"
+        ],
+        "so_covered_subdomains": [
+          "D-06.2"
+        ],
+        "extras": [
+          "D-02.1"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-009",
+        "sub_domain_actual": [
+          "D-02.1",
+          "D-06.2",
+          "D-09.4"
+        ],
+        "linked_objectives": [
+          "SO-CRA-007",
+          "SO-CRA-038"
+        ],
+        "so_covered_subdomains": [
+          "D-06.2"
+        ],
+        "extras": [
+          "D-02.1",
+          "D-09.4"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-010",
+        "sub_domain_actual": [
+          "D-02.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-008"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.2"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-011",
+        "sub_domain_actual": [
+          "D-02.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-008",
+          "SO-CRA-009"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.2"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-012",
+        "sub_domain_actual": [
+          "D-02.2",
+          "D-04.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-010"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.2",
+          "D-04.2"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-013",
+        "sub_domain_actual": [
+          "D-02.2",
+          "D-09.4"
+        ],
+        "linked_objectives": [
+          "SO-CRA-010",
+          "SO-CRA-061"
+        ],
+        "so_covered_subdomains": [
+          "D-09.3"
+        ],
+        "extras": [
+          "D-02.2",
+          "D-09.4"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-014",
+        "sub_domain_actual": [
+          "D-02.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-010",
+          "SO-CRA-061"
+        ],
+        "so_covered_subdomains": [
+          "D-09.3"
+        ],
+        "extras": [
+          "D-02.2"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-015",
+        "sub_domain_actual": [
+          "D-02.2",
+          "D-07.4",
+          "D-09.4"
+        ],
+        "linked_objectives": [
+          "SO-CRA-060",
+          "SO-CRA-047"
+        ],
+        "so_covered_subdomains": [
+          "D-07.4"
+        ],
+        "extras": [
+          "D-02.2",
+          "D-09.4"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-016",
+        "sub_domain_actual": [
+          "D-02.2",
+          "D-05.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-011"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.2",
+          "D-05.2"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-017",
+        "sub_domain_actual": [
+          "D-02.2"
+        ],
+        "linked_objectives": [
+          "SO-CRA-009"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.2"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-018",
+        "sub_domain_actual": [
+          "D-02.2",
+          "D-03.4"
+        ],
+        "linked_objectives": [
+          "SO-CRA-019",
+          "SO-CRA-009"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.2",
+          "D-03.4"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-019",
+        "sub_domain_actual": [
+          "D-02.3",
+          "D-09.1"
+        ],
+        "linked_objectives": [
+          "SO-CRA-012",
+          "SO-CRA-049"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.3",
+          "D-09.1"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-020",
+        "sub_domain_actual": [
+          "D-02.3"
+        ],
+        "linked_objectives": [
+          "SO-CRA-012"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.3"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-021",
+        "sub_domain_actual": [
+          "D-02.3",
+          "D-09.1",
+          "D-09.4"
+        ],
+        "linked_objectives": [
+          "SO-CRA-013"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-02.3",
+          "D-09.1",
+          "D-09.4"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-022",
+        "sub_domain_actual": [
+          "D-02.4",
+          "D-09.4",
+          "D-10.3"
+        ],
+        "linked_objectives": [
+          "SO-CRA-014",
+          "SO-CRA-069"
+        ],
+        "so_covered_subdomains": [
+          "D-02.4"
+        ],
+        "extras": [
+          "D-09.4",
+          "D-10.3"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-023",
+        "sub_domain_actual": [
+          "D-03.1",
+          "D-03.3",
+          "D-09.4"
+        ],
+        "linked_objectives": [
+          "SO-CRA-015",
+          "SO-CRA-056"
+        ],
+        "so_covered_subdomains": [
+          "D-03.1"
+        ],
+        "extras": [
+          "D-03.3",
+          "D-09.4"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-024",
+        "sub_domain_actual": [
+          "D-03.1",
+          "D-03.3"
+        ],
+        "linked_objectives": [
+          "SO-CRA-017"
+        ],
+        "so_covered_subdomains": [
+          "D-03.3"
+        ],
+        "extras": [
+          "D-03.1"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-025",
+        "sub_domain_actual": [
+          "D-03.4"
+        ],
+        "linked_objectives": [
+          "SO-CRA-018",
+          "SO-CRA-045"
+        ],
+        "so_covered_subdomains": [
+          "D-07.1"
+        ],
+        "extras": [
+          "D-03.4"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-026",
+        "sub_domain_actual": [
+          "D-03.4"
+        ],
+        "linked_objectives": [
+          "SO-CRA-018"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-03.4"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-027",
+        "sub_domain_actual": [
+          "D-04.1",
+          "D-10.1"
+        ],
+        "linked_objectives": [
+          "SO-CRA-020",
+          "SO-CRA-068"
+        ],
+        "so_covered_subdomains": [
+          "D-04.1"
+        ],
+        "extras": [
+          "D-10.1"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-028",
+        "sub_domain_actual": [
+          "D-04.3"
+        ],
+        "linked_objectives": [
+          "SO-CRA-023"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-04.3"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-030",
+        "sub_domain_actual": [
+          "D-04.3",
+          "D-09.4"
+        ],
+        "linked_objectives": [
+          "SO-CRA-024"
+        ],
+        "so_covered_subdomains": [
+          "D-04.3"
+        ],
+        "extras": [
+          "D-09.4"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-031",
+        "sub_domain_actual": [
+          "D-04.3"
+        ],
+        "linked_objectives": [
+          "SO-CRA-025",
+          "SO-CRA-027"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-04.3"
+        ]
+      },
+      {
+        "sr_id": "SR-CRA-032",
+        "sub_domain_actual": [
+          "D-04.3"
+        ],
+        "linked_objectives": [
+          "SO-CRA-026"
+        ],
+        "so_covered_subdomains": [],
+        "extras": [
+          "D-04.3"
+        ]
+      }
+    ],
+    "total_excess": 238
+  },
+  "known_gaps": {
+    "deferred_to": "CORR-030",
+    "so_without_sr_count": 8,
+    "note": "8 SO entries have no SR. These may be intentional (framework coverage without specific obligation) or may need new SRs. See CORR-030 scope."
+  }
+}

@@ -133,14 +133,85 @@ def _extract_considerations(text: str) -> list[str]:
 
 
 def _parse_yaml_block(body: str) -> dict[str, Any]:
+    """Parse a YAML fenced block from a SubDomain file.
+
+    Two strategies are combined:
+
+    1. **Primary**: standard ``yaml.safe_load`` on the block content.
+    2. **Fallback** (CORR-029): if the primary parse fails (e.g. because a
+       field like ``verified_relationship`` contains unquoted special
+       characters like ``():,**``), pre-extract the critical single-line
+       fields by regex so that ``inherits_from`` (the SO↔SR bridge) and
+       friends are still populated.
+
+    The fallback is critical because the SO↔SR index depends on
+    ``inherits_from`` being populated. Before CORR-029, this field was
+    ``None`` for 100% of the 38 subdomains because the unquoted
+    ``verified_relationship`` value broke the entire YAML parse.
+    """
     blocks = extract_fenced_blocks(body, lang="yaml")
     if not blocks:
         return {}
+    content = blocks[0][1]
     try:
-        parsed = yaml.safe_load(blocks[0][1])
-        return parsed if isinstance(parsed, dict) else {}
+        parsed = yaml.safe_load(content)
+        result = parsed if isinstance(parsed, dict) else {}
     except yaml.YAMLError:
-        return {}
+        result = {}
+
+    # If the primary parse returned a result and contains inherits_from,
+    # we're done. Otherwise (or as a defensive overlay) extract the critical
+    # fields by regex — this is robust to almost any value since the values
+    # are short strings on a single line.
+    for field in (
+        "id",
+        "inherits_from",
+        "source_SR",
+        "activation",
+        "applies_to",
+        "phase_1A_role",
+        "subdomain",
+    ):
+        if not result.get(field):
+            extracted = _extract_yaml_field(content, field)
+            if extracted is not None:
+                result[field] = extracted
+    return result
+
+
+# Field names whose value can be safely extracted as a single line.
+# ``verified_relationship`` and ``objective`` / ``considerations`` are
+# excluded because they may legitimately span multiple lines.
+_SIMPLE_YAML_FIELDS = frozenset(
+    {
+        "id",
+        "inherits_from",
+        "source_SR",
+        "activation",
+        "applies_to",
+        "phase_1A_role",
+        "subdomain",
+    }
+)
+
+_YAML_FIELD_RE_TEMPLATE = r"^\s*{field}:\s*(?P<v>.+?)\s*$"
+
+
+def _extract_yaml_field(yaml_content: str, field: str) -> str | None:
+    """Extract a single-line YAML field by regex.
+
+    Returns the trimmed value, or ``None`` if the field is not present.
+    Only the first occurrence is returned; multi-value lists (e.g.
+    ``applies_to: [GDPR, CRA]``) are returned as a single string —
+    callers that need a list should split on commas.
+    """
+    if field not in _SIMPLE_YAML_FIELDS:
+        # Defensive: don't try to extract fields that may legitimately
+        # span multiple lines.
+        return None
+    pat = re.compile(_YAML_FIELD_RE_TEMPLATE.format(field=re.escape(field)), re.MULTILINE)
+    m = pat.search(yaml_content)
+    return m.group("v").strip() if m else None
 
 
 def _parse_pair(block: str, subdomain_id: str, a: str, b: str) -> dict[str, Any]:
@@ -367,5 +438,46 @@ def parse_subdomain(path: Path) -> dict[str, Any]:
             "hso": {"raw_md": hso_raw},
             "security_requirements": {"raw_md": sr_raw},
         },
+        "orphan_sr_justifications": _parse_orphan_justifications(body),
         "warnings": warnings,
     }
+
+
+# CORR-029: extract orphan-SR justifications from a `## Decisions (CORR-029)`
+# block. Format:
+#
+#   ## Decisions (CORR-029)
+#
+#   ### Orphan SR justifications
+#
+#   **CRA**: Justification text...
+#   **AI_Act**: Justification text...
+#
+# Returns a {regulation: justification_text} dict.
+_DECISIONS_BLOCK_RE = re.compile(
+    r"^##\s+Decisions\s+\(CORR-\d+\)\s*$(?P<body>.*?)(?=^##\s|\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+_ORPHAN_JUSTIFICATION_RE = re.compile(
+    r"^\*\*(?P<reg>[A-Za-z_0-9]+)\*\*:\s*(?P<text>.+?)(?=\n\n\*\*[A-Za-z_0-9]+\*\*:|\n###|\n##|\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def _parse_orphan_justifications(body: str) -> dict[str, str]:
+    """CORR-029: parse the `## Decisions (CORR-029) → ### Orphan SR justifications`
+    block. Returns a {regulation: justification} dict.
+    """
+    out: dict[str, str] = {}
+    m = _DECISIONS_BLOCK_RE.search(body)
+    if not m:
+        return out
+    block_body = m.group("body")
+    if "Orphan SR justifications" not in block_body:
+        return out
+    for jm in _ORPHAN_JUSTIFICATION_RE.finditer(block_body):
+        reg = jm.group("reg")
+        text = jm.group("text").strip()
+        if reg and text:
+            out[reg] = text
+    return out
