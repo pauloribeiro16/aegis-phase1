@@ -46,7 +46,7 @@ _PAIR_H4_RE = re.compile(
     re.MULTILINE,
 )
 _SUB_SO_H3_RE = re.compile(
-    r"^###\s+(D-\d{2}\.\d+\.\d+)\s*—\s*Sub-SO\s+for\s+([A-Za-z_0-9 ]+?)\s*$",
+    r"^###\s+(D-\d{2}\.\d+\.\d+)\s*—\s*Sub-SO\s+for\s+([A-Za-z_0-9 ]+?)(?:\s+\([^)]+\))?\s*$",
     re.MULTILINE,
 )
 _HL_H3_RE = re.compile(

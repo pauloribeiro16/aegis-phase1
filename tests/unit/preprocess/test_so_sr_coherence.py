@@ -88,14 +88,10 @@ def test_no_silent_orphan_creation(audit_report: dict) -> None:
     """B.4: the orphan (reg, sub) pairs must be documented (justified) in the
     source MDs / JSON shards, not silently created.
 
-    The 2 (reg, sub) pairs that remain orphans after CORR-029's
-    (partial) parser fix are (AI_Act D-07.3, NIS2 D-01.2). The other
-    2 from the original (CRA D-08.1, CRA D-08.2) are NO LONGER
-    orphans because the parser fix for `(partial)` in sub-SO titles
-    now correctly captures their CRA SOs (D-08.1.3, D-08.2.3), so
-    the corresponding SRs are now classified as partial-coverage
-    (linked SOs exist but don't cover all sub_domains), not as raw
-    orphans. This is the CORRECT state.
+    CORR-030 (2026-07-20): the 2 (reg, sub) pairs that remained orphans
+    after CORR-029's parser fix (AI_Act D-07.3, NIS2 D-01.2) are now
+    resolved by CORR-030 phantom sub-SO propagation. So both the raw
+    and the justified list are now empty.
     """
     sr_no_so = audit_report["sr_without_so"]
     # The raw orphans list should be empty
@@ -103,17 +99,11 @@ def test_no_silent_orphan_creation(audit_report: dict) -> None:
         f"unexpected un-justified SR-without-SO pairs: "
         f"{[(i['regulation'], i['subdomain']) for i in sr_no_so['items']]}"
     )
-    # The justified list should have at least 2 entries
-    # (the 2 known orphans that remain after the (partial) parser fix)
-    assert sr_no_so.get("justified_count", 0) >= 2, (
-        f"expected ≥2 justified orphans, got {sr_no_so.get('justified_count', 0)}"
+    # CORR-030: the previously justified orphans are now resolved by
+    # phantoms, so the justified list is also empty.
+    assert sr_no_so.get("justified_count", 0) == 0, (
+        f"expected 0 justified orphans after CORR-030, got {sr_no_so.get('justified_count', 0)}"
     )
-    # The specific known orphans must be present
-    actual_justified = {
-        (it["regulation"], it["subdomain"]) for it in sr_no_so["justified_items"]
-    }
-    assert ("AI_Act", "D-07.3") in actual_justified
-    assert ("NIS2", "D-01.2") in actual_justified, f"expected ≥4 justified orphans, got {sr_no_so.get('justified_count', 0)}"
 
 
 def test_known_so_without_sr_justified(audit_report: dict) -> None:

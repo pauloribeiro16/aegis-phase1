@@ -95,6 +95,15 @@ def _build_so_index(subdomains: dict[str, dict]) -> dict[tuple[str, str], set[st
                 parts = [str(p).strip() for p in inh]
             else:
                 parts = re.split(r"[,+/]\s*|\s+and\s+", str(inh))
+            # CORR-030: strip surrounding list brackets and any
+            # trailing comment/parenthetical from each part so that
+            # ``[SO-CRA-039, SO-CRA-040]`` and
+            # ``SO-CRA-009 (partial cross-ref ...)`` both split cleanly.
+            parts = [
+                re.sub(r"^[\[\(]\s*|\s*[\]\)]$", "", p).strip()
+                for p in parts
+            ]
+            parts = [re.sub(r"\s+[#(].*$|\s+\(.*\)$", "", p).strip() for p in parts]
             for part in parts:
                 part = part.strip()
                 if part.startswith("SO-"):
