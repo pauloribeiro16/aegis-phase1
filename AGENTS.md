@@ -92,6 +92,11 @@ mypy src/aegis_phase1/
 
 # Pre-commit
 pre-commit run --all-files
+
+# CORR-027: rebuild preproc_out + run the CSF audit
+python -m scripts.preprocess build                              # regenerate preproc_out/
+python -m scripts.preprocess.audit_csf_mapping                 # CSF coverage report (38 subdomains)
+bash .hooks/ci-csf-frozen-list.sh                              # .md ↔ preproc_out parity gate
 ```
 
 ---
