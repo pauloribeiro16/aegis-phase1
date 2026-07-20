@@ -118,6 +118,39 @@
       ]
     },
     {
+      "id": "SO-D-08.1.CRA",
+      "yaml_id": "SO-D-08.1.CRA",
+      "regulation": "CRA",
+      "subdomain_id": "D-08.1",
+      "applies_to": "[CRA]",
+      "inherits_from": "SO-CRA-048 (partial)",
+      "source_SR": "SR-CRA-071",
+      "activation": "if CRA in applicable_regs",
+      "phase_1A_role": "1_of_N",
+      "verified_relationship": null,
+      "objective": "A product with digital elements is accompanied by detailed instructions — or an internet address referring to such detailed instructions — covering the necessary measures during initial commissioning and throughout the lifetime of the product to ensure its secure use (Annex II §8(a)–(e) CRA), and — where the product is intended for integration into other products — the information necessary for the integrator to comply with the essential cybersecurity requirements set out in Part I of Annex I and the documentation requirements set out in Annex VII (Annex II §8(f) CRA).",
+      "considerations": [
+        "Annex II §8(a) covers necessary measures during initial commissioning and throughout the lifetime of the product; §8(b) covers how changes to the product can affect the security of data; §8(c) covers how security-relevant updates can be installed; §8(d) covers secure decommissioning of the product including user data removal; §8(e) covers how the default setting enabling automatic installation of security updates can be turned off.",
+        "Art. 13(18) extends this to a duty to provide the instructions in paper or electronic form, accessible for the support period (10-year Annex II information accessibility; cross to D-09.4).",
+        "The CRA participation at D-08.1 is partial: Annex II §8(a)–(f) addresses the end-user audience with the product — not the manufacturer's or operator's workforce. AEGIS taxonomy §4.1 marks NIS 2 / DORA / GDPR as the authorities for full staff awareness.",
+        "The Annex II §8(f) integrator information is the workforce-side partial dimension — integrators who incorporate the product into a downstream system are informed of the cybersecurity measures required to maintain Annex I compliance (B2B integrators are the closest workforce-side dimension at D-08.1).",
+        "The chosen PR.AT-01 mapping at SR-CRA-071 anchors the workforce-side (integrator) dimension; the user-side is marked UNMAPPED_CSF per SR-CRA-071 unmapped_csf_justification (NIST CSF 2.0 PR.AT-01 trains the workforce, not the end-user; no direct CSF 2.0 Subcategory for end-user instructions on secure product use).",
+        "For an integrated manufacturer-controller-deployer, the CRA-side user-facing instructions are independent of the GDPR workforce awareness programme (DPO-catalysed workforce) and the NIS 2 hygiene baseline on the manufacturer workforce (substantively scope-disjoint audiences — workforce vs end-user).",
+        "For a CRA-regulated manufacturer, the workforce awareness obligation is discharged via NIS 2 / DORA / GDPR; the parallel tracks coexist on substantively scope-disjoint audiences."
+      ],
+      "anchors": [
+        "Annex I",
+        "Annex II",
+        "Annex VII (Annex II §8(f)",
+        "Art. 13(18)",
+        "§4",
+        "§8"
+      ],
+      "csf": [
+        "PR.AT-01"
+      ]
+    },
+    {
       "id": "SO-D-08.1.DORA",
       "yaml_id": "SO-D-08.1.DORA",
       "regulation": "DORA",
@@ -358,6 +391,7 @@
   "orphan_sr_justifications": {
     "CRA": "4 SRs (SR-CRA-071, SR-CRA-107, SR-CRA-110, SR-CRA-111) target D-08.1 but no CRA SO exists. Per source MD line 39, CRA is 'partial coverage' (Annex II §8 user-instructions only — not workforce awareness). The CRA-side user-instructions obligation is preserved as a partial-coverage cross-ref to the D-08.1 awareness layer; the primary CRA SO is SR-CRA-048 (Annex II §8 user-instructions) which is anchored in D-08.1 for the user-audience dimension only. No standalone CRA SO for D-08.1 is needed because the workforce-awareness obligation is not in the OJ text; Annex II §8 instructions are user-facing, not workforce-facing. CORR-030 will consider whether to create an explicit partial-coverage CRA SO here or to re-anchor these SRs to a different subdomain."
   },
+  "orphan_so_justifications": {},
   "warnings": [],
   "csf_hint": [
     "PR.AT-01"

@@ -34,6 +34,7 @@ import argparse
 import datetime as _dt
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -74,19 +75,30 @@ def _load_srs() -> list[tuple[str, dict]]:
 
 
 def _build_so_index(subdomains: dict[str, dict]) -> dict[tuple[str, str], set[str]]:
-    """Build (reg, so_id) → set of subdomain_ids.
+    """Build (reg, regulatory_so_id) → set of subdomain_ids.
 
-    Uses inherits_from (regulatory ID) and id (local ID) as the keys.
-    This is the bridge between the two ID conventions.
+    Only ``inherits_from`` is used (the regulatory SO ID). The local
+    ``id`` / ``yaml_id`` are NOT indexed because they don't help resolve
+    regulatory IDs referenced in SRs' ``linked_objectives``.
+
+    ``inherits_from`` can be a string (possibly multi-value, separated by
+    ',', '+', '/', or ' and ') or a list of strings. We split and dedupe.
     """
     out: dict[tuple[str, str], set[str]] = {}
     for sid, sd in subdomains.items():
         for hso in sd.get("hso_per_reg", []):
             reg = hso.get("regulation", "?")
-            for k in ("inherits_from", "id", "yaml_id", "source_SR"):
-                v = hso.get(k)
-                if v and isinstance(v, str) and v.startswith("SO-"):
-                    out.setdefault((reg, v), set()).add(sid)
+            inh = hso.get("inherits_from")
+            if not inh:
+                continue
+            if isinstance(inh, list):
+                parts = [str(p).strip() for p in inh]
+            else:
+                parts = re.split(r"[,+/]\s*|\s+and\s+", str(inh))
+            for part in parts:
+                part = part.strip()
+                if part.startswith("SO-"):
+                    out.setdefault((reg, part), set()).add(sid)
     return out
 
 
@@ -177,24 +189,78 @@ def _audit() -> dict:
                     )
 
     # 4. Coverage check (sub_domain ⊆ ∪ of SO-covered subs)
-    coverage_mismatches: list[dict] = []
+    #    Two failure modes:
+    #    a) **Unresolved** — SR references SOs that don't exist in any
+    #       hso_per_reg[].inherits_from (the regulatory SO is defined in
+    #       01_SecurityObjectives.md but was never propagated to a subdomain).
+    #    b) **Partial** — SR.sub_domain is a superset of what the linked
+    #       SOs cover (the SO exists but covers fewer subdomains than the
+    #       SR claims).
+    coverage_unresolved: list[dict] = []
+    coverage_partial: list[dict] = []
+    coverage_full: int = 0
     for reg, sr in srs:
         expected_subs: set[str] = set()
+        unresolved_los: list[str] = []
         for so_id in sr.get("linked_objectives", []):
-            for s in so_index.get((reg, so_id), []):
-                expected_subs.add(s)
+            resolved = so_index.get((reg, so_id), set())
+            if not resolved:
+                unresolved_los.append(so_id)
+            expected_subs |= resolved
         actual_subs = set(sr.get("sub_domain", []))
         extras = actual_subs - expected_subs
-        if extras:
-            coverage_mismatches.append(
-                {
-                    "sr_id": sr["id"],
-                    "sub_domain_actual": sorted(actual_subs),
-                    "linked_objectives": sr.get("linked_objectives", []),
-                    "so_covered_subdomains": sorted(expected_subs),
-                    "extras": sorted(extras),
-                }
-            )
+        # Classify
+        if unresolved_los and not actual_subs:
+            # SR with linked_objectives but none resolve AND no sub_domain
+            coverage_unresolved.append({
+                "sr_id": sr["id"],
+                "sr_title": sr.get("title", "")[:80],
+                "linked_objectives": sr.get("linked_objectives", []),
+                "unresolved_los": unresolved_los,
+                "sub_domain": sorted(actual_subs),
+            })
+        elif unresolved_los:
+            # Some LOs unresolved + SR has sub_domain
+            coverage_unresolved.append({
+                "sr_id": sr["id"],
+                "sr_title": sr.get("title", "")[:80],
+                "linked_objectives": sr.get("linked_objectives", []),
+                "unresolved_los": unresolved_los,
+                "sub_domain": sorted(actual_subs),
+            })
+        elif extras:
+            # All LOs resolved but coverage partial
+            # Classify the pattern
+            if len(actual_subs) > 1:
+                pattern = "multi_subdomain"
+            else:
+                pattern = "so_narrower"
+            coverage_partial.append({
+                "sr_id": sr["id"],
+                "sr_title": sr.get("title", "")[:80],
+                "sub_domain": sorted(actual_subs),
+                "linked_objectives": sr.get("linked_objectives", []),
+                "so_covered_subdomains": sorted(expected_subs),
+                "extras": sorted(extras),
+                "pattern": pattern,
+            })
+        else:
+            coverage_full += 1
+
+    # Build distinct-unresolved analysis
+    distinct_unresolved: dict[tuple[str, str], dict] = {}
+    for entry in coverage_unresolved:
+        for so_id in entry["unresolved_los"]:
+            key = (entry.get("linked_objectives", []) and
+                   next((lo for lo in entry.get("linked_objectives", []) if lo == so_id), so_id),
+                   so_id)
+            # We don't have the reg in this entry; refactor to include it
+    # Rebuild with reg
+    distinct_unresolved_with_reg: dict[tuple[str, str], list[str]] = {}
+    for reg, sr in srs:
+        for so_id in sr.get("linked_objectives", []):
+            if (reg, so_id) not in so_index:
+                distinct_unresolved_with_reg.setdefault((reg, so_id), []).append(sr["id"])
 
     return {
         "schema_version": "1.0",
@@ -212,6 +278,9 @@ def _audit() -> dict:
             "sr_lo_resolution_pct": (
                 round(100 * resolved_lo / total_sr_lo, 1) if total_sr_lo else 0
             ),
+            "coverage_full": coverage_full,
+            "coverage_partial_count": len(coverage_partial),
+            "coverage_unresolved_count": len(coverage_unresolved),
         },
         "so_without_sr": {
             "count": len(so_no_sr),
@@ -225,18 +294,52 @@ def _audit() -> dict:
             "justified_count": len(sr_no_so_justified),
             "justified_items": sr_no_so_justified,
         },
-        "coverage_mismatches": {
-            "count": len(coverage_mismatches),
-            "items": coverage_mismatches[:50],  # cap for readability
-            "total_excess": len(coverage_mismatches),
+        "coverage_partial": {
+            # CORR-029c: every SR whose sub_domain is NOT fully covered
+            # by the union of its linked SOs (and all linked SOs resolve).
+            # Deferred to CORR-030 (user decision 2026-07-20).
+            "count": len(coverage_partial),
+            "by_pattern": {
+                pattern: sum(1 for e in coverage_partial if e["pattern"] == pattern)
+                for pattern in {e["pattern"] for e in coverage_partial}
+            },
+            "items": coverage_partial,
+        },
+        "coverage_unresolved": {
+            # CORR-029c: every SR whose linked_objectives reference
+            # regulatory SOs that don't exist in any hso_per_reg[].inherits_from
+            # (the regulatory SOs are defined in 01_SecurityObjectives.md but
+            # were never propagated to a subdomain).
+            # Deferred to CORR-030.
+            "count": len(coverage_unresolved),
+            "items": coverage_unresolved,
+            "distinct_unresolved": [
+                {
+                    "regulation": reg,
+                    "so_id": so_id,
+                    "referenced_by_srs": sorted(sr_ids),
+                    "reference_count": len(sr_ids),
+                }
+                for (reg, so_id), sr_ids in sorted(
+                    distinct_unresolved_with_reg.items(),
+                    key=lambda x: -len(x[1]),
+                )
+            ],
+            "distinct_count": len(distinct_unresolved_with_reg),
         },
         "known_gaps": {
             "deferred_to": "CORR-030",
+            "user_decision": "2026-07-20: 'Só auditar (deferir) — criar um relatório detalhado dos 166 sem mexer nos MDs'",
             "so_without_sr_count": len(so_no_sr),
+            "sr_partial_coverage_count": len(coverage_partial),
+            "sr_unresolved_lo_count": len(coverage_unresolved),
+            "distinct_unresolved_so_count": len(distinct_unresolved_with_reg),
             "note": (
-                f"{len(so_no_sr)} SO entries have no SR. These may be "
-                "intentional (framework coverage without specific obligation) "
-                "or may need new SRs. See CORR-030 scope."
+                f"{len(so_no_sr)} SO entries have no SR; {len(coverage_partial)} "
+                f"SRs have partial SO coverage; {len(coverage_unresolved)} "
+                f"SRs reference unresolved regulatory SOs. All 166 gaps are "
+                f"documented in the report (deferred to CORR-030 per user "
+                f"decision 2026-07-20)."
             ),
         },
     }
@@ -267,7 +370,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"SO without SR: {report['so_without_sr']['count']}")
     print(f"SR without SO: {report['sr_without_so']['count']}")
-    print(f"Coverage mismatches: {report['coverage_mismatches']['count']}")
+    print(
+        f"Coverage: full={t['coverage_full']}, partial={t['coverage_partial_count']}, "
+        f"unresolved={t['coverage_unresolved_count']}"
+    )
+    by_pat = report["coverage_partial"].get("by_pattern", {})
+    if by_pat:
+        print(
+            f"  partial by pattern: "
+            + ", ".join(f"{k}={v}" for k, v in sorted(by_pat.items()))
+        )
+    print(
+        f"Coverage partial: {report['coverage_partial']['count']} "
+        f"(distinct unresolved: {report['coverage_unresolved']['distinct_count']})"
+    )
     return 0
 
 

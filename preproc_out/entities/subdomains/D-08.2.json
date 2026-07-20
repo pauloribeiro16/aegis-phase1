@@ -132,6 +132,44 @@
       ]
     },
     {
+      "id": "SO-D-08.2.CRA",
+      "yaml_id": "SO-D-08.2.CRA",
+      "regulation": "CRA",
+      "subdomain_id": "D-08.2",
+      "applies_to": "[CRA]",
+      "inherits_from": "SO-CRA-048 (partial via SR-CRA-108 Annex II §8(f))",
+      "source_SR": "SR-CRA-108",
+      "activation": "if CRA in applicable_regs",
+      "phase_1A_role": "1_of_N",
+      "verified_relationship": null,
+      "objective": "Where the product with digital elements is intended for integration into other products with digital elements, the manufacturer provides the information necessary for the integrator to comply with the essential cybersecurity requirements set out in Part I of Annex I and the documentation requirements set out in Annex VII (Annex II §8(f) CRA).",
+      "considerations": [
+        "The clause sits within the Annex II user-information package; it is the supply-chain-facing counterpart to the §8(a)–(e) user-facing instructions.",
+        "The CRA participation at D-08.2 is partial: Annex II §8(f) addresses the integrator-B2B audience — not the manufacturer's or operator's workforce. AEGIS taxonomy §4.1 marks NIS 2 / DORA as the authorities for full role-specific workforce competence.",
+        "The asymmetry — workforce training (NIS 2 / DORA / GDPR) vs product-integrator training (CRA) — is unique to D-08.2 (per DomainAnalysis §D-08.2 line 107).",
+        "The chosen PR.AT-04 mapping at SR-CRA-108 anchors the integrator's understanding of the upstream product's threat model, configuration constraints, and vulnerability-handling interface — the workforce-supplier analog for the integrator side.",
+        "GV.SC-03 (per SR-CRA-108 security_rationale) anchors the contractual / information-disclosure layer: the §8(f) information is the information counterpart to a contractually-anchored SCRM commitment.",
+        "The chosen reading of `intended for integration` is the manufacturer's documented intended purpose (Article 3(23) D23 + Annex II §4), not third-party speculation about possible integration patterns. Where the intended purpose does not include integration, §8(f) is not engaged.",
+        "For an integrated manufacturer-controller-deployer, the CRA-side Annex II §8(f) integrator information is independent of the GDPR Art. 39(1)(b) DPO-catalysed workforce training, the NIS 2 employee risk-identification training, the DORA Art. 13(6) internal staff training, and the AI Act Art. 14(4) + Art. 26(2) human-overseer competence (different audiences: integrator-B2B vs AI-overseer role within deployer organization) — substantively scope-disjoint across all four pairs."
+      ],
+      "anchors": [
+        "Annex I",
+        "Annex II",
+        "Annex VII (Annex II §8(f)",
+        "Art. 13(6)",
+        "Art. 14(4)",
+        "Art. 26(2)",
+        "Art. 39(1)",
+        "Article 3(23)",
+        "§4",
+        "§8"
+      ],
+      "csf": [
+        "GV.SC-03",
+        "PR.AT-04"
+      ]
+    },
+    {
       "id": "SO-D-08.2.DORA",
       "yaml_id": "SO-D-08.2.DORA",
       "regulation": "DORA",
@@ -522,6 +560,7 @@
   "orphan_sr_justifications": {
     "CRA": "1 SR (SR-CRA-108) targets D-08.2 but no CRA SO exists. Per source MD line 41, 'CRA's role-specific dimension is integrator-facing (Annex II §8(f)) — B2B audience, not workforce'. SR-CRA-108 (integrator-facing upstream product information delivery) is a partial-coverage cross-ref to the workforce-competence layer. No standalone CRA SO for D-08.2 is needed because CRA does not impose workforce training; it imposes integrator information delivery. CORR-030 will consider whether to add a partial-coverage CRA SO for the integrator dimension."
   },
+  "orphan_so_justifications": {},
   "warnings": [],
   "csf_hint": [
     "PR.AT-02"

@@ -64,7 +64,10 @@ def test_audit_report_exists(audit_report: dict) -> None:
     assert "totals" in audit_report
     assert "so_without_sr" in audit_report
     assert "sr_without_so" in audit_report
-    assert "coverage_mismatches" in audit_report
+    # CORR-029c: the audit now classifies coverage gaps as
+    # coverage_partial and coverage_unresolved (was coverage_mismatches).
+    assert "coverage_partial" in audit_report
+    assert "coverage_unresolved" in audit_report
 
 
 def test_audit_totals(audit_report: dict) -> None:
@@ -85,23 +88,32 @@ def test_no_silent_orphan_creation(audit_report: dict) -> None:
     """B.4: the orphan (reg, sub) pairs must be documented (justified) in the
     source MDs / JSON shards, not silently created.
 
-    The 4 (reg, sub) pairs (AI_Act D-07.3, CRA D-08.1, CRA D-08.2, NIS2 D-01.2)
-    are intentional partial-coverage or out-of-scope cross-refs (per the
-    source MDs). They are documented in each subdomain's
-    `orphan_sr_justifications` field. The audit must classify them as
-    'justified', not as raw orphans.
+    The 2 (reg, sub) pairs that remain orphans after CORR-029's
+    (partial) parser fix are (AI_Act D-07.3, NIS2 D-01.2). The other
+    2 from the original (CRA D-08.1, CRA D-08.2) are NO LONGER
+    orphans because the parser fix for `(partial)` in sub-SO titles
+    now correctly captures their CRA SOs (D-08.1.3, D-08.2.3), so
+    the corresponding SRs are now classified as partial-coverage
+    (linked SOs exist but don't cover all sub_domains), not as raw
+    orphans. This is the CORRECT state.
     """
     sr_no_so = audit_report["sr_without_so"]
-    # The raw orphans list should be empty (or very small — only new cases
-    # that haven't been justified yet).
+    # The raw orphans list should be empty
     assert sr_no_so["count"] == 0, (
         f"unexpected un-justified SR-without-SO pairs: "
         f"{[(i['regulation'], i['subdomain']) for i in sr_no_so['items']]}"
     )
-    # And the justified list should have at least 4 entries (the 4 known)
-    assert (
-        sr_no_so.get("justified_count", 0) >= 4
-    ), f"expected ≥4 justified orphans, got {sr_no_so.get('justified_count', 0)}"
+    # The justified list should have at least 2 entries
+    # (the 2 known orphans that remain after the (partial) parser fix)
+    assert sr_no_so.get("justified_count", 0) >= 2, (
+        f"expected ≥2 justified orphans, got {sr_no_so.get('justified_count', 0)}"
+    )
+    # The specific known orphans must be present
+    actual_justified = {
+        (it["regulation"], it["subdomain"]) for it in sr_no_so["justified_items"]
+    }
+    assert ("AI_Act", "D-07.3") in actual_justified
+    assert ("NIS2", "D-01.2") in actual_justified, f"expected ≥4 justified orphans, got {sr_no_so.get('justified_count', 0)}"
 
 
 def test_known_so_without_sr_justified(audit_report: dict) -> None:
@@ -122,3 +134,78 @@ def test_known_so_without_sr_justified(audit_report: dict) -> None:
     assert so_no_sr.get("justified_count", 0) == 8, (
         f"expected 8 justified SO-without-SR pairs, got {so_no_sr.get('justified_count', 0)}"
     )
+
+
+# ─── CORR-029c: coverage gaps detailed report ────────────────────────
+
+
+def test_coverage_gaps_documented(audit_report: dict) -> None:
+    """CORR-029c: the coverage gaps (partial + unresolved) are documented in
+    the report and deferred to CORR-030 (per user decision).
+
+    We do not assert zero gaps here (the user explicitly chose to defer).
+    We do assert that the report has the structure to enumerate them
+    so CORR-030 can pick up the work.
+    """
+    assert "coverage_partial" in audit_report
+    assert "coverage_unresolved" in audit_report
+
+    partial = audit_report["coverage_partial"]
+    assert "count" in partial
+    assert "items" in partial
+    assert "by_pattern" in partial
+    if partial["items"]:
+        first = partial["items"][0]
+        assert "sr_id" in first
+        assert "sub_domain" in first
+        assert "linked_objectives" in first
+        assert "so_covered_subdomains" in first
+        assert "extras" in first
+        assert "pattern" in first
+        assert first["pattern"] in ("multi_subdomain", "so_narrower")
+
+    unresolved = audit_report["coverage_unresolved"]
+    assert "distinct_unresolved" in unresolved
+    if unresolved["distinct_unresolved"]:
+        first = unresolved["distinct_unresolved"][0]
+        assert "regulation" in first
+        assert "so_id" in first
+        assert "referenced_by_srs" in first
+        assert "reference_count" in first
+
+
+def test_known_gaps_deferred_to_corr_030(audit_report: dict) -> None:
+    """The coverage gaps are explicitly deferred to CORR-030 with the
+    user decision captured for the audit trail.
+    """
+    gaps = audit_report["known_gaps"]
+    assert gaps["deferred_to"] == "CORR-030"
+    # The user decision is captured
+    assert "user_decision" in gaps
+    assert "2026-07-20" in gaps["user_decision"]
+    # And the user explicitly chose "defer_audit"
+    assert "defer" in gaps["user_decision"].lower() or "audit" in gaps["user_decision"].lower()
+
+
+def test_coverage_classification_invariants(audit_report: dict) -> None:
+    """Invariants on the coverage classification:
+    - every SR falls into exactly one of full / partial / unresolved
+    - the count of each is consistent with the items length
+    - the partial items have a 'pattern' field
+    - the unresolved items have unresolved_los (not sub_domain mismatch)
+    """
+    t = audit_report["totals"]
+    partial = audit_report["coverage_partial"]
+    unresolved = audit_report["coverage_unresolved"]
+    total_srs = t["srs_total"]
+    # Sum of categories must equal total SRs
+    assert (
+        t["coverage_full"] + len(partial["items"]) + len(unresolved["items"])
+        == total_srs
+    )
+    # Count fields must match items length
+    assert partial["count"] == len(partial["items"])
+    assert unresolved["count"] == len(unresolved["items"])
+    # The pattern counts should sum to the items count
+    if partial["by_pattern"]:
+        assert sum(partial["by_pattern"].values()) == len(partial["items"])
