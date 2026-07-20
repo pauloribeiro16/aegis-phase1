@@ -20,8 +20,10 @@ from ..frontmatter import parse_frontmatter
 from ..markdown import extract_table_rows
 
 # ``GDPR-CL05`` (Art. 5(1)(e)) → ("GDPR-CL05", "Art. 5(1)(e)")
+# CORR-032: accept legacy aliases (AIACT, AIA, AI Act) on input;
+# the canonical "AI_Act" form is what we emit.
 _CLAUSE_REF_RE = re.compile(
-    r"`?\b((?:GDPR|NIS2|CRA|DORA|AI_Act|AIACT)-CL\d+)`?\s*" r"(?:\(([^)]+)\))?",
+    r"`?\b((?:GDPR|NIS2|CRA|DORA|AI_Act|AIACT|AIA|AI[ _]?Act)-CL\d+)`?\s*" r"(?:\(([^)]+)\))?",
 )
 # ``SO-GDPR-001 (cross-ref)`` → ("SO-GDPR-001", True)
 _CROSS_REF_RE = re.compile(

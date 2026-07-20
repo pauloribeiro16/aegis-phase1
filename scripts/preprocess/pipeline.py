@@ -1780,14 +1780,17 @@ def _entity_kind(entity: dict[str, Any]) -> str:
         return "so"
     if eid.startswith("SR-"):
         return "sr"
-    if (
-        eid.startswith("GDPR-CL")
-        or eid.startswith("NIS2-CL")
-        or eid.startswith("CRA-CL")
-        or eid.startswith("DORA-CL")
-        or eid.startswith("AI_Act-CL")
-        or eid.startswith("AIACT-CL")
-    ):
+    # CORR-032: clause ids are {REG}-CL{NN}. We accept the legacy
+    # {REG}-C{NN} (GDPR/DORA drift) and the AI_Act family of aliases
+    # (AI_Act, AIACT, AIA, AI) so the pipeline keeps reading pre-CORR-032
+    # source MDs while we migrate. The canonical form is enforced on
+    # output by the canonical-id check in audit.
+    clause_prefixes = (
+        "GDPR-CL", "NIS2-CL", "CRA-CL", "DORA-CL",
+        "GDPR-C", "DORA-C",  # legacy short form
+        "AI_Act-CL", "AIACT-CL", "AIA-C", "AI-CL", "AI-C",
+    )
+    if any(eid.startswith(p) for p in clause_prefixes):
         return "clause"
     if re.match(r"^[A-Z]{2}\.[A-Z]{2}-\d{2}$", eid):
         return "csf"

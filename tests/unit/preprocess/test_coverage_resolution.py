@@ -138,16 +138,16 @@ def test_corresponding_phantom_phantoms_present() -> None:
         assert p.is_file(), f"missing {p}"
         return json.loads(p.read_text())
 
-    # 1. AI_Act D-07.3 phantom (SO-AIACT-001 cross-ref)
+    # 1. AI_Act D-07.3 phantom (SO-AI_Act-001 cross-ref)
     d = _load_subdomain("D-07.3")
     ai_phantoms = [
         hso
         for hso in d.get("hso_per_reg", [])
         if hso.get("regulation") == "AI_Act"
-        and (hso.get("inherits_from") or "").endswith("SO-AIACT-001")
+        and (hso.get("inherits_from") or "").endswith("SO-AI_Act-001")
         and hso.get("phase_1A_role") == "propagated"
     ]
-    assert ai_phantoms, "no AI_Act D-07.3 phantom (inherits SO-AIACT-001) found"
+    assert ai_phantoms, "no AI_Act D-07.3 phantom (inherits SO-AI_Act-001) found"
 
     # 2. NIS2 D-01.2 phantom (SO-NIS2-004 partial)
     d = _load_subdomain("D-01.2")

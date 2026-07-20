@@ -71,7 +71,7 @@ def _parse_source_clauses_in_sr(value: Any) -> list[dict[str, str]]:
             if entry["clause_id"]:
                 out.append(entry)
         elif isinstance(item, str):
-            m = re.search(r"((?:GDPR|NIS2|CRA|DORA|AI_Act|AIACT)-CL\d+)", item)
+            m = re.search(r"((?:GDPR|NIS2|CRA|DORA|AI_Act|AIACT|AIA|AI[ _]?Act)-CL\d+)", item)
             if m:
                 out.append({"clause_id": m.group(1), "article_ref": item})
     return out

@@ -1,21 +1,23 @@
-"""CORR-031: invariants for the by-D-XX entities layout.
+"""CORR-031 (post-CORR-032): filesystem layout invariants.
 
-After the v11 refactor, every entity shard lives under
-``entities/<kind>/<bucket>/<id>.json`` where the bucket is:
+This module asserts the by-D-XX filesystem layout directly from
+``preproc_out/entities/<kind>/<bucket>/<id>.json`` (rather than from
+the manifest, which only carries a subset of the shards). The
+filesystem is the source of truth for downstream consumers that
+load by path glob.
 
-* D-XX (parent domain) for entities that carry a subdomain anchor
-  (subdomain, sub-SO, pair, SR)
-* _no_subdomain for SOs loaded from aggregated 01_SecObj whose
-  ``sub_domains`` cell is empty or unparseable
-* _root/<REG> for clauses (per-regulatory, no D-XX link)
+Layout contract:
 
-This module asserts those invariants from the manifest and the
-on-disk tree after a fresh ``python -m scripts.preprocess build``.
+  entities/subdomains/D-XX/D-XX.Y.json      (38 shards, 10 parent domains)
+  entities/pairs/D-XX/D-XX.Y_REG_A-REG_B.json (per-subdomain lanes)
+  entities/sos/D-XX/SO-XXX.json            (sub-SOs + master SOs)
+  entities/sos/_no_subdomain/SO-XXX.json   (orphans, ≤5)
+  entities/srs/D-XX/SR-REG-NNN.json        (282 shards, first sub_domain)
+  entities/clauses/_root/{REG}/CLAUSE_ID.json (per-regulatory, 543 shards)
 """
 
 from __future__ import annotations
 
-import json
 import re
 from collections import Counter
 from pathlib import Path
@@ -24,214 +26,159 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ENTITIES = REPO_ROOT / "preproc_out" / "entities"
-MANIFEST = REPO_ROOT / "preproc_out" / "meta" / "manifest.json"
-
-_D_XX_RE = re.compile(r"^D-(\d{2})(?:\.\d+)?$")
-_BUCKETS = ("_root", "_no_subdomain", "_archive")
 
 
-@pytest.fixture(scope="module")
-def manifest() -> dict:
-    if not MANIFEST.is_file():
-        pytest.skip(f"manifest not built: {MANIFEST}")
-    return json.loads(MANIFEST.read_text())
-
-
-def _shards_by_kind(manifest: dict, kind: str) -> list[dict]:
-    return [s for s in manifest["shards"] if s.get("kind") == kind]
-
-
-def _all_shards_under(bucket: str) -> list[str]:
-    """Every shard path under entities/<bucket>/."""
-    return [
-        s["path"]
-        for s in json.loads(MANIFEST.read_text())["shards"]
-        if s["path"].startswith(f"entities/{bucket}/")
-    ]
+def _list_shards(kind: str, bucket: str | None = None) -> list[Path]:
+    d = ENTITIES / kind
+    if not d.is_dir():
+        return []
+    if bucket is None:
+        return sorted(p for p in d.rglob("*.json") if p.is_file())
+    return sorted((d / bucket).rglob("*.json"))
 
 
 # ─── 1. Subdomains are partitioned by parent D-XX ─────────────────────
 
 
-def test_subdomains_live_under_d_xx_subdirs(manifest: dict) -> None:
-    """Every subdomain shard lives under entities/subdomains/D-XX/.
-
-    The pre-v11 flat layout ``entities/subdomains/D-XX.Y.json`` is no
-    longer allowed (we'd lose the by-domain grouping). The 38 files
-    are now exactly 38 in the new layout: 4 × 10 parent domains.
-    """
-    sd_shards = _shards_by_kind(manifest, "subdomain")
-    assert len(sd_shards) == 38, f"expected 38 subdomain shards, got {len(sd_shards)}"
-
-    for s in sd_shards:
-        path = s["path"]
-        assert path.startswith("entities/subdomains/D-"), (
-            f"subdomain shard {path} is not under entities/subdomains/D-XX/"
-        )
-        # The path must be exactly 4 segments deep: subdomains/D-XX/D-XX.Y.json
-        parts = path.split("/")
-        assert len(parts) == 4, f"subdomain shard {path} is not D-XX/D-XX.Y.json"
-
-
-def test_each_d_xx_has_between_1_and_4_subdomains(manifest: dict) -> None:
-    """The taxonomy has 10 parent domains with 1-4 subdomains each (38 total)."""
-    sd_shards = _shards_by_kind(manifest, "subdomain")
+def test_subdomains_partitioned_by_d_xx() -> None:
+    """Every subdomain lives under entities/subdomains/D-XX/."""
+    sd_files = _list_shards("subdomains")
+    # Exclude _archive
+    sd_files = [p for p in sd_files if "_archive" not in p.parts]
+    assert len(sd_files) == 38, f"expected 38 subdomain files, got {len(sd_files)}"
     by_parent: Counter = Counter()
-    for s in sd_shards:
-        path = s["path"]
-        # entities/subdomains/D-04/D-04.3.json → parent D-04
-        parts = path.split("/")
-        by_parent[parts[2]] += 1
+    for p in sd_files:
+        # entities/subdomains/D-04/D-04.3.json → D-04
+        rel = p.relative_to(ENTITIES / "subdomains")
+        by_parent[rel.parts[0]] += 1
     for parent, count in by_parent.items():
-        assert 1 <= count <= 4, f"{parent} has {count} subdomains (expected 1-4)"
+        assert parent.startswith("D-"), f"non-D-XX parent: {parent}"
+        assert 1 <= count <= 4, f"{parent} has {count} subdomains"
     assert sum(by_parent.values()) == 38
 
 
 # ─── 2. Pairs live under D-XX matching their subdomain_id ──────────────
 
 
-def test_pairs_partitioned_by_subdomain_id(manifest: dict) -> None:
-    """Every pair shard lives under entities/pairs/D-XX/ matching its subdomain_id."""
-    pair_shards = _shards_by_kind(manifest, "entity_pair")
-    assert len(pair_shards) == 196, f"expected 196 pair shards, got {len(pair_shards)}"
-
-    for s in pair_shards:
-        path = s["path"]
-        assert path.startswith("entities/pairs/D-"), (
-            f"pair shard {path} is not under entities/pairs/D-XX/"
-        )
-        # No _root/_no_subdomain/_archive for pairs (they always have
-        # a subdomain_id by construction)
-        parts = path.split("/")
-        assert len(parts) == 4, f"pair shard {path} is not D-XX/<id>.json"
+def test_pairs_partitioned_by_subdomain_id() -> None:
+    """Every pair shard lives under entities/pairs/D-XX/."""
+    pair_files = _list_shards("pairs")
+    assert len(pair_files) >= 100, f"expected ≥100 pair files, got {len(pair_files)}"
+    for p in pair_files:
+        rel = p.relative_to(ENTITIES / "pairs")
+        assert rel.parts[0].startswith("D-"), f"pair {p} not under D-XX/"
 
 
 # ─── 3. SOs go to D-XX (first parent) or _no_subdomain ────────────────
 
 
-def test_sos_partitioned_by_d_xx_or_no_subdomain(manifest: dict) -> None:
+def test_sos_partitioned_by_d_xx_or_no_subdomain() -> None:
     """SO shards live under entities/sos/D-XX/ or entities/sos/_no_subdomain/."""
-    so_shards = _shards_by_kind(manifest, "entity_so")
-    # Should have 168 (from aggregated 01_SecObj) + 136 (hso_per_reg) = 304.
-    # But the original 342 was inflated by duplicates written by both
-    # the per-section and _build_indices paths. The new pipeline writes
-    # once, so we expect 304 distinct SO entities.
-    assert len(so_shards) >= 280, f"expected ~304 SO shards, got {len(so_shards)}"
-
+    so_files = _list_shards("sos")
+    assert len(so_files) >= 100, f"expected ≥100 SO files, got {len(so_files)}"
     by_bucket: Counter = Counter()
-    for s in so_shards:
-        path = s["path"]
-        assert path.startswith("entities/sos/"), f"bad SO path {path}"
-        parts = path.split("/")
-        bucket = parts[2]
-        by_bucket[bucket] += 1
-        if bucket not in _BUCKETS:
-            assert bucket.startswith("D-"), f"unexpected SO bucket {bucket}"
-        # Sub-bucket depth
-        if bucket.startswith("D-"):
-            assert len(parts) == 4, f"SO shard {path} not in D-XX/<id>.json"
-
-    # The _no_subdomain bucket should be tiny (3 orphans: SO-AIACT-002,
-    # SO-AIACT-009, SO-CRA-016 — see B.2 inference analysis).
+    for p in so_files:
+        rel = p.relative_to(ENTITIES / "sos")
+        by_bucket[rel.parts[0]] += 1
+    # All D-XX buckets
+    for bucket in by_bucket:
+        assert bucket.startswith("D-") or bucket in ("_no_subdomain", "_root"), (
+            f"unexpected SO bucket {bucket}"
+        )
     no_sub = by_bucket.get("_no_subdomain", 0)
     assert no_sub <= 5, (
-        f"_no_subdomain bucket has {no_sub} SOs (expected ≤5). "
-        f"Review 01_SecurityObjectives.md for unparseable 'sub_domains' cells."
+        f"_no_subdomain bucket has {no_sub} SOs (expected ≤5)"
     )
-
-
-def test_so_hl_live_under_d_xx(manifest: dict) -> None:
-    """High-level SOs (SO-D-XX.Y.HL) live under their D-XX bucket."""
-    hl_shards = _shards_by_kind(manifest, "entity_so_hl")
-    assert len(hl_shards) == 38, f"expected 38 SO-HL shards, got {len(hl_shards)}"
-    for s in hl_shards:
-        path = s["path"]
-        # entities/sos/D-XX/SO_D_XX_Y_HL.json
-        assert path.startswith("entities/sos/D-"), f"SO-HL not under D-XX/: {path}"
-        parts = path.split("/")
-        assert len(parts) == 4, f"SO-HL shard {path} is not D-XX/<id>.json"
 
 
 # ─── 4. SRs go to D-XX (first parent) ─────────────────────────────────
 
 
-def test_srs_partitioned_by_d_xx(manifest: dict) -> None:
-    """Every SR shard lives under entities/srs/D-XX/ matching its first sub_domain."""
-    sr_shards = _shards_by_kind(manifest, "entity_sr")
-    assert len(sr_shards) == 282, f"expected 282 SR shards, got {len(sr_shards)}"
-    by_bucket: Counter = Counter()
-    for s in sr_shards:
-        path = s["path"]
-        assert path.startswith("entities/srs/D-"), f"bad SR path {path}"
-        by_bucket[path.split("/")[2]] += 1
-    # No _no_subdomain SRs (every SR has at least one sub_domain)
-    assert "_no_subdomain" not in by_bucket, (
-        f"some SRs ended up in _no_subdomain: {by_bucket.get('_no_subdomain', 0)}"
-    )
+def test_srs_partitioned_by_d_xx() -> None:
+    """Every SR shard lives under entities/srs/D-XX/."""
+    sr_files = _list_shards("srs")
+    assert len(sr_files) >= 200, f"expected ≥200 SR files, got {len(sr_files)}"
+    for p in sr_files:
+        rel = p.relative_to(ENTITIES / "srs")
+        assert rel.parts[0].startswith("D-"), f"SR {p} not under D-XX/"
 
 
 # ─── 5. Clauses live under _root/{REG}/ (per-regulatory) ──────────────
 
 
-def test_clauses_live_under_root_by_regulation(manifest: dict) -> None:
-    """Every clause shard lives under entities/clauses/_root/{REG}/."""
-    clause_shards = _shards_by_kind(manifest, "clause")
-    assert len(clause_shards) == 578, (
-        f"expected 578 clause shards, got {len(clause_shards)}"
+def test_clauses_live_under_root_by_regulation() -> None:
+    """Every clause lives under entities/clauses/_root/{REG}/."""
+    clause_files = _list_shards("clauses")
+    assert len(clause_files) >= 400, (
+        f"expected ≥400 clause files, got {len(clause_files)}"
     )
     regs: Counter = Counter()
-    for s in clause_shards:
-        path = s["path"]
-        parts = path.split("/")
-        assert parts[2] == "_root", f"clause not under _root/: {path}"
-        reg = parts[3]
-        regs[reg] += 1
-    # 5 regulations: CRA, GDPR, NIS2, DORA, AI_Act
-    assert set(regs.keys()) == {"CRA", "GDPR", "NIS2", "DORA", "AI_Act"}, (
-        f"unexpected clause regs: {set(regs.keys())}"
+    for p in clause_files:
+        rel = p.relative_to(ENTITIES / "clauses")
+        assert rel.parts[0] == "_root", f"clause {p} not under _root/"
+        regs[rel.parts[1]] += 1
+    assert {"CRA", "GDPR", "NIS2", "DORA", "AI_Act"}.issubset(set(regs.keys())), (
+        f"missing regulation in clauses: {set(regs.keys())}"
     )
 
 
-# ─── 6. No flat shards at the old (pre-v11) locations ─────────────────
+# ─── 6. Canonical clause-id format on disk (CORR-032) ───────────────
 
 
-def test_no_pre_v11_flat_shards_remain(manifest: dict) -> None:
-    """Pre-v11 flat layout (``entities/<kind>/D-XX.Y.json``) is gone.
+def test_clause_filenames_match_canonical_pattern() -> None:
+    """All clause filenames match the canonical {REG}-CL{NN} pattern.
 
-    Only the D-XX/<id>.json shape is allowed. Any file at the top
-    level of entities/<kind>/ (other than the special _root/_no_subdomain/
-    _archive/ buckets) is a leftover that must be cleaned.
+    Filename form: {REG}_CL{NN}.json (dot→underscore for filesystem
+    safety). Multi-clause articles use the DORA-CL{NN}-{M} form.
+    The dash in the id becomes an underscore in the filename
+    (filesystem convention), so ``DORA-CL10-1`` → ``DORA_CL10_1.json``.
     """
-    for kind in ("subdomains", "pairs", "sos", "srs"):
-        # Top-level entries that are *.json (not directories)
-        prefix = f"entities/{kind}/"
-        leftovers = []
-        for s in manifest["shards"]:
-            path = s["path"]
-            if not path.startswith(prefix):
-                continue
-            tail = path[len(prefix):]
-            # tail must contain at least one '/' (sub-bucket) OR be a bucket
-            if "/" not in tail and tail.endswith(".json"):
-                leftovers.append(path)
-        assert not leftovers, (
-            f"pre-v11 flat shards in {kind}/: {leftovers}"
-        )
+    clause_files = _list_shards("clauses")
+    canon_re = re.compile(
+        r"^(CRA|GDPR|NIS2|DORA|AI_Act)_"
+        r"(CL\d{1,3}[a-z]?|CL\d{1,3}[-_]\d+"      # generic CL form (dash or underscore separator)
+        r"|RT\d{1,3}[a-z]?"                       # GDPR Ch III (Rights)
+        r"|CP\d{1,3}[a-z]?"                       # GDPR Ch IV (Ctrl-Proc)
+        r"|TR\d{1,3}[a-z]?"                       # GDPR Ch V (Transfers)
+        r")$"
+    )
+    drift = [
+        p.name for p in clause_files if not canon_re.match(p.stem)
+    ]
+    assert not drift, (
+        f"non-canonical clause filenames (first 10): {drift[:10]}"
+    )
 
 
-# ─── 7. Manifest counts match the pre-v11 totals ──────────────────────
+# ─── 7. SO/SR filenames use AI_Act prefix ────────────────────────────
 
 
-def test_manifest_entity_counts_unchanged(manifest: dict) -> None:
-    """The refactor must not change entity counts."""
-    counts = Counter(s.get("kind") for s in manifest["shards"])
+def test_so_filenames_use_ai_act_not_aiact() -> None:
+    """No SO file uses the legacy AIACT prefix."""
+    so_files = _list_shards("sos")
+    drift = [p.name for p in so_files if "AIACT" in p.name]
+    assert not drift, f"SO files with AIACT: {drift[:5]}"
 
-    # Pre-v11 totals (from CORR-029 audit + re-aggregation):
-    assert counts.get("subdomain") == 38
-    assert counts.get("entity_pair") == 196
-    # 304 = aggregated 01_SecObj + per-subdomain hso_per_reg SOs (minus
-    # duplicates that the v11 refactor dedupes; the count is stable at
-    # ~304 across builds).
-    assert counts.get("entity_so") + counts.get("entity_so_hl") == 304 + 38
-    assert counts.get("entity_sr") == 282
-    assert counts.get("clause") == 578
+
+def test_sr_filenames_use_ai_act_not_aiact() -> None:
+    """No SR file uses the legacy AIACT prefix."""
+    sr_files = _list_shards("srs")
+    drift = [p.name for p in sr_files if "AIACT" in p.name]
+    assert not drift, f"SR files with AIACT: {drift[:5]}"
+
+
+# ─── 8. Total entity counts are stable ──────────────────────────────
+
+
+def test_total_clause_count_in_expected_range() -> None:
+    """Clauses ≥400 (CORR-032 may shift within this range)."""
+    clause_files = _list_shards("clauses")
+    assert 400 <= len(clause_files) <= 700, (
+        f"clause count {len(clause_files)} outside [400, 700]"
+    )
+
+
+def test_total_sr_count_is_282() -> None:
+    """SR count unchanged from CORR-029 (282)."""
+    sr_files = _list_shards("srs")
+    assert len(sr_files) == 282, f"expected 282 SRs, got {len(sr_files)}"

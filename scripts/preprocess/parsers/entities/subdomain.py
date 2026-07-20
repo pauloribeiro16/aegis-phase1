@@ -98,6 +98,12 @@ _REG_NORMALIZE = {
     "DORA": "DORA",
     "AI Act": "AI_Act",
     "AI_Act": "AI_Act",
+    # CORR-032: legacy aliases for AI_Act. These were produced by
+    # the v0.x and v1.x source MDs; we accept them as input but
+    # always emit the canonical "AI_Act" form downstream.
+    "AIACT": "AI_Act",
+    "AIA": "AI_Act",
+    "AI": "AI_Act",
 }
 
 

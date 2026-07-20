@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "built_at": "2026-07-20T13:45:59.251322+00:00",
+  "built_at": "2026-07-20T15:20:26.008692+00:00",
   "totals": {
     "subdomains": 38,
     "srs_total": 282,
@@ -72,8 +72,8 @@
         "subdomain": "D-09.4",
         "regulation": "AI_Act",
         "so_id": "SO-D-09.4.AI_Act",
-        "inherits_from": "SO-AIACT-009 + SO-AIACT-010 + SO-AIACT-008 (logs)",
-        "justification": "SO-D-09.4.AI_Act inherits from SO-AIACT-009 + SO-AIACT-010 + SO-AIACT-008 (logs). The AI_Act technical-documentation obligation in D-09.4 is preserved as a multi-inheritance from the three primary technical-documentation and log-keeping SOs in D-09.3 / D-09.4 / D-10.2. The AI Act Annex IV technical-documentation package overlaps with the D-09.3 / D-09.4 / D-10.2 sub-domains; the AI_Act side is surfaced as multi-inheritance rather than a standalone SO. The 3-inheritance pattern reflects the AI Act's vertical-stack nature (upstream training, runtime governance, post-market monitoring).\n\n\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---"
+        "inherits_from": "SO-AI_Act-009 + SO-AI_Act-010 + SO-AI_Act-008 (logs)",
+        "justification": "SO-D-09.4.AI_Act inherits from SO-AI_Act-009 + SO-AI_Act-010 + SO-AI_Act-008 (logs). The AI_Act technical-documentation obligation in D-09.4 is preserved as a multi-inheritance from the three primary technical-documentation and log-keeping SOs in D-09.3 / D-09.4 / D-10.2. The AI Act Annex IV technical-documentation package overlaps with the D-09.3 / D-09.4 / D-10.2 sub-domains; the AI_Act side is surfaced as multi-inheritance rather than a standalone SO. The 3-inheritance pattern reflects the AI Act's vertical-stack nature (upstream training, runtime governance, post-market monitoring).\n\n\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---"
       }
     ]
   },
