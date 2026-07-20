@@ -5,6 +5,24 @@
 
 ---
 
+## 0. Framework policy — NIST CSF 2.0 ONLY
+
+> **This project uses NIST CSF 2.0 as the sole control framework.**
+> No other control framework (ISO 27001, NIST 800-53, OWASP, CSF 1.1, etc.)
+> is used as a source of control identifiers or control families.
+
+- **Canonical declaration:** [`docs/NIST_CSF_2.0_ONLY.md`](docs/NIST_CSF_2.0_ONLY.md)
+- **Source catalogue:** `preproc_out/global/NIST_CSF_2.0_subcategories.json`
+  (106 active subcategories, 22 active categories — NIST CSWP 29, 2024-02-26)
+- **Audit (CSF coverage):** `python -m scripts.preprocess.audit_csf_mapping` must report `BROKEN == 0`
+- **Audit (SO↔SR coherence):** `python -m scripts.preprocess.audit_so_sr_coherence` must report `sr_without_so.count == 0` (raw orphans only — the 8 SOs-without-SRs are deferred to CORR-030)
+- **CI gate:** `bash .hooks/ci-frameworks.sh` (rejects unannotated references to other control frameworks)
+
+When in doubt: pick the CSF 2.0 subcategory. If a regulation cannot be mapped to any
+of the 106, mark the rule as `UNMAPPED_CSF` per `methodology-00/PREPROCESSING/NIST_CSF_2.0_subcategories.md`.
+
+---
+
 ## 1. Architecture
 
 ```
@@ -92,6 +110,13 @@ mypy src/aegis_phase1/
 
 # Pre-commit
 pre-commit run --all-files
+
+# CORR-027: rebuild preproc_out + run the CSF audit
+python -m scripts.preprocess build                              # regenerate preproc_out/
+python -m scripts.preprocess.audit_csf_mapping                 # CSF coverage report (38 subdomains)
+python -m scripts.preprocess.audit_so_sr_coherence             # SO↔SR coherence report (CORR-029)
+bash .hooks/ci-csf-frozen-list.sh                              # .md ↔ preproc_out parity gate
+bash .hooks/ci-frameworks.sh                                   # framework policy gate (CORR-028)
 ```
 
 ---
@@ -263,3 +288,109 @@ A validator that reports "X tests passed" without confirming collection complete
 ### 10.3 Historical reference
 
 The contract `AEGIS-P1-CORR-001` (2026-07-14) was the first contract executed under this policy, after the 7-branch fragmentation incident. See commit `1001a10` for the consolidated single-branch commit (Phases 0-6 as logical commit groups).
+
+## 11. Canonical ID conventions (CORR-032 — MANDATORY 2026-07-20)
+
+All entity IDs in the AEGIS-KG preproc must follow a single canonical
+form. This section is the **single source of truth** for ID conventions;
+if a new entity type is added, follow the patterns below or update this
+section **before** introducing the new ID.
+
+### 11.1 Canonical forms
+
+| Entity kind | Format | Example |
+|---|---|---|
+| Subdomain | `D-XX.Y` | `D-04.3` |
+| Sub-SO (per-reg) | `SO-D-XX.Y.{REG}` | `SO-D-04.3.CRA` |
+| Sub-SO (high-level) | `SO-D-XX.Y.HL` | `SO-D-04.3.HL` |
+| Master SO | `SO-{REG}-{NNN}` (3-digit, zero-padded) | `SO-CRA-001`, `SO-AI_Act-001` |
+| Security Rule | `SR-{REG}-{NNN}` (3-digit, zero-padded) | `SR-CRA-001`, `SR-AI_Act-001` |
+| Source clause | `{REG}-CL{NN}` (2-digit, zero-padded) | `CRA-CL01`, `AI_Act-CL01` |
+| Cross-reg pair | `D-XX.Y_{REG_A}-{REG_B}` (alphabetic REG_A < REG_B) | `D-04.3_CRA-AI_Act` |
+| CSF subcategory | `GV.OC-01` (NIST standard, not ours) | unchanged |
+
+### 11.2 Regulation canonical names
+
+The 5 regulations have **one** canonical name each. The filesystem
+folder, the JSON `regulation` field, and any code reference all use
+this name.
+
+| Canonical | Aliases accepted on input (legacy) |
+|---|---|
+| `CRA` | — |
+| `GDPR` | — |
+| `NIS2` | `NIS 2`, `NIS_2` |
+| `DORA` | — |
+| `AI_Act` | `AI Act`, `AIACT`, `AIA`, `AI` |
+
+Aliases are accepted in `_REG_NORMALIZE` (parsers/entities/subdomain.py)
+and `_entity_kind` (scripts/preprocess/pipeline.py) **for backward
+compatibility with pre-CORR-032 source MDs**, but the **output** is
+always the canonical form.
+
+### 11.3 Source-clause ID special cases
+
+- **DORA** has multi-clause-per-article. The canonical form is
+  `DORA-CL{NN}-{M}` where `NN` is the article number and `M` is the
+  ordinal clause within that article (e.g. `DORA-CL17-1` for the first
+  clause of Art. 17).
+- **AI_Act** uses the per-article `Ambiguity/0N_AI_Act_Art*.md` files,
+  not the older 06_AI_Act.md cross-article file (which is superseded).
+- **GDPR / CRA / NIS2** use single clauses per article (no `-M` suffix).
+
+### 11.4 Naming anti-patterns (do NOT introduce these)
+
+The following forms are **forbidden** in new source MDs and in any
+parser output. They will be caught by `test_id_normalization.py` in CI.
+
+- `AIA-C{NN}`, `AIA-CL{NN}`, `AI-C{NN}`, `AI-CL{NN}` (use `AI_Act-CL{NN}`)
+- `AIACT-C{NN}`, `AIACT-CL{NN}` (use `AI_Act-CL{NN}`)
+- `SO-AIACT-NNN`, `SR-AIACT-NNN` (use `SO-AI_Act-NNN`, `SR-AI_Act-NNN`)
+- `GDPR-C{NN}`, `DORA-C{NN}` (use `GDPR-CL{NN}`, `DORA-CL{NN}`)
+- `CL{NN}-{M}` standalone (use `DORA-CL{NN}-{M}` — DORA is the only
+  regulation using this pattern)
+
+### 11.5 Migration scripts
+
+Two helper scripts in `Methodology-main/`:
+
+- **`scripts/migrate_canonical_ids.py`** (or equivalent) — bulk
+  regex-driven rewrite of all `00_METHODOLOGY/**/*.md`. Re-runnable
+  idempotently. Skips `_archive/`, `_build/`, and `.git/`.
+
+The aegis-phase1 pipeline side:
+
+- **`scripts/preprocess/parsers/entities/subdomain.py`** —
+  `_REG_NORMALIZE` map: source of truth for `REG → REG` aliases
+  (add a new entry here when introducing a new regulation, never
+  inline-rewrite in a parser).
+- **`scripts/preprocess/pipeline.py`** — `_entity_kind` function:
+  source of truth for `entity_id → kind` classification. Add new
+  clause/SO/SR prefix patterns here as the canonical form evolves.
+
+### 11.6 Validation
+
+```bash
+# Source-level (run from Methodology-main/)
+grep -rE "AIA-C[0-9]|SO-AIACT|SR-AIACT|\bDORA-C[0-9]\b|\bGDPR-C[0-9]\b|AIACT-C" \
+  00_METHODOLOGY/ --include="*.md" --exclude-dir=_archive | head -5
+# Expected: empty output (or only the 1-line historical note in
+# 00_METHODOLOGY/PREPROCESSING/Regulation/AI_Act/00_README.md).
+
+# Preproc-level (run from aegis-phase1/)
+PYTHONPATH=src pytest tests/unit/preprocess/test_id_normalization.py -v
+# Expected: 6 tests pass.
+```
+
+If a new ID drift appears, fix it in the same PR — don't defer.
+
+### 11.7 When to update this section
+
+Add a new entry to this table when:
+- A new entity kind is introduced (e.g. a "scenario" or "evidence" type)
+- A new regulation is onboarded (add to the canonical name table AND
+  to the `_REG_NORMALIZE` map)
+- A new clause-Sub-domain mapping convention is adopted (e.g. if
+  NIS2 starts using the `-M` suffix)
+
+The next person to onboard something will read this section first.

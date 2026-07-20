@@ -612,6 +612,8 @@ def _section_7_architectural_implications(
             "GDPR, CRA",
             "Infrastructure",
             "HIGH",
+            # NOTE (CORR-028, NIST_CSF_2.0_ONLY.md §2): "SOC 2 / ISO 27001"
+            # below is a vendor attestation pattern, NOT a control framework.
             "Obtain SOC 2 / ISO 27001 evidence from each cloud provider; include security clauses in DPAs and SBOM updates",
         )
     )

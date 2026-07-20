@@ -157,6 +157,8 @@ class TrackB:
             "MINIMAL": {
                 "satisfaction_pattern": "INHERIT",
                 "evidence_depth": (
+                    # NOTE (CORR-028, NIST_CSF_2.0_ONLY.md §2): "SOC 2 / ISO 27001"
+                    # below is a vendor attestation pattern, NOT a control framework.
                     "Supplier attestation on file (SOC 2 / ISO 27001) + "
                     "1-page internal statement"
                 ),
@@ -201,6 +203,8 @@ class TrackB:
                 "example_controls": [
                     "Enterprise SIEM",
                     "External pen test",
+                    # NOTE (CORR-028, NIST_CSF_2.0_ONLY.md §2): "ISO 27001"
+                    # below is a vendor attestation pattern, NOT a control framework.
                     "ISO 27001 certified ISMS",
                 ],
             },

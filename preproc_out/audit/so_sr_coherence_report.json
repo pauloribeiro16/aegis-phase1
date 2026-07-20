@@ -1,0 +1,106 @@
+{
+  "schema_version": "1.0",
+  "built_at": "2026-07-20T15:20:26.008692+00:00",
+  "totals": {
+    "subdomains": 38,
+    "srs_total": 282,
+    "so_entries": 189,
+    "so_with_inherits_from": 189,
+    "so_inherits_from_pct": 100.0,
+    "sr_linked_objectives_total": 484,
+    "sr_linked_objectives_resolved": 484,
+    "sr_lo_resolution_pct": 100.0,
+    "coverage_full": 282,
+    "coverage_partial_count": 0,
+    "coverage_unresolved_count": 0
+  },
+  "so_without_sr": {
+    "count": 0,
+    "items": [],
+    "justified_count": 8,
+    "justified_items": [
+      {
+        "subdomain": "D-03.2",
+        "regulation": "GDPR",
+        "so_id": "SO-D-03.2.GDPR",
+        "inherits_from": "SO-GDPR-006 (cross-ref), SO-GDPR-005 (cross-ref)",
+        "justification": "SO-D-03.2.GDPR inherits from SO-GDPR-006 and SO-GDPR-005 (cross-ref). The D-03.2 GDPR access-control obligation is preserved as a cross-reference to SOs that live primarily in D-03.1 (Identity & Authentication Management) and D-03.3 (Authorisation), per the GDPR Art. 32(1)(b) confidentiality-of-processing anchor. No standalone SO is needed in D-03.2 because the access-control dimension is operationalised through identity (D-03.1) and authorisation (D-03.3) controls; D-03.2 surfaces the cross-ref. The inherits_from field already documents this; CORR-029 formalises it as an intentional orphan (cross-ref pattern)."
+      },
+      {
+        "subdomain": "D-03.2",
+        "regulation": "CRA",
+        "so_id": "SO-D-03.2.CRA",
+        "inherits_from": "SO-CRA-016 (partial)",
+        "justification": "SO-D-03.2.CRA inherits from SO-CRA-016 (partial). The D-03.2 CRA access-control obligation is preserved as a partial-coverage cross-ref to SO-CRA-016 (which lives in D-03.1 — Identity & Authentication). CRA's access-control framing is anchored in Annex I Part I (2)(d) (`identify, authenticate and authorise access to data and functions') but the OJ text does not specify a distinct access-control sub-domain; the obligation is rolled into the identity-management primary in D-03.1. D-03.2 surfaces the partial cross-ref to the primary SO."
+      },
+      {
+        "subdomain": "D-07.2",
+        "regulation": "DORA",
+        "so_id": "SO-D-07.2.DORA",
+        "inherits_from": "SO-DORA-013 (partial via Art. 9(4)(e) — D-07.4 primary, D-07.2 partial by inference only)",
+        "justification": "SO-D-07.2.DORA inherits from SO-DORA-013 (partial via Art. 9(4)(e) — D-07.4 primary, D-07.2 partial by inference only). DORA's secure-coding obligation is preserved as a partial-coverage cross-ref to the change-management primary in D-07.4. DORA Art. 9(4)(e) is a change-management policy, not a secure-coding-standards policy; the secure-coding dimension is inferred through the 'tested' and 'assessed' legs of the change-mgmt six-step. No standalone DORA SO for D-07.2 is needed because the OJ text does not prescribe secure-coding standards; the obligation is operationalised through D-07.4."
+      },
+      {
+        "subdomain": "D-07.3",
+        "regulation": "NIS2",
+        "so_id": "SO-D-07.3.NIS2",
+        "inherits_from": "SO-NIS2-017 (partial via the maintenance dimension — `SO-NIS2-017` routes to D-07.3 via Art. 21(2)(e) third clause)",
+        "justification": "SO-D-07.3.NIS2 inherits from SO-NIS2-017 (partial via the maintenance dimension — SO-NIS2-017 routes to D-07.3 via Art. 21(2)(e) third clause). The CI/CD-pipeline-security obligation in NIS2 is preserved as a partial-coverage cross-ref to the maintenance-dimension primary in D-02.2. AEGIS taxonomy §4.1 marks NIS2 as sole authority for D-07.3 (T3-vs-text gap: OJ Art. 21(2)(e) does not mention 'pipeline', 'CI', or 'CD'). The partial coverage is via the maintenance dimension only. No standalone NIS2 SO is needed for D-07.3 because the OJ text does not prescribe CI/CD build-time controls; the obligation is operationalised through D-02.2's maintenance dimension."
+      },
+      {
+        "subdomain": "D-07.3",
+        "regulation": "CRA",
+        "so_id": "SO-D-07.3.CRA",
+        "inherits_from": "SO-CRA-009 (partial cross-ref via Annex I Part II (7) — secure update distribution; SO-CRA-009 primary sub-domain is D-02.2 patch management with cross-ref to D-07.3 partial)",
+        "justification": "SO-D-07.3.CRA inherits from SO-CRA-009 (partial cross-ref via Annex I Part II (7) — secure update distribution; SO-CRA-009 primary sub-domain is D-02.2 patch management with cross-ref to D-07.3 partial). The CRA CI/CD-pipeline-security obligation is preserved as a partial-coverage cross-ref to the patch-management primary in D-02.2. CRA covers the product-side update delivery path (Annex I Part II (7)+(8)) only, not CI/CD build-time controls. The CI/CD build-time baseline is supplied by industry frameworks (NIST SP 800-204 / OWASP CI/CD Top 10 / SLSA), not by the OJ text.\n\n\n---"
+      },
+      {
+        "subdomain": "D-09.3",
+        "regulation": "CRA",
+        "so_id": "SO-D-09.3.CRA",
+        "inherits_from": "SO-CRA-061",
+        "justification": "SO-D-09.3.CRA inherits from SO-CRA-061. The D-09.3 CRA technical-documentation obligation is preserved as an inheritance from the master technical-documentation SO. The Annex VII §1-§6 technical documentation package spans multiple sub-domains (D-09.3 General Description + D-09.4 Design & Development + D-10.2 Assessment); the primary documentation SO lives in D-09.4 and D-09.3 surfaces a cross-ref. The same documentation record discharges the §1 general-description obligation here and the §2 design-development obligation elsewhere.\n\n\n---\n---\n---"
+      },
+      {
+        "subdomain": "D-09.4",
+        "regulation": "DORA",
+        "so_id": "SO-D-09.4.DORA",
+        "inherits_from": "(out-of-scope as RoPA-equivalent — partial via DORA Art. 9(4)(a) SO-DORA-018 cross)",
+        "justification": "SO-D-09.4.DORA inherits from (out-of-scope as RoPA-equivalent — partial via DORA Art. 9(4)(a) SO-DORA-018 cross). DORA does not impose a Records-of-Processing-Activities (RoPA)-equivalent obligation analogous to GDPR Art. 30. DORA's information-security-policy obligation (Art. 9(4)(a)) is operationalised through SO-DORA-018 (lives in D-09.1 Policies). D-09.4 is therefore a DORA-orphan at the surface level but the DORA-side documentation discipline is captured under the policy layer (D-09.1). No standalone DORA SO for D-09.4 is needed because the OJ text does not impose RoPA-equivalent records on financial entities."
+      },
+      {
+        "subdomain": "D-09.4",
+        "regulation": "AI_Act",
+        "so_id": "SO-D-09.4.AI_Act",
+        "inherits_from": "SO-AI_Act-009 + SO-AI_Act-010 + SO-AI_Act-008 (logs)",
+        "justification": "SO-D-09.4.AI_Act inherits from SO-AI_Act-009 + SO-AI_Act-010 + SO-AI_Act-008 (logs). The AI_Act technical-documentation obligation in D-09.4 is preserved as a multi-inheritance from the three primary technical-documentation and log-keeping SOs in D-09.3 / D-09.4 / D-10.2. The AI Act Annex IV technical-documentation package overlaps with the D-09.3 / D-09.4 / D-10.2 sub-domains; the AI_Act side is surfaced as multi-inheritance rather than a standalone SO. The 3-inheritance pattern reflects the AI Act's vertical-stack nature (upstream training, runtime governance, post-market monitoring).\n\n\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---\n---"
+      }
+    ]
+  },
+  "sr_without_so": {
+    "count": 0,
+    "items": [],
+    "justified_count": 0,
+    "justified_items": []
+  },
+  "coverage_partial": {
+    "count": 0,
+    "by_pattern": {},
+    "items": []
+  },
+  "coverage_unresolved": {
+    "count": 0,
+    "items": [],
+    "distinct_unresolved": [],
+    "distinct_count": 0
+  },
+  "known_gaps": {
+    "deferred_to": "CORR-030",
+    "user_decision": "2026-07-20: 'Só auditar (deferir) — criar um relatório detalhado dos 166 sem mexer nos MDs'",
+    "so_without_sr_count": 0,
+    "sr_partial_coverage_count": 0,
+    "sr_unresolved_lo_count": 0,
+    "distinct_unresolved_so_count": 0,
+    "note": "0 SO entries have no SR; 0 SRs have partial SO coverage; 0 SRs reference unresolved regulatory SOs. All 166 gaps are documented in the report (deferred to CORR-030 per user decision 2026-07-20)."
+  }
+}
