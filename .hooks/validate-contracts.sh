@@ -145,6 +145,10 @@ check "18. Static case catalogue defined (CORR-007 — 3 cases)" \
 check "19. run_wizard() importable from menu module" \
     'cd "$REPO_ROOT" && .venv/bin/python -c "from aegis_phase1.v2.cli.menu import run_wizard; assert callable(run_wizard)"'
 
+# Check 20: CSF 2.0 frozen-list .md ↔ preproc_out parity (CORR-027)
+check "20. CSF 2.0 frozen-list .md ↔ preproc_out parity (CORR-027)" \
+    'cd "$REPO_ROOT" && bash .hooks/ci-csf-frozen-list.sh'
+
 echo ""
 echo "${CYAN}═══════════════════════════════════════════${RESET}"
 echo "${CYAN}  Summary${RESET}"

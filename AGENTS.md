@@ -5,6 +5,24 @@
 
 ---
 
+## 0. Framework policy — NIST CSF 2.0 ONLY
+
+> **This project uses NIST CSF 2.0 as the sole control framework.**
+> No other control framework (ISO 27001, NIST 800-53, OWASP, CSF 1.1, etc.)
+> is used as a source of control identifiers or control families.
+
+- **Canonical declaration:** [`docs/NIST_CSF_2.0_ONLY.md`](docs/NIST_CSF_2.0_ONLY.md)
+- **Source catalogue:** `preproc_out/global/NIST_CSF_2.0_subcategories.json`
+  (106 active subcategories, 22 active categories — NIST CSWP 29, 2024-02-26)
+- **Audit (CSF coverage):** `python -m scripts.preprocess.audit_csf_mapping` must report `BROKEN == 0`
+- **Audit (SO↔SR coherence):** `python -m scripts.preprocess.audit_so_sr_coherence` must report `sr_without_so.count == 0` (raw orphans only — the 8 SOs-without-SRs are deferred to CORR-030)
+- **CI gate:** `bash .hooks/ci-frameworks.sh` (rejects unannotated references to other control frameworks)
+
+When in doubt: pick the CSF 2.0 subcategory. If a regulation cannot be mapped to any
+of the 106, mark the rule as `UNMAPPED_CSF` per `methodology-00/PREPROCESSING/NIST_CSF_2.0_subcategories.md`.
+
+---
+
 ## 1. Architecture
 
 ```
@@ -92,6 +110,13 @@ mypy src/aegis_phase1/
 
 # Pre-commit
 pre-commit run --all-files
+
+# CORR-027: rebuild preproc_out + run the CSF audit
+python -m scripts.preprocess build                              # regenerate preproc_out/
+python -m scripts.preprocess.audit_csf_mapping                 # CSF coverage report (38 subdomains)
+python -m scripts.preprocess.audit_so_sr_coherence             # SO↔SR coherence report (CORR-029)
+bash .hooks/ci-csf-frozen-list.sh                              # .md ↔ preproc_out parity gate
+bash .hooks/ci-frameworks.sh                                   # framework policy gate (CORR-028)
 ```
 
 ---

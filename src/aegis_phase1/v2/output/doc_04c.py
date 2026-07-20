@@ -268,6 +268,9 @@ def _section_contractual_controls(state: dict[str, Any]) -> list[str]:
         provider_service = f"{entry.get('provider', '-')} — {entry.get('service', '-')}"
         # Deterministic inference
         art28 = "Y" if dpa in {"Y", "Yes", "yes", "TRUE", "true", True} else "—"
+        # NOTE (CORR-028, NIST_CSF_2.0_ONLY.md §2): "SOC 2 / ISO 27001" below
+        # is a vendor attestation pattern, NOT a control framework. The
+        # control framework remains NIST CSF 2.0.
         audit = "Indirect — vendor SOC 2 / ISO 27001 substituted" if art28 == "Y" else "—"
         subproc = "Y — vendor publishes subprocessor list" if art28 == "Y" else "—"
         rows.append((provider_service, dpa, art28, audit, subproc))
@@ -276,6 +279,8 @@ def _section_contractual_controls(state: dict[str, Any]) -> list[str]:
         return parts
     parts.append(markdown_table(headers, rows))
     parts.append("")
+    # NOTE (CORR-028, NIST_CSF_2.0_ONLY.md §2): "SOC 2 / ISO 27001" below
+    # is a vendor attestation pattern, NOT a control framework.
     parts.append(
         "**Common pattern:** Providers substitute third-party certifications "
         "(SOC 2 / ISO 27001) for direct audit access. This is industry-standard "

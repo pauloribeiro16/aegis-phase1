@@ -1,0 +1,858 @@
+{
+  "schema_version": "1.0",
+  "built_at": "2026-07-20T10:54:54Z",
+  "frozen_list_source": "preproc_out/global/NIST_CSF_2.0_subcategories.json",
+  "frozen_list_id_count": 106,
+  "subdomain_count": 38,
+  "summary": {
+    "subdomains_with_empty_csf_hint": [],
+    "subdomains_with_empty_sr_csf_mapping": [],
+    "orphan_csf_in_hint_total": 0,
+    "subdomains_with_orphan": [],
+    "verdict_counts": {
+      "OK": 2,
+      "SPARSE": 36
+    }
+  },
+  "rows": [
+    {
+      "subdomain_id": "D-01.1",
+      "title": "D-01.1 Data at Rest Encryption",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 8,
+      "csf_hint_ids": [
+        "PR.DS-01",
+        "PR.DS-10",
+        "PR.DS-11",
+        "PR.AA-01",
+        "PR.AA-05",
+        "ID.AM-08",
+        "GV.RM-04",
+        "DE.CM-09"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "DE.CM",
+        "GV.RM",
+        "ID.AM",
+        "PR.AA",
+        "PR.DS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "OK"
+    },
+    {
+      "subdomain_id": "D-01.2",
+      "title": "D-01.2 Data in Transit Encryption",
+      "participating_regulations": [
+        "GDPR",
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.DS-02",
+        "PR.IR-01"
+      ],
+      "sr_csf_mapping_total": 3,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.DS",
+        "PR.IR"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-01.3",
+      "title": "D-01.3 Cryptographic Key Management",
+      "participating_regulations": [
+        "GDPR",
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "PR.DS-01"
+      ],
+      "sr_csf_mapping_total": 3,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.DS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-01.4",
+      "title": "D-01.4 Data Integrity Mechanisms",
+      "participating_regulations": [
+        "GDPR",
+        "CRA",
+        "DORA",
+        "AI_Act (partial)"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.DS-01",
+        "PR.DS-10"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.DS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-02.1",
+      "title": "D-02.1 Vulnerability Identification",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 3,
+      "csf_hint_ids": [
+        "ID.RA-01",
+        "ID.RA-02",
+        "PR.PS-02"
+      ],
+      "sr_csf_mapping_total": 5,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "ID.RA",
+        "PR.PS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-02.2",
+      "title": "D-02.2 Patch Management & Updates",
+      "participating_regulations": [
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.PS-02",
+        "ID.RA-01"
+      ],
+      "sr_csf_mapping_total": 2,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "ID.RA",
+        "PR.PS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-02.3",
+      "title": "D-02.3 Coordinated Vulnerability Disclosure",
+      "participating_regulations": [
+        "CRA",
+        "NIS2 partial"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "ID.RA-01",
+        "ID.RA-04"
+      ],
+      "sr_csf_mapping_total": 2,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "ID.RA"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-02.4",
+      "title": "D-02.4 Threat-Led Penetration Testing",
+      "participating_regulations": [
+        "CRA",
+        "DORA",
+        "AI_Act partial"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "ID.RA-01",
+        "GV.SC-04"
+      ],
+      "sr_csf_mapping_total": 3,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.SC",
+        "ID.RA"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-03.1",
+      "title": "D-03.1 Identity Lifecycle Management",
+      "participating_regulations": [],
+      "csf_hint_count": 3,
+      "csf_hint_ids": [
+        "PR.AA-01",
+        "PR.AA-05",
+        "PR.AA-06"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.AA"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-03.2",
+      "title": "D-03.2 Multi-Factor Authentication",
+      "participating_regulations": [],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.AA-02",
+        "PR.AA-03"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.AA"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-03.3",
+      "title": "D-03.3 Authorisation & Least Privilege",
+      "participating_regulations": [],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "PR.AA-05"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.AA"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-03.4",
+      "title": "D-03.4 Secure System Defaults",
+      "participating_regulations": [],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.AA-05",
+        "PR.AA-06"
+      ],
+      "sr_csf_mapping_total": 2,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.AA"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-04.1",
+      "title": "D-04.1 Incident Detection & Triage",
+      "participating_regulations": [],
+      "csf_hint_count": 3,
+      "csf_hint_ids": [
+        "RS.MA-01",
+        "RS.MA-02",
+        "RS.MA-03"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "RS.MA"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-04.2",
+      "title": "D-04.2 Incident Containment & Response",
+      "participating_regulations": [],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "RS.AN-03",
+        "RS.AN-06"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "RS.AN"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-04.3",
+      "title": "D-04.3 Incident Notification & Reporting",
+      "participating_regulations": [],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "RS.CO-02"
+      ],
+      "sr_csf_mapping_total": 5,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "RS.CO"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-04.4",
+      "title": "D-04.4 Incident Recovery & Lessons Learned",
+      "participating_regulations": [],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "RC.RP-06",
+        "ID.IM-01"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "ID.IM",
+        "RC.RP"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-05.1",
+      "title": "D-05.1 Data Minimisation",
+      "participating_regulations": [
+        "GDPR",
+        "CRA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "ID.AM-03"
+      ],
+      "sr_csf_mapping_total": 3,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "ID.AM"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-05.2",
+      "title": "D-05.2 Retention & Archiving",
+      "participating_regulations": [
+        "GDPR",
+        "CRA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 6,
+      "csf_hint_ids": [
+        "ID.AM-03",
+        "PR.PS-02",
+        "PR.PS-04",
+        "GV.PO-02",
+        "GV.OV-02",
+        "GV.OC-04"
+      ],
+      "sr_csf_mapping_total": 3,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.OC",
+        "GV.OV",
+        "GV.PO",
+        "ID.AM",
+        "PR.PS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "OK"
+    },
+    {
+      "subdomain_id": "D-05.3",
+      "title": "D-05.3 Right to Erasure",
+      "participating_regulations": [
+        "GDPR",
+        "CRA"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.DS-10",
+        "GV.SC-04"
+      ],
+      "sr_csf_mapping_total": 2,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.SC",
+        "PR.DS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-05.4",
+      "title": "D-05.4 Data Portability",
+      "participating_regulations": [
+        "GDPR (sole authority)"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "PR.DS-10"
+      ],
+      "sr_csf_mapping_total": 1,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.DS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-06.1",
+      "title": "D-06.1 Vendor Risk Assessment",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "GV.SC-02",
+        "GV.SC-03"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.SC"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-06.2",
+      "title": "D-06.2 Software Bill of Materials (SBOM)",
+      "participating_regulations": [
+        "CRA (sole authority)"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "ID.AM-02",
+        "GV.SC-02"
+      ],
+      "sr_csf_mapping_total": 1,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.SC",
+        "ID.AM"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-06.3",
+      "title": "D-06.3 Contractual Security Obligations",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "GV.SC-04",
+        "DE.CM-06"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "DE.CM",
+        "GV.SC"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-06.4",
+      "title": "D-06.4 Third-Party Boundary Management",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "GV.SC-02",
+        "ID.AM-05"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.SC",
+        "ID.AM"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-07.1",
+      "title": "D-07.1 Secure-by-Design Principles",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "PR.PS-06"
+      ],
+      "sr_csf_mapping_total": 5,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.PS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-07.2",
+      "title": "D-07.2 Secure Coding Practices",
+      "participating_regulations": [
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "PR.PS-06"
+      ],
+      "sr_csf_mapping_total": 3,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.PS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-07.3",
+      "title": "D-07.3 CI/CD Pipeline Security",
+      "participating_regulations": [
+        "NIS2",
+        "CRA"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.PS-06",
+        "ID.RA-01"
+      ],
+      "sr_csf_mapping_total": 2,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "ID.RA",
+        "PR.PS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-07.4",
+      "title": "D-07.4 Change Management",
+      "participating_regulations": [
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.PS-02",
+        "PR.PS-06"
+      ],
+      "sr_csf_mapping_total": 2,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.PS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-08.1",
+      "title": "D-08.1 General Security Awareness",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "PR.AT-01"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.AT"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-08.2",
+      "title": "D-08.2 Role-Specific Competence",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "PR.AT-02"
+      ],
+      "sr_csf_mapping_total": 5,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "PR.AT"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-08.3",
+      "title": "D-08.3 Management Board Training",
+      "participating_regulations": [
+        "NIS2",
+        "DORA"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "GV.RR-01"
+      ],
+      "sr_csf_mapping_total": 2,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.RR"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-09.1",
+      "title": "D-09.1 Information Security Policies",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "GV.PO-01"
+      ],
+      "sr_csf_mapping_total": 5,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.PO"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-09.2",
+      "title": "D-09.2 Impact & Risk Assessments",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "ID.RA-05",
+        "GV.RM-06"
+      ],
+      "sr_csf_mapping_total": 5,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.RM",
+        "ID.RA"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-09.3",
+      "title": "D-09.3 Asset Inventories",
+      "participating_regulations": [
+        "NIS2",
+        "CRA",
+        "DORA"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "GV.OC-03",
+        "GV.OV-03"
+      ],
+      "sr_csf_mapping_total": 3,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.OC",
+        "GV.OV"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-09.4",
+      "title": "D-09.4 Records of Processing",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "GV.PO-02"
+      ],
+      "sr_csf_mapping_total": 5,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.PO"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-10.1",
+      "title": "D-10.1 Continuous Security Monitoring",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.PS-04",
+        "DE.CM-09"
+      ],
+      "sr_csf_mapping_total": 5,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "DE.CM",
+        "PR.PS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-10.2",
+      "title": "D-10.2 Audit Logging & Traceability",
+      "participating_regulations": [
+        "GDPR",
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 2,
+      "csf_hint_ids": [
+        "PR.PS-04",
+        "DE.AE-03"
+      ],
+      "sr_csf_mapping_total": 4,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "DE.AE",
+        "PR.PS"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    },
+    {
+      "subdomain_id": "D-10.3",
+      "title": "D-10.3 Compliance Testing",
+      "participating_regulations": [
+        "GDPR",
+        "NIS2",
+        "CRA",
+        "DORA",
+        "AI_Act"
+      ],
+      "csf_hint_count": 1,
+      "csf_hint_ids": [
+        "GV.OV-03"
+      ],
+      "sr_csf_mapping_total": 5,
+      "sr_csf_mapping_empty": 0,
+      "orphan_csf_in_hint": [],
+      "expected_families": [
+        "GV.OV"
+      ],
+      "expected_families_missing": [],
+      "audit_verdict": "SPARSE"
+    }
+  ]
+}

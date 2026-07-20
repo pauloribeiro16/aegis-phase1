@@ -281,6 +281,9 @@ _DEFAULT_CONTROLS: dict[str, list[dict[str, str]]] = {
         },
         {
             "control": "Secure coding",
+            # NOTE (CORR-028, NIST_CSF_2.0_ONLY.md §2): OWASP is implementation
+            # guidance here, NOT a control framework. The control is PR.PS-06
+            # (Secure software development practices are integrated).
             "current": "OWASP guidelines and peer code review",
             "evidence_refs": [],
             "notes": "Code review exists but security checklist is not consistently recorded",
