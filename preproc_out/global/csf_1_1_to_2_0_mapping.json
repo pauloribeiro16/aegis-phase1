@@ -1,0 +1,2686 @@
+{
+  "schema_version": "1.0",
+  "source": "csf2.xlsx (NIST CSF 2.0 Reference Tool, 2024-02-26)",
+  "csf_1_1_total": 108,
+  "csf_2_0_active_total": 106,
+  "unmapped_v1_1_ids": [],
+  "category_level_only": [
+    "DE.DP-2"
+  ],
+  "inconsistent_v1_1_ids": [
+    "RC.CO-2"
+  ],
+  "mappings": [
+    {
+      "v11_id": "DE.AE-1",
+      "v11_title": "A baseline of network operations and expected data flows for users and systems is established and managed",
+      "v20_destinations": [
+        "ID.AM-03"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 46,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-03"
+        },
+        {
+          "row": 170,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.AE-01",
+          "tag": "Incorporated into ID.AM-03",
+          "destinations": [
+            "ID.AM-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.AE-2",
+      "v11_title": "Detected events are analyzed to understand attack targets and methods",
+      "v20_destinations": [
+        "DE.AE-02"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 171,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.AE-02"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.AE-3",
+      "v11_title": "Event data are collected and correlated from multiple sources and sensors",
+      "v20_destinations": [
+        "DE.AE-03",
+        "DE.AE-07"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 172,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.AE-03"
+        },
+        {
+          "row": 176,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.AE-07"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.AE-4",
+      "v11_title": "Impact of events is determined",
+      "v20_destinations": [
+        "DE.AE-04"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 173,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.AE-04"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.AE-5",
+      "v11_title": "Incident alert thresholds are established",
+      "v20_destinations": [
+        "DE.AE-08"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 174,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.AE-05",
+          "tag": "Moved to DE.AE-08",
+          "destinations": [
+            "DE.AE-08"
+          ]
+        },
+        {
+          "row": 177,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.AE-08"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.CM-1",
+      "v11_title": "The network is monitored to detect potential cybersecurity events",
+      "v20_destinations": [
+        "DE.CM-01"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 160,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-01"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.CM-2",
+      "v11_title": "The physical environment is monitored to detect potential cybersecurity events",
+      "v20_destinations": [
+        "DE.CM-02"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 161,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-02"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.CM-3",
+      "v11_title": "Personnel activity is monitored to detect potential cybersecurity events",
+      "v20_destinations": [
+        "DE.CM-03"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 162,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-03"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.CM-4",
+      "v11_title": "Malicious code is detected",
+      "v20_destinations": [
+        "DE.CM-01",
+        "DE.CM-09"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 160,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-01"
+        },
+        {
+          "row": 163,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.CM-04",
+          "tag": "Incorporated into DE.CM-01, DE.CM-09",
+          "destinations": [
+            "DE.CM-01",
+            "DE.CM-09"
+          ]
+        },
+        {
+          "row": 168,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-09"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.CM-5",
+      "v11_title": "Unauthorized mobile code is detected",
+      "v20_destinations": [
+        "DE.CM-01",
+        "DE.CM-09"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 160,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-01"
+        },
+        {
+          "row": 164,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.CM-05",
+          "tag": "Incorporated into DE.CM-01, DE.CM-09",
+          "destinations": [
+            "DE.CM-01",
+            "DE.CM-09"
+          ]
+        },
+        {
+          "row": 168,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-09"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.CM-6",
+      "v11_title": "External service provider activity is monitored to detect potential cybersecurity events",
+      "v20_destinations": [
+        "DE.CM-06"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 165,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-06"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.CM-7",
+      "v11_title": "Monitoring for unauthorized personnel, connections, devices, and software is performed",
+      "v20_destinations": [
+        "DE.CM-01",
+        "DE.CM-03",
+        "DE.CM-06",
+        "DE.CM-09"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 160,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-01"
+        },
+        {
+          "row": 162,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-03"
+        },
+        {
+          "row": 165,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-06"
+        },
+        {
+          "row": 166,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.CM-07",
+          "tag": "Incorporated into DE.CM-01, DE.CM-03, DE.CM-06, DE.CM-09",
+          "destinations": [
+            "DE.CM-01",
+            "DE.CM-03",
+            "DE.CM-06",
+            "DE.CM-09"
+          ]
+        },
+        {
+          "row": 168,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-09"
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.CM-8",
+      "v11_title": "Vulnerability scans are performed",
+      "v20_destinations": [
+        "ID.RA-01"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 53,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-01"
+        },
+        {
+          "row": 167,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.CM-08",
+          "tag": "Incorporated into ID.RA-01",
+          "destinations": [
+            "ID.RA-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.DP-1",
+      "v11_title": "Roles and responsibilities for detection are well defined to ensure accountability",
+      "v20_destinations": [
+        "GV.RR-02"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 20,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RR-02"
+        },
+        {
+          "row": 179,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.DP-01",
+          "tag": "Incorporated into GV.RR-02",
+          "destinations": [
+            "GV.RR-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.DP-2",
+      "v11_title": "Detection processes and procedures are understood and followed; detection information is communicated to ensure accountability",
+      "v20_destinations": [
+        "DE.AE"
+      ],
+      "mapping_type": "CATEGORY_LEVEL",
+      "provenance": [
+        {
+          "row": 180,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.DP-02",
+          "tag": "Incorporated into DE.AE",
+          "destinations": [
+            "DE.AE"
+          ]
+        }
+      ],
+      "rationale": "DE.DP category eliminated in v2.0; DE.AE category header in xlsx (row 169) cites 'CSF v1.1: DE.DP-2' as the only v1.1 ID absorbed at the category level. No specific v2.0 subcategory captures 'detection process accountability' — recommend UNMAPPED_CSF in chain for the 'process understood and followed' dimension."
+    },
+    {
+      "v11_id": "DE.DP-3",
+      "v11_title": "Detection processes and procedures are tested",
+      "v20_destinations": [
+        "ID.IM-02"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 65,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-02"
+        },
+        {
+          "row": 181,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.DP-03",
+          "tag": "Incorporated into ID.IM-02",
+          "destinations": [
+            "ID.IM-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.DP-4",
+      "v11_title": "Event detection information is communicated",
+      "v20_destinations": [
+        "DE.AE-06"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 175,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.AE-06"
+        },
+        {
+          "row": 182,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.DP-04",
+          "tag": "Incorporated into DE.AE-06",
+          "destinations": [
+            "DE.AE-06"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "DE.DP-5",
+      "v11_title": "Detection processes and procedures are improved",
+      "v20_destinations": [
+        "ID.IM",
+        "ID.IM-03"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 66,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-03"
+        },
+        {
+          "row": 183,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "DE.DP-05",
+          "tag": "Incorporated into ID.IM, ID.IM-03",
+          "destinations": [
+            "ID.IM",
+            "ID.IM-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.AM-1",
+      "v11_title": "Physical devices and systems within the organization are inventoried",
+      "v20_destinations": [
+        "ID.AM-01"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 44,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-01"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.AM-2",
+      "v11_title": "Software platforms and applications within the organization are inventoried",
+      "v20_destinations": [
+        "ID.AM-02"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 45,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-02"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.AM-3",
+      "v11_title": "Organizational communication and data flows are mapped",
+      "v20_destinations": [
+        "ID.AM-03"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 46,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-03"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.AM-4",
+      "v11_title": "External information systems are catalogued",
+      "v20_destinations": [
+        "ID.AM-04"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 47,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-04"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.AM-5",
+      "v11_title": "Resources (e.g., hardware, devices, data, time, people, and software) are prioritized based on their classification, criticality, and business value",
+      "v20_destinations": [
+        "ID.AM-05"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 48,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-05"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.AM-6",
+      "v11_title": "Cybersecurity roles and responsibilities for the entire workforce and third-party stakeholders (e.g., suppliers, customers, partners) are established",
+      "v20_destinations": [
+        "GV.RR-02",
+        "GV.SC-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 20,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RR-02"
+        },
+        {
+          "row": 32,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-02"
+        },
+        {
+          "row": 49,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.AM-06",
+          "tag": "Incorporated into GV.RR-02, GV.SC-02",
+          "destinations": [
+            "GV.RR-02",
+            "GV.SC-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.BE-1",
+      "v11_title": "The organization's role in the supply chain is identified and communicated",
+      "v20_destinations": [
+        "GV.OC-05"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 9,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.OC-05"
+        },
+        {
+          "row": 69,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.BE-01",
+          "tag": "Incorporated into GV.OC-05",
+          "destinations": [
+            "GV.OC-05"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.BE-2",
+      "v11_title": "The organization's place in critical infrastructure and its industry sector is identified and communicated",
+      "v20_destinations": [
+        "GV.OC-01"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 5,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.OC-01"
+        },
+        {
+          "row": 70,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.BE-02",
+          "tag": "Incorporated into GV.OC-01",
+          "destinations": [
+            "GV.OC-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.BE-3",
+      "v11_title": "Priorities for organizational mission, objectives, and activities are established and communicated",
+      "v20_destinations": [
+        "GV.OC-01"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 5,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.OC-01"
+        },
+        {
+          "row": 71,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.BE-03",
+          "tag": "Incorporated into GV.OC-01",
+          "destinations": [
+            "GV.OC-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.BE-4",
+      "v11_title": "Dependencies and critical functions for delivery of critical services are established",
+      "v20_destinations": [
+        "GV.OC-04",
+        "GV.OC-05"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 8,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.OC-04"
+        },
+        {
+          "row": 9,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.OC-05"
+        },
+        {
+          "row": 72,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.BE-04",
+          "tag": "Incorporated into GV.OC-04, GV.OC-05",
+          "destinations": [
+            "GV.OC-04",
+            "GV.OC-05"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.BE-5",
+      "v11_title": "Resilience requirements to support delivery of critical services are established for all operating states (e.g., under duress/attack, during recovery, normal operations)",
+      "v20_destinations": [
+        "GV.OC-04"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 8,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.OC-04"
+        },
+        {
+          "row": 73,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.BE-05",
+          "tag": "Incorporated into GV.OC-04",
+          "destinations": [
+            "GV.OC-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.GV-1",
+      "v11_title": "Organizational cybersecurity policy is established and communicated",
+      "v20_destinations": [
+        "GV.PO",
+        "GV.PO-01",
+        "GV.PO-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 24,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.PO-01"
+        },
+        {
+          "row": 25,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.PO-02"
+        },
+        {
+          "row": 75,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.GV-01",
+          "tag": "Incorporated into GV.PO, GV.PO-01, GV.PO-02",
+          "destinations": [
+            "GV.PO",
+            "GV.PO-01",
+            "GV.PO-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.GV-2",
+      "v11_title": "Cybersecurity roles and responsibilities are coordinated and aligned with internal roles and external partners",
+      "v20_destinations": [
+        "GV.OC-02",
+        "GV.RR",
+        "GV.RR-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 6,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.OC-02"
+        },
+        {
+          "row": 20,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RR-02"
+        },
+        {
+          "row": 76,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.GV-02",
+          "tag": "Incorporated into GV.OC-02, GV.RR, GV.RR-02",
+          "destinations": [
+            "GV.OC-02",
+            "GV.RR",
+            "GV.RR-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.GV-3",
+      "v11_title": "Legal and regulatory requirements regarding cybersecurity, including privacy and civil liberties obligations, are understood and managed",
+      "v20_destinations": [
+        "GV.OC-03"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 7,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.OC-03"
+        },
+        {
+          "row": 77,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.GV-03",
+          "tag": "Moved to GV.OC-03",
+          "destinations": [
+            "GV.OC-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.GV-4",
+      "v11_title": "Governance and risk management processes address cybersecurity risks",
+      "v20_destinations": [
+        "GV.RM-03",
+        "GV.RM-04"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 13,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RM-03"
+        },
+        {
+          "row": 78,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.GV-04",
+          "tag": "Moved to GV.RM-04",
+          "destinations": [
+            "GV.RM-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.RA-1",
+      "v11_title": "Asset vulnerabilities are identified, validated, and recorded",
+      "v20_destinations": [
+        "ID.RA-01"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 53,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-01"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.RA-2",
+      "v11_title": "Cyber threat intelligence and vulnerability information is received from information sharing forums and sources",
+      "v20_destinations": [
+        "ID.RA-02"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 54,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-02"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.RA-3",
+      "v11_title": "Threats, both internal and external, are identified and recorded",
+      "v20_destinations": [
+        "ID.RA-03"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 55,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-03"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.RA-4",
+      "v11_title": "Potential business impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded",
+      "v20_destinations": [
+        "ID.RA-04"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 56,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-04"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.RA-5",
+      "v11_title": "Threats, vulnerabilities, likelihoods, and impacts are used to determine risk",
+      "v20_destinations": [
+        "ID.RA-05"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 57,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-05"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.RA-6",
+      "v11_title": "Risk responses are identified, prioritized, and executed",
+      "v20_destinations": [
+        "ID.RA-06"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 58,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-06"
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.RM-1",
+      "v11_title": "Risk management processes are established, managed, and agreed to by organizational stakeholders",
+      "v20_destinations": [
+        "GV.RM-01",
+        "GV.RM-06",
+        "GV.RR-03"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 11,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RM-01"
+        },
+        {
+          "row": 16,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RM-06"
+        },
+        {
+          "row": 21,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RR-03"
+        },
+        {
+          "row": 80,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.RM-01",
+          "tag": "Incorporated into GV.RM-01, GV.RM-06, GV.RR-03",
+          "destinations": [
+            "GV.RM-01",
+            "GV.RM-06",
+            "GV.RR-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.RM-2",
+      "v11_title": "Risk tolerance is determined and clearly expressed",
+      "v20_destinations": [
+        "GV.RM-02",
+        "GV.RM-04"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 12,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RM-02"
+        },
+        {
+          "row": 14,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RM-04"
+        },
+        {
+          "row": 81,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.RM-02",
+          "tag": "Incorporated into GV.RM-02, GV.RM-04",
+          "destinations": [
+            "GV.RM-02",
+            "GV.RM-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.RM-3",
+      "v11_title": "The organization's determination of risk tolerance is informed by its role in critical infrastructure and sector-specific risk analysis",
+      "v20_destinations": [
+        "GV.RM-02",
+        "Moved into GV.RM-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 12,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RM-02"
+        },
+        {
+          "row": 82,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.RM-03",
+          "tag": "Moved into GV.RM-02",
+          "destinations": [
+            "Moved into GV.RM-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.SC-1",
+      "v11_title": "Cyber supply chain risk management processes are identified, established, assessed, managed, and agreed to by organizational stakeholders",
+      "v20_destinations": [
+        "GV.RM-05",
+        "GV.SC-01",
+        "GV.SC-06",
+        "GV.SC-09",
+        "GV.SC-10"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 15,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RM-05"
+        },
+        {
+          "row": 31,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-01"
+        },
+        {
+          "row": 36,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-06"
+        },
+        {
+          "row": 39,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-09"
+        },
+        {
+          "row": 40,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-10"
+        },
+        {
+          "row": 84,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.SC-01",
+          "tag": "Incorporated into GV.RM-05, GV.SC-01, GV.SC-06, GV.SC-09, GV.SC-10",
+          "destinations": [
+            "GV.RM-05",
+            "GV.SC-01",
+            "GV.SC-06",
+            "GV.SC-09",
+            "GV.SC-10"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.SC-2",
+      "v11_title": "Suppliers and third-party partners of information systems, components, and services are identified, prioritized, and assessed using a cyber supply chain risk management process",
+      "v20_destinations": [
+        "GV.OC-02",
+        "GV.SC-03",
+        "GV.SC-04",
+        "GV.SC-07",
+        "ID.RA-10"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 6,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.OC-02"
+        },
+        {
+          "row": 33,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-03"
+        },
+        {
+          "row": 34,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-04"
+        },
+        {
+          "row": 37,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-07"
+        },
+        {
+          "row": 62,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-10"
+        },
+        {
+          "row": 85,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.SC-02",
+          "tag": "Incorporated into GV.OC-02, GV.SC-03, GV.SC-04, GV.SC-07, ID.RA-10",
+          "destinations": [
+            "GV.OC-02",
+            "GV.SC-03",
+            "GV.SC-04",
+            "GV.SC-07",
+            "ID.RA-10"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.SC-3",
+      "v11_title": "Contracts with suppliers and third-party partners are used to implement appropriate measures designed to meet the objectives of an organization's cybersecurity program and Cyber Supply Chain Risk Management Plan",
+      "v20_destinations": [
+        "GV.SC-05"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 35,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-05"
+        },
+        {
+          "row": 86,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.SC-03",
+          "tag": "Moved to GV.SC-05",
+          "destinations": [
+            "GV.SC-05"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.SC-4",
+      "v11_title": "Suppliers and third-party partners are routinely assessed using audits, test results, or other forms of evaluation to confirm them meeting their contractual obligations",
+      "v20_destinations": [
+        "GV.SC-07",
+        "ID.RA-10"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 37,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-07"
+        },
+        {
+          "row": 62,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-10"
+        },
+        {
+          "row": 87,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.SC-04",
+          "tag": "Incorporated into GV.SC-07, ID.RA-10",
+          "destinations": [
+            "GV.SC-07",
+            "ID.RA-10"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "ID.SC-5",
+      "v11_title": "Response and recovery planning and testing are conducted with suppliers and third-party partners",
+      "v20_destinations": [
+        "GV.SC-08",
+        "ID.IM-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 38,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.SC-08"
+        },
+        {
+          "row": 65,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-02"
+        },
+        {
+          "row": 88,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "ID.SC-05",
+          "tag": "Incorporated into GV.SC-08, ID.IM-02",
+          "destinations": [
+            "GV.SC-08",
+            "ID.IM-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AC-1",
+      "v11_title": "Identities and credentials are issued, managed, verified, revoked, and audited for authorized devices, users and processes",
+      "v20_destinations": [
+        "PR.AA-01",
+        "PR.AA-05"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 92,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AA-01"
+        },
+        {
+          "row": 96,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AA-05"
+        },
+        {
+          "row": 128,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AC-01",
+          "tag": "Incorporated into PR.AA-01, PR.AA-05",
+          "destinations": [
+            "PR.AA-01",
+            "PR.AA-05"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AC-2",
+      "v11_title": "Physical access to assets is managed and protected",
+      "v20_destinations": [
+        "PR.AA-06"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 97,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AA-06"
+        },
+        {
+          "row": 129,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AC-02",
+          "tag": "Moved to PR.AA-06",
+          "destinations": [
+            "PR.AA-06"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AC-3",
+      "v11_title": "Logical access to assets is managed and protected",
+      "v20_destinations": [
+        "PR.AA-03",
+        "PR.AA-05",
+        "PR.IR-01"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 94,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AA-03"
+        },
+        {
+          "row": 96,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AA-05"
+        },
+        {
+          "row": 123,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.IR-01"
+        },
+        {
+          "row": 130,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AC-03",
+          "tag": "Incorporated into PR.AA-03, PR.AA-05, PR.IR-01",
+          "destinations": [
+            "PR.AA-03",
+            "PR.AA-05",
+            "PR.IR-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AC-4",
+      "v11_title": "Access permissions and authorizations are managed, incorporating the principles of least privilege and separation of duties",
+      "v20_destinations": [
+        "PR.AA-05"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 96,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AA-05"
+        },
+        {
+          "row": 131,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AC-04",
+          "tag": "Moved to PR.AA-05",
+          "destinations": [
+            "PR.AA-05"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AC-5",
+      "v11_title": "Network integrity is protected (e.g., network segregation, network segmentation)",
+      "v20_destinations": [
+        "PR.IR-01"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 123,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.IR-01"
+        },
+        {
+          "row": 132,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AC-05",
+          "tag": "Incorporated into PR.IR-01",
+          "destinations": [
+            "PR.IR-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AC-6",
+      "v11_title": "Users and devices are authenticated (e.g., multi-factor authentication) for access to organizational assets",
+      "v20_destinations": [
+        "PR.AA-02"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 93,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AA-02"
+        },
+        {
+          "row": 133,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AC-06",
+          "tag": "Moved to PR.AA-02",
+          "destinations": [
+            "PR.AA-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AC-7",
+      "v11_title": "Users, devices, and assets are authenticated (e.g., single-factor, multi-factor) commensurate with the risk of the transaction",
+      "v20_destinations": [
+        "PR.AA-03"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 94,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AA-03"
+        },
+        {
+          "row": 134,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AC-07",
+          "tag": "Moved to PR.AA-03",
+          "destinations": [
+            "PR.AA-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AT-1",
+      "v11_title": "All users are informed and trained",
+      "v20_destinations": [
+        "PR.AT-01"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 99,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AT-01"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AT-2",
+      "v11_title": "Privileged users understand their roles and responsibilities",
+      "v20_destinations": [
+        "PR.AT-02"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 100,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AT-02"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AT-3",
+      "v11_title": "Third-party stakeholders (e.g., suppliers, customers, partners) understand their roles and responsibilities",
+      "v20_destinations": [
+        "PR.AT-01",
+        "PR.AT-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 99,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AT-01"
+        },
+        {
+          "row": 100,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AT-02"
+        },
+        {
+          "row": 101,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AT-03",
+          "tag": "Incorporated into PR.AT-01, PR.AT-02",
+          "destinations": [
+            "PR.AT-01",
+            "PR.AT-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AT-4",
+      "v11_title": "Senior executives understand their roles and responsibilities",
+      "v20_destinations": [
+        "PR.AT-02"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 100,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AT-02"
+        },
+        {
+          "row": 102,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AT-04",
+          "tag": "Incorporated into PR.AT-02",
+          "destinations": [
+            "PR.AT-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.AT-5",
+      "v11_title": "Physical and cybersecurity personnel understand their roles and responsibilities",
+      "v20_destinations": [
+        "PR.AT-02"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 100,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AT-02"
+        },
+        {
+          "row": 103,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.AT-05",
+          "tag": "Incorporated into PR.AT-02",
+          "destinations": [
+            "PR.AT-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.DS-1",
+      "v11_title": "Data-at-rest is protected",
+      "v20_destinations": [
+        "PR.DS-01"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 105,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.DS-01"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.DS-2",
+      "v11_title": "Data-in-transit is protected",
+      "v20_destinations": [
+        "PR.DS-02"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 106,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.DS-02"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.DS-3",
+      "v11_title": "Assets are formally managed throughout removal, transfers, and disposition",
+      "v20_destinations": [
+        "ID.AM-08",
+        "PR.PS-03"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 51,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-08"
+        },
+        {
+          "row": 107,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.DS-03",
+          "tag": "Incorporated into ID.AM-08, PR.PS-03",
+          "destinations": [
+            "ID.AM-08",
+            "PR.PS-03"
+          ]
+        },
+        {
+          "row": 118,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-03"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.DS-4",
+      "v11_title": "Adequate resource capacity to ensure availability is maintained",
+      "v20_destinations": [
+        "PR.IR-04"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 108,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.DS-04",
+          "tag": "Moved to PR.IR-04",
+          "destinations": [
+            "PR.IR-04"
+          ]
+        },
+        {
+          "row": 126,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.IR-04"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.DS-5",
+      "v11_title": "Protections against data leaks are implemented",
+      "v20_destinations": [
+        "PR.DS-01",
+        "PR.DS-02",
+        "PR.DS-10"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 105,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.DS-01"
+        },
+        {
+          "row": 106,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.DS-02"
+        },
+        {
+          "row": 109,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.DS-05",
+          "tag": "Incorporated into PR.DS-01, PR.DS-02, PR.DS-10",
+          "destinations": [
+            "PR.DS-01",
+            "PR.DS-02",
+            "PR.DS-10"
+          ]
+        },
+        {
+          "row": 113,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.DS-10"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.DS-6",
+      "v11_title": "Integrity checking mechanisms are used to verify software, firmware, and information integrity",
+      "v20_destinations": [
+        "DE.CM-09",
+        "PR.DS-01"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 105,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.DS-01"
+        },
+        {
+          "row": 110,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.DS-06",
+          "tag": "Incorporated into PR.DS-01, DE.CM-09",
+          "destinations": [
+            "PR.DS-01",
+            "DE.CM-09"
+          ]
+        },
+        {
+          "row": 168,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-09"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.DS-7",
+      "v11_title": "The development and testing environment(s) are separate from the production environment",
+      "v20_destinations": [
+        "PR.IR-01"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 111,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.DS-07",
+          "tag": "Incorporated into PR.IR-01",
+          "destinations": [
+            "PR.IR-01"
+          ]
+        },
+        {
+          "row": 123,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.IR-01"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.DS-8",
+      "v11_title": "Integrity checking mechanisms are used to verify hardware integrity",
+      "v20_destinations": [
+        "DE.CM-09",
+        "ID.RA-09"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 61,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-09"
+        },
+        {
+          "row": 112,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.DS-08",
+          "tag": "Incorporated into ID.RA-09, DE.CM-09",
+          "destinations": [
+            "ID.RA-09",
+            "DE.CM-09"
+          ]
+        },
+        {
+          "row": 168,
+          "kind": "active_informative_ref",
+          "csf2_id": "DE.CM-09"
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-1",
+      "v11_title": "A baseline configuration of information technology/industrial control systems is created and maintained incorporating appropriate security principles (e.g. concept of least functionality)",
+      "v20_destinations": [
+        "PR.PS-01"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 116,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-01"
+        },
+        {
+          "row": 136,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-01",
+          "tag": "Incorporated into PR.PS-01",
+          "destinations": [
+            "PR.PS-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-10",
+      "v11_title": "Response and recovery plans are tested",
+      "v20_destinations": [
+        "ID.IM-02",
+        "ID.IM-04"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 65,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-02"
+        },
+        {
+          "row": 67,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-04"
+        },
+        {
+          "row": 145,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-10",
+          "tag": "Incorporated into ID.IM-02, ID.IM-04",
+          "destinations": [
+            "ID.IM-02",
+            "ID.IM-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-11",
+      "v11_title": "Cybersecurity is included in human resources practices (e.g., deprovisioning, personnel screening)",
+      "v20_destinations": [
+        "GV.RR-04"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 22,
+          "kind": "active_informative_ref",
+          "csf2_id": "GV.RR-04"
+        },
+        {
+          "row": 146,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-11",
+          "tag": "Moved to GV.RR-04",
+          "destinations": [
+            "GV.RR-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-12",
+      "v11_title": "A vulnerability management plan is developed and implemented",
+      "v20_destinations": [
+        "ID.RA-01",
+        "PR.PS-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 53,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-01"
+        },
+        {
+          "row": 117,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-02"
+        },
+        {
+          "row": 147,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-12",
+          "tag": "Incorporated into ID.RA-01, PR.PS-02",
+          "destinations": [
+            "ID.RA-01",
+            "PR.PS-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-2",
+      "v11_title": "A System Development Life Cycle to manage systems is implemented",
+      "v20_destinations": [
+        "ID.AM-08",
+        "PR.PS-06"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 51,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-08"
+        },
+        {
+          "row": 121,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-06"
+        },
+        {
+          "row": 137,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-02",
+          "tag": "Incorporated into ID.AM-08, PR.PS-06",
+          "destinations": [
+            "ID.AM-08",
+            "PR.PS-06"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-3",
+      "v11_title": "Configuration change control processes are in place",
+      "v20_destinations": [
+        "ID.RA-07",
+        "PR.PS-01"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 59,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-07"
+        },
+        {
+          "row": 116,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-01"
+        },
+        {
+          "row": 138,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-03",
+          "tag": "Incorporated into PR.PS-01, ID.RA-07",
+          "destinations": [
+            "PR.PS-01",
+            "ID.RA-07"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-4",
+      "v11_title": "Backups of information are conducted, maintained, and tested periodically",
+      "v20_destinations": [
+        "PR.DS-11"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 114,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.DS-11"
+        },
+        {
+          "row": 139,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-04",
+          "tag": "Moved to PR.DS-11",
+          "destinations": [
+            "PR.DS-11"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-5",
+      "v11_title": "Policy and regulations regarding the physical operating environment for organizational assets are met",
+      "v20_destinations": [
+        "PR.IR-02"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 124,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.IR-02"
+        },
+        {
+          "row": 140,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-05",
+          "tag": "Moved to PR.IR-02",
+          "destinations": [
+            "PR.IR-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-6",
+      "v11_title": "Data is destroyed according to policy",
+      "v20_destinations": [
+        "ID.AM-08"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 51,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-08"
+        },
+        {
+          "row": 141,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-06",
+          "tag": "Incorporated into ID.AM-08",
+          "destinations": [
+            "ID.AM-08"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-7",
+      "v11_title": "Protection processes are improved",
+      "v20_destinations": [
+        "ID.IM",
+        "ID.IM-03"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 66,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-03"
+        },
+        {
+          "row": 142,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-07",
+          "tag": "Incorporated into ID.IM, ID.IM-03",
+          "destinations": [
+            "ID.IM",
+            "ID.IM-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-8",
+      "v11_title": "Effectiveness of protection processes is shared with appropriate parties",
+      "v20_destinations": [
+        "ID.IM-03"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 66,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-03"
+        },
+        {
+          "row": 143,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-08",
+          "tag": "Moved to ID.IM-03",
+          "destinations": [
+            "ID.IM-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.IP-9",
+      "v11_title": "Response plans (Incident Response and Business Continuity) and recovery plans (Incident Recovery and Disaster Recovery) are in place and managed",
+      "v20_destinations": [
+        "ID.IM-04"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 67,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-04"
+        },
+        {
+          "row": 144,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.IP-09",
+          "tag": "Moved to ID.IM-04",
+          "destinations": [
+            "ID.IM-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.MA-1",
+      "v11_title": "Maintenance and repair of organizational assets are performed and logged, with approved and controlled tools",
+      "v20_destinations": [
+        "ID.AM-08",
+        "PR.PS-03"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 51,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-08"
+        },
+        {
+          "row": 118,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-03"
+        },
+        {
+          "row": 149,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.MA-01",
+          "tag": "Incorporated into ID.AM-08, PR.PS-03",
+          "destinations": [
+            "ID.AM-08",
+            "PR.PS-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.MA-2",
+      "v11_title": "Remote maintenance of organizational assets is approved, logged, and performed in a manner that prevents unauthorized access",
+      "v20_destinations": [
+        "ID.AM-08",
+        "PR.PS-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 51,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.AM-08"
+        },
+        {
+          "row": 117,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-02"
+        },
+        {
+          "row": 150,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.MA-02",
+          "tag": "Incorporated into ID.AM-08, PR.PS-02",
+          "destinations": [
+            "ID.AM-08",
+            "PR.PS-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.PT-1",
+      "v11_title": "Audit/log records are determined, documented, implemented, and reviewed in accordance with policy",
+      "v20_destinations": [
+        "PR.PS-04"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 119,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-04"
+        },
+        {
+          "row": 152,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.PT-01",
+          "tag": "Incorporated into PR.PS-04",
+          "destinations": [
+            "PR.PS-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.PT-2",
+      "v11_title": "Removable media is protected and its use restricted according to policy",
+      "v20_destinations": [
+        "PR.DS-01",
+        "PR.PS-01"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 105,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.DS-01"
+        },
+        {
+          "row": 116,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-01"
+        },
+        {
+          "row": 153,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.PT-02",
+          "tag": "Incorporated into PR.DS-01, PR.PS-01",
+          "destinations": [
+            "PR.DS-01",
+            "PR.PS-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.PT-3",
+      "v11_title": "The principle of least functionality is incorporated by configuring systems to provide only essential capabilities",
+      "v20_destinations": [
+        "PR.PS-01"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 116,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.PS-01"
+        },
+        {
+          "row": 154,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.PT-03",
+          "tag": "Incorporated into PR.PS-01",
+          "destinations": [
+            "PR.PS-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.PT-4",
+      "v11_title": "Communications and control networks are protected",
+      "v20_destinations": [
+        "PR.AA-06",
+        "PR.IR-01"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 97,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AA-06"
+        },
+        {
+          "row": 123,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.IR-01"
+        },
+        {
+          "row": 155,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.PT-04",
+          "tag": "Incorporated into PR.AA-06, PR.IR-01",
+          "destinations": [
+            "PR.AA-06",
+            "PR.IR-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "PR.PT-5",
+      "v11_title": "Mechanisms (e.g., failsafe, load balancing, hot swap) are implemented to achieve resilience requirements in normal and adverse situations",
+      "v20_destinations": [
+        "PR.IR-03"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 125,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.IR-03"
+        },
+        {
+          "row": 156,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "PR.PT-05",
+          "tag": "Moved to PR.IR-03",
+          "destinations": [
+            "PR.IR-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RC.CO-1",
+      "v11_title": "Public relations are managed",
+      "v20_destinations": [
+        "RC.CO-04"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 226,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RC.CO-01",
+          "tag": "Incorporated into RC.CO-04",
+          "destinations": [
+            "RC.CO-04"
+          ]
+        },
+        {
+          "row": 229,
+          "kind": "active_informative_ref",
+          "csf2_id": "RC.CO-04"
+        }
+      ]
+    },
+    {
+      "v11_id": "RC.CO-2",
+      "v11_title": "Reputation is repaired after an incident",
+      "v20_destinations": [
+        "RC.CO-04"
+      ],
+      "mapping_type": "WITHDRAWN_DESTINATION_INCONSISTENT",
+      "provenance": [
+        {
+          "row": 227,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RC.CO-02",
+          "tag": "Incorporated into RC.CO-04",
+          "destinations": [
+            "RC.CO-04"
+          ]
+        }
+      ],
+      "rationale": "Withdrawn row RC.CO-02 (xlsx row 227) tag says 'Incorporated into RC.CO-04', but the active RC.CO-04 (xlsx row 229) cites v1.1: RC.CO-1 and RS.CO-2, NOT RC.CO-2. NIST's mapping for 'reputation repair' is effectively dropped from CSF 2.0 — recommend UNMAPPED_CSF in chain for any SR touching this v1.1 control."
+    },
+    {
+      "v11_id": "RC.CO-3",
+      "v11_title": "Recovery activities are communicated to internal stakeholders and executives",
+      "v20_destinations": [
+        "RC.CO-03"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 228,
+          "kind": "active_informative_ref",
+          "csf2_id": "RC.CO-03"
+        }
+      ]
+    },
+    {
+      "v11_id": "RC.IM-1",
+      "v11_title": "Recovery plans incorporate lessons learned",
+      "v20_destinations": [
+        "ID.IM-03",
+        "ID.IM-04"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 66,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-03"
+        },
+        {
+          "row": 67,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-04"
+        },
+        {
+          "row": 231,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RC.IM-01",
+          "tag": "Incorporated into ID.IM-03, ID.IM-04",
+          "destinations": [
+            "ID.IM-03",
+            "ID.IM-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RC.IM-2",
+      "v11_title": "Recovery strategies are updated",
+      "v20_destinations": [
+        "ID.IM-03"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 66,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-03"
+        },
+        {
+          "row": 232,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RC.IM-02",
+          "tag": "Incorporated into ID.IM-03",
+          "destinations": [
+            "ID.IM-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RC.RP-1",
+      "v11_title": "Recovery plan is executed during or after a cybersecurity incident",
+      "v20_destinations": [
+        "RC.RP-01",
+        "RC.RP-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 219,
+          "kind": "active_informative_ref",
+          "csf2_id": "RC.RP-01"
+        },
+        {
+          "row": 220,
+          "kind": "active_informative_ref",
+          "csf2_id": "RC.RP-02"
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.AN-1",
+      "v11_title": "Notifications from detection systems are investigated",
+      "v20_destinations": [
+        "RS.MA-02"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 188,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MA-02"
+        },
+        {
+          "row": 193,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.AN-01",
+          "tag": "Incorporated into RS.MA-02",
+          "destinations": [
+            "RS.MA-02"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.AN-2",
+      "v11_title": "The impact of the incident is understood",
+      "v20_destinations": [
+        "RS.MA-02",
+        "RS.MA-03",
+        "RS.MA-04"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 188,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MA-02"
+        },
+        {
+          "row": 189,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MA-03"
+        },
+        {
+          "row": 190,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MA-04"
+        },
+        {
+          "row": 194,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.AN-02",
+          "tag": "Incorporated into RS.MA-02, RS.MA-03, RS.MA-04",
+          "destinations": [
+            "RS.MA-02",
+            "RS.MA-03",
+            "RS.MA-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.AN-3",
+      "v11_title": "Forensics are performed",
+      "v20_destinations": [
+        "RS.AN-03",
+        "RS.AN-06"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 195,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.AN-03"
+        },
+        {
+          "row": 198,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.AN-06"
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.AN-4",
+      "v11_title": "Incidents are categorized consistent with response plans",
+      "v20_destinations": [
+        "RS.MA-03"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 189,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MA-03"
+        },
+        {
+          "row": 196,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.AN-04",
+          "tag": "Moved to RS.MA-03",
+          "destinations": [
+            "RS.MA-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.AN-5",
+      "v11_title": "Processes are established to receive, analyze and respond to vulnerabilities disclosed to the organization from internal and external sources (e.g. internal testing, security bulletins, or security researchers)",
+      "v20_destinations": [
+        "ID.RA-08"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 60,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-08"
+        },
+        {
+          "row": 197,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.AN-05",
+          "tag": "Moved to ID.RA-08",
+          "destinations": [
+            "ID.RA-08"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.CO-1",
+      "v11_title": "Personnel know their roles in order to support a response to an incident",
+      "v20_destinations": [
+        "PR.AT-01"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 99,
+          "kind": "active_informative_ref",
+          "csf2_id": "PR.AT-01"
+        },
+        {
+          "row": 202,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.CO-01",
+          "tag": "Incorporated into PR.AT-01",
+          "destinations": [
+            "PR.AT-01"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.CO-2",
+      "v11_title": "Incidents are reported consistent with established criteria",
+      "v20_destinations": [
+        "RC.CO-04",
+        "RS.CO-02"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 203,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.CO-02"
+        },
+        {
+          "row": 229,
+          "kind": "active_informative_ref",
+          "csf2_id": "RC.CO-04"
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.CO-3",
+      "v11_title": "Information is shared consistent with response plans",
+      "v20_destinations": [
+        "RS.CO-02",
+        "RS.CO-03"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 203,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.CO-02"
+        },
+        {
+          "row": 204,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.CO-03"
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.CO-4",
+      "v11_title": "Coordination with stakeholders occurs consistent with response plans",
+      "v20_destinations": [
+        "RS.MA-01",
+        "RS.MA-04"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 187,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MA-01"
+        },
+        {
+          "row": 190,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MA-04"
+        },
+        {
+          "row": 205,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.CO-04",
+          "tag": "Incorporated into RS.MA-01, RS.MA-04",
+          "destinations": [
+            "RS.MA-01",
+            "RS.MA-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.CO-5",
+      "v11_title": "Voluntary information sharing occurs with external stakeholders to achieve broader cybersecurity situational awareness",
+      "v20_destinations": [
+        "RS.CO-03"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 204,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.CO-03"
+        },
+        {
+          "row": 206,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.CO-05",
+          "tag": "Incorporated into RS.CO-03",
+          "destinations": [
+            "RS.CO-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.IM-1",
+      "v11_title": "Response plans incorporate lessons learned",
+      "v20_destinations": [
+        "ID.IM-03",
+        "ID.IM-04"
+      ],
+      "mapping_type": "MULTI_INCORPORATED",
+      "provenance": [
+        {
+          "row": 66,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-03"
+        },
+        {
+          "row": 67,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-04"
+        },
+        {
+          "row": 214,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.IM-01",
+          "tag": "Incorporated into ID.IM-03, ID.IM-04",
+          "destinations": [
+            "ID.IM-03",
+            "ID.IM-04"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.IM-2",
+      "v11_title": "Response strategies are updated",
+      "v20_destinations": [
+        "ID.IM-03"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 66,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.IM-03"
+        },
+        {
+          "row": 215,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.IM-02",
+          "tag": "Incorporated into ID.IM-03",
+          "destinations": [
+            "ID.IM-03"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.MI-1",
+      "v11_title": "Incidents are contained",
+      "v20_destinations": [
+        "RS.MI-01"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 208,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MI-01"
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.MI-2",
+      "v11_title": "Incidents are mitigated",
+      "v20_destinations": [
+        "RS.MI-02"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 209,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MI-02"
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.MI-3",
+      "v11_title": "Newly identified vulnerabilities are mitigated or documented as accepted risks",
+      "v20_destinations": [
+        "ID.RA-06"
+      ],
+      "mapping_type": "SINGLE_INCORPORATED",
+      "provenance": [
+        {
+          "row": 58,
+          "kind": "active_informative_ref",
+          "csf2_id": "ID.RA-06"
+        },
+        {
+          "row": 210,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.MI-03",
+          "tag": "Incorporated into ID.RA-06",
+          "destinations": [
+            "ID.RA-06"
+          ]
+        }
+      ]
+    },
+    {
+      "v11_id": "RS.RP-1",
+      "v11_title": "Response plan is executed during or after an incident",
+      "v20_destinations": [
+        "RS.MA-01"
+      ],
+      "mapping_type": "IDENTITY_RENAME",
+      "provenance": [
+        {
+          "row": 187,
+          "kind": "active_informative_ref",
+          "csf2_id": "RS.MA-01"
+        },
+        {
+          "row": 212,
+          "kind": "withdrawn_id_strip",
+          "csf2_id": "RS.RP-01",
+          "tag": "Incorporated into RS.MA-01",
+          "destinations": [
+            "RS.MA-01"
+          ]
+        }
+      ]
+    }
+  ]
+}
