@@ -211,8 +211,8 @@ def _normalize_subdomain_to_v1(sub: Any) -> dict[str, Any]:
         shape-agnostic.
 
     CORR-037-T3c: enables the orchestrator to substitute v2 Pydantic
-    Subdomain (from preproc_catalog) for v1 SubDomainDef (from
-    SubDomainLoader) without breaking downstream consumers.
+    Subdomain (from preproc_catalog) for the legacy SubDomainDef (from
+    the removed regex-MD loader) without breaking downstream consumers.
     """
     # Pass-through: already a dict (assume v1 shape; if it's v2 shape,
     # the model_dump-equivalent values won't have section2_hso and the

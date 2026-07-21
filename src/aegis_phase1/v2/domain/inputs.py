@@ -22,8 +22,6 @@ from typing import Any
 
 from aegis_phase1.prompts_v2.track_b import TrackB
 from aegis_phase1.v2.domain.filters import (
-    filter_ambiguities,
-    filter_articles,
     filter_cross_reg,
     filter_implementations,
     filter_regs,
@@ -81,8 +79,10 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
               ``CompanyContext`` (name/scale/employees/fte/tech/applicable_regs).
             - ``subdomains`` (list[dict]): from ``filter_subdomains``.
             - ``applicable_regs`` (list[str]): from ``filter_regs``.
-            - ``applicable_articles`` (list[dict]): from ``filter_articles``.
-            - ``ambiguities`` (list[dict]): from ``filter_ambiguities``.
+            - ``applicable_articles`` (list[dict]): empty post-T4
+              (replaced by preproc catalog clause data in future contracts).
+            - ``ambiguities`` (list[dict]): empty post-T4 (replaced by
+              preproc_catalog.load_pairs() for cross-regulation analysis).
             - ``cross_reg_analysis`` (list[dict]): from ``filter_cross_reg``.
             - ``existing_implementations`` (list[dict]): from
               ``filter_implementations``.
@@ -106,8 +106,13 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
 
     subdomains = filter_subdomains(state, domain_id)
     applicable_regs = filter_regs(state, domain_id)
-    applicable_articles = filter_articles(state, domain_id)
-    ambiguities = filter_ambiguities(state, domain_id)
+    # CORR-037-T4: filter_articles/filter_ambiguities removed (v1 ambiguity/
+    # article loaders deprecated). For now, leave the keys in the inputs
+    # dict as empty lists so consumers don't KeyError. New consumers (SP-B/C)
+    # should use preproc_catalog.load_pairs() for cross-regulation analysis
+    # and read the regulatory OJ text directly from preproc_out/3-entities/clauses/.
+    applicable_articles: list[dict] = []
+    ambiguities: list[dict] = []
     cross_reg_analysis = filter_cross_reg(state, domain_id)
     existing_implementations = filter_implementations(state, domain_id)
 
@@ -127,12 +132,10 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
     }
 
     logger.debug(
-        "assemble_inputs(%s): subs=%d regs=%d arts=%d ambig=%d cr=%d impls=%d",
+        "assemble_inputs(%s): subs=%d regs=%d cr=%d impls=%d (articles/ambiguities empty post-T4)",
         domain_id,
         len(subdomains),
         len(applicable_regs),
-        len(applicable_articles),
-        len(ambiguities),
         len(cross_reg_analysis),
         len(existing_implementations),
     )

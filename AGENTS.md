@@ -139,16 +139,33 @@ bash .hooks/ci-frameworks.sh                                   # framework polic
 src/aegis_phase1/          # Main package
 ├── config/                # case.yaml loader, defaults, models
 ├── llm/                   # Ollama client, tracing stub
-├── nodes/                 # 23 LangGraph node functions
 ├── parsers/               # applicability rules, intake, JSON utils
 ├── prompts/               # subphase_a/b/c prompt templates
-├── shared/                # document producer, template parser
-├── subphases/             # subphase orchestration
-├── graph.py               # LangGraph state machine
 ├── models.py              # Pydantic data models
 ├── state.py               # Phase1State TypedDict
-└── env.py                 # .env loader
+├── env.py                 # .env loader
+└── v2/                    # Phase 1 v2 pipeline (CORR-037)
+    ├── loader/            # PreprocCatalogLoader (preproc_out JSON),
+    │                      # CaseProfileLoader (case input YAML),
+    │                      # + common_loader + preprocessing_loader
+    │                      # (legacy v1 retained for ontology/preprocessing
+    │                      #  until T4b migrates the 8 output consumers)
+    ├── domain/            # MAP-stage filters and input assembly
+    ├── output/            # 9 doc_*.py renderers + xlsx_generator
+    ├── reduce/            # REDUCE-stage synthesis + Track B proportionality
+    ├── orchestrator.py    # 4-stage state machine (LOAD→MAP→REDUCE→OUTPUT)
+    ├── runner.py          # CLI entry point
+    └── llm.py             # LLM invoker wiring
 ```
+
+**CORR-037-T4:** v1 legacy removed (`graph.py`, `subphases/`, `nodes/`,
+`shared/`, `run_with_iteration.py`, `section_refill.py`, `doc_evaluator.py`,
+plus 4 v2/loader/*.py: ambiguity_loader, article_loader, subdomain_loader,
+yaml_input_loader was RESTORED because common_loader still uses it).
+The remaining `common_loader.py` + `preprocessing_loader.py` provide
+`state['ontology']` and `state['preprocessing']` for the 8 output
+consumers (Doc 04/04a-d/05/06/07/07b + xlsx). Full migration is
+deferred to **T4b** (out of scope for this contract).
 
 ```
 cases/case1-tinytask/

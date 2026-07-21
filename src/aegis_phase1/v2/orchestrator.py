@@ -23,8 +23,8 @@ Note (CORR-037-T3 scaffolding): The orchestrator now accepts optional
 Pydantic loaders from CORR-037-T1/T2). They are NOT yet wired into
 ``load()`` — that wiring is deferred to a follow-up session (T3 full
 refactor). When provided, they are stored on self and exposed for
-downstream use; ``load()`` still uses the v1 loaders (CommonLoader,
-SubDomainLoader, PreprocessingLoader) for backwards compatibility.
+downstream use; ``load()`` still uses the legacy loaders
+(CommonLoader, PreprocessingLoader) for backwards compatibility.
 Existing tests pass; new code can opt-in via constructor injection.
 """
 
@@ -223,13 +223,11 @@ class Phase1Orchestrator:
 
         from aegis_phase1.v2.loader.common_loader import CommonLoader
         from aegis_phase1.v2.loader.preprocessing_loader import PreprocessingLoader
-        from aegis_phase1.v2.loader.subdomain_loader import SubDomainLoader
 
         logger.info("=== STAGE 0: LOAD ===")
         start = time.time()
 
         common_loader = CommonLoader()
-        subdomain_loader = SubDomainLoader()
         preprocessing_loader = PreprocessingLoader()
 
         common = common_loader.load(case_path)
@@ -255,7 +253,14 @@ class Phase1Orchestrator:
             # to match the v1 state shape (dict keyed by sub-id).
             self.state["subdomains"] = {s.id: s for s in subs_list}
         else:
-            self.state["subdomains"] = subdomain_loader.load(str(subdomains_path))
+            # CORR-037-T4: SubDomainLoader was removed (regex parsing of MDs).
+            # Fallback when no preproc_catalog is provided: empty dict. New
+            # code should always inject a preproc_catalog.
+            logger.warning(
+                "T4: no preproc_catalog injected — state['subdomains'] is empty. "
+                "Inject a PreprocCatalogLoader for the canonical 38 subdomains."
+            )
+            self.state["subdomains"] = {}
 
         self.state["preprocessing"] = preprocessing_loader.load(regulatory_baseline_path)
 

@@ -74,26 +74,36 @@ def test_assemble_inputs_returns_applicable_regs_intersected(mock_state: V2State
 
 
 def test_assemble_inputs_includes_verbatim_articles(mock_state: V2State) -> None:
+    """CORR-037-T4: applicable_articles is now empty (v1 article_loader removed).
+
+    Future contract (T4b or SP-B) will populate this from preproc_catalog
+    clause data. For now, the key exists in inputs but is an empty list.
+    """
     result = assemble_inputs(mock_state, "D-04")
     arts = result["applicable_articles"]
-    assert arts, "expected at least one article"
-    for art in arts:
-        assert {"regulation", "article", "title", "text"} <= set(art.keys())
-        assert art["text"]
+    assert arts == [], "expected empty list (T4 removed v1 article_loader)"
+    # Key still exists in the inputs dict (backwards compat for consumers)
+    assert "applicable_articles" in result
 
 
 def test_assemble_inputs_returns_regulation_ambiguities(mock_state: V2State) -> None:
+    """CORR-037-T4: ambiguities is now empty (v1 ambiguity_loader removed).
+
+    Future contract will populate this from preproc_catalog.load_pairs().
+    For now, the key exists in inputs but is an empty list.
+    """
     mock_state["company_context"].applicable_regs = ["GDPR"]
 
     result = assemble_inputs(mock_state, "D-04")
 
-    assert result["ambiguities"]
-    assert {entry["regulation"] for entry in result["ambiguities"]} == {"GDPR"}
+    assert result["ambiguities"] == []
+    assert "ambiguities" in result
 
 
 def test_assemble_inputs_excludes_non_applicable_regulation_ambiguities(
     mock_state: V2State,
 ) -> None:
+    """T4 placeholder: trivially true since ambiguities is empty."""
     mock_state["company_context"].applicable_regs = ["GDPR"]
 
     result = assemble_inputs(mock_state, "D-04")
@@ -196,8 +206,8 @@ def test_assemble_inputs_returns_empty_lists_when_no_data(mock_state: V2State) -
     assert result["subdomains"] == []
     assert result["applicable_regs"] == ["CRA", "GDPR"]
     assert result["applicable_articles"] == []
-    assert result["ambiguities"]
-    assert {entry["regulation"] for entry in result["ambiguities"]} == {"CRA", "GDPR"}
+    # CORR-037-T4: ambiguities is empty (v1 ambiguity_loader removed).
+    assert result["ambiguities"] == []
     assert result["cross_reg_analysis"] == []
     # Implementations are tech-stack driven, not subdomain-driven,
     # so they may still be present for any domain the company uses.
