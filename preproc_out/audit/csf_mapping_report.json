@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "built_at": "2026-07-20T10:54:54Z",
+  "built_at": "2026-07-21T08:49:15Z",
   "frozen_list_source": "preproc_out/global/NIST_CSF_2.0_subcategories.json",
   "frozen_list_id_count": 106,
   "subdomain_count": 38,

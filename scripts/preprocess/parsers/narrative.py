@@ -786,6 +786,222 @@ def _extract_table_rows_from_block(table_block_text: str) -> list[list[str]]:
     return rows
 
 
+# ─── DomainAnalysis pair granularity helpers (CORR-PILOT-DA) ───────────
+#
+# DomainAnalysis files use a different pair format than DeepAnalysis:
+#   1. `<!-- pair: REG_A,REG_B --> ... <!-- /pair -->` markers wrap each pair
+#   2. Inside, a 3-column table:
+#        | REG_A ↔ REG_B | **Classification** | Tension/difference |
+#        | **REG_A** (SR-X, Art. Y) | description | scope/angle |
+#        | **REG_B** (SR-X, Art. Y) | description | scope/angle |
+#   3. A `**Why CLASSIFICATION (qualifier)**: PARAGRAPH` block follows
+#   4. NO blockquoted OJ article — the table cell IS the OJ quote (synthesis)
+#   5. NO `**Scope-disjoint test:**` — the verdict is encoded in the
+#      classification and the (qualifier) of the Why header
+#
+# Because the structure differs, we have DA-specific helpers. The DeepAnalysis
+# helpers (_extract_oj_quotes_verbatim, _extract_comparison_sections, etc.)
+# are NOT reused because their regexes assume `**REG article (...):**`
+# headers and `> blockquote` lines that DA files don't have.
+
+
+# Canonical classification normalization. The MD source uses inconsistent
+# casing ("Complementary" vs "complementary") and inconsistent naming
+# ("Different perspective" vs "different-perspective"). We canonicalize to
+# 4 labels: Complementary, Equal, Different perspective, Contradictory.
+_DA_CLASS_CANONICAL: dict[str, str] = {
+    "complementary": "Complementary",
+    "equal": "Equal",
+    "different perspective": "Different perspective",
+    "different-perspective": "Different perspective",
+    "contradictory": "Contradictory",
+    # already-canonical (uppercase first letter)
+    "complementary ": "Complementary",  # trailing-space safety
+}
+
+
+def _canonicalize_classification(raw: str) -> str:
+    """Map a raw classification string to its canonical form.
+
+    The MD has "complementary" / "Complementary" / "equal" / "Equal" /
+    "different-perspective" / "Different perspective" / "contradictory"
+    (the only 4 valid verdicts, in canonical form).
+    """
+    if not raw:
+        return ""
+    key = raw.strip().lower()
+    if key in _DA_CLASS_CANONICAL:
+        return _DA_CLASS_CANONICAL[key]
+    # Unknown verdict — return as-is (caller will surface as a test failure
+    # so the inventory is auditable).
+    return raw.strip()
+
+
+def _extract_why_metadata(block_text: str) -> dict[str, str]:
+    """Extract the `**Why CLASSIFICATION (qualifier)**: PARAGRAPH` block.
+
+    Returns:
+      - classification: canonical label (Complementary/Equal/...)
+      - qualifier: the text in parens, e.g. "with structural differences"
+        (may be empty string if no qualifier)
+      - note: the prose paragraph after the colon
+      - raw_header: the full `**Why CLASSIFICATION (qualifier)**` text
+        verbatim (for audit / zero-loss)
+
+    The classification is taken from the Why header (the table cell
+    carries the same verdict — they are always identical in DA files).
+    """
+    # Match "**Why <verdict> (qualifier)**: PARAGRAPH" or "**Why <verdict>**: PARAGRAPH"
+    m = re.search(
+        r"\*\*Why\s+([^*]+?)\*\*\s*:\s*([^\n]+(?:\n(?!\s*<!--|\s*\*\*)[^\n]+)*)",
+        block_text,
+    )
+    if not m:
+        return {
+            "classification": "",
+            "qualifier": "",
+            "note": "",
+            "raw_header": "",
+        }
+    header = m.group(1).strip()
+    note = m.group(2).strip()
+    # The header may be "complementary (with timeline overlap)",
+    # "complementary + partial overlap", or "equal for financial
+    # entities" — split verdict from qualifier. Strategy:
+    #   1. Try parenthesized form: "verdict (qualifier)"
+    #   2. Try "verdict + qualifier"
+    #   3. Try "verdict <space> for|with|when|on|in|across <...>"
+    #   4. Fall back to whole header as verdict (no qualifier)
+    qual_m = re.match(r"^([\w\- ]+?)\s*\(([^)]+)\)\s*$", header)
+    if qual_m:
+        verdict = _canonicalize_classification(qual_m.group(1))
+        qualifier = qual_m.group(2).strip()
+    else:
+        plus_m = re.match(r"^([\w\- ]+?)\s+\+\s+(.+)$", header)
+        if plus_m:
+            verdict = _canonicalize_classification(plus_m.group(1))
+            qualifier = plus_m.group(2).strip()
+        else:
+            # "verdict <filler-word> <rest>" — the 4 canonical verdicts
+            # are single-word. The filler words we accept: for, with,
+            # when, on, in, across, given, under, where, plus.
+            split_m = re.match(
+                r"^(\w+(?:[\-]\w+)?)\s+(for|with|when|on|in|across|"
+                r"given|under|where|plus)\b\s*(.*)$",
+                header,
+                re.IGNORECASE,
+            )
+            if split_m:
+                verdict = _canonicalize_classification(split_m.group(1))
+                rest = split_m.group(3).strip()
+                qualifier = (
+                    f"{split_m.group(2).lower()} {rest}".strip()
+                    if rest
+                    else split_m.group(2).lower()
+                )
+            else:
+                verdict = _canonicalize_classification(header)
+                qualifier = ""
+    return {
+        "classification": verdict,
+        "qualifier": qualifier,
+        "note": note,
+        "raw_header": f"Why {header}",
+    }
+
+
+def _extract_oj_quotes_from_table(block_text: str) -> list[dict[str, Any]]:
+    """Extract the 2 OJ-quote cells from a DomainAnalysis pair table.
+
+    DA pair block has structure (inside `<!-- pair -->` markers):
+        | GDPR ↔ NIS2 | **Complementary** | Tension/difference |
+        | **GDPR** (SR-GDPR-001, Art. 32(1)(a)/(b)) | description | scope |
+        | **NIS2** (SR-NIS2-001, Art. 21(2)(h)) | description | scope |
+
+    We return one entry per data row (i.e. 2 entries per pair), with:
+      - regulation: bold name from col 0 (e.g. "GDPR")
+      - citation_raw: text inside the parens (e.g. "SR-GDPR-001, Art. 32(1)(a)/(b)")
+      - sr_id: first SR-XXX-NNN matched in citation
+      - article: first Art. NN(...) matched
+      - annex: first Annex NN matched
+      - description: column 1 verbatim
+      - scope: column 2 verbatim
+    """
+    out: list[dict[str, Any]] = []
+    # Find the first table block inside the pair body
+    table_re = re.compile(
+        r"^\s*\|(.+)\|\s*$\n^\s*\|[\s\-:|]+\|\s*$\n((?:^\s*\|.+\|\s*$\n?)+)",
+        re.MULTILINE,
+    )
+    tm = table_re.search(block_text)
+    if not tm:
+        return out
+    rows_raw = tm.group(2).strip().splitlines()
+    for row_line in rows_raw:
+        row = _parse_table_row(row_line)
+        if row is None or len(row) < 2:
+            continue
+        # First column starts with **REG** (citation)
+        col0 = row[0]
+        m_oj = re.match(r"^\s*\*\*\s*(\w+)\*\*\s*\(((?:[^()]|\([^)]*\))+)\)", col0)
+        if not m_oj:
+            continue
+        regulation = m_oj.group(1).strip()
+        citation = m_oj.group(2).strip()
+        sr_m = re.search(r"(SR-[\w\-]+)", citation)
+        art_m = re.search(r"(Art(?:icle)?\.?\s*\d+(?:\([^)]+\))*)", citation)
+        annex_m = re.search(r"(Annex\s+[IVX]+)", citation)
+        out.append(
+            {
+                "regulation": regulation,
+                "citation_raw": citation,
+                "sr_id": sr_m.group(1) if sr_m else None,
+                "article": art_m.group(1).strip() if art_m else None,
+                "annex": annex_m.group(1) if annex_m else None,
+                "description": row[1] if len(row) > 1 else "",
+                "scope": row[2] if len(row) > 2 else "",
+            }
+        )
+    return out
+
+
+def _extract_comparison_sections_domain(
+    block_text: str, reg_a: str, reg_b: str
+) -> list[dict[str, Any]]:
+    """Build a 2-axis comparison structure for a DomainAnalysis pair.
+
+    Per the CORR-034 contract, DA's \`comparison_sections\` model is:
+      - "obligation"  (col 1 of the pair table): populated
+      - "scope"       (always empty in DA): contract-mandated
+
+    Why "scope" is always empty in DA:
+      - DeepAnalysis has 5 axes (incl. scope) — it is the rich version.
+      - DA is the lite version for the crossregulation matrix; the
+        scope/angle dimension is intentionally NOT modelled here.
+      - Some source MDs (D-01..D-03) carry a 3rd column in the pair
+        table with descriptive scope text, but that text is
+        semi-structured prose, not a structured axis. Stripping it
+        here aligns all 38 files on a single contract.
+    """
+    rows = _extract_oj_quotes_from_table(block_text)
+    reg_a_row = next((r for r in rows if r["regulation"] == reg_a), None)
+    reg_b_row = next((r for r in rows if r["regulation"] == reg_b), None)
+    if not reg_a_row or not reg_b_row:
+        return []
+    return [
+        {
+            "axis": "obligation",
+            "reg_a_value": reg_a_row["description"],
+            "reg_b_value": reg_b_row["description"],
+        },
+        {
+            "axis": "scope",
+            "reg_a_value": "",
+            "reg_b_value": "",
+        },
+    ]
+
+
 # ─── Fase 2: crossregulation/D-XX_*/ per-subdomain ───────────────────
 
 
@@ -831,10 +1047,23 @@ def parse_crossregulation_subdomain(
             break
 
     # Extract participants from the "<!-- participants: ... -->" comment
+    # (legacy — keep the raw split for backward-compat with consumers
+    # that read participants_meta as a list of strings).
     participants_meta: list[str] = []
     m_part = re.search(r"<!--\s*participants:\s*([^>]+?)\s*-->", body)
     if m_part:
         participants_meta = [r.strip() for r in m_part.group(1).split(",")]
+
+    # CORR-PILOT: DeepAnalysis files do NOT have an H4 "Participants" table —
+    # they carry participants in the HTML comment + the bold prose paragraph.
+    # We extract structured fields for both kinds (DomainAnalysis keeps
+    # the H4 table path; DeepAnalysis fills the new structured fields).
+    participants_info = _extract_participants_from_deep(body)
+    if sub_kind == "deep_analysis" and not participants_info["participants"]:
+        # Fallback to the comment split if the helper found nothing
+        participants_info["participants"] = [
+            _deep_norm_reg(r) for r in participants_meta
+        ]
 
     # Extract participants table (after H4 "Participants")
     participants_table: list[dict[str, str]] = []
@@ -929,13 +1158,74 @@ def parse_crossregulation_subdomain(
             if bk == "table":
                 table_block_raw = bv
                 break
+        # CORR-PILOT-DA: enrich DomainAnalysis pair with the same
+        # granularity fields as DeepAnalysis (so consumers can read both
+        # kinds uniformly). The Why metadata gives the canonical
+        # classification + qualifier; the table-extracted quotes give
+        # per-regulation verbatim description + scope; the comparison
+        # sections synthesize a 2-axis structure (obligation + scope).
+        why_meta = _extract_why_metadata(block_text)
+        canonical_class = why_meta["classification"] or _canonicalize_classification(
+            classification
+        )
+        oj_quotes_table = _extract_oj_quotes_from_table(block_text)
+        comparison_sections = _extract_comparison_sections_domain(
+            block_text, regs[0], regs[1]
+        )
+        # Build oj_quotes_verbatim from the table rows (DA has no blockquote
+        # — the description cell IS the synthesized OJ quote)
+        oj_quotes_verbatim = [
+            {
+                "regulation": q["regulation"],
+                "header": f"{q['regulation']} ({q['citation_raw']})",
+                "verbatim": q["description"],
+                "sr_ids": [q["sr_id"]] if q["sr_id"] else [],
+                "articles": [q["article"]] if q["article"] else [],
+                "annexes": [q["annex"]] if q["annex"] else [],
+            }
+            for q in oj_quotes_table
+        ]
+        # Scope-disjoint test: derive a verdict from the canonical
+        # classification. DA doesn't have a dedicated section, so we map:
+        #   Complementary  -> "Y"  (they co-exist in scope)
+        #   Equal          -> "Y"  (same scope)
+        #   Different perspective -> "N" (scope-disjoint by definition)
+        #   Contradictory  -> "Conditional" (scope overlaps but
+        #                      obligation conflicts — binding-procedure
+        #                      applies)
+        _verdict_map = {
+            "Complementary": "Y",
+            "Equal": "Y",
+            "Different perspective": "N",
+            "Contradictory": "Conditional",
+        }
+        scope_disjoint = {
+            "verdict": _verdict_map.get(canonical_class, ""),
+            "note": why_meta.get("qualifier", "")
+            or f"derived_from_classification:{canonical_class}",
+        }
+        # downstream_implication: look for an H4 "Downstream implication"
+        # in the file body (it's a top-level section, not a per-pair
+        # field). For per-pair downstream notes, we use the qualifier +
+        # the first sentence of why_meta["note"].
+        downstream_implication = why_meta["note"][:200] if why_meta["note"] else ""
+        p0_notes = _extract_p0_notes(block_text)
+        sr_ids_per_pair = sorted(set(_SR_RE.findall(block_text)))
         pairs.append(
             {
                 "reg_a": regs[0],
                 "reg_b": regs[1],
-                "classification": classification,
+                "classification": canonical_class or classification,
                 "why": why,
+                "why_qualifier": why_meta.get("qualifier", ""),
+                "why_note": why_meta.get("note", ""),
                 "oj_quotes": oj_quotes,
+                "oj_quotes_verbatim": oj_quotes_verbatim,
+                "comparison_sections": comparison_sections,
+                "scope_disjoint_test": scope_disjoint,
+                "downstream_implication": downstream_implication,
+                "p0_notes": p0_notes,
+                "sr_ids_per_pair": sr_ids_per_pair,
                 "table_block_raw": table_block_raw,
                 "block_text_raw": block_text,
             }
@@ -950,7 +1240,12 @@ def parse_crossregulation_subdomain(
     # augments the comment-marker set above; duplicates are deduped by
     # (reg_a, reg_b) at the end of the function.
     h4_pair_re = re.compile(r"^#{4}\s+Pair:\s+(.+?)\s*$", re.MULTILINE)
-    h2_h3_re = re.compile(r"^#{2,3}\s+", re.MULTILINE)
+    # CORR-PILOT: include H4 in the boundary regex so consecutive pair
+    # blocks don't merge (the old regex used H2/H3 only, which caused
+    # every pair's block_text to swallow all subsequent pairs until the
+    # next H2/H3 — that masked the granularity in oj_quotes_verbatim and
+    # comparison_sections).
+    h2_h3_h4_re = re.compile(r"^#{2,4}\s+", re.MULTILINE)
     for h4_m in h4_pair_re.finditer(body):
         header_text = h4_m.group(1).strip()
         # Parse "REG_A ↔ REG_B" (or "REG_A vs REG_B", or comma-separated)
@@ -963,8 +1258,22 @@ def parse_crossregulation_subdomain(
             regs = [r.strip() for r in header_text.split(",")]
         if len(regs) != 2:
             continue
+        # CORR-PILOT: skip "omitted" pairs. The MD may list pair headers
+        # like "#### Pair: GDPR ↔ AI_Act (omitted — AI Act not in D-08.1
+        # participants)" to document an explicit non-analysis. These are
+        # NOT real pairs — they have no body, no OJ quotes, and would
+        # pollute the JSON. Filter them out here.
+        if re.search(r"\bomitted\b", header_text, re.IGNORECASE):
+            continue
+        # Also skip headers where one reg is the placeholder
+        # "[not in CRDA D-XX.Y]" — these are explicit "no analysis" markers.
+        if any("[not in" in r for r in regs):
+            continue
+        # CORR-PILOT: canonicalize reg_a / reg_b so NIS 2 -> NIS2, AI Act -> AI_Act
+        reg_a = _deep_norm_reg(regs[0])
+        reg_b = _deep_norm_reg(regs[1])
         # Determine block end: next H2/H3/H4 or EOF
-        next_boundary = h2_h3_re.search(body, h4_m.end())
+        next_boundary = h2_h3_h4_re.search(body, h4_m.end())
         block_end = next_boundary.start() if next_boundary else len(body)
         block_text = body[h4_m.end():block_end].strip()
         # Extract classification (first ** word) — DeepAnalysis uses phrases
@@ -981,7 +1290,7 @@ def parse_crossregulation_subdomain(
         )
         if not m_why:
             m_why = re.search(
-                r"\*\*Reasoning\*\*\s*:\s*([^\n]+(?:\n(?!\s*\*\*)[^\n]+)*)",
+                r"\*\*[^*]*Reasoning[^*]*\*\*\s*[:\.]?\s*([^\n]+(?:\n(?!\s*\*\*)[^\n]+)*)",
                 block_text,
             )
         if m_why:
@@ -1006,13 +1315,37 @@ def parse_crossregulation_subdomain(
                     "annex": annex_m.group(1) if annex_m else None,
                 }
             )
+        # CORR-PILOT: DeepAnalysis structured extraction
+        oj_quotes_verbatim = _extract_oj_quotes_verbatim(block_text)
+        comparison_sections = _extract_comparison_sections(block_text)
+        relationship_pair = _extract_relationship_pair(block_text)
+        scope_disjoint = _extract_scope_disjoint_test(block_text)
+        downstream_implication = _extract_labeled_value(
+            block_text, "Downstream implication"
+        )
+        p0_notes = _extract_p0_notes(block_text)
+        # SR-IDs that appear inside THIS pair's body (not the whole file)
+        sr_ids_per_pair = sorted(set(_SR_RE.findall(block_text)))
         pairs.append(
             {
-                "reg_a": regs[0],
-                "reg_b": regs[1],
+                "reg_a": reg_a,
+                "reg_b": reg_b,
+                "header_text": header_text,
                 "classification": classification,
+                "classified_relationship_crda": relationship_pair[
+                    "classified_relationship_crda"
+                ],
+                "verified_relationship_oj": relationship_pair[
+                    "verified_relationship_oj"
+                ],
                 "why": why,
                 "oj_quotes": oj_quotes,
+                "oj_quotes_verbatim": oj_quotes_verbatim,
+                "comparison_sections": comparison_sections,
+                "scope_disjoint_test": scope_disjoint,
+                "downstream_implication": downstream_implication,
+                "p0_notes": p0_notes,
+                "sr_ids_per_pair": sr_ids_per_pair,
                 "table_block_raw": "",
                 "block_text_raw": block_text,
             }
@@ -1031,17 +1364,109 @@ def parse_crossregulation_subdomain(
 
     # Extract SR-XXX-NNN cross-references
     sr_cross_references: list[str] = []
-    for m_sr in re.finditer(r"SR-[A-Z_]+-\d{3}", body):
+    for m_sr in re.finditer(r"SR-[A-Za-z0-9_]+-\d{3}", body):
         sr_id = m_sr.group(0)
         if sr_id not in sr_cross_references:
             sr_cross_references.append(sr_id)
+
+    # CORR-PILOT-DA: extract the top-level "Downstream implication" and
+    # "SR cross-validation" H4 sections (these are file-level, not per
+    # pair). The Downstream implication in DA files describes the
+    # sub-domain's overall implication for Phase 1C Doc 07; the SR
+    # cross-validation lists the NIST CSF mapping + supplementary layer.
+    # In DA files these appear as `#### Downstream implication\n<text>` or
+    # `#### SR cross-validation\n<text>`; in DeepAnalysis the same content
+    # is per-pair (in each pair block) so we only need this for DA.
+    def _extract_h4_section(text: str, heading: str) -> str:
+        """Extract the body of an H4 section. Looks for
+        `#### <heading>\\n<body until next H4 or EOF>` — we stop at H4
+        only (not H2/H3) because a nested H4 inside another H4-section
+        would otherwise eat content meant for the outer section.
+
+        CORR-035 fix: the regex stops at the next `#### <heading>` (or
+        EOF). When the section is the LAST one in a multi-subdomain
+        file, the source MD appends a horizontal-rule separator
+        (`\\n---\\n`) and the next `## <next-subdomain>` H2 before EOF.
+        The body must be stripped at the HR boundary so it doesn't
+        leak the next subdomain's title.
+        """
+        # Match `#### <heading>` (case-insensitive) on its own line, then
+        # capture everything until the next H4 (or EOF). If the section
+        # has no H4 closer (i.e. it's the last section in the file),
+        # capture to EOF.
+        pattern = re.compile(
+            rf"^####\s+{re.escape(heading)}\s*$\n(.*?)(?=^####\s|\Z)",
+            re.MULTILINE | re.IGNORECASE | re.DOTALL,
+        )
+        m = pattern.search(text)
+        if m:
+            body = m.group(1).strip()
+        else:
+            # Fallback: maybe it's bold-inline (DeepAnalysis style)
+            body = _extract_labeled_value(text, heading)
+        # CORR-035 bug-A: strip the leaked horizontal-rule and
+        # next-subdomain H2 that source MDs append at EOF when this
+        # H4 is the last section of a multi-subdomain file. Pattern:
+        #   "<body>\n\n---\n\n## D-XX+1 ...\n"  (subdomain boundary)
+        #   "<body>\n\n---\n"                    (just the HR, no next H2)
+        # Both are stripped at the first "\n---\n" (or trailing "\n---").
+        if body:
+            hr_idx = body.find("\n---")
+            if hr_idx != -1:
+                body = body[:hr_idx].rstrip()
+        return body
+
+    downstream_implication_top = _extract_h4_section(
+        body, "Downstream implication"
+    )
+    sr_cross_validation = _extract_h4_section(body, "SR cross-validation")
+    # CORR-035 c5: detect macro_domain <-> sub_domain mismatch in the
+    # frontmatter and fix it. The bug is a transcription error in
+    # source MDs (e.g. D-10.1/2/3 say macro_domain="D-09 Governance &
+    # Documentation" but the sub_domain is D-10.*). The parser
+    # derives the correct macro_domain from sub_domain's D-XX prefix
+    # and looks up the canonical name from a small map.
+    macro_domain_raw = fm.get("macro_domain", "")
+    sub_domain = fm.get("sub_domain", "")
+    if sub_domain:
+        m = re.match(r"^(D-\d+)\.", sub_domain)
+        if m:
+            sub_prefix = m.group(1)
+            # Canonical macro_domain names keyed by D-XX prefix
+            _MACRO_CANONICAL = {
+                "D-01": "D-01 Data Protection & Encryption",
+                "D-02": "D-02 Vulnerability Management",
+                "D-03": "D-03 Access Control",
+                "D-04": "D-04 Incident Response",
+                "D-05": "D-05 Data Lifecycle",
+                "D-06": "D-06 Supply Chain",
+                "D-07": "D-07 Secure Development",
+                "D-08": "D-08 Human Factors",
+                "D-09": "D-09 Governance & Documentation",
+                "D-10": "D-10 Monitoring & Audit",
+            }
+            if sub_prefix not in macro_domain_raw:
+                # Mismatch — use the canonical name
+                macro_domain = _MACRO_CANONICAL.get(sub_prefix, macro_domain_raw)
+            else:
+                macro_domain = macro_domain_raw
+        else:
+            macro_domain = macro_domain_raw
+    else:
+        macro_domain = macro_domain_raw
+    classification_distribution: dict[str, int] = {}
+    for p in pairs:
+        cls = p.get("classification") or "(empty)"
+        classification_distribution[cls] = (
+            classification_distribution.get(cls, 0) + 1
+        )
 
     return {
         "schema_version": "1.0",
         "source": str(path),
         "doc_id": fm.get("document_id", f"AEGIS-PREPROC-CRDA-{path.stem}"),
         "sub_kind": sub_kind,
-        "macro_domain": fm.get("macro_domain", ""),
+        "macro_domain": macro_domain,
         "sub_domain": fm.get("sub_domain", ""),
         "title": fm.get("title", path.stem),
         "status": fm.get("status", ""),
@@ -1050,14 +1475,496 @@ def parse_crossregulation_subdomain(
         "participants_meta": participants_meta,
         "participants_table": participants_table,
         "participant_count": len(participants_table),
+        # CORR-PILOT: structured participants (DeepAnalysis has no H4 table)
+        "participants": participants_info["participants"],
+        "participants_absent": participants_info["participants_absent"],
+        "participants_note": participants_info["participants_note"],
         # Dedup pairs by (reg_a, reg_b) — symmetric so we sort the tuple
         "pairs": _dedup_pairs(pairs),
         "pair_count": len(_dedup_pairs(pairs)),
+        # CORR-PILOT-DA: top-level fields derived from the pairs
+        "classification_distribution": classification_distribution,
+        "downstream_implication_top": downstream_implication_top,
+        "sr_cross_validation": sr_cross_validation,
         "emergent_tensions": emergent_tensions,
         "sr_cross_references": sr_cross_references,
         "sr_cross_reference_count": len(sr_cross_references),
         "raw_md": body,  # zero-loss
         "raw_md_kept_reason": "audit_fallback_for_zero_loss_invariant",
+    }
+
+
+# ─── DeepAnalysis granularity helpers (CORR-PILOT) ────────────────────
+#
+# Source-of-truth for _REG_NORMALIZE is scripts/preprocess/parsers/entities/
+# subdomain.py. We duplicate the 5-row alias map here to avoid a hard
+# import cycle (narrative.py is loaded before entities/subdomain.py in some
+# CLI paths). If a new regulation is onboarded, update BOTH tables.
+# See AGENTS.md §11.7.
+_DEEP_REG_NORMALIZE: dict[str, str] = {
+    "CRA": "CRA",
+    "GDPR": "GDPR",
+    "NIS 2": "NIS2",
+    "NIS2": "NIS2",
+    "NIS_2": "NIS2",
+    "DORA": "DORA",
+    "AI Act": "AI_Act",
+    "AI_Act": "AI_Act",
+    "AIACT": "AI_Act",
+    "AIA": "AI_Act",
+    "AI": "AI_Act",
+}
+
+
+def _deep_norm_reg(label: str) -> str:
+    """Canonicalize a regulation label to its short form (CRA, GDPR, ...)."""
+    s = label.strip().rstrip(",.;:")
+    return _DEEP_REG_NORMALIZE.get(s, s)
+
+
+# Pre-compiled regexes used by the DeepAnalysis pair extractor.
+# Keep them module-level so the pair loop stays fast.
+_DEEP_HEADER_RE = re.compile(
+    r"^(\d+)\.\s+\*\*([^*]+?)\*\*\s*:\s*([^\n]+?)\s*$",
+    re.MULTILINE,
+)
+# Match a bullet like "- GDPR trigger: continuous..." — we use this inside
+# comparison sections to split "reg_a_value" from "reg_b_value" and
+# catch the "Trigger alignment: SAME" / "Tension: NONE" / "Scope overlap: Y"
+# trailing lines.
+_BULLET_RE = re.compile(r"^\s*-\s+([^\n]+)$", re.MULTILINE)
+_SR_RE = re.compile(r"SR-[A-Za-z0-9_]+-\d{3}")
+_ART_RE = re.compile(r"Art(?:icle)?\.?\s*\d+(?:\([^)]+\))*")
+_ANNEX_RE = re.compile(r"Annex\s+[IVX]+(?:\s+Part\s+[IVX]+)?")
+# Strip leading "- " / "1. " from bullets
+_LEAD_DASH_RE = re.compile(r"^\s*[-*+]\s+")
+_LEAD_NUM_RE = re.compile(r"^\s*\d+\.\s+")
+
+
+def _extract_oj_quotes_verbatim(block_text: str) -> list[dict[str, Any]]:
+    """Extract OJ verbatim quotes from a DeepAnalysis pair block.
+
+    A DeepAnalysis pair block has structure::
+
+        **GDPR article (verbatim from SR-GDPR-001, Art. 5(1)(f) + Art. 32(1)(a)/(b)):**
+        > Art. 5(1)(f) integrity and confidentiality …
+
+        **NIS 2 article (verbatim from SR-NIS2-001, Art. 21(2)(h)):**
+        > Article 21(2)(h) of Directive (EU) 2022/2555 (NIS2) …
+
+    We return one entry per (header, blockquote) pair, with the
+    regulation normalized, all SR-IDs / articles / annexes extracted
+    from both the header line AND the verbatim text.
+    """
+    out: list[dict[str, Any]] = []
+    # Split on bold "**REG article (verbatim ...):**" lines. Capture the
+    # FULL header line (including the parenthetical citation) so we can
+    # extract SR-IDs / articles / annexes from it.
+    header_re = re.compile(
+        r"^\*\*\s*([^*\n]+?)\s*:\*\*\s*$",
+        re.MULTILINE,
+    )
+    headers = list(header_re.finditer(block_text))
+    # Filter to "**X article (...):**" only (skip unrelated bold headers)
+    article_header_re = re.compile(
+        r"\barticle\b\s*\(",
+        re.IGNORECASE,
+    )
+    article_headers = [h for h in headers if article_header_re.search(h.group(1))]
+    for idx, h in enumerate(article_headers):
+        full_header = h.group(1).strip()
+        # The regulation name is the first 1-2 tokens BEFORE the word
+        # "article" (e.g. "GDPR", "NIS 2", "CRA", "DORA", "AI Act").
+        # We deliberately stop at "article" to avoid capturing it.
+        reg_m = re.match(
+            r"^((?:\S+\s+){0,2}\S+?)\s+article\b",
+            full_header,
+            re.IGNORECASE,
+        )
+        reg_label = reg_m.group(1).strip() if reg_m else full_header.split()[0]
+        # Find the blockquote(s) immediately following this header
+        bq_start = h.end()
+        bq_end = (
+            article_headers[idx + 1].start()
+            if idx + 1 < len(article_headers)
+            else len(block_text)
+        )
+        segment = block_text[bq_start:bq_end]
+        # Collect contiguous blockquote lines
+        bq_lines: list[str] = []
+        for line in segment.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                if bq_lines:
+                    break
+                continue
+            m = _BLOCKQUOTE_RE.match(stripped)
+            if not m:
+                break
+            bq_lines.append(m.group(1))
+        if not bq_lines:
+            continue
+        verbatim = " ".join(bq_lines).strip()
+        # Extract IDs from BOTH header and verbatim
+        all_text = full_header + " " + verbatim
+        sr_ids = sorted(set(_SR_RE.findall(all_text)))
+        articles = sorted(set(_ART_RE.findall(all_text)))
+        annexes = sorted(set(_ANNEX_RE.findall(all_text)))
+        out.append(
+            {
+                "regulation": _deep_norm_reg(reg_label),
+                "header": f"{full_header}:",
+                "verbatim": verbatim,
+                "sr_ids": sr_ids,
+                "articles": articles,
+                "annexes": annexes,
+            }
+        )
+    return out
+
+
+def _extract_comparison_sections(block_text: str) -> list[dict[str, Any]]:
+    """Extract the 5 canonical comparison sections from a DeepAnalysis
+    pair block.
+
+    The five axes (in canonical order) are:
+      - scope
+      - trigger
+      - threshold_timeline
+      - recipient
+      - content_template
+
+    Each axis is introduced by ``**Axis comparison:**`` followed by
+    bullets. Some axes carry a trailing one-liner marker (e.g.
+    "Trigger alignment: SAME", "Tension: NONE", "Scope overlap: Y").
+    We capture those in ``<axis>_<marker>`` fields.
+    """
+    out: list[dict[str, Any]] = []
+    # Match a section header like "**Scope comparison:**"
+    section_re = re.compile(
+        r"\*\*\s*(Scope|Trigger|Threshold/timeline|Recipient|Content template)"
+        r"\s+comparison\s*:\*\*\s*",
+        re.MULTILINE | re.IGNORECASE,
+    )
+    sections = list(section_re.finditer(block_text))
+    # Map axis name -> canonical key + marker field suffix
+    axis_map = {
+        "scope": ("scope", "scope_overlap", "scope_overlap_note"),
+        "trigger": ("trigger", "trigger_alignment", "trigger_alignment_note"),
+        "threshold/timeline": (
+            "threshold_timeline",
+            "tension",
+            "tension_note",
+        ),
+        "recipient": ("recipient", None, None),
+        "content template": ("content_template", None, None),
+    }
+    # Display-name -> marker label as it appears in the MD (for the
+    # trailing one-liner after the bullets).
+    marker_label_map = {
+        "scope": "scope overlap",
+        "trigger": "trigger alignment",
+        "threshold/timeline": "tension",
+    }
+    for idx, s in enumerate(sections):
+        axis_display = s.group(1).strip()
+        axis_key, marker_key, marker_note_key = axis_map[axis_display.lower()]
+        # Body = from end of header to start of next section header
+        body_start = s.end()
+        body_end = sections[idx + 1].start() if idx + 1 < len(sections) else len(block_text)
+        body = block_text[body_start:body_end].strip()
+        # Split body into bullets
+        bullets: list[str] = []
+        for b in _BULLET_RE.finditer(body):
+            bullets.append(b.group(1).strip())
+        # First two bullets are reg_a_value / reg_b_value (by convention
+        # in DeepAnalysis — the pair is (reg_a, reg_b) ordered).
+        # We capture them in order; downstream consumers know the order
+        # matches the (reg_a, reg_b) header.
+        reg_a_value = bullets[0] if len(bullets) >= 1 else ""
+        reg_b_value = bullets[1] if len(bullets) >= 2 else ""
+        # Marker: look for a non-bullet line that contains
+        # "<Marker>: <value>" — e.g. "Trigger alignment: PARTIAL (...)."
+        entry: dict[str, Any] = {
+            "axis": axis_key,
+            "reg_a_value": reg_a_value,
+            "reg_b_value": reg_b_value,
+        }
+        if marker_key:
+            # Find first non-empty line in body that starts with the marker
+            # label (case-insensitive) followed by ':'. The line may be
+            # prefixed by "- " (bullet) in some DeepAnalysis variants.
+            marker_label = marker_label_map[axis_display.lower()]
+            marker_re = re.compile(
+                rf"^[\s\-\*]*{re.escape(marker_label)}\s*:\s*([^\n]+)$",
+                re.IGNORECASE | re.MULTILINE,
+            )
+            m = marker_re.search(body)
+            if m:
+                full = m.group(1).strip()
+                # Split "Y (conditional) — Y when..." into verdict + note.
+                # Heuristic: the verdict is everything up to the FIRST " ("
+                # (an opening paren preceded by whitespace). We do NOT split
+                # on "-" because some MD values contain "at-rest" etc.
+                split_m = re.search(r"\s+\((.+)\)\s*(?:[\u2014\-]\s*)?(.*)$", full)
+                if split_m:
+                    # "Y (conditional) — Y when the at-rest..." -> verdict="Y", note="conditional — Y when..."
+                    # The verdict is the leading part, the parenthetical is folded into the note.
+                    verdict_part = full[: split_m.start()].strip()
+                    parenthetical = split_m.group(1).strip()
+                    rest = split_m.group(2).strip()
+                    # Combine: "Y (conditional)" as marker value (keeps the
+                    # nuance the MD author wrote), the rest as the note.
+                    entry[marker_key] = f"{verdict_part} ({parenthetical})"
+                    if rest:
+                        entry[marker_note_key] = rest
+                else:
+                    entry[marker_key] = full
+        out.append(entry)
+    return out
+
+
+def _extract_labeled_value(block_text: str, key: str) -> str:
+    """Extract the value of a single-line ``**Key:** VALUE`` field.
+
+    Used for: Classified relationship (from CRDA), Verified relationship
+    (after OJ-text analysis), Reasoning, Scope-disjoint test,
+    Downstream implication. Returns "" if not found.
+    """
+    # Escape regex meta in key, but allow the parens that some keys have
+    key_escaped = re.escape(key)
+    m = re.search(
+        rf"\*\*{key_escaped}[^*\n]*\*\*\s*:?\s*([^\n]+(?:\n(?!\s*\*\*)[^\n]+)*)",
+        block_text,
+    )
+    if m:
+        return m.group(1).strip()
+    return ""
+
+
+def _extract_scope_disjoint_test(block_text: str) -> dict[str, str]:
+    """Extract the scope-disjoint test result (Y / N / Conditional + note).
+
+    Two formats exist in the source MDs:
+
+    (A) Canonical one-liner (D-01, some D-04/D-07):
+        ``**Scope-disjoint test:** Y — the controller ...``
+
+    (B) Multi-line with rhetorical question (D-04, D-07):
+        ``**Scope-disjoint test:** Does this pair actually overlap on a
+        single event at a single party? Conditional``
+        ``- If N or Conditional: the CRDA "contradictory" ...``
+
+    In (A) the verdict is the first whitespace-delimited token of the line.
+    In (B) the verdict is the FIRST line of the block (the rhetorical
+    question + verdict), and the conditional "If N or Conditional:" is a
+    separate sub-paragraph that does NOT change the verdict.
+
+    Strategy: split the block on newlines, take the FIRST non-empty line,
+    find the first occurrence of Y / N / Conditional (skipping "Does").
+    """
+    raw = _extract_labeled_value(block_text, "Scope-disjoint test")
+    if not raw:
+        return {"verdict": "", "note": ""}
+    # Use the FIRST non-empty line of the block (the line that contains
+    # the rhetorical question + verdict)
+    first_line = ""
+    for line in raw.splitlines():
+        if line.strip():
+            first_line = line.strip()
+            break
+    if not first_line:
+        first_line = raw
+    # Find the verdict: first occurrence of Y / N / Conditional in the
+    # first line. We use word boundaries so "Does" doesn't match.
+    m = re.search(
+        r"\b(Y|N|Conditional)\b(?:\s*\(([^)]*)\))?",
+        first_line,
+    )
+    if not m:
+        # Fallback: look anywhere in the block
+        m = re.search(
+            r"\b(Y|N|Conditional)\b(?:\s*\(([^)]*)\))?",
+            raw,
+        )
+    if not m:
+        return {"verdict": "", "note": raw}
+    verdict = m.group(1)
+    qualifier = m.group(2) or ""
+    # Note: everything after the verdict in the first line, plus any
+    # continuation lines (the "If N or Conditional:" paragraph).
+    remainder = first_line[m.end():].strip(" —-")
+    # Continuation lines
+    rest_lines = raw.splitlines()[1:]
+    continuation = " ".join(line.strip() for line in rest_lines if line.strip())
+    if qualifier:
+        note = f"{qualifier}"
+        if remainder:
+            note += f" — {remainder}"
+    else:
+        note = remainder
+    if continuation:
+        if note:
+            note += " || " + continuation
+        else:
+            note = continuation
+    return {"verdict": verdict, "note": note}
+
+
+def _extract_relationship_pair(block_text: str) -> dict[str, str]:
+    """Extract the two canonical relationship lines:
+    - classified_relationship_crda: from '**Classified relationship (from CRDA):**'
+    - verified_relationship_oj:     from '**Verified relationship (after OJ-text analysis):**'
+    """
+    crda = _extract_labeled_value(block_text, "Classified relationship (from CRDA)")
+    oj = _extract_labeled_value(
+        block_text, "Verified relationship (after OJ-text analysis)"
+    )
+    # Strip trailing punctuation (e.g. "COMPLEMENTARY.") but preserve
+    # parentheses that carry nuance (e.g. "SAME (CORRECTED — wording only)").
+    def _clean(s: str) -> str:
+        s = s.strip()
+        if s.endswith(".") and "(" not in s:
+            s = s[:-1]
+        return s
+    return {
+        "classified_relationship_crda": _clean(crda),
+        "verified_relationship_oj": _clean(oj),
+    }
+
+
+def _extract_p0_notes(block_text: str) -> list[str]:
+    """Extract P0 notes (lines starting with '**P0 note:**' or '- **P0 note:**')."""
+    out: list[str] = []
+    for m in re.finditer(
+        r"\*\*P0\s+note\s*:?\*\*\s*([^\n]+(?:\n(?!\s*\*\*)[^\n]+)*)",
+        block_text,
+        re.IGNORECASE,
+    ):
+        out.append(m.group(1).strip())
+    return out
+
+
+def _extract_participants_from_deep(body: str) -> dict[str, Any]:
+    """Extract participants info from a DeepAnalysis body.
+
+    DeepAnalysis D-XX.Y files typically carry participants in two places:
+      1. HTML comment: ``<!-- participants: GDPR, NIS2, CRA, DORA; AI_Act absent -->``
+      2. Bold paragraph: ``**Participants (from CRDA):** GDPR, NIS2, CRA, DORA
+         (AI_Act is not present; ...).``
+
+    We normalize into:
+      - participants: ["GDPR", "NIS2", "CRA", "DORA"]  (canonicals present)
+      - participants_absent: ["AI_Act"]                (canonicals marked absent)
+      - participants_note: "<parenthetical note>"       (the prose annotation)
+
+    This fixes the v10 bug where the H4 "Participants" table was always
+    empty for DeepAnalysis files.
+    """
+    present: list[str] = []
+    absent: list[str] = []
+    note = ""
+    # 1. HTML comment
+    m = re.search(r"<!--\s*participants\s*:\s*([^>]+?)\s*-->", body)
+    if m:
+        comment_body = m.group(1)
+        # Split the comment body into tokens on "," or ";" or "/".
+        # Each token may carry a qualifier (e.g. "NIS2 partial via SR-NIS2-007",
+        # "AI_Act (partial)", "AI_Act absent"). The qualifier is the
+        # "evidence" of the regulation's status:
+        #   - "absent" / "not present" / "missing"  -> absent
+        #   - anything else (incl. "partial", "(partial)") -> present
+        for tok in re.split(r"[,;/]", comment_body):
+            tok = tok.strip().rstrip(",")
+            if not tok:
+                continue
+            # Drop any trailing qualifier starting with whitespace + (word|paren)
+            # Examples:
+            #   "NIS2 partial via SR-NIS2-007" -> "NIS2"
+            #   "AI_Act (partial)"             -> "AI_Act"
+            #   "AI_Act absent"                -> "AI_Act"  (we detect "absent")
+            #   "AI_Act not present"           -> "AI_Act"  (we detect "not present")
+            #   "NIS2"                         -> "NIS2"
+            base_match = re.match(r"^(\S+?)(?:\s+|\s*\()", tok)
+            if base_match:
+                reg_label = base_match.group(1)
+            else:
+                reg_label = tok.split()[0] if tok else ""
+            if not reg_label:
+                continue
+            n = _deep_norm_reg(reg_label)
+            if not n:
+                continue
+            # Detect "absent" / "not present" qualifier anywhere in the token
+            is_absent = bool(
+                re.search(r"\b(absent|not\s+present|missing|out[\s-]of[\s-]scope)\b", tok, re.IGNORECASE)
+            )
+            if is_absent:
+                if n not in absent and n not in present:
+                    absent.append(n)
+            else:
+                if n not in present:
+                    present.append(n)
+    # 2. Bold paragraph (prose annotation). The bold line is
+    # ``**Participants (from CRDA):**`` — the closing ``**`` comes AFTER
+    # the colon, so we have to match ``CRDA):**`` explicitly.
+    m2 = re.search(
+        r"\*\*Participants[^*]*?CRDA\)\:\*\*\s*([^\n]+)",
+        body,
+    )
+    if m2:
+        prose = m2.group(1).strip()
+        # Extract the parenthetical note. The prose has the shape
+        # "GDPR, NIS2, ... (note text)." — the note is the FIRST
+        # balanced paren group that comes after the participant list.
+        # We use the position of the first "(" as the start, then walk
+        # balanced parens to find the matching ")".
+        i = prose.find("(")
+        if i != -1:
+            depth = 1
+            j = i + 1
+            while j < len(prose) and depth > 0:
+                if prose[j] == "(":
+                    depth += 1
+                elif prose[j] == ")":
+                    depth -= 1
+                j += 1
+            if depth == 0:
+                note = prose[i + 1 : j - 1].strip()
+    # Fallback: if the HTML comment was absent (D-04, D-07 use the prose
+    # paragraph only), parse the tokens from the bold paragraph itself.
+    if not present and m2:
+        prose = m2.group(1).strip()
+        # Take only the part BEFORE the first "(" (the parenthetical note)
+        head = prose.split("(", 1)[0]
+        for tok in re.split(r"[,;]", head):
+            tok = tok.strip()
+            if not tok:
+                continue
+            # Detect absence qualifier anywhere in the token
+            is_absent = bool(
+                re.search(
+                    r"\b(absent|not\s+present|missing|out[\s-]of[\s-]scope)\b",
+                    tok,
+                    re.IGNORECASE,
+                )
+            )
+            reg_label = tok.split()[0] if tok else ""
+            if not reg_label:
+                continue
+            n = _deep_norm_reg(reg_label)
+            if not n:
+                continue
+            if is_absent:
+                if n not in absent and n not in present:
+                    absent.append(n)
+            else:
+                if n not in present:
+                    present.append(n)
+    return {
+        "participants": present,
+        "participants_absent": absent,
+        "participants_note": note,
     }
 
 
@@ -1118,7 +2025,14 @@ def enrich_pair_entity(
                 enriched["cr_domain_pair"] = {
                     "classification": p.get("classification", ""),
                     "why": p.get("why", ""),
+                    "why_qualifier": p.get("why_qualifier", ""),
                     "oj_quotes": p.get("oj_quotes", []),
+                    "oj_quotes_verbatim": p.get("oj_quotes_verbatim", []),
+                    "comparison_sections": p.get("comparison_sections", []),
+                    "scope_disjoint_test": p.get("scope_disjoint_test", {}),
+                    "downstream_implication": p.get("downstream_implication", ""),
+                    "p0_notes": p.get("p0_notes", []),
+                    "sr_ids_per_pair": p.get("sr_ids_per_pair", []),
                     "table_block_raw": p.get("table_block_raw", ""),
                     "block_text_raw": p.get("block_text_raw", ""),
                 }
