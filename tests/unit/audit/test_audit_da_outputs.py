@@ -207,7 +207,17 @@ def test_no_h4_leak_in_real_da_files() -> None:
 
 
 def test_why_equals_note_is_medium(tmp_path: Path) -> None:
-    """MEDIUM: why == why_note (the bug-B pattern)."""
+    """Regression for CORR-035 c4: WHY_EQUALS_NOTE finding is disabled.
+
+    The CORR-034 contract said `why_note` is the qualifier-stripped
+    version of `why`, but the parser `_extract_why_metadata` populates
+    `note` with the prose after the `**Why HEADER**:` marker — which
+    is identical to what `why` captures. Stripping the qualifier from
+    embedded prose (e.g. `the "where feasible" softening`) would be
+    fragile. The audit was incorrectly flagging this as a MEDIUM
+    issue; we now accept `why == why_note` as contract-compliant.
+    See CONTRACT-035 c4.
+    """
     data = _minimal_da(
         pairs=[
             {
@@ -232,7 +242,8 @@ def test_why_equals_note_is_medium(tmp_path: Path) -> None:
     p = tmp_path / "x.json"
     p.write_text(json.dumps(data))
     findings = audit_da_file(p)
-    assert any(f.code == "WHY_EQUALS_NOTE" for f in findings)
+    # CORR-035 c4: this check is disabled — `why == why_note` is OK.
+    assert not any(f.code == "WHY_EQUALS_NOTE" for f in findings)
 
 
 def test_scope_axis_populated_is_medium(tmp_path: Path) -> None:

@@ -49,8 +49,15 @@ a perder ~25% dos SRs.
 
 1. **Bug E**: fix no **parser** (ignorar 3ª coluna da tabela do par).
    Não editar 12 source MDs.
-2. **Bug B**: strippar o qualifier do `note` no helper
-   `_extract_why_metadata`. Não remover o campo (preserva retro-compat).
+2. **Bug B**: aceitar `why == why_note` como comportamento correcto
+   (revisão da decisão original). Investigação em c4 revelou que o
+   parser `_extract_why_metadata` popula `note` com a prosa após
+   `**Why HEADER**:`, que é o mesmo conteúdo que `why` apanha
+   (regex separado mas equivalente). Strippar o qualifier da prosa
+   seria frágil porque o qualifier está embebido no texto
+   (e.g. `the "where feasible" softening`), não como prefixo
+   removível. Decisão: desabilitar o finding `WHY_EQUALS_NOTE`
+   no audit; manter o campo `why_note` para retro-compat.
 3. **Estrutura**: 6 commits sequenciais (cada um revertível), 1 contract,
    1 branch.
 

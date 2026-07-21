@@ -336,17 +336,19 @@ def audit_da_file(json_path: Path) -> list[Finding]:
             add(findings, "MEDIUM", "WHY_EMPTY", pair_rel, "why field is empty")
         if not p.get("why_note"):
             add(findings, "MEDIUM", "WHY_NOTE_EMPTY", pair_rel, "why_note is empty")
-
-        # why vs why_note should differ (note is supposed to be the
-        # qualifier-stripped version of why)
-        if p.get("why") and p.get("why_note") and p["why"] == p["why_note"]:
-            add(
-                findings,
-                "MEDIUM",
-                "WHY_EQUALS_NOTE",
-                pair_rel,
-                "why and why_note are identical (expected note to be qualifier-stripped)",
-            )
+        # NOTE: CORR-035 c4 decision — the WHY_EQUALS_NOTE check is
+        # disabled. CORR-034's contract said "why_note is the version of
+        # why with the qualifier removed", but the parser
+        # (`_extract_why_metadata` in narrative.py) was implemented
+        # such that `note` = the prose after the `**Why HEADER**:`
+        # marker — which is identical to `why` (which is captured by a
+        # separate regex that also takes the prose-after-marker).
+        # Stripping the qualifier from the prose would be fragile
+        # (qualifier strings appear embedded in the prose, not as a
+        # removable prefix). We accept that `why == why_note` is the
+        # current contract-compliant behavior; the field is kept for
+        # forward-compat (a future iteration may add a richer
+        # qualifier-stripping). See CONTRACT-035 c4 rationale.
 
         # oj_quotes must have 2 entries (one per reg)
         oq = p.get("oj_quotes", [])
