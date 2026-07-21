@@ -1,0 +1,558 @@
+=== 04_Company_Context_Assessment ===
+3a4,6
+> version: 2.2
+> status: DRAFT
+> generated_at: "DATET21:49:28Z"
+5,7d7
+< version: 2.0
+< created: DATE
+< updated: DATE
+9c9
+< status: DRAFT
+---
+> case_study: TinyTask Lda.
+13c13,15
+< related_documents: [00_Taxonomy_Reference.md, 01_Company_Context.md]
+---
+> related_documents: [00_Taxonomy_Reference.md, 01_Company_Context.md, 04a_Architecture_DataInventory.md]
+> applicable_regs: [CRA, GDPR]
+> tier: LOW
+15c17
+< # Company Context Assessment
+---
+> # AEGIS-P1-04 Company Context Assessment
+17c19
+< This document consolidates the company context assessment (Step A1+A2+A3) including stakeholder analysis, business goals, and intake form responses. This is the primary input for regulatory applicability assessment.
+---
+> This document consolidates the company context assessment (Step A1 + A2 + A3 of the AEGIS Phase 1 methodology), including stakeholder analysis, business goals catalog, the layered intake form response summary, regulatory applicability flags, architectural implications, data flow summary, and the compliance capability assessment. It is the primary input for regulatory applicability (05) and the clause mapping matrix (06).
+19,22c21,24
+< - `CompanyContext` - Instantiated from AEGIS Intake Form v2.0 (layered format)
+< - `ComplianceContext` - Derived regulatory applicability flags
+< - `Stakeholder` - Organizational roles and responsibilities
+< - `BusinessGoal` - Strategic objectives
+---
+> - `CompanyContext` — instantiated from AEGIS Intake Form v2.0 (layered format)
+> - `ComplianceContext` — derived regulatory applicability flags
+> - `Stakeholder` — organizational roles and responsibilities
+> - `BusinessGoal` — strategic objectives
+28,29c30,31
+< |-------|-------|
+< | Assessment ID |  |
+---
+> | --- | --- |
+> | Assessment ID | AEGIS-04-case1-tinytask-202607 |
+33,35c35,37
+< | Jurisdiction | EU |
+< | Sector | Technology |
+< | Size Category | Micro — 8 employees, <€2M revenue |
+---
+> | Jurisdiction | Portugal (EU) |
+> | Sector | Technology/Software |
+> | Size Category | MICRO — 8 employees, <€2M revenue |
+40,49c42,51
+< | ID | Name | Role | Organization | Contact | Responsibilities |
+< |----|------|------|-------------|---------|-----------------|
+< | STK-CEO-01 | CEO (implicit) | Internal | TinyTask Lda. | — | Business strategy, compliance accountability |
+< | STK-CTO-01 | CTO (implicit) | Internal | TinyTask Lda. | — | Technical leadership, security architecture |
+< | STK-DPO-01 | DPO (implicit) | Internal | TinyTask Lda. | — | Data protection oversight, GDPR compliance |
+< | STK-DEVP-01 | Development Team | Internal | TinyTask Lda. | — | Secure development, implementation |
+< | STK-CUSTOMER-01 | B2B Customers | External | Client organizations | — | Data controllers; recipient of breach notifications |
+< | STK-STRIPE-01 | Stripe | External | Stripe Technologies | compliance@stripe.com | Payment processing; PCI-DSS compliance |
+< | STK-AWS-01 | AWS | External | Amazon Web Services | — | Cloud infrastructure; inherited security controls |
+
+=== 05_Regulatory_Applicability ===
+5c5
+< version: 1.0
+---
+> version: 1.1
+8c8
+< author: Compliance Lead
+---
+> author: Executor
+10,196c10,82
+< inputs: [04_Company_Context_Assessment.md]
+< outputs: [06_Clause_Mapping_Matrix.xlsx]
+< traceability: AEGIS Class Model → ComplianceContext, RegulatoryClause classes
+< related_documents: 00_Taxonomy_Reference.md, 04_Company_Context_Assessment.md
+< ---
+< > **Mapping to Phase 1 Strategy:** This document is the artifact of
+< > **Filter 1 (Regulation Applicability — binary predicates)** in
+< > [`00_METHODOLOGY/PHASE1_STRATEGY.md`](../../../00_METHODOLOGY/PHASE1_STRATEGY.md) §5.
+< > Updates to the underlying filter logic should be reflected here.
+< # Regulatory Applicability Assessment
+< ## 1. DOCUMENT PURPOSE
+< This document consolidates the regulatory applicability assessment (Step B1+B3), determining which regulations apply to the company context and establishing the Native vs. Inherited compliance boundaries.
+< **Alignment with Class Model:**
+< - `ComplianceContext` - Applicable regulations and applicability scores
+< - `RegulatoryClause` - Filtered clauses based on applicability
+< - `DomainCoverageEntry` - Initial domain coverage assessment
+< **Phase 1 Step:** B (Regulatory Applicability)
+< **Gate Criteria:** Clear applicability determination for all 5 regulations with documented rationale
+< ---
+< ## 2. APPLICABILITY ASSESSMENT METADATA
+< | Attribute | Value |
+< |-----------|-------|
+< | complianceContextId | ID |
+< | assessmentDate | DATE |
+< | basedOnCompanyContext | ID |
+< | assessedBy | Compliance Lead |
+< | reviewedBy | Legal Counsel (pending) |
+< ---
+< ## 3. REGULATION-BY-REGULATION APPLICABILITY ANALYSIS
+< ### 3.1 GDPR (General Data Protection Regulation)
+< | Criterion | Company Context Value | Threshold | Met? |
+< |-----------|----------------------|-----------|------|
+< | processes_personal_data | TRUE (emails, names, passwords) | ANY | YES |
+< | EU data subjects | TRUE (EU customers) | ANY | YES |
+< | Special category data | FALSE | ANY | N/A |
+< **Applicability Result:** ✅ APPLICABLE
+< **Rationale:** TinyTask processes personal data (emails, names, passwords) of EU residents. As a data controller for account data and processor for B2B client content, GDPR applies fully.
+< **Obligated Party:** CONTROLLER (for account data, user management) + PROCESSOR (for B2B client content stored on behalf of customers).
+< **Multi-Actor Note:** GDPR Art. 32 (security of processing) applies **directly to both controllers AND processors** ("the controller and the processor shall implement..."). For clauses under Art. 32, TinyTask as processor has **NativeCompliance** obligations — not merely InheritedCompliance via DPA. Other GDPR clauses (e.g., Art. 5, 6, 7) apply only in the controller capacity.
+< **Key Clauses in Scope:** GDPR-C01 through GDPR-C28 (all applicable clauses)
+< **Nuance:** Where TinyTask acts solely as processor (hosting client content), Art. 28(3)(f) requires it to implement Art. 32 measures directly. This means encryption, access control, and breach notification obligations are not inherited via contract — they are direct statutory duties under the GDPR.
+< **Nuance — Processor Breach Notification (Art. 33(2)):** Art. 33(2) requires processors to notify controllers "without undue delay" after becoming aware of a personal data breach. This is **not** the same as the 72h controller→SA deadline in Art. 33(1). As a processor, TinyTask must notify its B2B clients (who are controllers) "without undue delay" — an unquantified timeframe that should be defined internally (e.g., within 4-8 hours). The 72h clock applies to the controller's notification to the supervisory authority, not to TinyTask's notification to its clients.
+< ---
+< ### 3.2 CRA (Cyber Resilience Act)
+< | Criterion | Company Context Value | Threshold | Met? |
+< |-----------|----------------------|-----------|------|
+< | places_digital_products_eu | TRUE (SaaS in EU market) | TRUE | YES |
+< | Digital element | TRUE (Web App + Mobile App) | YES/NO | YES |
+< | Manufacturer status | TRUE (TinyTask develops and operates) | YES/NO | YES |
+< **Applicability Result:** ✅ APPLICABLE
+< **Rationale:** TinyTask Team Organizer is a digital product (SaaS) placed on the EU market. TinyTask Lda. qualifies as the manufacturer under CRA definitions.
+
+=== 06_Clause_Mapping_Matrix ===
+4d3
+< phase: 1
+6,8d4
+< created: DATE
+< updated: DATE
+< author: Compliance Lead
+10,13c6
+< inputs: [04_Company_Context_Assessment.md, 05_Regulatory_Applicability.md]
+< outputs: [07_Structured_Compliance_Matrix.md]
+< traceability: AEGIS Class Model → RegulatoryClause, DomainCoverageEntry classes
+< related_documents: 00_Taxonomy_Reference.md
+---
+> generated_at: "DATET21:49:39Z"
+15,105c8,243
+< # Clause Mapping Matrix
+< ## 1. DOCUMENT PURPOSE
+< This document specifies the Excel-based Clause Mapping Matrix (Step B2), mapping regulatory clauses to the 10×38 taxonomy with Normative Intensity and gap analysis.
+< **Note:** The actual matrix is maintained in Excel format (`06_Clause_Mapping_Matrix.xlsx`). This document provides the specification and summary.
+< **Phase 1 Step:** B (Clause Mapping)
+< ---
+< ## 2. EXCEL STRUCTURE (7 Sheets)
+< ### Sheet 1: COVER
+< | Field | Value |
+< |-------|-------|
+< | Document ID | AEGIS-P1-06 |
+< | Title | Clause Mapping Matrix - TinyTask SaaS |
+< | Version | 1.0 |
+< | Created | DATE |
+< | Author | Compliance Lead |
+< | Applicable Regulations | GDPR, CRA |
+< ### Sheet 2: GDPR_MAPPING (T1)
+< **Columns:** Clause ID | Article | Sub-Domain ID | Sub-Domain Name | Description | obligatedParty | obligationType | Normative Weight | Justification | TinyTask Relevance
+< **Summary for TinyTask:**
+< | Metric | Value |
+< |--------|-------|
+< | Total GDPR Clauses | 28 |
+< | Applicable to TinyTask | 28 |
+< | Weight 3 (Mandatory) | 20 (71.4%) |
+< | Weight 2 (Recommended) | 8 (28.6%) |
+< | Mean NI | 2.714 |
+< ### Sheet 3: CRA_MAPPING (T2)
+< **Columns:** Clause ID | Article/Annex | Sub-Domain ID | Sub-Domain Name | Description | obligatedParty | obligationType | Normative Weight | Justification | TinyTask Relevance
+< **Summary for TinyTask:**
+< | Metric | Value |
+< |--------|-------|
+< | Total CRA Clauses | 26 |
+< | Applicable to TinyTask | 26 |
+< | Weight 3 (Mandatory) | 24 (92.3%) |
+< | Weight 2 (Recommended) | 2 (7.7%) |
+< | Mean NI | 2.923 |
+< ### Sheets 4-6: NIS2, DORA, AIACT
+< **Status:** Not applicable for TinyTask (see 05_Regulatory_Applicability.md)
+< ### Sheet 7: CONSOLIDATED_VIEW (T6 + T9)
+< **Pivot Table:** Sub-Domain coverage across applicable regulations
+< ---
+< ## 3. CLAUSE-TO-SUB-DOMAIN MAPPING SUMMARY
+< ### GDPR Mapping (28 clauses → 10×38 taxonomy)
+< | Sub-Domain | Clause Count | Clauses |
+< |------------|--------------|---------|
+< | D-01 (Encryption) | 3 | GDPR-C04, C05, C14 |
+
+=== 07_Structured_Compliance_Matrix ===
+8c8
+< author: Compliance Lead
+---
+> author: Executor
+10,212c10,279
+< inputs: [04_Company_Context_Assessment.md, 05_Regulatory_Applicability.md, 06_Clause_Mapping_Matrix.xlsx]
+< outputs: [08_Obligation_Derivation.md]
+< traceability: AEGIS Class Model → ComplianceContext, DomainCoverageEntry classes
+< related_documents: 00_Taxonomy_Reference.md
+< ---
+< # Structured Compliance Matrix
+< ## 1. DOCUMENT PURPOSE
+< This document presents the final Phase 1 output (Step C1+C2+C3), consolidating the compliance matrix with complementarity analysis and strategic implications. This is the primary output of Phase 1 and input to Phase 2.
+< **Alignment with Class Model:**
+< - `ComplianceContext` - Final applicable regulations with coverage scores
+< - `DomainCoverageEntry` - Complete 38 sub-domain coverage matrix
+< - `RegulatoryClause` - Filtered and mapped clauses
+< **Phase 1 Step:** C (Structured Compliance Matrix)
+< **Phase 1 Gate:** ✅ COMPLETE when this document is approved
+< ---
+< ## 2. COMPLIANCE MATRIX METADATA
+< | Attribute | Value |
+< |-----------|-------|
+< | complianceMatrixId | ID |
+< | completionDate | DATE |
+< | basedOnCompanyContext | ID |
+< | basedOnApplicability | ID |
+< | basedOnClauseMapping | AEGIS-P1-06 |
+< | phase1Status | COMPLETE |
+< ---
+< ## 3. SUB-DOMAIN COVERAGE MATRIX (38 Entries)
+< ### D-01: Data Protection & Encryption
+< | Sub-Domain | GDPR | CRA | NIS 2 | DORA | AI Act | Total | Coverage | NI |
+< |------------|------|-----|-------|------|--------|-------|----------|-----|
+< | D-01.1 Data at Rest Encryption | ✅ | ✅ | — | — | — | 2 | SUBSTANTIVE | 3.0 |
+< | D-01.2 Data in Transit Encryption | ✅ | ✅ | — | — | — | 2 | SUBSTANTIVE | 3.0 |
+< | D-01.3 Cryptographic Key Management | ✅ | ✅ | — | — | — | 2 | SUBSTANTIVE | 3.0 |
+< | D-01.4 Data Integrity Mechanisms | ✅ | ✅ | — | — | — | 2 | SUBSTANTIVE | 3.0 |
+< ### D-02: Vulnerability Management
+< | Sub-Domain | GDPR | CRA | NIS 2 | DORA | AI Act | Total | Coverage | NI |
+< |------------|------|-----|-------|------|--------|-------|----------|-----|
+< | D-02.1 Vulnerability Identification | — | ✅ | — | — | — | 1 | PARTIAL | 3.0 |
+< | D-02.2 Patch Management & Updates | — | ✅ | — | — | — | 1 | PARTIAL | 3.0 |
+< | D-02.3 Coordinated Vuln. Disclosure | — | ✅ | — | — | — | 1 | PARTIAL | 3.0 |
+< | D-02.4 Threat-Led Penetration Testing | — | — | — | — | — | 0 | NOT_ADDRESSED | — |
+< ### D-03: Access Control
+< | Sub-Domain | GDPR | CRA | NIS 2 | DORA | AI Act | Total | Coverage | NI |
+< |------------|------|-----|-------|------|--------|-------|----------|-----|
+< | D-03.1 Identity Lifecycle Management | ✅ | ✅ | — | — | — | 2 | SUBSTANTIVE | 3.0 |
+< | D-03.2 Multi-Factor Authentication | ✅ | ✅ | — | — | — | 2 | SUBSTANTIVE | 3.0 |
+< | D-03.3 Authorization & Least Privilege | ✅ | — | — | — | — | 1 | PARTIAL | 3.0 |
+< | D-03.4 Secure System Defaults | — | ✅ | — | — | — | 1 | PARTIAL | 3.0 |
+< ### D-04: Incident Response
+< | Sub-Domain | GDPR | CRA | NIS 2 | DORA | AI Act | Total | Coverage | NI |
+< |------------|------|-----|-------|------|--------|-------|----------|-----|
+< | D-04.1 Incident Detection & Triage | ✅ | ✅ | — | — | — | 2 | SUBSTANTIVE | 3.0 |
+< | D-04.2 Containment & Mitigation | ✅ | ✅ | — | — | — | 2 | SUBSTANTIVE | 3.0 |
+< | D-04.3 Regulatory Notification | ✅ | ✅ | — | — | — | 2 | SUBSTANTIVE | 3.0 |
+< | D-04.4 Data Restoration & Recovery | ✅ | — | — | — | — | 1 | PARTIAL | 3.0 |
+< ### D-05: Data Lifecycle
+
+=== 07b_Proportionality_Profile ===
+3c3
+< title: Proportionality Profile — TinyTask SaaS
+---
+> title: Proportionality Profile
+8,10c8,11
+< author: Compliance Lead
+< status: ACTIVE
+< inputs: [04_Company_Context_Assessment.md, 05_Regulatory_Applicability.md, 07_Structured_Compliance_Matrix.md, ../../../../../00_METHODOLOGY/REFERENCE/proportionality_model.md]
+---
+> author: Executor
+> status: DRAFT
+> case_study: UNKNOWN
+> inputs: [04_Company_Context_Assessment.md, 05_Regulatory_Applicability.md, 07_Structured_Compliance_Matrix.md, ../../../00_METHODOLOGY/REFERENCE/proportionality_model.md]
+12,22c13,24
+< related_documents: [04_Company_Context_Assessment.md, 05_Regulatory_Applicability.md, 07_Structured_Compliance_Matrix.md, ../../../../../00_METHODOLOGY/REFERENCE/proportionality_model.md, ../03_PHASE3_DECOMPOSITION/annexes/Critical_Analysis_Micro_Enterprise.md]
+< frozen: false
+< supersedes: none
+< ---
+< # Proportionality Profile — TinyTask SaaS
+< ## 1. DOCUMENT PURPOSE
+< This document is the **case instance** of the Track B Proportionality Model for TinyTask Lda. It binds every ACTIVE sub-domain in this case to a concrete tier and to the five operational attributes (`satisfaction_pattern`, `evidence_depth`, `verification_method`, `ownership`, `example_controls`) defined in `00_METHODOLOGY/REFERENCE/proportionality_model.md` §6.
+< This document **does not alter Regulatory Baseline**. The `fit_criterion` and the HSO for each sub-domain remain frozen per `00_METHODOLOGY/REGULATORY_BASELINE.md` §6. Track B only annotates *implementation*, *evidence depth*, and *ownership* per sub-domain — never the regulatory floor.
+< **Invariant (quoted from proportionality_model.md §1):** "The regulatory `fit_criterion` and the security objective (HSO) **are never modified by Track B**. [...] Track B only varies three axes: `satisfaction_pattern`, `evidence_depth`, `ownership`." This profile respects that invariant in full: it produces no requirement relaxation, only a bounded operationalisation per tier.
+< **Gate criteria:** This file is consumed by `eval_proportionality.py` (GATE-P per `dependency_graph.yaml`). It must be complete and internally consistent before Phase 1 exit.
+< ---
+---
+> applicable_regs: [CRA, GDPR]
+> scale: "-"
+> security_fte: 0
+> related_documents: [04_Company_Context_Assessment.md, 05_Regulatory_Applicability.md, 07_Structured_Compliance_Matrix.md]
+> generated_at: "DATET21:49:51Z"
+> ---
+> # AEGIS-P1-07b Proportionality Profile
+> ## 1. PURPOSE
+> Assign a tier (MINIMAL / LIGHTWEIGHT / STANDARD / RIGOROUS / DEFERRED) and the five operational attributes (``satisfaction_pattern``, ``evidence_depth``, ``verification_method``, ``ownership``, ``example_controls``) to every active security sub-domain according to the Track B decision table. The five attributes are produced verbatim by TrackB and never modify layer-0 fit criteria.
+> Two invariants are preserved:
+> - The regulatory ``fit_criterion`` and the HSO for each sub-domain remain frozen per layer-0; Track B only annotates implementation, evidence depth, and ownership.
+> - The MUST floor at MINIMAL is never breached (§5.3 of the proportionality model).
+24,37c26,38
+< Inputs are read from `04_Company_Context_Assessment.md` §2 (size) and §5 (intake summary, complexity tier, FTE).
+< | Attribute            | Value                              | Source                              |
+< |----------------------|------------------------------------|-------------------------------------|
+< | Scale (S)            | MICRO                              | Doc 04 §2 — 8 employees, <€2M       |
+< | Employees            | 8                                  | Doc 04 §2 / §5                      |
+< | Revenue              | <€2M                               | Doc 04 §2 / §5                      |
+< | Sector               | SaaS (Productivity / B2B)          | Doc 04 §2 / §5                      |
+< | Jurisdiction         | EU (Portugal)                      | Doc 04 §5                           |
+< | Applicable regs      | [GDPR, CRA]                        | Doc 04 §6 / Doc 05 §4               |
+< | Complexity tier      | MEDIUM                             | Doc 04 §5                           |
+< | Security FTE         | 0.85                               | Critical_Analysis §3.2              |
+< | Stack                | AWS (eu-west-1), Firebase Auth, Stripe | Doc 04 §7 / Doc 05 §5.2          |
+< Because `S = MICRO` and `security_FTE = 0.85 ≤ 1.0`, proportionality_model.md §5.2 applies: any SHOULD/COULD sub-domain drops one tier, and the `DEFERRED` marker becomes available.
+< ---
+---
+> Inputs are read from the company context (size, sector, applicable regulations) and from the architecture inventory (stack). The proportionality decision table uses the scale (MICRO / SMALL / MEDIUM / LARGE / MAX) and the security-dedicated FTE.
+> | Field | Value | Source |
+> | --- | --- | --- |
+> | Company name | TinyTask Lda. | AEGIS-P1-04 §2 |
+> | Sector | Technology/Software | AEGIS-P1-04 §2 |
+> | Jurisdiction | Portugal (EU) | AEGIS-P1-04 §2 |
+
+=== 04a_Architecture_DataInventory ===
+11,18c11,13
+< inputs:
+<   - 04_Company_Context_Assessment.md
+<   - ../00_COMMON/01_Company_Context.md
+<   - 05_Regulatory_Applicability.md
+< outputs:
+<   - 04b_Security_Posture.md
+<   - 07_Structured_Compliance_Matrix.md
+< applicable_regs: [GDPR, CRA]
+---
+> inputs: [04_Company_Context_Assessment.md, ../00_COMMON/01_Company_Context.md, 05_Regulatory_Applicability.md]
+> outputs: [04b_Security_Posture.md, 07_Structured_Compliance_Matrix.md]
+> applicable_regs: [CRA, GDPR]
+21,25c16,17
+< related_documents:
+<   - ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/index.md
+<   - ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-01_Data-Protection/
+<   - ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-05_Data-Lifecycle/
+<   - ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-09_Governance-Documentation/D-09.4.md
+---
+> related_documents: [../../../00_METHODOLOGY/PREPROCESSING/SubDomains/index.md, ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-01_Data-Protection/, ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-05_Data-Lifecycle/, ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-09_Governance-Documentation/D-09.4.md]
+> generated_at: "DATET21:49:52Z"
+27c19
+< # Architecture & Data Inventory
+---
+> # AEGIS-P1-04a Architecture & Data Inventory
+29c21
+< TinyTask Lda. is a micro SaaS provider in Portugal with 8 employees, operating a productivity web application for EU customers. The company is a GDPR Controller for account and billing data, a GDPR Processor for B2B customer project content, and a CRA Manufacturer for the Team Organizer SaaS product. Operational maturity is low-tier; regulatory complexity remains medium because GDPR and CRA both apply.
+---
+> The TinyTask Lda. architecture is built upon segregated data stores that manage both active operational sub-domains, specifically 37, and inactive archival systems, such as D-08.3, ensuring clear separation between live transactional data and historical records. Inventory flows are managed via a centralized processing layer that interfaces directly with these disparate stores, facilitating real-time tracking of physical goods while maintaining strict data governance required by GDPR and CRA. This system employs secure access controls and auditable data pipelines to ensure compliance and integrity across all inventory operations and associated data lifecycle management.
+31,37c23
+< | System ID | Name | Type | Tech Stack | Owner | Criticality | Hosts Personal Data? |
+< |---|---|---|---|---|---|---|
+< | SYS-01 | Main SaaS Application | Cloud SaaS application | Node.js API, React web client, PostgreSQL driver | CTO and development team | Important | Y |
+< | SYS-02 | Auth Service | Managed identity service | Auth0 using OAuth 2.0 and OIDC | CTO | Important | Y |
+< | SYS-03 | Customer Data Store | Managed relational database | PostgreSQL on EU cloud region | CTO and lead developer | Critical | Y |
+< | SYS-04 | Cloud KMS | Managed key management | Cloud KMS with provider-managed key storage | CTO | Supporting | N |
+< | SYS-05 | Backup Store | Managed object storage | S3-compatible encrypted bucket | CTO | Important | Y |
+---
+> _No systems inventoried._
+39,40c25
+< Users access the React web client over HTTPS. The web client calls SYS-01 through the public application endpoint protected by TLS 1.3. SYS-01 runs in a cloud application environment and connects to SYS-03 over the provider internal network with encrypted database transport. SYS-01 sends authentication requests to SYS-02 using OAuth 2.0 and OIDC over HTTPS, emits pseudonymised operational logs to STORE-03, and sends billing metadata to Stripe for payment processing. SYS-05 receives scheduled encrypted backup exports from SYS-03. Administrative access is limited to the CTO and developers through Auth0 administrator accounts; MFA is enforced for administrators only.
+< TinyTask does not operate separate enterprise network zones, private SOC infrastructure, or a dedicated SIEM. Boundary controls are cloud-native security groups, managed identity controls, TLS, and least-privilege cloud IAM.
+---
+> The TinyTask Lda. network architecture is characterized by a relatively direct, flat topology focusing on core system communication between systems like SYS-01 and SYS-03. User access flows primarily route through SYS-01, establishing the primary pathway for end-user interaction with localized data. Administrative access is managed directly across these core systems without dedicated segmentation or firewall zones. Notably, this configuration lacks any formalized enterprise zones, Security Operations Centers (SOCs), or centralized Security Information and Event Management (SIEM) solutions, indicating a perimeter-focused security approach within the infrastructure.
+42,49c27
+< | Provider | Service | Data Stored | Region | Contract Basis | DPA in Place? |
+< |---|---|---|---|---|---|
+< | AWS or equivalent EU cloud provider | PostgreSQL managed database | Customer accounts, project metadata, B2B project content | eu-west-1 or equivalent EU region | Cloud services agreement and DPA | Y |
+< | AWS or equivalent EU cloud provider | S3-compatible object storage | Encrypted database backups | eu-west-1 or equivalent EU region | Cloud services agreement and DPA | Y |
+< | AWS or equivalent EU cloud provider | Cloud KMS | Encryption keys and key metadata | EU region | Cloud services agreement and DPA | Y |
+< | Auth0 | Authentication and identity | Email identifiers, authentication metadata, session metadata | EU tenant where available | Auth0 subscription terms and DPA | Y |
+< | Stripe | Payment processing | Card/payment data, billing contact metadata | Stripe controlled processing locations | Stripe services agreement and DPA | Y |
+< | Datadog or equivalent | Logs and analytics | Pseudonymised event logs and operational metrics | EU site where available | Monitoring service agreement and DPA | Y |
+---
+> _No cloud services inventoried._
+51,55c29
+< | System | Purpose | MFA? | SSO? | Password Policy |
+< |---|---|---|---|---|
+< | SYS-02 Auth0 | Customer and administrator authentication | Admins only; optional for customers | OIDC for SYS-01 | Auth0 default password policy with minimum length and breached-password checks |
+
+=== 04b_Security_Posture ===
+4d3
+< phase: 1
+5a5,7
+> status: DRAFT
+> generated_at: "DATET21:50:04Z"
+> phase: 1
+9d10
+< status: DRAFT
+11,23c12,17
+< inputs:
+<   - 04_Company_Context_Assessment.md
+<   - 04a_Architecture_DataInventory.md
+<   - 05_Regulatory_Applicability.md
+< outputs:
+<   - 07_Structured_Compliance_Matrix.md
+< applicable_regs: [GDPR, CRA]
+< active_subdomains: 37
+< inactive_subdomains: [D-08.3]
+< related_documents:
+<   - 04a_Architecture_DataInventory.md
+<   - ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/index.md
+<   - ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/
+---
+> inputs: [04_Company_Context_Assessment.md, 04a_Architecture_DataInventory.md, 05_Regulatory_Applicability.md]
+> outputs: [07_Structured_Compliance_Matrix.md]
+> applicable_regs: [CRA, GDPR]
+> active_subdomains: 0
+> inactive_subdomains: []
+> related_documents: [04a_Architecture_DataInventory.md, ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/index.md, ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/]
+26,27c20,23
+< ## 1. Assessment Methodology
+< TinyTask is assessed as a low-tier micro SaaS with 8 employees and managed-cloud infrastructure. Current maturity measures what exists today, not the target state. Target maturity is proportional to TinyTask's profile but still aligned with active GDPR and CRA SubDomains fit criteria.
+---
+> ## 1. Purpose
+> This document captures the company's **current security posture** across the 10 AEGIS macro-domains (D-01 .. D-10) using a 0-4 maturity scale, and identifies the gap to a target maturity proportional to the company's tier. It supports compliance evidence for **GDPR Art. 32**, **CRA Annex I Part I**, and downstream Doc 07 (Structured Compliance Matrix).
+> ## 2. Assessment Methodology
+> TinyTask Lda. is assessed as a low-tier MICRO SaaS with 8 employees using managed-cloud infrastructure. Current maturity measures what exists today, not the target state. Target maturity is proportional to the company profile but aligned with active GDPR/CRA SubDomains fit criteria (applicable_regs = CRA, GDPR).
+35,36c31,32
+< Assessment evidence is drawn from `04a_Architecture_DataInventory.md`, `04_Company_Context_Assessment.md`, and `05_Regulatory_Applicability.md`. The active Regulatory Baseline scope is 37 of 38 SubDomains for `applicable_regs = [GDPR, CRA]`; D-08.3 is inactive because it only participates in NIS2 and DORA.
+< ## 2. Per-Domain Assessment
+---
+> Assessment evidence is drawn from `04a_Architecture_DataInventory.md`, `04_Company_Context_Assessment.md`, and `05_Regulatory_Applicability.md`. The active Layer 0 scope is 0 of 38 SubDomains for `applicable_regs = [CRA, GDPR]`; D-08.3 is inactive when its participating regulations do not apply.
+> ## 3. Per-Domain Assessment
+39,42c35,38
+< |---|---|---|---|
+< | Encryption at rest | Implemented for main database, backups, and logs | STORE-01, STORE-02, STORE-03 in 04a Section 2.1 | Provider-managed AES-256 encryption; no customer-managed HSM |
+< | Encryption in transit | Implemented for all documented production flows | FLOW-01 to FLOW-05 in 04a Section 2.2 | TLS 1.3 used for main app and Auth0; third-party APIs use TLS 1.2 or higher |
+< | Key management | Basic cloud KMS | SYS-04 in 04a Section 1.1 | Manual key rotation; no formal key ceremony or dual control |
+---
+> | --- | --- | --- | --- |
+> | Encryption at rest | Implemented for main database, backups, and logs | STORE-01, STORE-02, STORE-03 | Provider-managed AES-256 encryption; no customer-managed HSM |
+> | Encryption in transit | Implemented for all documented production flows | FLOW-01, FLOW-02, FLOW-03, FLOW-04, FLOW-05 | TLS 1.3 used for main app and Auth0; third-party APIs use TLS 1.2 or higher |
+> | Key management | Basic cloud KMS | SYS-04 | Manual key rotation; no formal key ceremony or dual control |
+46c42,132
+< **Notes**: Current evidence supports D-01.1, D-01.2, and part of D-01.3/D-01.4. The gap is formal key lifecycle documentation, periodic restore/integrity tests, and review evidence for GDPR Art. 32 and CRA Annex I Part I confidentiality/integrity controls. Relevant Regulatory Baseline files: [D-01.1](../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-01_Data-Protection/D-01.1.md), [D-01.2](../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-01_Data-Protection/D-01.2.md), [D-01.3](../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-01_Data-Protection/D-01.3.md), [D-01.4](../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-01_Data-Protection/D-01.4.md).
+---
+> **Notes**: The current maturity level of 2 indicates that while basic data protection controls, such as encryption and key management, are implemented, the processes lack the necessary systematic oversight required for full compliance with GDPR Article 32 and CRA Annex I security mandates. The identified gap requires immediate remediation focused on establishing comprehensive monitoring and continuous auditing across all in-scope controls—encryption at rest/in transit, data integrity, and key lifecycle management. Material remediation efforts must prioritize implementing robust key management protocols and establishing continuous monitoring systems to ensure the ongoing confidentiality, integrity, and availability of personal data.
+> #### D-01 — Adapted Objective
+> **Source**: MAP stage | **Tier**: UNKNOWN | **Confidence**: UNKNOWN | **Status**: PENDING
+> ##### D-01.1 — Data at Rest Encryption
+
+=== 04c_ThirdParty_Landscape ===
+4d3
+< phase: 1
+5a5,7
+> status: DRAFT
+> generated_at: "DATET21:51:06Z"
+> phase: 1
+9d10
+< status: DRAFT
+11,25c12,16
+< inputs:
+<   - 04_Company_Context_Assessment.md
+<   - 04a_Architecture_DataInventory.md
+<   - ../00_COMMON/01_Company_Context.md
+< outputs:
+<   - 04b_Security_Posture.md
+<   - 06_Clause_Mapping_Matrix.md
+<   - 07_Structured_Compliance_Matrix.md
+< applicable_regs: [GDPR, CRA]
+< active_subdomains: 37
+< inactive_subdomains: [D-08.3]
+< related_documents:
+<   - ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-06_Supply-Chain/
+<   - ../../../00_METHODOLOGY/TEMPLATES/04c_ThirdParty_Landscape.md
+<   - ../../../00_METHODOLOGY/CONTEXT/CONTEXT_PHASE1.md
+---
+> inputs: [04_Company_Context_Assessment.md, 04a_Architecture_DataInventory.md, ../00_COMMON/01_Company_Context.md]
+> outputs: [04b_Security_Posture.md, 06_Clause_Mapping_Matrix.md, 07_Structured_Compliance_Matrix.md]
+> applicable_regs: [CRA, GDPR]
+> active_subdomains: 0
+> related_documents: [../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-06_Supply-Chain/, ../../../00_METHODOLOGY/TEMPLATES/04c_ThirdParty_Landscape.md]
+30c21
+< This document inventories TinyTask Lda.'s third-party landscape: cloud providers, software vendors, subprocessors. It maps directly to Regulatory Baseline sub-domain **D-06 (Supply Chain)** — specifically D-06.1, D-06.2, D-06.3, D-06.4 — and supports compliance with **GDPR Art. 28** (processor obligations and controller due diligence) and **CRA Annex I Part I (2)(j) and (k)** (attack-surface reduction, exploitation-mitigation via the supply chain).
+---
+> This document inventories TinyTask Lda.'s third-party landscape: cloud providers, software vendors, subprocessors. It maps directly to Layer 0 sub-domain **D-06 (Supply Chain)** — D-06.1, D-06.2, D-06.3, D-06.4 — and supports compliance with **GDPR Art. 28** (processor obligations and controller due diligence) and **CRA Annex I Part I (2)(j) and (k)** (attack-surface reduction, exploitation-mitigation via the supply chain).
+32,66c23,227
+< **Method:** Inventory was constructed from the architecture documentation (`04a`), the stakeholder register in `04_Company_Context_Assessment.md §3`, and the intake form layer-2 block B6 answers (supply chain visibility = Low; SBOM = Not started; supplier security assessment = None; component vulnerability = Manual ad hoc).
+< **Proportionality note (P2 — Company Reality First):** TinyTask is an 8-employee micro-SaaS. Inventory is limited to 6 third parties that actually touch personal data or the production system. No formal supplier programme exists; the inventory is a precondition to building one, not evidence one already exists.
+< ---
+< ## 2. Cloud & Infrastructure Providers
+< The following providers host customer data, the production application, or authentication. All three are critical because they process personal data on behalf of the controller (account data) and/or the B2B customers whose content is processed.
+< | Provider | Service | Data Accessed | Region | Contract Basis | DPA in Place? | Article 28 Compliant? | Exit Plan? |
+< |---|---|---|---|---|---|---|---|
+< | AWS (or equivalent EU cloud provider) | EC2 / compute (SYS-01 application runtime) | Application logs, runtime config, no direct personal data at this layer | eu-west-1 | MSA + AWS DPA (GDPR addendum) + SCCs via AWS Customer Agreement | Y | Y (AWS DPA Art. 28 compliant; SCCs Module 2 where applicable) | N — exit procedure not yet documented; data extraction via DB dump + S3 inventory |
+< | AWS (or equivalent EU cloud provider) | RDS / managed PostgreSQL (SYS-03) | Customer accounts (email, name, hashed password), B2B project content — personal data | eu-west-1 | MSA + AWS DPA + SCCs | Y | Y (AWS DPA Art. 28 compliant) | N — exit procedure not yet documented |
+< | AWS (or equivalent EU cloud provider) | S3 / object storage (SYS-05 backups) | Encrypted DB backups containing personal data | eu-west-1 | MSA + AWS DPA + SCCs | Y | Y | N — exit procedure not yet documented (see gap in Section 8) |
+< | AWS (or equivalent EU cloud provider) | Cloud KMS (SYS-04) | Key metadata only; raw keys never leave HSM-bound processors | EU region | MSA + AWS DPA | Y | Y | N — wrapped keys exportable; procedure not yet documented |
+< | Stripe | Stripe-hosted payment checkout (FLOW-05) | Card PAN tokenised by Stripe; TinyTask stores only billing metadata and Stripe customer IDs; no PAN | Stripe-controlled regions (TinyTask EU customers' card data reside in Stripe-controlled EU processing locations per Stripe DPA) | Stripe Services Agreement + Stripe DPA (Standard Contractual Clauses incorporated) | Y | Y (Stripe DPA — Art. 28 / GDPR-compliant terms) | Y (Stripe exports customer + transaction data; documented process via Stripe Dashboard API) |
+< | Auth0 (by Okta) | Authentication / identity (SYS-02) | Email addresses (used as identifiers), hashed passwords, MFA factors, session metadata, OIDC tokens | EU tenant where available (Auth0 EU region) | Auth0 subscription terms + Auth0 DPA | Y | Y (Auth0 DPA — Art. 28 compliant; SCCs Module 2) | Y (Auth0 user-export API documented; export procedure known but not yet exercised) |
+< **Summary:** 6 cloud / infrastructure providers; all 6 have a DPA in place; all 6 (subject to the noted exit-plan gap for AWS) have GDPR-compliant Article 28 terms.
+< ---
+< ## 3. Software Vendors & SaaS Products
+< The following SaaS products are used in the development-and-operations lifecycle. None of these vendors process customer personal data directly; they process developer/source-code artefacts, pseudonymised operational telemetry, or vulnerability metadata only. They are tracked here for CRA Annex I Part II supply-chain obligations, GDPR records of processing (Art. 30), and D-06.1 vendor risk assessment.
+< | Vendor | Product | Data Processed | Subprocessor? | Contract Type | CRA-Conformant? | Criticality |
+< |---|---|---|---|---|---|---|
+< | GitHub | Source-code hosting + Git-based version control | Source code, issue text, commit metadata (no production personal data) | N (developer tool; no end-user data path) | GitHub MSA for Organisations + GitHub DPA | Not assessed (CRA scope = products with digital elements on EU market; GitHub's internal CRA posture is not separately verified by TinyTask) | Important (single point of failure for code IP and release artefacts) |
+< | Datadog (or equivalent) | APM / log aggregation (STORE-03) | Pseudonymised operational logs and metrics — no raw customer content by design | Y (logs flow from SYS-01 → Datadog subprocessor) | Datadog MSA + Datadog DPA + SCCs | Not assessed | Critical (sole telemetry/detection supplier — D-10.1 dependency) |
+< | Snyk | Software composition analysis / vulnerability scanning | Source code + dependency manifests; no runtime personal data | N (developer tool; on-demand scans only) | Snyk subscription + Snyk DPA (paid tiers) | Not assessed | Important (feeds CRA Annex I Part II (1) SBOM-derivation and D-02.1 vulnerability identification) |
+< | Auth0 (by Okta) | Authentication (also listed in Section 2) | Already inventoried | Y | Already inventoried | Already inventoried | Already inventoried |
+< **Summary:** 3 distinct software vendors (GitHub, Datadog, Snyk); Auth0 is duplicated above only to mark the cross-reference; it is operationally counted once as a cloud/identity provider in Section 2.
+< ---
+
+=== 04d_Org_Roles_RACI ===
+4d3
+< phase: 1
+5a5,7
+> status: DRAFT
+> generated_at: "DATET21:51:06Z"
+> phase: 1
+9d10
+< status: DRAFT
+11,28c12,17
+< inputs:
+<   - 04_Company_Context_Assessment.md
+<   - 04a_Architecture_DataInventory.md
+<   - 04c_ThirdParty_Landscape.md
+<   - ../00_COMMON/01_Company_Context.md
+< outputs:
+<   - 04b_Security_Posture.md
+<   - 05_Regulatory_Applicability.md
+<   - 06_Clause_Mapping_Matrix.md
+<   - 07_Structured_Compliance_Matrix.md
+< applicable_regs: [GDPR, CRA]
+< active_subdomains: 36  # 37 active minus D-08.3 INACTIVE; D-08.1 and D-08.2 cover training at staff level
+< inactive_subdomains: [D-08.3]  # board training out of scope (NIS2 + DORA only participating)
+< related_documents:
+<   - ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-08_Human-Factors/
+<   - ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-09_Governance-Documentation/
+<   - ../../../00_METHODOLOGY/TEMPLATES/04d_Org_Roles_RACI.md
+<   - ../../../00_METHODOLOGY/CONTEXT/CONTEXT_PHASE1.md
+---
+> inputs: [04_Company_Context_Assessment.md, 04a_Architecture_DataInventory.md, 04c_ThirdParty_Landscape.md, ../00_COMMON/01_Company_Context.md]
+> outputs: [04b_Security_Posture.md, 05_Regulatory_Applicability.md, 06_Clause_Mapping_Matrix.md, 07_Structured_Compliance_Matrix.md]
+> applicable_regs: [CRA, GDPR]
+> active_subdomains: 0
+> inactive_subdomains: []
+> related_documents: [../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-08_Human-Factors/, ../../../00_METHODOLOGY/PREPROCESSING/SubDomains/D-09_Governance-Documentation/, ../../../00_METHODOLOGY/TEMPLATES/04d_Org_Roles_RACI.md]
+33c22
+< This document describes TinyTask Lda.'s organisational structure and the per-activity RACI matrix that allocates information-security and data-protection responsibilities. It maps to Regulatory Baseline sub-domains **D-08 (Human Factors)** and **D-09 (Governance Documentation)**, and supports compliance with **GDPR Art. 37-39** (DPO designation, not mandatory for TinyTask but voluntarily adopted), **GDPR Art. 32** (security of processing), **CRA Annex I Part II (8)(f)** (handling of vulnerabilities — competence requirements), and **CRA Annex VII §5** (technical documentation — organisational measures).
+---
+> This document describes TinyTask Lda.'s organisational structure and the per-activity RACI matrix that allocates information-security and data-protection responsibilities. It maps to Layer 0 sub-domains **D-08 (Human Factors)** and **D-09 (Governance Documentation)**, and supports compliance with **GDPR Art. 37-39** (DPO designation), **GDPR Art. 32** (security of processing), **CRA Annex I Part II (8)(f)** (vulnerability handling competence), and **CRA Annex VII §5** (technical documentation — organisational measures).
+35,39c24,44
+< **Critical caveat — sub-domain D-08.3 is INACTIVE for TinyTask.** Per `05_Regulatory_Applicability.md §6.3` (migrated from Doc 04 §7 in v2.2), D-08.3 (Management Board Training) participates only in **NIS2** and **DORA**; neither regulation applies to TinyTask (8 employees, <€2M revenue, not a financial entity). Consequently, there is **no OJ-level regulatory mandate** for formal board cybersecurity training at TinyTask. The board-training row in the RACI matrix below is retained as a **best-practice placeholder** (recommended under CRA spirit and CRS-style executive awareness), not as a derived compliance requirement.
+< **Proportionality note (P2 — Company Reality First):** TinyTask has 8 employees. Formal role separation characteristic of larger firms (separate DPO, CISO, IT Manager, Legal, HR, IR Lead) is not feasible — many hats fall on the CEO/CTO/lead developer. RACI assignments therefore concentrate **A** (Accountable) on the CEO or CTO, with one **R** (Responsible) per activity and the rest as **C** (Consulted) or **I** (Informed).
+< ---
+< ## 2. Key Roles
+< TinyTask has 8 employees. Functional roles are listed below; only one external legal adviser exists (DPO-support on retainer). There is no separate HR function — the CEO handles people ops and security training coordination as part of the 0.2 FTE DPO allocation.
+---
+> **Proportionality note (P2 — Company Reality First):** TinyTask Lda. has 8 employee headcount. Formal role separation characteristic of larger firms (separate DPO, CISO, IT Manager, Legal, HR, IR Lead) is not feasible — many hats fall on the CEO/CTO/lead developer. RACI assignments concentrate **A** (Accountable) on the CEO or CTO, with one **R** (Responsible) per activity and the rest as **C** (Consulted) or **I** (Informed).
+> ## 2. Company-Level Responsible
+> The following roles cover the obligations applicable to the company. Each row pairs a role with the regulations it owns and a default owner title. Actual assignment is delegated to §3 (Key Roles) and §5 (RACI Matrix).
+> | Role | Default Owner | Regulations |
+> | --- | --- | --- |
+> | Compliance Lead | Chief Compliance Officer / DPO (CEO) | GDPR — controller + processor |
+> | Engineering Lead | CTO / Head of Engineering | CRA — secure development / vulnerability |
+> | Operations Lead | COO / Head of Operations | NIS 2, DORA (when applicable) |
+> | DPO (voluntary) | CEO (voluntary designation per Art. 37) | GDPR Art. 37-39 |
+> | CISO / Security Lead | CTO (CRA Annex I Part II (8)(f)) | CRA Annex I, NIS 2, DORA |
+> ## 3. Regulation-Level Owner
+> Per-regulation ownership matrix. "n/a" indicates the regulation is not applicable at the current proportionality tier; "-" indicates owner is not separately tracked.
+> | Regulation | Applicable | Owner |
+> | --- | --- | --- |
+> | GDPR | YES | Compliance Lead (CEO/DPO) |
+
