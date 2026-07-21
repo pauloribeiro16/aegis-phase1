@@ -591,7 +591,7 @@ class Phase1Orchestrator:
             case_id=case_id,
             applicable_regs=applicable_regs,
             company_facts=cc,
-            layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
+            layer0_subdomain_refs=self._build_layer0_subdomain_refs(),
         )
         # Translate executor output → DomainResult shape
         results: dict[str, Any] = {}
@@ -711,6 +711,72 @@ class Phase1Orchestrator:
             )
         except Exception as exc:
             logger.warning("T2: build_synthesis_context failed: %s", exc)
+
+
+    def _build_layer0_subdomain_refs(
+        self,
+        subdomain_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """CORR-043-T1: build the metadata-rich layer0_subdomain_refs list.
+
+        The canonical P1C-LLM-01 (and P1B-LLM-01/02) specs expect a
+        list of dicts with subdomain metadata (id, title, participating
+        regulations, hso_hl objective, pairs, anchors, csf). Previously
+        the orchestrator passed only ``list[str]`` of IDs which caused
+        the P1C-LLM-01 canonical path to crash with
+        ``'str' object has no attribute 'get'``.
+
+        Reads from the cached ``PreprocCatalogLoader`` (preferred) or
+        falls back to the v2 state when no loader is injected.
+
+        Args:
+            subdomain_ids: Optional list of IDs to include. When None,
+                includes all 38 subdomains.
+
+        Returns:
+            List of dicts, one per subdomain. Sorted by ID for
+            determinism.
+        """
+        # Prefer the PreprocCatalogLoader (canonical, in-memory cached
+        # from CORR-037-T1)
+        if self.preproc_catalog is not None:
+            all_subs = self.preproc_catalog.load_subdomains()
+        else:
+            all_subs = list(self.state.get("v2_subdomains") or [])
+
+        if subdomain_ids is not None:
+            wanted = set(subdomain_ids)
+            all_subs = [sd for sd in all_subs if getattr(sd, "id", None) in wanted]
+
+        refs: list[dict[str, Any]] = []
+        for sd in all_subs:
+            sd_id = getattr(sd, "id", None)
+            if not sd_id:
+                continue
+            hso = getattr(sd, "hso_hl", None)
+            objective = getattr(hso, "objective", None) if hso else None
+            sr_list = list(getattr(sd, "security_requirements", []) or [])
+            anchors = [
+                a
+                for sr in sr_list
+                for a in list(getattr(sr, "anchors", []) or [])
+            ]
+            refs.append(
+                {
+                    "sub_domain_id": sd_id,
+                    "title": str(getattr(sd, "title", "") or ""),
+                    "participating_regulations": list(
+                        getattr(sd, "participating_regulations", []) or []
+                    ),
+                    "hso_hl_objective": objective,
+                    "objective": objective,  # alias per spec
+                    "pairs": list(getattr(sd, "pairs", []) or []),
+                    "anchors": anchors,
+                    "csf": list(getattr(sd, "csf_hint", []) or []),
+                }
+            )
+        refs.sort(key=lambda r: r["sub_domain_id"])
+        return refs
 
     def _failed_domain_result(self, domain_id: str, exc: Exception) -> dict[str, Any]:
         """Build the FAILED ``DomainResult`` dict for a domain whose processing raised.
@@ -953,7 +1019,7 @@ class Phase1Orchestrator:
                 track_b_profile=self.state["aggregated_data"].get("profile", {}),
                 applicable_regs=applicable_regs,
                 company_facts=company_context,
-                layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
+                layer0_subdomain_refs=self._build_layer0_subdomain_refs(),
                 config=config,
             )
         except Exception as exc:
@@ -1595,7 +1661,7 @@ class Phase1Orchestrator:
             company_facts=cc,
             coverage_matrix_row=coverage_rows,
             aggregated_activations=aggregated_activations,
-            layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
+            layer0_subdomain_refs=self._build_layer0_subdomain_refs(),
             layer0_catalog=layer0_catalog,
             classification={
                 "role": cc.get("role") or cc.get("obligated_party") or "controller",
