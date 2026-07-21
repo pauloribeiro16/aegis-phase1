@@ -58,7 +58,16 @@ a perder ~25% dos SRs.
    (e.g. `the "where feasible" softening`), não como prefixo
    removível. Decisão: desabilitar o finding `WHY_EQUALS_NOTE`
    no audit; manter o campo `why_note` para retro-compat.
-3. **Estrutura**: 6 commits sequenciais (cada um revertível), 1 contract,
+3. **Bug D**: fix no **parser** (auto-correction de `macro_domain` quando
+   o prefix não bate com `sub_domain`). Os source MDs vivem no repo
+   `Methodology-main` (symlink), e o git do `aegis-phase1` recusa-se a
+   atravessar o symlink (commit policy + AGENTS.md §10). Decisão
+   pragmática: detectar o mismatch no parser e usar um map canónico
+   de 10 prefixes → nomes macro_domain.
+4. **Bug F**: aceitar "None" / "no 3-regulation" / "Only N regulations"
+   no body do H4 `#### Emergent tensions` como declaração explícita
+   de não-existência de emergent. Não força marker em source MD.
+5. **Estrutura**: 6 commits sequenciais (cada um revertível), 1 contract,
    1 branch.
 
 ---

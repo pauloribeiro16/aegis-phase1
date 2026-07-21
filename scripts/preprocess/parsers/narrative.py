@@ -1419,6 +1419,40 @@ def parse_crossregulation_subdomain(
         body, "Downstream implication"
     )
     sr_cross_validation = _extract_h4_section(body, "SR cross-validation")
+    # CORR-035 c5: detect macro_domain <-> sub_domain mismatch in the
+    # frontmatter and fix it. The bug is a transcription error in
+    # source MDs (e.g. D-10.1/2/3 say macro_domain="D-09 Governance &
+    # Documentation" but the sub_domain is D-10.*). The parser
+    # derives the correct macro_domain from sub_domain's D-XX prefix
+    # and looks up the canonical name from a small map.
+    macro_domain_raw = fm.get("macro_domain", "")
+    sub_domain = fm.get("sub_domain", "")
+    if sub_domain:
+        m = re.match(r"^(D-\d+)\.", sub_domain)
+        if m:
+            sub_prefix = m.group(1)
+            # Canonical macro_domain names keyed by D-XX prefix
+            _MACRO_CANONICAL = {
+                "D-01": "D-01 Data Protection & Encryption",
+                "D-02": "D-02 Vulnerability Management",
+                "D-03": "D-03 Access Control",
+                "D-04": "D-04 Incident Response",
+                "D-05": "D-05 Data Lifecycle",
+                "D-06": "D-06 Supply Chain",
+                "D-07": "D-07 Secure Development",
+                "D-08": "D-08 Human Factors",
+                "D-09": "D-09 Governance & Documentation",
+                "D-10": "D-10 Monitoring & Audit",
+            }
+            if sub_prefix not in macro_domain_raw:
+                # Mismatch — use the canonical name
+                macro_domain = _MACRO_CANONICAL.get(sub_prefix, macro_domain_raw)
+            else:
+                macro_domain = macro_domain_raw
+        else:
+            macro_domain = macro_domain_raw
+    else:
+        macro_domain = macro_domain_raw
     classification_distribution: dict[str, int] = {}
     for p in pairs:
         cls = p.get("classification") or "(empty)"
@@ -1431,7 +1465,7 @@ def parse_crossregulation_subdomain(
         "source": str(path),
         "doc_id": fm.get("document_id", f"AEGIS-PREPROC-CRDA-{path.stem}"),
         "sub_kind": sub_kind,
-        "macro_domain": fm.get("macro_domain", ""),
+        "macro_domain": macro_domain,
         "sub_domain": fm.get("sub_domain", ""),
         "title": fm.get("title", path.stem),
         "status": fm.get("status", ""),

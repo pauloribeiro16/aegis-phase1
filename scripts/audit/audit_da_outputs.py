@@ -572,17 +572,34 @@ def audit_da_file(json_path: Path) -> list[Finding]:
             rel,
             f"emergent_tensions is {type(et).__name__}",
         )
-    # If 5+ participants, an emergent marker is expected (per AEGIS
-    # convention for 3+ regulation overlap). But not strictly required,
-    # so MEDIUM severity only.
+    # If 3+ participants, an emergent marker is expected (per AEGIS
+    # convention for 3+ regulation overlap). But "None" or an explicit
+    # "no 3-regulation emergent tension exists" declaration is
+    # contract-compliant. Check raw_md for these patterns.
     if len(data.get("participants", [])) >= 3 and not et:
-        add(
-            findings,
-            "LOW",
-            "ET_MISSING_FOR_3PLUS",
-            rel,
-            f"3+ participants but no emergent_tensions marker",
+        raw = data.get("raw_md", "")
+        # Match "#### Emergent tensions ..." section whose body
+        # contains an explicit "no emergent" declaration. Three
+        # accepted patterns:
+        #   1. starts with "None" (e.g. "None. The pairwise readings...")
+        #   2. contains "no 3-regulation" / "no 3-way" / "no emergent"
+        #   3. starts with "Only 2/N regulations" (explicit N<3 note)
+        none_decl = re.search(
+            r"^####\s+Emergent\s+tensions[^\n]*\n"
+            r"(?:\s*None\b"
+            r"|[^\n]*\bno\s+(?:3[\-\s]?regulation|3[\-\s]?way|emergent)"
+            r"|\s*-\s+Only\s+\d+\s+regulations?\b)",
+            raw,
+            re.MULTILINE | re.IGNORECASE,
         )
+        if not none_decl:
+            add(
+                findings,
+                "LOW",
+                "ET_MISSING_FOR_3PLUS",
+                rel,
+                "3+ participants but no emergent_tensions marker (and no explicit 'None' declaration)",
+            )
 
     # ── 9. top-level required fields non-empty when pairs > 0 ─────────
     if pairs:
