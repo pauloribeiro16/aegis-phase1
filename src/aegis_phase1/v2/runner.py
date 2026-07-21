@@ -167,6 +167,27 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--run-clauses",
+        action="store_true",
+        dest="run_clauses",
+        help=(
+            "CORR-039: Generate ONLY Doc 06 (clause mapping matrix) "
+            "from the ClauseMappingContext. No LLM. Skips MAP, "
+            "REDUCE, and Phase 1B. Useful for verifying clause-to-"
+            "sub-domain mapping after a preproc rebuild."
+        ),
+    )
+    parser.add_argument(
+        "--run-phase-1b",
+        action="store_true",
+        dest="run_phase_1b",
+        help=(
+            "CORR-039: Run Phase 1B (P1B-LLM-01 + P1B-LLM-02 per "
+            "applicable_reg) and render Doc 05 with per-reg rationale. "
+            "Requires MOCK_LLM=true or Ollama running with gemma4:e2b."
+        ),
+    )
+    parser.add_argument(
         "--skip-reduce-llms",
         action="store_true",
         help=(
@@ -352,6 +373,28 @@ def main() -> None:
         for label, p in paths.items():
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
+    elif args.run_clauses:
+        logger.info(
+            "Non-interactive mode — clauses only (CORR-039; no LLM)"
+        )
+        paths = cmd_run_clauses(
+            orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
+        )
+        logger.info("=== CLAUSES DOC COMPLETE ===")
+        for label, p in paths.items():
+            print(f"  {label}: {p}")
+        print(f"  total: {len(paths)} artefacts")
+    elif args.run_phase_1b:
+        logger.info(
+            "Non-interactive mode — Phase 1B only (CORR-039; with LLM)"
+        )
+        paths = cmd_run_phase_1b(
+            orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
+        )
+        logger.info("=== PHASE 1B COMPLETE ===")
+        for label, p in paths.items():
+            print(f"  {label}: {p}")
+        print(f"  total: {len(paths)} artefacts")
     else:
         logger.info("Interactive mode — running wizard (CORR-006)")
         from aegis_phase1.v2.cli.menu import run_wizard
@@ -402,6 +445,83 @@ def cmd_run_applicability(
     orch.state["output_paths"] = dict(orch.state.get("output_paths", {}), **paths)
 
     logger.info("cmd_run_applicability: wrote %d artefacts to %s", len(paths), out_dir)
+    return paths
+
+
+def cmd_run_clauses(
+    *,
+    orch: "Phase1Orchestrator",
+    case_path: str,
+    prep_path: str,
+    output_path: str,
+) -> dict[str, str]:
+    """CORR-039-T5: render only Doc 06 from the ClauseMappingContext.
+
+    Skips MAP / REDUCE / Phase 1B entirely. No LLM is invoked. Builds
+    the v2 state via ``orch.load()`` (which runs the v2 loaders + the
+    T1 catalog_loader), then renders Doc 06 from the populated
+    ClauseMappingContext.
+
+    Returns:
+        Mapping ``AEGIS-P1-06`` -> absolute file path.
+    """
+    from aegis_phase1.v2.output.doc_06 import render_doc_06
+
+    orch.load(case_path, prep_path)
+    out_dir = Path(output_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    paths = render_doc_06(orch.state, str(out_dir))
+    orch.state["output_paths"] = dict(orch.state.get("output_paths", {}), **paths)
+
+    logger.info("cmd_run_clauses: wrote %d artefacts to %s", len(paths), out_dir)
+    return paths
+
+
+def cmd_run_phase_1b(
+    *,
+    orch: "Phase1Orchestrator",
+    case_path: str,
+    prep_path: str,
+    output_path: str,
+) -> dict[str, str]:
+    """CORR-039-T5: run Phase 1B (P1B-LLM-01 + P1B-LLM-02 per applicable_reg).
+
+    Loads the v2 state, then calls ``orch.run_phase_1b()`` which iterates
+    per-regulation and invokes the 5-canonical-LLM ``Phase1Executor``
+    (CORR-039-T4: with catalog filtering wired). Finally re-renders
+    Doc 05 so §6.1b surfaces the per-reg rationale that Phase 1B
+    populates into ``state['aggregated_data']['rationale_by_reg']``.
+
+    Requires either ``MOCK_LLM=true`` / ``--mock-llm`` (returns a
+    stub response) or a running Ollama with ``gemma4:e2b``.
+
+    Returns:
+        Mapping ``AEGIS-P1-05`` -> absolute file path (re-rendered
+        Doc 05 with per-reg rationale populated).
+    """
+    from aegis_phase1.v2.output.doc_05 import render_doc_05
+
+    orch.load(case_path, prep_path)
+    out_dir = Path(output_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Phase 1B invokes P1B-LLM-01 + P1B-LLM-02 per applicable_reg
+    # (CORR-039-T4 wires the catalog + classification inputs).
+    orch.run_phase_1b()
+
+    # Re-render Doc 05 so §6.1b surfaces the rationale_by_reg data.
+    paths = render_doc_05(orch.state, str(out_dir), llm_invoker=orch.llm_invoker)
+    orch.state["output_paths"] = dict(orch.state.get("output_paths", {}), **paths)
+
+    # Surface per-reg count for the CLI summary line.
+    rationale = (orch.state.get("aggregated_data") or {}).get("rationale_by_reg") or {}
+    logger.info(
+        "cmd_run_phase_1b: wrote %d artefacts to %s; rationale_by_reg has %d entries",
+        len(paths),
+        out_dir,
+        len(rationale) if isinstance(rationale, dict) else 0,
+    )
     return paths
 
 
