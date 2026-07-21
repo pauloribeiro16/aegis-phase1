@@ -183,6 +183,25 @@ def test_h2_leak_in_downstream_implication(tmp_path: Path) -> None:
     )
 
 
+def test_no_h4_leak_in_real_da_files() -> None:
+    """Regression: post commit 2, no DA file has an h4 leak."""
+    if not DA_DIR.exists():
+        pytest.skip(f"{DA_DIR} not present")
+    proc = _run_audit("--only", "HIGH", "--json")
+    payload = json.loads(proc.stdout)
+    leak_codes = {
+        "DOWNSTREAM_IMPLICATION_TOP_HR_LEAK",
+        "DOWNSTREAM_IMPLICATION_TOP_H2_LEAK",
+        "SR_CROSS_VALIDATION_HR_LEAK",
+        "SR_CROSS_VALIDATION_H2_LEAK",
+    }
+    leaks = [f for f in payload["findings"] if f["code"] in leak_codes]
+    assert not leaks, (
+        f"{len(leaks)} h4 leaks still present post-commit-2: "
+        + ", ".join(f["path"] for f in leaks[:5])
+    )
+
+
 # ─── MEDIUM detection ─────────────────────────────────────────────────
 
 
@@ -326,10 +345,12 @@ def test_baseline_38_da_files_scanned() -> None:
 
 
 def test_baseline_has_known_high_findings() -> None:
-    """Sanity: at baseline, the script reports >= 37 HIGH findings.
+    """Sanity: after commit 2 (bug A fixed), no HIGH findings remain.
 
-    After CORR-035 commits 2-6 are applied, this should drop to 0.
-    This test pins the baseline for regression detection.
+    Pre-commit-2 baseline was 37 HIGH. This test now pins 0 HIGH
+    as the post-commit-2 expected state. Subsequent commits may
+    keep it at 0 (commits 3, 5, 6) or briefly raise it (commit 4
+    may surface new findings as parser behavior changes).
     """
     if not DA_DIR.exists():
         pytest.skip(f"{DA_DIR} not present")
@@ -337,8 +358,10 @@ def test_baseline_has_known_high_findings() -> None:
     if proc.returncode not in (0, 1):
         pytest.fail(f"audit script failed: {proc.stderr}")
     payload = json.loads(proc.stdout)
-    # Pre-fix: at least 37 HIGH (the h4 leak). This is the baseline.
-    assert payload["by_severity"].get("HIGH", 0) >= 37
+    # Post commit 2: bug A fixed. We expect 0 HIGH findings.
+    assert payload["by_severity"].get("HIGH", 0) == 0, (
+        f"unexpected HIGH findings post-commit-2: {payload['by_severity']}"
+    )
 
 
 # ─── End-to-end CLI ─────────────────────────────────────────────────

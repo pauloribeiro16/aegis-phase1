@@ -641,10 +641,14 @@ def audit_index(idx_path: Path) -> list[Finding]:
         add(findings, "CRITICAL", "INDEX_PARSE", str(idx_path), str(exc))
         return findings
 
-    if "domains" in idx:
+    if "domains" in idx and isinstance(idx["domains"], list):
         declared_files = {Path(d["path"]).name for d in idx["domains"] if "path" in d}
     else:
-        declared_files = set()
+        # This index.json is a taxonomy wrapper (relationship_taxonomy
+        # + workflow_steps), not a directory listing. The D-*.json
+        # files are tracked by the parent pipeline (build.sh), not by
+        # this index. Skip the cross-check.
+        return findings
 
     actual_files = {p.name for p in idx_path.parent.glob("**/D-*.json")}
     missing_from_index = actual_files - declared_files

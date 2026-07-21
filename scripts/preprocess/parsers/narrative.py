@@ -1381,6 +1381,13 @@ def parse_crossregulation_subdomain(
         `#### <heading>\\n<body until next H4 or EOF>` — we stop at H4
         only (not H2/H3) because a nested H4 inside another H4-section
         would otherwise eat content meant for the outer section.
+
+        CORR-035 fix: the regex stops at the next `#### <heading>` (or
+        EOF). When the section is the LAST one in a multi-subdomain
+        file, the source MD appends a horizontal-rule separator
+        (`\\n---\\n`) and the next `## <next-subdomain>` H2 before EOF.
+        The body must be stripped at the HR boundary so it doesn't
+        leak the next subdomain's title.
         """
         # Match `#### <heading>` (case-insensitive) on its own line, then
         # capture everything until the next H4 (or EOF). If the section
@@ -1392,9 +1399,21 @@ def parse_crossregulation_subdomain(
         )
         m = pattern.search(text)
         if m:
-            return m.group(1).strip()
-        # Fallback: maybe it's bold-inline (DeepAnalysis style)
-        return _extract_labeled_value(text, heading)
+            body = m.group(1).strip()
+        else:
+            # Fallback: maybe it's bold-inline (DeepAnalysis style)
+            body = _extract_labeled_value(text, heading)
+        # CORR-035 bug-A: strip the leaked horizontal-rule and
+        # next-subdomain H2 that source MDs append at EOF when this
+        # H4 is the last section of a multi-subdomain file. Pattern:
+        #   "<body>\n\n---\n\n## D-XX+1 ...\n"  (subdomain boundary)
+        #   "<body>\n\n---\n"                    (just the HR, no next H2)
+        # Both are stripped at the first "\n---\n" (or trailing "\n---").
+        if body:
+            hr_idx = body.find("\n---")
+            if hr_idx != -1:
+                body = body[:hr_idx].rstrip()
+        return body
 
     downstream_implication_top = _extract_h4_section(
         body, "Downstream implication"
