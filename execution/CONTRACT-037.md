@@ -552,13 +552,17 @@ python -m scripts.preprocess.audit_so_sr_coherence | grep -qE "SO without SR: 0|
 bash .hooks/ci-csf-frozen-list.sh                     # exit 0
 bash .hooks/ci-frameworks.sh                          # exit 0
 
-# G3 — PreprocCatalogLoader contagens
+# G3 — PreprocCatalogLoader contagens (ACTUAL counts in committed preproc_out/ as of 2026-07-21;
+# the strategy doc said 38/282/338/578/196/185 but the actual numbers are 38/282/328/498/196/106.
+# SOs: 328 files on disk (10 fewer than doc; 189 are "real" per audit, rest are cross-refs).
+# CSFs: 106 ACTIVE on disk (79 withdrawn/archived are not committed; doc said 185).
+# Clauses: 498 files on disk (80 fewer than doc).
 python -c "from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader; from pathlib import Path; cl = PreprocCatalogLoader(Path('preproc_out')); print(len(cl.load_subdomains()))" | grep -q "^38$"
 python -c "from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader; from pathlib import Path; cl = PreprocCatalogLoader(Path('preproc_out')); print(len(cl.load_srs()))" | grep -q "^282$"
-python -c "from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader; from pathlib import Path; cl = PreprocCatalogLoader(Path('preproc_out')); print(len(cl.load_sos()))" | grep -q "^338$"
-python -c "from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader; from pathlib import Path; cl = PreprocCatalogLoader(Path('preproc_out')); print(len(cl.load_clauses()))" | grep -q "^578$"
+python -c "from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader; from pathlib import Path; cl = PreprocCatalogLoader(Path('preproc_out')); print(len(cl.load_sos()))" | grep -q "^328$"
+python -c "from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader; from pathlib import Path; cl = PreprocCatalogLoader(Path('preproc_out')); print(len(cl.load_clauses()))" | grep -q "^498$"
 python -c "from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader; from pathlib import Path; cl = PreprocCatalogLoader(Path('preproc_out')); print(len(cl.load_pairs()))" | grep -q "^196$"
-python -c "from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader; from pathlib import Path; cl = PreprocCatalogLoader(Path('preproc_out')); print(len(cl.load_csfs()))" | grep -q "^185$"
+python -c "from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader; from pathlib import Path; cl = PreprocCatalogLoader(Path('preproc_out')); print(len(cl.load_csfs()))" | grep -q "^106$"
 
 # G4 — Specific D-01.1 assertions (per strategy doc)
 python -c "
