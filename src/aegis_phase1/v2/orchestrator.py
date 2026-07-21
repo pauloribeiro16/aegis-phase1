@@ -445,6 +445,15 @@ class Phase1Orchestrator:
         each call. Per-domain results are stored in
         ``state["domain_results"]`` keyed by domain ID.
 
+        CORR-040-T2: when the canonical Phase1Executor is available
+        (i.e. a real LLM invoker is wired and MOCK_LLM is not set), the
+        canonical 5-LLM ``run_phase_1c_map`` is invoked instead — this
+        fires P1C-LLM-01-OVERLAP-CLASSIFICATION per domain with the
+        full input set (case_id + applicable_regs + sub_domain refs).
+        Result is translated into the same ``state["domain_results"]``
+        shape so downstream consumers (Doc 07, Doc 07b, the new
+        DomainActivationContext) don't change.
+
         Raises:
             OllamaUnreachable: Propagated from ``map_single_domain`` when
                 the LLM is unreachable. The whole MAP stage aborts.
@@ -460,6 +469,42 @@ class Phase1Orchestrator:
             OllamaUnreachable,
         )
 
+        # CORR-040-T2: try the canonical P1C-LLM-01 path first
+        executor = self._get_phase1_executor()
+        if executor is not None:
+            try:
+                results = self._map_domains_via_p1c_llm_01(executor)
+                self.state["domain_results"] = results
+                self.state["current_stage"] = "MAPPED"
+                statuses: dict[str, int] = {}
+                for r in results.values():
+                    s = r.get("llm_status", "UNKNOWN")
+                    statuses[s] = statuses.get(s, 0) + 1
+                elapsed = time.time() - start
+                logger.info(
+                    "MAP complete (P1C-LLM-01 canonical): %d domains in %.2fs — statuses=%s",
+                    len(results),
+                    elapsed,
+                    statuses,
+                )
+                self._persist_state()
+                self._seed_review_after_map(results)
+                failed = [d for d, r in results.items() if r.get("llm_status") == "FAILED"]
+                if failed:
+                    raise MapPartialFailure(
+                        f"{len(failed)} domain(s) failed: {failed}"
+                    )
+                return self.state
+            except MapPartialFailure:
+                raise
+            except Exception as exc:
+                logger.warning(
+                    "P1C-LLM-01 MAP path failed (%s) — falling back to legacy loop",
+                    exc,
+                )
+                # Fall through to the legacy loop below.
+
+        # LEGACY path (LLM-A via DomainProcessor)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         processor = DomainProcessor(
             llm_invoker=self.llm_invoker,
@@ -468,8 +513,8 @@ class Phase1Orchestrator:
         )
         domain_ids = [f"D-{i:02d}" for i in range(1, 11)]
 
-        results: dict[str, Any] = dict(self.state.get("domain_results") or {})
-        statuses: dict[str, int] = {}
+        results = dict(self.state.get("domain_results") or {})
+        statuses = {}
         failed_domains: list[str] = []
 
         for did in domain_ids:
@@ -511,6 +556,89 @@ class Phase1Orchestrator:
             )
             raise MapPartialFailure(f"{len(failed_domains)} domain(s) failed: {failed_domains}")
         return self.state
+
+    def _map_domains_via_p1c_llm_01(
+        self,
+        executor: Any,
+    ) -> dict[str, Any]:
+        """CORR-040-T2 helper: invoke the canonical P1C-LLM-01 per domain.
+
+        Calls ``executor.run_phase_1c_map`` once for all 10 lanes, then
+        translates the per-lane result into the same ``DomainResult``
+        shape produced by the legacy ``DomainProcessor.process()`` so
+        downstream consumers (Doc 07, Doc 07b,
+        DomainActivationContext) work unchanged.
+
+        Returns:
+            Mapping ``D-XX`` -> ``DomainResult`` (10 entries).
+        """
+        from aegis_phase1.v2.domain.processor import DOMAIN_NAMES
+
+        # Extract applicable_regs
+        cc_raw = self.state.get("company_context")
+        if hasattr(cc_raw, "model_dump"):
+            cc = cc_raw.model_dump()
+        elif isinstance(cc_raw, dict):
+            cc = dict(cc_raw)
+        else:
+            cc = {}
+        applicable_regs = [
+            str(r) for r in (cc.get("applicable_regs") or []) if r
+        ]
+
+        case_id = Path(self.state.get("case_path") or "case").name
+        lane_outputs = executor.run_phase_1c_map(
+            case_id=case_id,
+            applicable_regs=applicable_regs,
+            company_facts=cc,
+            layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
+        )
+        # Translate executor output → DomainResult shape
+        results: dict[str, Any] = {}
+        for lane in lane_outputs:
+            did = str(lane.get("lane_id") or "")
+            if not did.startswith("D-"):
+                continue
+            status = str(lane.get("status") or "FAILED")
+            sd_activations = lane.get("sub_domain_activations") or []
+            # Build adapted_subdomains_v3 from sub_domain_activations
+            adapted_v3 = []
+            for sd in sd_activations:
+                if not isinstance(sd, dict):
+                    continue
+                adapted_v3.append(
+                    {
+                        "sub_domain_id": sd.get("sub_domain_id", ""),
+                        "reg_pair": sd.get("reg_pair", []),
+                        "company_scope_verdict": sd.get("company_scope_verdict", ""),
+                        "regulatory_baseline_relationship": sd.get(
+                            "regulatory_baseline_relationship", ""
+                        ),
+                        "layer0_refs": sd.get("layer0_refs", []),
+                    }
+                )
+            results[did] = {
+                "domain_id": did,
+                "domain_name": DOMAIN_NAMES.get(did, did),
+                "subdomains": [],
+                "coverage": "SUBSTANTIVE" if adapted_v3 else "NOT_ADDRESSED",
+                "cross_regulation": [],
+                "llm_status": "OK" if status == "OK" else "FAILED",
+                "adapted_objective": "",
+                "adapted_subdomains": [],
+                "adapted_subdomains_v3": adapted_v3,
+                "key_changes": [],
+                "applicable_regs": applicable_regs,
+                "confidence": "UNKNOWN",
+                "latency_ms": int(lane.get("latency_ms") or 0),
+            }
+        # Fill missing lanes (executor may skip failed ones)
+        for did in [f"D-{i:02d}" for i in range(1, 11)]:
+            if did not in results:
+                results[did] = self._failed_domain_result(
+                    did, Exception("P1C-LLM-01 lane missing from executor output")
+                )
+        return results
 
     def map_single_domain(
         self,
