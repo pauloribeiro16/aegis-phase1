@@ -328,7 +328,9 @@ def test_sr_ids_per_pair_is_list(parsed) -> None:
     (may be empty if the pair body doesn't cite any SR-IDs — most pairs
     do, but some legacy files don't)."""
     import re
-    sr_pat = re.compile(r"^SR-[A-Z_]+-\d{3}$")
+    # CORR-035 c3: NIS2 has digits in its canonical name. Use
+    # [A-Za-z0-9_]+ (not [A-Z_]+) to match all 5 regulations.
+    sr_pat = re.compile(r"^SR-[A-Za-z0-9_]+-\d{3}$")
     for p in parsed["pairs"]:
         assert isinstance(p["sr_ids_per_pair"], list)
         for sr_id in p["sr_ids_per_pair"]:

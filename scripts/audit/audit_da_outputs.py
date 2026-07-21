@@ -525,7 +525,7 @@ def audit_da_file(json_path: Path) -> list[Finding]:
             )
         else:
             for sid in sids:
-                if not re.fullmatch(r"SR-[A-Z_]+-\d{3}", sid):
+                if not re.fullmatch(r"SR-[A-Za-z0-9_]+-\d{3}", sid):
                     add(
                         findings,
                         "HIGH",

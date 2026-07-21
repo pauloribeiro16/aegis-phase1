@@ -1363,7 +1363,7 @@ def parse_crossregulation_subdomain(
 
     # Extract SR-XXX-NNN cross-references
     sr_cross_references: list[str] = []
-    for m_sr in re.finditer(r"SR-[A-Z_]+-\d{3}", body):
+    for m_sr in re.finditer(r"SR-[A-Za-z0-9_]+-\d{3}", body):
         sr_id = m_sr.group(0)
         if sr_id not in sr_cross_references:
             sr_cross_references.append(sr_id)
@@ -1498,7 +1498,7 @@ _DEEP_HEADER_RE = re.compile(
 # catch the "Trigger alignment: SAME" / "Tension: NONE" / "Scope overlap: Y"
 # trailing lines.
 _BULLET_RE = re.compile(r"^\s*-\s+([^\n]+)$", re.MULTILINE)
-_SR_RE = re.compile(r"SR-[A-Z_]+-\d{3}")
+_SR_RE = re.compile(r"SR-[A-Za-z0-9_]+-\d{3}")
 _ART_RE = re.compile(r"Art(?:icle)?\.?\s*\d+(?:\([^)]+\))*")
 _ANNEX_RE = re.compile(r"Annex\s+[IVX]+(?:\s+Part\s+[IVX]+)?")
 # Strip leading "- " / "1. " from bullets

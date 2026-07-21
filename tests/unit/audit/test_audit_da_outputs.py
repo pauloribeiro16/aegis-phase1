@@ -13,6 +13,7 @@ Total: 14+ named tests + parametrized expansion = 30+ test cases.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -448,4 +449,57 @@ def test_no_critical_in_real_da_file(da_file: Path) -> None:
     assert not critical, (
         f"{da_file.name}: unexpected CRITICAL findings: "
         + ", ".join(f"{f.code}({f.msg[:60]})" for f in critical)
+    )
+
+
+# ─── Bug C regression: SR regex accepts all 5 reg canonical names ───
+
+
+@pytest.mark.parametrize(
+    "sid",
+    [
+        "SR-GDPR-001",
+        "SR-NIS2-010",  # has digit in reg name — pre-fix bug
+        "SR-CRA-029",
+        "SR-DORA-017",
+        "SR-AI_Act-022",  # has underscore in reg name
+    ],
+)
+def test_sr_id_regex_accepts_all_canonical_names(sid: str) -> None:
+    """CORR-035 c3: the SR-ID regex must accept all 5 reg names.
+
+    Pre-fix: SR-NIS2-NNN failed because [A-Z_]+ didn't accept digits
+    in the reg-name segment.
+    """
+    assert re.fullmatch(r"SR-[A-Za-z0-9_]+-\d{3}", sid), f"{sid!r} not accepted"
+
+
+def test_sr_id_regex_rejects_malformed() -> None:
+    """Negative: regex must reject malformed SR-IDs."""
+    import re
+
+    for bad in ["SR-", "SR-A-1", "SR-GDPR-1", "SR-GDPR-1234", "GDPR-001"]:
+        assert not re.fullmatch(r"SR-[A-Za-z0-9_]+-\d{3}", bad), f"{bad!r} wrongly accepted"
+
+
+def test_no_sr_ids_empty_for_known_class_post_fix() -> None:
+    """Regression: after the SR regex fix, no pair with NIS2 in its
+    block should have sr_ids_per_pair=[] (provided classification is
+    known).
+    """
+    if not DA_DIR.exists():
+        pytest.skip(f"{DA_DIR} not present")
+    proc = _run_audit("--json")
+    payload = json.loads(proc.stdout)
+    # The remaining SR_IDS_EMPTY_FOR_KNOWN_CLASS findings must NOT be
+    # caused by NIS2 (post-fix) — they should be 0 or only non-NIS2.
+    nis2_leak = [
+        f
+        for f in payload["findings"]
+        if f["code"] == "SR_IDS_EMPTY_FOR_KNOWN_CLASS" and "NIS2" in f["path"]
+    ]
+    # Before fix: 7. After fix: 0 (all NIS2 SRs now captured).
+    assert len(nis2_leak) == 0, (
+        f"{len(nis2_leak)} NIS2 pairs still have empty sr_ids_per_pair: "
+        + ", ".join(f["path"] for f in nis2_leak[:5])
     )

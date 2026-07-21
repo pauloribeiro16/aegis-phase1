@@ -277,7 +277,9 @@ def test_sr_ids_per_pair_is_list(parsed) -> None:
         assert isinstance(p["sr_ids_per_pair"], list), (
             f"sr_ids_per_pair not a list for {p['reg_a']}<->{p['reg_b']}"
         )
-        sr_pat = __import__("re").compile(r"^SR-[A-Z_]+-\d{3}$")
+        # CORR-035 c3: NIS2 has digits in its canonical name. Use
+        # [A-Za-z0-9_]+ (not [A-Z_]+) to match all 5 regulations.
+        sr_pat = __import__("re").compile(r"^SR-[A-Za-z0-9_]+-\d{3}$")
         for sr_id in p["sr_ids_per_pair"]:
             assert sr_pat.match(sr_id), f"malformed SR id: {sr_id}"
 
