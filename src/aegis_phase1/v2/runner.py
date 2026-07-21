@@ -198,6 +198,17 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--run-reduce",
+        action="store_true",
+        dest="run_reduce",
+        help=(
+            "CORR-041: Run the REDUCE stage (P1C-LLM-03 strategic "
+            "synthesis + P1C-LLM-02 compound events) and re-render "
+            "Doc 04a + Doc 04b + Doc 04c + Doc 04d. Requires "
+            "MOCK_LLM=true or Ollama running with gemma4:e2b."
+        ),
+    )
+    parser.add_argument(
         "--skip-reduce-llms",
         action="store_true",
         help=(
@@ -416,6 +427,17 @@ def main() -> None:
         for label, p in paths.items():
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
+    elif args.run_reduce:
+        logger.info(
+            "Non-interactive mode — REDUCE only (CORR-041; P1C-LLM-03/02)"
+        )
+        paths = cmd_run_reduce(
+            orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
+        )
+        logger.info("=== REDUCE COMPLETE ===")
+        for label, p in paths.items():
+            print(f"  {label}: {p}")
+        print(f"  total: {len(paths)} artefacts")
     else:
         logger.info("Interactive mode — running wizard (CORR-006)")
         from aegis_phase1.v2.cli.menu import run_wizard
@@ -614,6 +636,71 @@ def cmd_run_map(
         act_ctx.total_lanes,
         act_ctx.failed_lanes,
         act_ctx.total_sub_domain_activations,
+        len(paths),
+    )
+    return paths
+
+
+def cmd_run_reduce(
+    *,
+    orch: "Phase1Orchestrator",
+    case_path: str,
+    prep_path: str,
+    output_path: str,
+) -> dict[str, str]:
+    """CORR-041-T4: run the REDUCE stage (P1C-LLM-03 + P1C-LLM-02).
+
+    Loads the v2 state, calls ``orch.reduce()`` (which dispatches
+    to P1C-LLM-03 then P1C-LLM-02 via the Phase1Executor), then
+    re-renders the 4 enhanced docs (04a, 04b, 04c, 04d) so they
+    surface the synthesis prose + compound events.
+
+    With MOCK_LLM=true the executor is skipped (by design),
+    the deterministic reduce path runs (concat / merge / conflicts /
+    proportionality), and the 4 docs render with empty synthesis
+    placeholders + the Track B profile populated.
+
+    Returns:
+        Mapping of the 4 AEGIS-P1-04{a,b,c,d} keys to absolute file
+        paths.
+    """
+    out_dir = Path(output_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load v2 state
+    orch.load(case_path, prep_path)
+
+    # REDUCE stage (P1C-LLM-03 + P1C-LLM-02 via Phase1Executor)
+    try:
+        orch.reduce()
+    except Exception as exc:
+        logger.warning("cmd_run_reduce: reduce() raised: %s — continuing to render", exc)
+
+    # Re-render Doc 04a-d so they surface the synthesis + compound events
+    paths: dict[str, str] = {}
+    for label, fn in (
+        ("04a", orch.render_doc_04a),
+        ("04b", orch.render_doc_04b),
+        ("04c", orch.render_doc_04c),
+        ("04d", orch.render_doc_04d),
+    ):
+        try:
+            result = fn(orch.state, str(out_dir))
+            if isinstance(result, dict):
+                paths.update(result)
+        except Exception as exc:
+            logger.warning("cmd_run_reduce: render_doc_%s failed: %s", label, exc)
+    orch.state["output_paths"] = dict(orch.state.get("output_paths", {}), **paths)
+
+    # Summary line with SynthesisContext
+    from aegis_phase1.v2.context import build_synthesis_context
+
+    ctx = build_synthesis_context(orch.state)
+    logger.info(
+        "cmd_run_reduce: status=%s, %d compound events, %d per-reg rationale, %d artefacts",
+        ctx.status,
+        ctx.compound_event_count(),
+        ctx.per_reg_count(),
         len(paths),
     )
     return paths
