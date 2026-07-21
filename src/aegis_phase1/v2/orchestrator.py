@@ -242,6 +242,16 @@ class Phase1Orchestrator:
         self.state["regulations"] = common.get("regulations", [])
 
         subdomains_path = Path(regulatory_baseline_path) / "SubDomains"
+        # CORR-037-T3b (deferred to T3c): prefer PreprocCatalogLoader (typed
+        # Pydantic) when injected. NOT YET — the new Pydantic Subdomain has
+        # a different field shape (hso_hl / hso_per_reg / participating_regulations
+        # / pairs / csf_hint) than the legacy SubDomainDef (section2_hso /
+        # section3_requirements / per_reg_sos) consumed by
+        # v2.domain.filters.subdomains._summarize. Migrating the consumer to
+        # the new shape is a separate T3c task. Until then, v1 SubDomainLoader
+        # remains the source of truth for state["subdomains"]. The
+        # preproc_catalog still populates state["v2_subdomains"] (list
+        # of Pydantic Subdomain) for future consumers (T3c + SP-D).
         self.state["subdomains"] = subdomain_loader.load(str(subdomains_path))
 
         self.state["preprocessing"] = preprocessing_loader.load(regulatory_baseline_path)
