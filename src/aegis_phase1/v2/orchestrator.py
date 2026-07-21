@@ -110,6 +110,70 @@ class Phase1Orchestrator:
         """
         self._skip_reduce_llms = bool(skip)
 
+    def _load_v2_catalog(self, case_path: str) -> None:
+        """CORR-037-T3a: populate v2_* state keys from typed loaders (opt-in).
+
+        New state keys (all Pydantic models; consumers must .field access):
+          - v2_company_profile    : CompanyProfile     (case inputs summary)
+          - v2_company_facts     : CompanyFacts       (canonical facts)
+          - v2_applicable_regs   : list[str]          (sorted, computed)
+          - v2_declared_regs     : list[str]          (from YAML)
+          - v2_obligated_party   : dict[str, str]     (reg → party)
+          - v2_subdomains        : list[Subdomain]    (38)
+          - v2_srs               : list[SR]           (282)
+          - v2_sos               : list[SO]           (328)
+          - v2_pairs             : list[Pair]         (196)
+          - v2_audit_both_pass   : bool               (gate)
+
+        All keys are populated ONLY when the corresponding loader is
+        injected via the constructor. When loaders are None, this method
+        is a no-op and the v1 legacy state keys remain the only data.
+        """
+        if self.case_profile_loader is not None:
+            try:
+                profile = self.case_profile_loader.load()
+                self.state["v2_company_profile"] = profile
+                self.state["v2_company_facts"] = profile.company
+                self.state["v2_applicable_regs"] = list(profile.applicable_regs)
+                self.state["v2_declared_regs"] = list(profile.declared_applicable_regs)
+                self.state["v2_obligated_party"] = dict(profile.regulatory.obligated_party_per_reg)
+                logger.debug(
+                    "T3a: case_profile loaded — %d stakeholders, %d goals, %d architecture sections",
+                    len(profile.stakeholders),
+                    len(profile.business_goals),
+                    sum(
+                        len(getattr(profile.architecture, attr))
+                        for attr in (
+                            "systems",
+                            "auth_systems",
+                            "cloud_services",
+                            "data_flows",
+                            "data_stores",
+                        )
+                    ),
+                )
+            except Exception as e:
+                logger.warning("T3a: case_profile_loader failed (%s) — v2_* keys not set", e)
+
+        if self.preproc_catalog is not None:
+            try:
+                self.state["v2_subdomains"] = self.preproc_catalog.load_subdomains()
+                self.state["v2_srs"] = self.preproc_catalog.load_srs()
+                self.state["v2_sos"] = self.preproc_catalog.load_sos()
+                self.state["v2_pairs"] = self.preproc_catalog.load_pairs()
+                audit = self.preproc_catalog.load_audit()
+                self.state["v2_audit_both_pass"] = audit.both_pass
+                logger.debug(
+                    "T3a: preproc_catalog loaded — %d subs, %d srs, %d sos, %d pairs, audit.both_pass=%s",
+                    len(self.state["v2_subdomains"]),
+                    len(self.state["v2_srs"]),
+                    len(self.state["v2_sos"]),
+                    len(self.state["v2_pairs"]),
+                    audit.both_pass,
+                )
+            except Exception as e:
+                logger.warning("T3a: preproc_catalog failed (%s) — v2_* keys not set", e)
+
     def set_skip_phase_1b(self, skip: bool) -> None:
         """Toggle skipping of Phase 1B RATIONALE LLM calls. Default: False.
 
@@ -182,6 +246,14 @@ class Phase1Orchestrator:
 
         self.state["preprocessing"] = preprocessing_loader.load(regulatory_baseline_path)
 
+        # CORR-037-T3a: ADDITIVE wiring of v2 typed loaders (opt-in via
+        # constructor). When self.case_profile_loader / self.preproc_catalog
+        # are provided, populate ADDITIONAL state keys (v2_*) for new
+        # consumers (SP-B/C/D/E). The 7 legacy keys above remain untouched
+        # for backwards compatibility with the v1 loaders' consumers.
+        # Migration of consumers from legacy to v2_* happens in T3c.
+        self._load_v2_catalog(case_path)
+
         self.state["current_stage"] = "LOADED"
         self.state["case_path"] = case_path
         # State key retains 'preprocessing_path' for backward compatibility
@@ -240,9 +312,7 @@ class Phase1Orchestrator:
             try:
                 result = self.map_single_domain(did, processor=processor)
             except OllamaUnreachable as exc:
-                logger.error(
-                    "MAP aborted — Ollama unreachable on %s: %s", did, exc
-                )
+                logger.error("MAP aborted — Ollama unreachable on %s: %s", did, exc)
                 self.state["domain_results"] = results
                 self.state["current_stage"] = "MAP_FAILED"
                 self._persist_state()
@@ -275,9 +345,7 @@ class Phase1Orchestrator:
                 len(failed_domains),
                 failed_domains,
             )
-            raise MapPartialFailure(
-                f"{len(failed_domains)} domain(s) failed: {failed_domains}"
-            )
+            raise MapPartialFailure(f"{len(failed_domains)} domain(s) failed: {failed_domains}")
         return self.state
 
     def map_single_domain(
@@ -322,9 +390,7 @@ class Phase1Orchestrator:
             processor.config = config
         return processor.process(domain_id, self.state)
 
-    def _failed_domain_result(
-        self, domain_id: str, exc: Exception
-    ) -> dict[str, Any]:
+    def _failed_domain_result(self, domain_id: str, exc: Exception) -> dict[str, Any]:
         """Build the FAILED ``DomainResult`` dict for a domain whose processing raised.
 
         Extracted from the inline construction in the legacy
@@ -391,9 +457,7 @@ class Phase1Orchestrator:
                 result = processor.process(did, self.state)
             except Exception as exc:
                 logger.exception("retry_failed: %s raised: %s", did, exc)
-                raise MapPartialFailure(
-                    f"Retry aborted for {did}: {exc}"
-                ) from exc
+                raise MapPartialFailure(f"Retry aborted for {did}: {exc}") from exc
             results[did] = result
             status = result.get("llm_status", "UNKNOWN")
             statuses[status] = statuses.get(status, 0) + 1
@@ -409,9 +473,7 @@ class Phase1Orchestrator:
                 len(failed),
                 failed,
             )
-            raise MapPartialFailure(
-                f"{len(failed)} domain(s) still failing after retry: {failed}"
-            )
+            raise MapPartialFailure(f"{len(failed)} domain(s) still failing after retry: {failed}")
         logger.info("Retry complete — statuses=%s", statuses)
         return self.state
 
@@ -487,9 +549,7 @@ class Phase1Orchestrator:
         resolved = resolve_conflicts(merged, ambiguities)
         profile = apply_proportionality(merged, self.state.get("company_context"))
 
-        profile_data = (
-            profile.get("profile", {}) if isinstance(profile, dict) else profile
-        )
+        profile_data = profile.get("profile", {}) if isinstance(profile, dict) else profile
         self.state["aggregated_data"] = {
             "concatenated": concatenated,
             "merged": merged,
@@ -501,9 +561,7 @@ class Phase1Orchestrator:
         self.state["current_stage"] = "REDUCED"
         return profile_data if isinstance(profile_data, dict) else None
 
-    def reduce_synthesis(
-        self, *, config: dict[str, Any] | None = None
-    ) -> dict[str, Any] | None:
+    def reduce_synthesis(self, *, config: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """P1C-LLM-03 STRATEGIC SYNTHESIS reduce step.
 
         Granular method extracted from :meth:`reduce` (CORR-018a S1).
@@ -535,14 +593,10 @@ class Phase1Orchestrator:
             {
                 "lane_id": lane_id,
                 "sub_domain_activations": (
-                    lane_result.get("subdomains") or []
-                    if isinstance(lane_result, dict)
-                    else []
+                    lane_result.get("subdomains") or [] if isinstance(lane_result, dict) else []
                 ),
             }
-            for lane_id, lane_result in (
-                self.state.get("domain_results") or {}
-            ).items()
+            for lane_id, lane_result in (self.state.get("domain_results") or {}).items()
         ]
 
         raw_company_context = self.state.get("company_context")
@@ -553,11 +607,7 @@ class Phase1Orchestrator:
         else:
             company_context = {}
 
-        applicable_regs = [
-            str(reg)
-            for reg in company_context.get("applicable_regs", [])
-            if reg
-        ]
+        applicable_regs = [str(reg) for reg in company_context.get("applicable_regs", []) if reg]
         if not applicable_regs:
             applicability = company_context.get("applicable_regulations", [])
             if isinstance(applicability, list):
@@ -574,18 +624,11 @@ class Phase1Orchestrator:
             run_result = executor.run_phase_1c_reduce(
                 case_id=case_id,
                 lane_outputs=lane_outputs,
-                sync_result={
-                    "conflicts": self.state["aggregated_data"].get(
-                        "conflicts", []
-                    )
-                    or []
-                },
+                sync_result={"conflicts": self.state["aggregated_data"].get("conflicts", []) or []},
                 track_b_profile=self.state["aggregated_data"].get("profile", {}),
                 applicable_regs=applicable_regs,
                 company_facts=company_context,
-                layer0_subdomain_refs=list(
-                    (self.state.get("subdomains") or {}).keys()
-                ),
+                layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
                 config=config,
             )
         except Exception as exc:
@@ -610,9 +653,7 @@ class Phase1Orchestrator:
             self.state["aggregated_data"]["synthesis"] = synthesis
         return synthesis if isinstance(synthesis, dict) else None
 
-    def reduce_compound(
-        self, *, config: dict[str, Any] | None = None
-    ) -> dict[str, Any] | None:
+    def reduce_compound(self, *, config: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """P1C-LLM-02 COMPOUND EVENTS reduce step.
 
         Granular method extracted from :meth:`reduce` (CORR-018a S1).
@@ -703,8 +744,7 @@ class Phase1Orchestrator:
             executor = invoker_to_executor(p1_invoker)
             self._phase1_executor_cached = executor
             logger.info(
-                "REDUCE-LLM Phase1Executor instantiated: model=%s (source=%s, "
-                "invoker_type=%s)",
+                "REDUCE-LLM Phase1Executor instantiated: model=%s (source=%s, " "invoker_type=%s)",
                 configured_model,
                 model_source,
                 type(self.llm_invoker).__name__,
@@ -755,9 +795,7 @@ class Phase1Orchestrator:
                 result = fn(self.state, output_dir)
             except Exception as exc:
                 logger.exception("OUTPUT (deterministic): renderer %s failed", label)
-                self.state.setdefault("errors", []).append(
-                    f"output:{label}: {exc!s}"
-                )
+                self.state.setdefault("errors", []).append(f"output:{label}: {exc!s}")
                 continue
             if isinstance(result, dict):
                 paths.update(result)
@@ -837,9 +875,7 @@ class Phase1Orchestrator:
                 result = fn(self.state, output_dir)
             except Exception as exc:
                 logger.exception("OUTPUT (enhanced): renderer %s failed", label)
-                self.state.setdefault("errors", []).append(
-                    f"output:{label}: {exc!s}"
-                )
+                self.state.setdefault("errors", []).append(f"output:{label}: {exc!s}")
                 continue
             if isinstance(result, dict):
                 paths.update(result)
@@ -1083,8 +1119,7 @@ class Phase1Orchestrator:
         executor = self._get_phase1_executor()
         if executor is None:
             logger.info(
-                "Phase 1B RATIONALE skipped (deterministic/mock "
-                "mode or --skip-phase-1b flag)"
+                "Phase 1B RATIONALE skipped (deterministic/mock " "mode or --skip-phase-1b flag)"
             )
             self.state["aggregated_data"]["rationale_by_reg"] = None
             self._persist_state()
@@ -1114,9 +1149,7 @@ class Phase1Orchestrator:
                         regs.append(str(entry["abbreviation"]))
 
         if not regs:
-            logger.warning(
-                "Phase 1B RATIONALE skipped: no applicable regulations"
-            )
+            logger.warning("Phase 1B RATIONALE skipped: no applicable regulations")
             self.state["aggregated_data"]["rationale_by_reg"] = {}
             self._persist_state()
             return self.state
@@ -1132,17 +1165,14 @@ class Phase1Orchestrator:
                     reg_id,
                     exc,
                 )
-                self.state.setdefault("errors", []).append(
-                    f"phase_1b:{reg_id}: {exc}"
-                )
+                self.state.setdefault("errors", []).append(f"phase_1b:{reg_id}: {exc}")
                 continue
             if isinstance(per_reg_synth, dict) and per_reg_synth:
                 synth_by_reg[reg_id] = per_reg_synth
 
         self.state["aggregated_data"]["rationale_by_reg"] = synth_by_reg
         logger.info(
-            "Phase 1B RATIONALE complete for %d regulation(s) "
-            "(status=%s)",
+            "Phase 1B RATIONALE complete for %d regulation(s) " "(status=%s)",
             len(synth_by_reg),
             last_status,
         )
@@ -1219,9 +1249,7 @@ class Phase1Orchestrator:
             company_facts=cc,
             coverage_matrix_row=coverage_rows,
             aggregated_activations=aggregated_activations,
-            layer0_subdomain_refs=list(
-                (self.state.get("subdomains") or {}).keys()
-            ),
+            layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
             classification={
                 "role": cc.get("role") or cc.get("obligated_party") or "controller",
                 "tier": cc.get("complexity_tier") or "LOW",

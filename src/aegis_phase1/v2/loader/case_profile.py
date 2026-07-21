@@ -1,4 +1,4 @@
-"""CORR-037-T2: CaseProfileLoader — loads case-specific inputs into CompanyContext.
+"""CORR-037-T2: CaseProfileLoader — loads case-specific inputs into CompanyProfile.
 
 Reads from `cases/<case>/input/` (treated as read-only per AGENTS.md §0):
   - company/classification.yaml   (canonical — see contract §T2)
@@ -8,7 +8,7 @@ Reads from `cases/<case>/input/` (treated as read-only per AGENTS.md §0):
   - architecture/*.yaml          (5 files: auth_systems, cloud_services,
                                   data_flows, data_stores, systems)
 
-Produces a `CompanyContext` Pydantic with:
+Produces a `CompanyProfile` Pydantic with:
   - company (CompanyFacts from classification.yaml)
   - applicability_predicates (derived from applicable_regs)
   - applicable_regs (computed)
@@ -151,7 +151,7 @@ class RegulatoryFacts(_TolerantModel):
     clause_count_per_reg: dict[str, int] = Field(default_factory=dict)
 
 
-class CompanyContext(_TolerantModel):
+class CompanyProfile(_TolerantModel):
     """Top-level case context produced by CaseProfileLoader.
 
     Consumed by:
@@ -210,7 +210,7 @@ def _symmetric_diff(a: list[str], b: list[str]) -> list[str]:
 
 
 class CaseProfileLoader:
-    """Loads a case directory into a typed CompanyContext.
+    """Loads a case directory into a typed CompanyProfile.
 
     Reads from:
       cases/<case>/input/company/{classification,business_goals,stakeholders}.yaml
@@ -316,8 +316,8 @@ class CaseProfileLoader:
     # -- main entrypoint --------------------------------------------------
 
     @functools_cache  # noqa: B019  (intentional: case_path is the cache key)
-    def load(self) -> CompanyContext:
-        """Load all case inputs and return a typed CompanyContext.
+    def load(self) -> CompanyProfile:
+        """Load all case inputs and return a typed CompanyProfile.
 
         `functools.cache` keyed by `self` (each loader instance is fresh per
         call site, so the cache is effectively per-load — the goal here is
@@ -348,7 +348,7 @@ class CaseProfileLoader:
             declared_non_applicable = sorted(all_regs - set(computed_applicable))
         regulatory_facts.non_applicable = declared_non_applicable
 
-        return CompanyContext(
+        return CompanyProfile(
             case_path=str(self.case_path),
             company=company,
             applicability_predicates=predicates,
@@ -368,7 +368,7 @@ __all__ = [
     "ArchitectureFacts",
     "BusinessGoal",
     "CaseProfileLoader",
-    "CompanyContext",
+    "CompanyProfile",
     "CompanyFacts",
     "DeclaredRegulation",
     "RegulatoryFacts",
