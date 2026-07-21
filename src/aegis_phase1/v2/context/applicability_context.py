@@ -216,6 +216,11 @@ def build_applicability_context(state: dict[str, Any]) -> ApplicabilityContext:
     facts_obj = state.get("v2_company_facts")
     profile_obj = state.get("v2_company_profile")
     regulatory_obj = state.get("regulatory")  # RegulatoryFacts (v1 or from T4b shim)
+    # CORR-038-T2: also read the v2 keys populated by the orchestrator
+    # (v2_regulatory_rationale + v2_clause_count_per_reg) so we don't
+    # require a v1 shim.
+    v2_rationale = state.get("v2_regulatory_rationale") or {}
+    v2_clause_count = state.get("v2_clause_count_per_reg") or {}
 
     if facts_obj is not None:
         company_facts_dict: dict[str, Any] = (
@@ -248,12 +253,17 @@ def build_applicability_context(state: dict[str, Any]) -> ApplicabilityContext:
             set(v1_applicable_from_cc) | set(v2_applicable_pre)
         )
 
-    # Declared: from regulatory.applicable (preferred) or v2_applicable_pre
+    # Declared: from regulatory.applicable (preferred) or v2_declared_regs
+    # (added in T2) or v2_applicable_pre
     declared_applicable: list[str] = []
     if regulatory_obj is not None and hasattr(regulatory_obj, "applicable"):
         declared_applicable = list(regulatory_obj.applicable or [])
     if not declared_applicable:
-        declared_applicable = list(v2_applicable_pre)
+        v2_declared = state.get("v2_declared_regs") or []
+        if v2_declared:
+            declared_applicable = list(v2_declared)
+        else:
+            declared_applicable = list(v2_applicable_pre)
 
     # Declaration gaps
     gaps = _compute_declaration_gaps(applicable_computed, declared_applicable)
@@ -282,11 +292,15 @@ def build_applicability_context(state: dict[str, Any]) -> ApplicabilityContext:
     rationale: dict[str, str] = {}
     if regulatory_obj is not None and hasattr(regulatory_obj, "applicability_rationale"):
         rationale = {str(k): str(v) for k, v in (regulatory_obj.applicability_rationale or {}).items()}
+    elif v2_rationale:
+        rationale = {str(k): str(v) for k, v in v2_rationale.items()}
 
     # Clause count
     clause_count: dict[str, int] = {}
     if regulatory_obj is not None and hasattr(regulatory_obj, "clause_count_per_reg"):
         clause_count = {str(k): int(v) for k, v in (regulatory_obj.clause_count_per_reg or {}).items() if isinstance(v, (int, float))}
+    elif v2_clause_count:
+        clause_count = {str(k): int(v) for k, v in v2_clause_count.items() if isinstance(v, (int, float))}
 
     # Tier
     tier = _estimate_tier(company_facts_dict, len(applicable_computed))
