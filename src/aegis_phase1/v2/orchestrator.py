@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Any, cast
 from aegis_phase1.v2.state import V2State
 
 if TYPE_CHECKING:
+    from aegis_phase1.prompts_v2.catalog import CatalogLoader
     from aegis_phase1.prompts_v2.phase1_executor import Phase1Executor
     from aegis_phase1.v2.loader.case_profile import CaseProfileLoader
     from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader
@@ -57,6 +58,7 @@ class Phase1Orchestrator:
         *,
         preproc_catalog: "PreprocCatalogLoader | None" = None,
         case_profile_loader: "CaseProfileLoader | None" = None,
+        catalog_loader: "CatalogLoader | None" = None,
     ):
         """Initialize the orchestrator.
 
@@ -71,6 +73,11 @@ class Phase1Orchestrator:
                 to the v1 loaders (CommonLoader, legacy PreprocessingLoader).
             case_profile_loader: CORR-037-T2 typed YAML loader for case
                 inputs. Optional. Same opt-in pattern as preproc_catalog.
+            catalog_loader: CORR-039-T1 CatalogLoader for tipo2/tipo3 YAML
+                catalogs (from ``Methodology-main/00_METHODOLOGY/PROMPTS/catalogs/``).
+                Optional. When provided, ``_load_v2_catalog`` populates
+                ``state["v2_catalog_tipo2"]`` and ``state["v2_catalog_tipo3"]``
+                for use by P1B-LLM-01 in Phase 1B (CORR-039-T4).
         """
         self.state: V2State = self._init_state()
         self.work_dir = Path(work_dir)
@@ -79,6 +86,11 @@ class Phase1Orchestrator:
         # CORR-037-T3: typed loaders (opt-in). Full wiring in follow-up.
         self.preproc_catalog = preproc_catalog
         self.case_profile_loader = case_profile_loader
+        # CORR-039-T1: catalog loader for tipo2/tipo3 YAMLs
+        self.catalog_loader = catalog_loader
+        # Stash the preproc_catalog reference in state so the T2
+        # ClauseMappingContext builder can call load_clauses() lazily.
+        # Set in _load_v2_catalog — see T1 branch below.
         self._skip_reduce_llms = False
         self._skip_phase_1b = False
         self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
@@ -168,6 +180,10 @@ class Phase1Orchestrator:
                 self.state["v2_pairs"] = self.preproc_catalog.load_pairs()
                 audit = self.preproc_catalog.load_audit()
                 self.state["v2_audit_both_pass"] = audit.both_pass
+                # CORR-039-T1: stash the loader reference so the
+                # ClauseMappingContext builder (T2) can call load_clauses()
+                # lazily without re-instantiating the loader.
+                self.state["v2_preproc_catalog_ref"] = self.preproc_catalog
                 logger.debug(
                     "T3a: preproc_catalog loaded — %d subs, %d srs, %d sos, %d pairs, audit.both_pass=%s",
                     len(self.state["v2_subdomains"]),
@@ -178,6 +194,30 @@ class Phase1Orchestrator:
                 )
             except Exception as e:
                 logger.warning("T3a: preproc_catalog failed (%s) — v2_* keys not set", e)
+
+        # CORR-039-T1: load tipo2 + tipo3 catalogs (filter for P1B-LLM-01)
+        if self.catalog_loader is not None:
+            try:
+                self.state["v2_catalog_tipo2"] = self.catalog_loader.load(
+                    "tipo2_interpretations"
+                )
+                self.state["v2_catalog_tipo3"] = self.catalog_loader.load(
+                    "tipo3_derogations"
+                )
+                logger.debug(
+                    "T1: catalogs loaded — tipo2=%d entries, tipo3=%d entries",
+                    len(self.state["v2_catalog_tipo2"]),
+                    len(self.state["v2_catalog_tipo3"]),
+                )
+            except Exception as e:
+                # Empty catalogs (file missing) is a valid state — fall
+                # back to empty lists so downstream LLM calls proceed.
+                logger.info(
+                    "T1: catalog_loader returned no entries (%s) — using empty lists",
+                    e,
+                )
+                self.state["v2_catalog_tipo2"] = []
+                self.state["v2_catalog_tipo3"] = []
 
         # CORR-037-T4b: SHIM — populate legacy v1 state keys from v2 sources
         # so the 8 output consumers (doc_04*.py, doc_05..07.py, xlsx_generator.py)

@@ -247,7 +247,24 @@ def main() -> None:
     logger.info("Output path: %s", output_path)
 
     llm_invoker = build_llm_invoker(model=args.model)
-    orch = Phase1Orchestrator(llm_invoker=llm_invoker)
+    # CORR-039-T1: inject typed loaders so _load_v2_catalog actually
+    # populates v2_subdomains / v2_srs / v2_sos / v2_pairs / v2_catalog_*.
+    # Pre-CORR-039 the runner passed only llm_invoker — every v2_* key
+    # stayed empty and the v1-compat shim produced a hollow state.
+    from aegis_phase1.prompts_v2.catalog import CatalogLoader
+    from aegis_phase1.prompts_v2.factory import get_prompts_root
+    from aegis_phase1.v2.loader.case_profile import CaseProfileLoader
+    from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader
+
+    preproc_catalog = PreprocCatalogLoader(preproc_root="preproc_out")
+    case_profile_loader = CaseProfileLoader(Path(args.case))
+    catalog_loader = CatalogLoader(root=get_prompts_root() / "catalogs")
+    orch = Phase1Orchestrator(
+        llm_invoker=llm_invoker,
+        preproc_catalog=preproc_catalog,
+        case_profile_loader=case_profile_loader,
+        catalog_loader=catalog_loader,
+    )
     if args.skip_reduce_llms:
         orch.set_skip_reduce_llms(True)
     if getattr(args, "skip_phase_1b", False):
