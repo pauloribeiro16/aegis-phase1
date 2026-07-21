@@ -182,20 +182,24 @@ def _parse_sub_domain_activations(
         else:
             reg_pair = []
         # company_scope_verdict: APPLICABLE / NOT_APPLICABLE / INDETERMINATE
-        verdict = str(
-            raw.get("company_scope_verdict")
-            or raw.get("verdict")
-            or raw.get("applicable")
-            or "INDETERMINATE"
-        )
-        if verdict.lower() in ("true", "yes", "1"):
-            verdict = "APPLICABLE"
-        elif verdict.lower() in ("false", "no", "0"):
-            verdict = "NOT_APPLICABLE"
+        # Use 'in' checks (not truthiness) so that explicit False is honoured.
+        if "company_scope_verdict" in raw:
+            verdict = str(raw["company_scope_verdict"])
+        elif "verdict" in raw:
+            verdict = str(raw["verdict"])
+        elif "applicable" in raw:
+            verdict = "APPLICABLE" if raw["applicable"] else "NOT_APPLICABLE"
         else:
-            verdict = verdict.upper()
-            if verdict not in ("APPLICABLE", "NOT_APPLICABLE", "INDETERMINATE"):
-                verdict = "INDETERMINATE"
+            verdict = "INDETERMINATE"
+        verdict_norm = verdict.strip().lower()
+        if verdict_norm in ("true", "yes", "1", "applicable"):
+            verdict = "APPLICABLE"
+        elif verdict_norm in ("false", "no", "0", "not_applicable", "not-applicable"):
+            verdict = "NOT_APPLICABLE"
+        elif verdict_norm in ("indeterminate", "unknown"):
+            verdict = "INDETERMINATE"
+        else:
+            verdict = "INDETERMINATE"  # default for unrecognized values
         out.append(
             SubDomainActivation(
                 sub_domain_id=sd_id,
