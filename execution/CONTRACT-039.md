@@ -865,3 +865,17 @@ semântico ≤ threshold contra
   canónica end-to-end do pipeline v2** (P1B-LLM-01 invocado via
   runner com catálogos filtrados). Implementação começa em sessão
   seguinte.
+
+---
+
+## Verdict pós-execução (CORR-042, 2026-07-21)
+
+**Status:** ✅ PASS
+
+**Evidence:**
+- Run end-to-end REAL (sem MOCK_LLM) com Ollama gemma4:e2b
+- Gates executados em: feature/aegis-p1-corr-042 @ commit de T7
+- Parity report: logs/phase1/corr042_parity_report.md
+- Run logs: logs/phase1/corr042_run_*.log
+- Errors post-mortem: logs/phase1/corr042_errors.md
+Parity 9/9 PASS. CORR-039 (ClauseMappingContext + Doc 06 + runner wiring + P1B-LLM-01) — Doc 06 com 222 rows (150 CRA + 72 GDPR); logs/phase1/llm-calls.jsonl confirma 4 P1B-LLM calls (P1B-LLM-01 + P1B-LLM-02 × 2 regs) all OK com tipo2 (8) + tipo3 (6) catalog content.

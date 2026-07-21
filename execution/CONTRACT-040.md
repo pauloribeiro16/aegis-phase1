@@ -208,3 +208,17 @@ Strategy: SP-D closed. Next: **CORR-041** (SynthesisContext + P1C-LLM-03/02 + P1
 
 - 2026-07-21: v1.0 — contract created after CORR-039 (PR #33 open).
   Branch `feature/aegis-p1-corr-040` to be based on CORR-039 tip.
+
+---
+
+## Verdict pós-execução (CORR-042, 2026-07-21)
+
+**Status:** ⚠️ PARTIAL (P1C-LLM-01 canonical path deferred to CORR-043; legacy LLM-A fallback works)
+
+**Evidence:**
+- Run end-to-end REAL (sem MOCK_LLM) com Ollama gemma4:e2b
+- Gates executados em: feature/aegis-p1-corr-042 @ commit de T7
+- Parity report: logs/phase1/corr042_parity_report.md
+- Run logs: logs/phase1/corr042_run_*.log
+- Errors post-mortem: logs/phase1/corr042_errors.md
+Parity 9/9 PASS. CORR-040 (DomainActivationContext + P1C-LLM-01 + --run-map) — 10/10 MAP lanes OK em 364s; legacy LLM-A loop (com inputs.py fix) usado como fallback. P1C-LLM-01 canonical path deferred to CORR-043 (input shape mismatch).
