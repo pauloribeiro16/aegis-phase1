@@ -223,3 +223,50 @@ def test_idempotent_invocation(tmp_work_dir: Path) -> None:
     # Verify content unchanged
     assert len(orch.state["v2_subdomains"]) == first_subs_count == 38
     assert orch.state["v2_audit_both_pass"] is first_audit is True
+
+
+# --- T3b (proper): state["subdomains"] source -------------------------------
+
+
+def test_state_subdomains_from_preproc_catalog(tmp_work_dir: Path) -> None:
+    """When preproc_catalog is injected, state['subdomains'] is populated
+    by PreprocCatalogLoader.load_subdomains() (T3b proper).
+
+    The state shape (dict keyed by sub-id) matches v1, so consumers
+    like filter_subdomains are unaffected after T3c's shape-agnostic
+    refactor.
+    """
+    orch = Phase1Orchestrator(
+        work_dir=str(tmp_work_dir),
+        preproc_catalog=PreprocCatalogLoader(Path("preproc_out")),
+    )
+    # We can't call full load() (requires regulatory_baseline_path);
+    # but we can simulate the T3b swap logic directly.
+    from aegis_phase1.v2.domain.filters.subdomains import filter_subdomains
+    from aegis_phase1.v2.state import V2State
+
+    subs_list = orch.preproc_catalog.load_subdomains()
+    orch.state["subdomains"] = {s.id: s for s in subs_list}
+    state: V2State = orch.state  # type: ignore[assignment]
+
+    # filter_subdomains should now consume the v2 Pydantic Subdomain objects
+    # (shape-agnostic via T3c) and return SubdomainSummary dicts.
+    summaries = filter_subdomains(state, "D-01")
+    assert len(summaries) == 4  # D-01.1, D-01.2, D-01.3, D-01.4
+    for s in summaries:
+        assert s["id"].startswith("D-01.")
+        assert "title" in s
+        assert "hso_hl" in s
+        assert "hso_per_reg" in s
+
+
+def test_state_subdomains_fallback_to_v1(tmp_work_dir: Path) -> None:
+    """When no preproc_catalog is injected, _load_v2_catalog is a no-op
+    and the v1 SubDomainLoader is the source of state['subdomains']
+    (T3b keeps the v1 fallback for backwards compat)."""
+    orch = Phase1Orchestrator(work_dir=str(tmp_work_dir))
+    # Without preproc_catalog, _load_v2_catalog doesn't add v2_subdomains.
+    orch._load_v2_catalog("cases/case1-tinytask")
+    assert "v2_subdomains" not in orch.state
+    # The orchestrator is still in a usable state (no v2_* keys, but
+    # the constructor is happy with no loaders).

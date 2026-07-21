@@ -242,17 +242,20 @@ class Phase1Orchestrator:
         self.state["regulations"] = common.get("regulations", [])
 
         subdomains_path = Path(regulatory_baseline_path) / "SubDomains"
-        # CORR-037-T3b (deferred to T3c): prefer PreprocCatalogLoader (typed
-        # Pydantic) when injected. NOT YET — the new Pydantic Subdomain has
-        # a different field shape (hso_hl / hso_per_reg / participating_regulations
-        # / pairs / csf_hint) than the legacy SubDomainDef (section2_hso /
-        # section3_requirements / per_reg_sos) consumed by
-        # v2.domain.filters.subdomains._summarize. Migrating the consumer to
-        # the new shape is a separate T3c task. Until then, v1 SubDomainLoader
-        # remains the source of truth for state["subdomains"]. The
-        # preproc_catalog still populates state["v2_subdomains"] (list
-        # of Pydantic Subdomain) for future consumers (T3c + SP-D).
-        self.state["subdomains"] = subdomain_loader.load(str(subdomains_path))
+        # CORR-037-T3b (proper): prefer PreprocCatalogLoader (typed Pydantic)
+        # when injected. T3c made the consumer shape-agnostic, so v2 Pydantic
+        # Subdomain objects (with hso_hl / hso_per_reg / security_requirements
+        # / pairs) are now transparently normalized to the v1 SubDomainDef
+        # shape by v2.domain.filters.subdomains._summarize.
+        # Fall back to v1 SubDomainLoader (regex-parsed MD) for backwards
+        # compatibility when no preproc_catalog is injected.
+        if self.preproc_catalog is not None:
+            subs_list = self.preproc_catalog.load_subdomains()
+            # Re-key the list into dict[str, Subdomain] (Pydantic instances)
+            # to match the v1 state shape (dict keyed by sub-id).
+            self.state["subdomains"] = {s.id: s for s in subs_list}
+        else:
+            self.state["subdomains"] = subdomain_loader.load(str(subdomains_path))
 
         self.state["preprocessing"] = preprocessing_loader.load(regulatory_baseline_path)
 

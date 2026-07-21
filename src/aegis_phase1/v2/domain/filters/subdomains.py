@@ -116,7 +116,10 @@ def filter_subdomains(state: V2State, domain_id: str) -> list[dict[str, Any]]:
     source_regs_by_sub = _build_source_regs_index(state.get("ontology") or {})
 
     company_context = state.get("company_context")
-    if company_context is not None and getattr(company_context, "applicable_regs", None) is not None:
+    if (
+        company_context is not None
+        and getattr(company_context, "applicable_regs", None) is not None
+    ):
         applicable_regs = company_context.applicable_regs
     else:
         applicable_regs = None
@@ -126,13 +129,13 @@ def filter_subdomains(state: V2State, domain_id: str) -> list[dict[str, Any]]:
         if not sid.startswith(prefix):
             continue
         sub = subs[sid]
-        summaries.append(
-            _summarize(sid, sub, source_regs_by_sub, applicable_regs=applicable_regs)
-        )
+        summaries.append(_summarize(sid, sub, source_regs_by_sub, applicable_regs=applicable_regs))
 
     logger.debug(
         "filter_subdomains(%s): %d subdomains (of %d total)",
-        domain_id, len(summaries), len(subs),
+        domain_id,
+        len(summaries),
+        len(subs),
     )
     return summaries
 
@@ -144,11 +147,14 @@ def _summarize(
     *,
     applicable_regs: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
-    """Build a single ``SubdomainSummary`` from a ``SubDomainDef``.
+    """Build a single ``SubdomainSummary`` from a sub-domain.
 
     Args:
         sid: Sub-domain identifier (e.g. ``"D-04.1"``).
-        sub: ``SubDomainDef`` instance (or dict) for the sub-domain.
+        sub: A v1 ``SubDomainDef`` (state.py) OR a v2 Pydantic ``Subdomain``
+            (preproc_catalog.py). Both shapes are accepted; the helper
+            :func:`_normalize_subdomain_to_v1` adapts the v2 shape to the
+            v1 dict shape so the rest of the consumer code is unchanged.
         source_regs_by_sub: Ontology-derived regulation index keyed by
             sub-domain id. Used as a position-based hint for legacy
             1:1 pairing.
@@ -158,11 +164,8 @@ def _summarize(
             are kept. When ``None``, no applicability filter is
             applied and all parseable entries are kept.
     """
-    if hasattr(sub, "model_dump"):
-        data = sub.model_dump()
-    elif isinstance(sub, dict):
-        data = sub
-    else:
+    data = _normalize_subdomain_to_v1(sub)
+    if not isinstance(data, dict):
         data = {}
 
     title = data.get("title", sid) if isinstance(data, dict) else sid
@@ -183,8 +186,161 @@ def _summarize(
         "title": title,
         "hso_hl": hl_objective,
         "hso_per_reg": hso_per_reg,
-        "volere_requirements": list(volere_requirements) if isinstance(volere_requirements, list) else [],
+        "volere_requirements": list(volere_requirements)
+        if isinstance(volere_requirements, list)
+        else [],
     }
+
+
+def _normalize_subdomain_to_v1(sub: Any) -> dict[str, Any]:
+    """Normalize a sub-domain object to the v1 dict shape.
+
+    Accepts:
+      - v1: ``SubDomainDef`` (state.py) — has ``model_dump()`` returning
+        the v1 shape (title, section2_hso, section3_requirements, ...)
+      - v1: plain dict in v1 shape (passes through)
+      - v2: ``Subdomain`` Pydantic (preproc_catalog.py) — has different
+        field names (hso_hl / hso_per_reg / security_requirements /
+        participating_regulations / pairs) that this helper maps to
+        the v1 shape (section2_hso.hl_objective + per_reg_sos;
+        section3_requirements).
+
+    Returns:
+        A dict with v1 keys (title, section2_hso, section3_requirements,
+        section1_crda, frontmatter) so the rest of the consumer code is
+        shape-agnostic.
+
+    CORR-037-T3c: enables the orchestrator to substitute v2 Pydantic
+    Subdomain (from preproc_catalog) for v1 SubDomainDef (from
+    SubDomainLoader) without breaking downstream consumers.
+    """
+    # Pass-through: already a dict (assume v1 shape; if it's v2 shape,
+    # the model_dump-equivalent values won't have section2_hso and the
+    # rest of the helper would return empty — that path is rare).
+    if isinstance(sub, dict):
+        # Quick detection: v1 has "section2_hso" key; v2 has "hso_hl".
+        if "section2_hso" in sub or "section3_requirements" in sub:
+            return sub
+        # If it looks like a v2 model_dump (has hso_hl / hso_per_reg),
+        # fall through to the Pydantic-style normalization below.
+        if "hso_hl" in sub or "hso_per_reg" in sub:
+            return _v2_dict_to_v1_dict(sub)
+        # Unknown shape; return as-is (best effort).
+        return sub
+
+    if hasattr(sub, "model_dump"):
+        try:
+            dumped = sub.model_dump()
+        except Exception:
+            return {}
+        return _normalize_subdomain_to_v1(dumped)
+
+    return {}
+
+
+def _v2_dict_to_v1_dict(data: dict[str, Any]) -> dict[str, Any]:
+    """Convert a v2 Pydantic Subdomain model_dump() to the v1 dict shape.
+
+    Mapping:
+      data["title"]                    -> data["title"]                  (same)
+      data["hso_hl"]["objective"]      -> data["section2_hso"]["hl_objective"]
+      data["hso_per_reg"][...]         -> data["section2_hso"]["per_reg_sos"][...]
+                                          (each item: {id, text, regulation})
+      data["security_requirements"]    -> data["section3_requirements"][...]
+      data["pairs"]                    -> data["section1_crda"][...]
+    """
+    out: dict[str, Any] = {}
+    out["title"] = data.get("title", "")
+
+    # hso_hl (Pydantic object after model_dump) -> section2_hso.hl_objective
+    hso_hl = data.get("hso_hl")
+    if isinstance(hso_hl, dict):
+        hl_objective = hso_hl.get("objective") or ""
+    elif hso_hl is not None and hasattr(hso_hl, "objective"):
+        hl_objective = getattr(hso_hl, "objective", "") or ""
+    else:
+        hl_objective = ""
+
+    # hso_per_reg (list of Pydantic HSOPerReg after model_dump) -> per_reg_sos
+    hso_per_reg = data.get("hso_per_reg") or []
+    per_reg_sos: list[dict[str, str]] = []
+    for entry in hso_per_reg:
+        if entry is None:
+            continue
+        if isinstance(entry, dict):
+            entry_id = str(entry.get("id") or "")
+            entry_text = str(entry.get("objective") or "")
+            entry_reg = str(entry.get("regulation") or "")
+        else:
+            entry_id = str(getattr(entry, "id", "") or "")
+            entry_text = str(getattr(entry, "objective", "") or "")
+            entry_reg = str(getattr(entry, "regulation", "") or "")
+        per_reg_sos.append(
+            {
+                "id": entry_id,
+                "text": entry_text,
+                "regulation": entry_reg,
+            }
+        )
+
+    out["section2_hso"] = {
+        "hl_objective": hl_objective,
+        "per_reg_sos": per_reg_sos,
+    }
+
+    # security_requirements -> section3_requirements
+    sec_reqs = data.get("security_requirements") or []
+    section3: list[dict[str, Any]] = []
+    for sr in sec_reqs:
+        if sr is None:
+            continue
+        if isinstance(sr, dict):
+            section3.append(
+                {
+                    "id": sr.get("id", ""),
+                    "sr_short": sr.get("sr_short", ""),
+                    "title": sr.get("title", ""),
+                    "csf": list(sr.get("csf") or []),
+                    "anchors": list(sr.get("anchors") or []),
+                    "nist_csf_mapping": list(sr.get("nist_csf_mapping") or []),
+                }
+            )
+        else:
+            section3.append(
+                {
+                    "id": getattr(sr, "id", ""),
+                    "sr_short": getattr(sr, "sr_short", ""),
+                    "title": getattr(sr, "title", ""),
+                    "csf": list(getattr(sr, "csf", []) or []),
+                    "anchors": list(getattr(sr, "anchors", []) or []),
+                    "nist_csf_mapping": list(getattr(sr, "nist_csf_mapping", []) or []),
+                }
+            )
+    out["section3_requirements"] = section3
+
+    # pairs -> section1_crda
+    pairs = data.get("pairs") or []
+    section1: list[dict[str, Any]] = []
+    for p in pairs:
+        if p is None:
+            continue
+        if isinstance(p, dict):
+            section1.append(dict(p))
+        else:
+            section1.append(
+                {
+                    "id": getattr(p, "id", ""),
+                    "subdomain_id": getattr(p, "subdomain_id", ""),
+                    "reg_a": getattr(p, "reg_a", ""),
+                    "reg_b": getattr(p, "reg_b", ""),
+                    "classification": getattr(p, "classification", ""),
+                    "verified_relationship": getattr(p, "verified_relationship", ""),
+                    "downstream_implication": getattr(p, "downstream_implication", ""),
+                }
+            )
+    out["section1_crda"] = section1
+
+    return out
 
 
 def _build_hso_per_reg(
