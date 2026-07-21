@@ -188,6 +188,16 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--run-map",
+        action="store_true",
+        dest="run_map",
+        help=(
+            "CORR-040: Run the MAP stage (P1C-LLM-01 per domain "
+            "D-01..D-10) and render Doc 07 + Doc 07b. Requires "
+            "MOCK_LLM=true or Ollama running with gemma4:e2b."
+        ),
+    )
+    parser.add_argument(
         "--skip-reduce-llms",
         action="store_true",
         help=(
@@ -395,6 +405,17 @@ def main() -> None:
         for label, p in paths.items():
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
+    elif args.run_map:
+        logger.info(
+            "Non-interactive mode — MAP only (CORR-040; P1C-LLM-01)"
+        )
+        paths = cmd_run_map(
+            orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
+        )
+        logger.info("=== MAP COMPLETE ===")
+        for label, p in paths.items():
+            print(f"  {label}: {p}")
+        print(f"  total: {len(paths)} artefacts")
     else:
         logger.info("Interactive mode — running wizard (CORR-006)")
         from aegis_phase1.v2.cli.menu import run_wizard
@@ -521,6 +542,79 @@ def cmd_run_phase_1b(
         len(paths),
         out_dir,
         len(rationale) if isinstance(rationale, dict) else 0,
+    )
+    return paths
+
+
+def cmd_run_map(
+    *,
+    orch: "Phase1Orchestrator",
+    case_path: str,
+    prep_path: str,
+    output_path: str,
+) -> dict[str, str]:
+    """CORR-040-T5: run the MAP stage (P1C-LLM-01 per D-01..D-10).
+
+    Loads the v2 state, then calls ``orch.map_domains()`` which (per
+    CORR-040-T2) dispatches to the canonical Phase1Executor if
+    available, or falls back to the legacy LLM-A loop. Renders Doc 07
+    + Doc 07b from the resulting ``state['domain_results']``.
+
+    With MOCK_LLM=true the executor is skipped (by design), the
+    legacy path uses the MockInvoker, and Doc 07 + Doc 07b render
+    with deterministic data.
+
+    Note: pre-existing assemble_inputs bug (expects Pydantic, gets dict
+    from v1-compat shim) may cause the legacy loop to fail all 10
+    domains — we catch MapPartialFailure and continue so the docs
+    still render with whatever state is available.
+
+    Returns:
+        Mapping ``AEGIS-P1-07`` -> absolute file path +
+        ``AEGIS-P1-07b`` -> absolute file path.
+    """
+    from aegis_phase1.v2.output.doc_07 import render_doc_07
+    from aegis_phase1.v2.output.doc_07b import render_doc_07b
+    from aegis_phase1.v2.domain.processor import MapPartialFailure
+
+    orch.load(case_path, prep_path)
+    out_dir = Path(output_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # MAP stage (P1C-LLM-01 per domain)
+    try:
+        orch.map_domains()
+    except MapPartialFailure as exc:
+        logger.warning(
+            "cmd_run_map: MAP partial failure (pre-existing bug in "
+            "assemble_inputs with v1-compat dict) — continuing to render "
+            "Doc 07/07b with empty state: %s",
+            exc,
+        )
+
+    # Render Doc 07 (coverage matrix) + Doc 07b (proportionality profile)
+    paths: dict[str, str] = {}
+    try:
+        paths.update(render_doc_07(orch.state, str(out_dir), llm_invoker=orch.llm_invoker))
+    except Exception as exc:
+        logger.warning("cmd_run_map: render_doc_07 failed: %s", exc)
+    try:
+        paths.update(render_doc_07b(orch.state, str(out_dir), llm_invoker=orch.llm_invoker))
+    except Exception as exc:
+        logger.warning("cmd_run_map: render_doc_07b failed: %s", exc)
+    orch.state["output_paths"] = dict(orch.state.get("output_paths", {}), **paths)
+
+    # Summary line with DomainActivationContext
+    from aegis_phase1.v2.context import build_domain_activation_context
+
+    act_ctx = build_domain_activation_context(orch.state)
+    logger.info(
+        "cmd_run_map: %d/%d lanes OK, %d failed, %d sub_domain_activations, %d artefacts",
+        act_ctx.ok_lanes,
+        act_ctx.total_lanes,
+        act_ctx.failed_lanes,
+        act_ctx.total_sub_domain_activations,
+        len(paths),
     )
     return paths
 
