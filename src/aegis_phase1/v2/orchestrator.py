@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Any, cast
 from aegis_phase1.v2.state import V2State
 
 if TYPE_CHECKING:
+    from aegis_phase1.prompts_v2.catalog import CatalogLoader
     from aegis_phase1.prompts_v2.phase1_executor import Phase1Executor
     from aegis_phase1.v2.loader.case_profile import CaseProfileLoader
     from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader
@@ -57,6 +58,7 @@ class Phase1Orchestrator:
         *,
         preproc_catalog: "PreprocCatalogLoader | None" = None,
         case_profile_loader: "CaseProfileLoader | None" = None,
+        catalog_loader: "CatalogLoader | None" = None,
     ):
         """Initialize the orchestrator.
 
@@ -71,6 +73,11 @@ class Phase1Orchestrator:
                 to the v1 loaders (CommonLoader, legacy PreprocessingLoader).
             case_profile_loader: CORR-037-T2 typed YAML loader for case
                 inputs. Optional. Same opt-in pattern as preproc_catalog.
+            catalog_loader: CORR-039-T1 CatalogLoader for tipo2/tipo3 YAML
+                catalogs (from ``Methodology-main/00_METHODOLOGY/PROMPTS/catalogs/``).
+                Optional. When provided, ``_load_v2_catalog`` populates
+                ``state["v2_catalog_tipo2"]`` and ``state["v2_catalog_tipo3"]``
+                for use by P1B-LLM-01 in Phase 1B (CORR-039-T4).
         """
         self.state: V2State = self._init_state()
         self.work_dir = Path(work_dir)
@@ -79,6 +86,11 @@ class Phase1Orchestrator:
         # CORR-037-T3: typed loaders (opt-in). Full wiring in follow-up.
         self.preproc_catalog = preproc_catalog
         self.case_profile_loader = case_profile_loader
+        # CORR-039-T1: catalog loader for tipo2/tipo3 YAMLs
+        self.catalog_loader = catalog_loader
+        # Stash the preproc_catalog reference in state so the T2
+        # ClauseMappingContext builder can call load_clauses() lazily.
+        # Set in _load_v2_catalog — see T1 branch below.
         self._skip_reduce_llms = False
         self._skip_phase_1b = False
         self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
@@ -168,6 +180,10 @@ class Phase1Orchestrator:
                 self.state["v2_pairs"] = self.preproc_catalog.load_pairs()
                 audit = self.preproc_catalog.load_audit()
                 self.state["v2_audit_both_pass"] = audit.both_pass
+                # CORR-039-T1: stash the loader reference so the
+                # ClauseMappingContext builder (T2) can call load_clauses()
+                # lazily without re-instantiating the loader.
+                self.state["v2_preproc_catalog_ref"] = self.preproc_catalog
                 logger.debug(
                     "T3a: preproc_catalog loaded — %d subs, %d srs, %d sos, %d pairs, audit.both_pass=%s",
                     len(self.state["v2_subdomains"]),
@@ -178,6 +194,30 @@ class Phase1Orchestrator:
                 )
             except Exception as e:
                 logger.warning("T3a: preproc_catalog failed (%s) — v2_* keys not set", e)
+
+        # CORR-039-T1: load tipo2 + tipo3 catalogs (filter for P1B-LLM-01)
+        if self.catalog_loader is not None:
+            try:
+                self.state["v2_catalog_tipo2"] = self.catalog_loader.load(
+                    "tipo2_interpretations"
+                )
+                self.state["v2_catalog_tipo3"] = self.catalog_loader.load(
+                    "tipo3_derogations"
+                )
+                logger.debug(
+                    "T1: catalogs loaded — tipo2=%d entries, tipo3=%d entries",
+                    len(self.state["v2_catalog_tipo2"]),
+                    len(self.state["v2_catalog_tipo3"]),
+                )
+            except Exception as e:
+                # Empty catalogs (file missing) is a valid state — fall
+                # back to empty lists so downstream LLM calls proceed.
+                logger.info(
+                    "T1: catalog_loader returned no entries (%s) — using empty lists",
+                    e,
+                )
+                self.state["v2_catalog_tipo2"] = []
+                self.state["v2_catalog_tipo3"] = []
 
         # CORR-037-T4b: SHIM — populate legacy v1 state keys from v2 sources
         # so the 8 output consumers (doc_04*.py, doc_05..07.py, xlsx_generator.py)
@@ -1318,6 +1358,13 @@ class Phase1Orchestrator:
         the ``aggregated_synthesis[reg_id]`` slice for that regulation
         (i.e. the per-reg synthesis dict the executor produced).
 
+        CORR-039-T4: enriches the inputs with the filtered tipo2 + tipo3
+        catalogs (via ``self.catalog_loader``), so P1B-LLM-01 sees the
+        interpretations and derogations that apply to this company
+        rather than the full unfiltered catalog. Also swaps the
+        coverage_matrix_row source from the empty v1 ontology
+        ``clause_mappings`` to the v2 ClauseMappingContext (T2/T3).
+
         Args:
             spec_id: Reserved for future per-spec splitting (e.g. to call
                 P1B-LLM-01 and P1B-LLM-02 independently per spec). The
@@ -1354,16 +1401,27 @@ class Phase1Orchestrator:
             if isinstance(subs, list):
                 aggregated_activations.extend(subs)
 
+        # CORR-039-T3/T4: use the v2 ClauseMappingContext for the
+        # per-reg coverage_matrix_row. Pre-CORR-039 this read the empty
+        # state['ontology']['clause_mappings'] and the LLM saw 0 rows.
         coverage_rows: list[Any] = []
-        ontology = self.state.get("ontology") or {}
-        cm = ontology.get("clause_mappings") or []
-        if isinstance(cm, list):
-            for entry in cm:
-                if not isinstance(entry, dict):
-                    continue
-                regs_in_mapping = [entry.get("regulation"), entry.get("reg")]
-                if reg_id in regs_in_mapping:
-                    coverage_rows.append(entry)
+        try:
+            from aegis_phase1.v2.context.clause_mapping_context import (
+                build_clause_mapping_context,
+            )
+
+            cm_ctx = build_clause_mapping_context(self.state)
+            coverage_rows = [e.model_dump() for e in cm_ctx.by_regulation(reg_id)]
+        except Exception as exc:
+            logger.debug(
+                "run_p1b_single: clause_mapping_context build failed (%s) — "
+                "coverage_rows will be empty for %s",
+                exc,
+                reg_id,
+            )
+
+        # CORR-039-T4: filter tipo2 + tipo3 catalogs for this reg + tier
+        layer0_catalog = self._load_filtered_catalogs_for_reg(reg_id, cc)
 
         case_id = Path(self.state.get("case_path") or "case").name
         result = executor.run_phase_1b(
@@ -1374,6 +1432,7 @@ class Phase1Orchestrator:
             coverage_matrix_row=coverage_rows,
             aggregated_activations=aggregated_activations,
             layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
+            layer0_catalog=layer0_catalog,
             classification={
                 "role": cc.get("role") or cc.get("obligated_party") or "controller",
                 "tier": cc.get("complexity_tier") or "LOW",
@@ -1395,6 +1454,72 @@ class Phase1Orchestrator:
         if not isinstance(synth, dict):
             return None
         return synth.get(reg_id)
+
+    def _load_filtered_catalogs_for_reg(
+        self,
+        reg_id: str,
+        company_context: dict[str, Any],
+    ) -> dict[str, list[dict[str, Any]]]:
+        """CORR-039-T4: return tipo2 + tipo3 entries filtered for this reg.
+
+        Uses ``self.catalog_loader.filter_applicable(regulation, tier)``
+        on the v2_catalog_tipo2 / v2_catalog_tipo3 lists populated by
+        ``_load_v2_catalog`` (T1). Falls back to empty lists when the
+        catalog loader is not injected or the catalogs are empty — the
+        LLM call still proceeds with an empty catalog and returns
+        ``interpretations: []`` / ``derogations: []``.
+
+        For tipo3 entries, ``evaluate_predicates`` is run against the
+        company facts and the verdict is attached to each entry as
+        ``predicate_verdict`` (True / False / None for
+        INSUFFICIENT_EVIDENCE). This gives P1B-LLM-01 the evaluated
+        activation signal alongside the catalog metadata.
+        """
+        out: dict[str, list[dict[str, Any]]] = {"tipo2": [], "tipo3": []}
+        if self.catalog_loader is None:
+            return out
+        tier = str(
+            company_context.get("complexity_tier")
+            or company_context.get("tier")
+            or "LOW"
+        )
+        try:
+            tipo2_all = self.state.get("v2_catalog_tipo2", []) or []
+            tipo3_all = self.state.get("v2_catalog_tipo3", []) or []
+            out["tipo2"] = self.catalog_loader.filter_applicable(
+                tipo2_all, regulation=reg_id, tier=tier
+            )
+            tipo3_filtered = self.catalog_loader.filter_applicable(
+                tipo3_all, regulation=reg_id, tier=tier
+            )
+            # Enrich tipo3 with predicate verdicts (best-effort)
+            try:
+                evaluated = self.catalog_loader.evaluate_predicates(
+                    tipo3_filtered, company_context
+                )
+                out["tipo3"] = [
+                    {**entry, "predicate_verdict": verdict}
+                    for entry, verdict in evaluated
+                ]
+            except Exception as exc:
+                logger.debug(
+                    "predicate evaluation failed for %s: %s — keeping unevaluated",
+                    reg_id,
+                    exc,
+                )
+                out["tipo3"] = list(tipo3_filtered)
+            logger.debug(
+                "T4: filtered catalogs for %s (tier=%s) — tipo2=%d, tipo3=%d",
+                reg_id,
+                tier,
+                len(out["tipo2"]),
+                len(out["tipo3"]),
+            )
+        except Exception as exc:
+            logger.warning(
+                "T4: catalog filter failed for %s: %s — using empty lists", reg_id, exc
+            )
+        return out
 
     def _init_state(self) -> V2State:
         return {
