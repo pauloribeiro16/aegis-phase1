@@ -17,6 +17,15 @@ template substitution performed by the sibling Methodology-main repo
 (out of this contract's scope). The PROMPTS-side rename will land in a
 follow-up contract; this file is the consumer-side mirror and must
 keep the wire name for now.
+
+Note (CORR-037-T3 scaffolding): The orchestrator now accepts optional
+``preproc_catalog`` and ``case_profile_loader`` constructor args (typed
+Pydantic loaders from CORR-037-T1/T2). They are NOT yet wired into
+``load()`` — that wiring is deferred to a follow-up session (T3 full
+refactor). When provided, they are stored on self and exposed for
+downstream use; ``load()`` still uses the v1 loaders (CommonLoader,
+SubDomainLoader, PreprocessingLoader) for backwards compatibility.
+Existing tests pass; new code can opt-in via constructor injection.
 """
 
 import json
@@ -29,6 +38,8 @@ from aegis_phase1.v2.state import V2State
 
 if TYPE_CHECKING:
     from aegis_phase1.prompts_v2.phase1_executor import Phase1Executor
+    from aegis_phase1.v2.loader.case_profile import CaseProfileLoader
+    from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +50,35 @@ class Phase1Orchestrator:
     Each stage updates the V2State, persists to work/state.json after each stage.
     """
 
-    def __init__(self, work_dir: str = "work", llm_invoker: Any | None = None):
+    def __init__(
+        self,
+        work_dir: str = "work",
+        llm_invoker: Any | None = None,
+        *,
+        preproc_catalog: "PreprocCatalogLoader | None" = None,
+        case_profile_loader: "CaseProfileLoader | None" = None,
+    ):
+        """Initialize the orchestrator.
+
+        Args:
+            work_dir: Where the orchestrator persists state.json
+                (default: "work").
+            llm_invoker: Phase1LLMInvoker for LLM calls (or None for
+                deterministic-only runs).
+            preproc_catalog: CORR-037-T1 typed JSON loader for preproc_out/.
+                Optional. When provided, stored on self.preproc_catalog for
+                downstream use (SP-B/C/D). When None, ``load()`` falls back
+                to the v1 loaders (CommonLoader/SubDomainLoader/PreprocessingLoader).
+            case_profile_loader: CORR-037-T2 typed YAML loader for case
+                inputs. Optional. Same opt-in pattern as preproc_catalog.
+        """
         self.state: V2State = self._init_state()
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
         self.llm_invoker = llm_invoker
+        # CORR-037-T3: typed loaders (opt-in). Full wiring in follow-up.
+        self.preproc_catalog = preproc_catalog
+        self.case_profile_loader = case_profile_loader
         self._skip_reduce_llms = False
         self._skip_phase_1b = False
         self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
