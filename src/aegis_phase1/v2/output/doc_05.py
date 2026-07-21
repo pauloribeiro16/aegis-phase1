@@ -38,6 +38,10 @@ from aegis_phase1.v2.output._common import (
     markdown_table,
     write_output,
 )
+from aegis_phase1.v2.context.applicability_context import (
+    ApplicabilityContext,
+    build_applicability_context,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
 
 logger = logging.getLogger(__name__)
@@ -124,6 +128,14 @@ def render_doc_05(
     parts: list[str] = []
     parts.append("# AEGIS-P1-05 Regulatory Applicability\n")
 
+    # CORR-038-T3: ApplicabilityContext (v2 source of truth) — added as
+    # a new §0 "Applicability Summary" before the existing §1 PURPOSE.
+    # The remaining sections (§3-§8) still consume the v1 ontology for
+    # detailed per-regulation assessments; §0 is the deterministic
+    # summary derived from the v2 case profile.
+    app_ctx: ApplicabilityContext = build_applicability_context(state)
+    parts.extend(_section_0_applicability_summary(app_ctx))
+
     parts.extend(_section_1_purpose())
     parts.extend(_section_2_summary(regs))
     parts.extend(
@@ -179,6 +191,79 @@ def _section_1_purpose() -> list[str]:
         "- a forward handover record (§8) that captures the artefacts "
         "passed to Phase 2.\n"
     )
+    return parts
+
+
+def _section_0_applicability_summary(app_ctx: ApplicabilityContext) -> list[str]:
+    """CORR-038-T3 NEW: deterministic applicability summary from v2.
+
+    Produces a §0 with:
+      - 5-row per-regulation table (GDPR/CRA/NIS2/DORA/AI_Act)
+        with APPLICABLE / NOT APPLICABLE, obligated party, rationale
+      - Declaration gaps table (PHASE1_STRATEGY §6: flag, never override)
+      - Tier badge (LOW / MEDIUM / HIGH)
+    """
+    parts: list[str] = []
+    parts.append("## 0. APPLICABILITY SUMMARY (CORR-038 — v2 source of truth)\n")
+    parts.append(
+        "The following table is the deterministic, v2-driven summary of "
+        "regulatory applicability for this case. The data comes from the "
+        ":class:`ApplicabilityContext` built by the v2 pipeline "
+        "(:mod:`aegis_phase1.v2.context.applicability_context`).\n"
+    )
+    rows: list[tuple[str, str, str, str]] = []
+    applicable_set = set(app_ctx.applicable_regs)
+    declared_set = set(app_ctx.declared_applicable_regs)
+    gap_regs = {g["regulation"] for g in app_ctx.declaration_gaps}
+    for reg in ("GDPR", "CRA", "NIS2", "DORA", "AI_Act"):
+        if reg in applicable_set:
+            status = "✅ APPLICABLE"
+        else:
+            status = "❌ NOT APPLICABLE"
+        if reg in gap_regs:
+            status += "  ⚠ GAP"
+        obligated = app_ctx.obligated_party_per_reg.get(reg, "") or "—"
+        rationale = app_ctx.rationale_per_reg.get(reg, "—")
+        rows.append((reg, status, obligated, rationale))
+    parts.append(
+        markdown_table(
+            ["Regulation", "Status", "Obligated Party", "Rationale"],
+            rows,
+        )
+    )
+    parts.append("")
+    # Tier badge
+    parts.append(
+        f"**Compliance Posture Tier:** `{app_ctx.tier}` "
+        + (
+            "(light-touch; MICRO/SMALL with 1-2 applicable regs)"
+            if app_ctx.tier == "LOW"
+            else "(elevated; ≥2 regs, or larger scale)"
+        )
+        + "\n"
+    )
+    parts.append("")
+    # Declaration gaps
+    if app_ctx.declaration_gaps:
+        parts.append("**⚠ DECLARATION GAPS (review required by Compliance Lead):**")
+        parts.append(
+            markdown_table(
+                ["Regulation", "Direction", "Computed", "Declared"],
+                [
+                    (
+                        g["regulation"],
+                        g["direction"],
+                        "yes" if g["computed"] else "no",
+                        "yes" if g["declared"] else "no",
+                    )
+                    for g in app_ctx.declaration_gaps
+                ],
+            )
+        )
+        parts.append("")
+    else:
+        parts.append("**Declaration gaps:** none — computed and declared are aligned.\n")
+    parts.append("---\n")
     return parts
 
 
@@ -907,12 +992,15 @@ def _should_use_llm(llm_invoker: Any | None) -> bool:
 def _build_frontmatter(state: dict[str, Any], regs: list[Any]) -> str:
     ctx = state.get("company_context")
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    applicable = sorted(_abbr(r) for r in regs if isinstance(r, Mapping) and r.get("applicable"))
+    # CORR-038-T3: source applicable_regs from app_ctx (canonical names)
+    # so the frontmatter is consistent with §0.
+    app_ctx = build_applicability_context(state)
+    applicable = list(app_ctx.applicable_regs)
     payload: dict[str, Any] = {
         "document_id": "AEGIS-P1-05",
         "title": "Regulatory Applicability Assessment",
         "phase": 1,
-        "version": 1.0,
+        "version": 1.1,
         "created": now,
         "updated": now,
         "author": "Executor",

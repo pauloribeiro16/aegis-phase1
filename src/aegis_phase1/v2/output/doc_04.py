@@ -40,6 +40,10 @@ from aegis_phase1.v2.output._common import (
     markdown_table,
     write_output,
 )
+from aegis_phase1.v2.context.applicability_context import (
+    ApplicabilityContext,
+    build_applicability_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +268,10 @@ def _build_doc_04_body(state: dict[str, Any]) -> str:
     business_goals = _business_goals(state)
     architecture_inventory = state.get("architecture_inventory") or {}
 
+    # CORR-038-T2: ApplicabilityContext (single source of truth for
+    # applicable_regs / declaration_gaps / tier / obligated_party_per_reg).
+    app_ctx: ApplicabilityContext = build_applicability_context(state)
+
     parts: list[str] = []
     parts.append("# AEGIS-P1-04 Company Context Assessment\n")
 
@@ -282,8 +290,8 @@ def _build_doc_04_body(state: dict[str, Any]) -> str:
     # §5 Intake Form Response Summary (layered)
     parts.extend(_section_5_intake_summary(state))
 
-    # §6 Regulatory Applicability Flags
-    parts.extend(_section_6_regulatory_flags(state, regs))
+    # §6 Regulatory Applicability Flags (now uses app_ctx)
+    parts.extend(_section_6_regulatory_flags(state, regs, app_ctx))
 
     # §7 Architectural Implications
     parts.extend(_section_7_architectural_implications(state, architecture_inventory))
@@ -293,6 +301,9 @@ def _build_doc_04_body(state: dict[str, Any]) -> str:
 
     # §9 Compliance Capability Assessment
     parts.extend(_section_9_compliance_capability(state))
+
+    # §10 Tier & Compliance Posture (CORR-038-T2 NEW)
+    parts.extend(_section_10_tier_and_posture(app_ctx))
 
     # N-1 Version History + N Document Approval
     parts.extend(_section_n_version_and_approval())
@@ -510,10 +521,12 @@ def _section_5_intake_summary(state: dict[str, Any]) -> list[str]:
 
 
 def _section_6_regulatory_flags(
-    state: dict[str, Any], regs: list[Any]
+    state: dict[str, Any], regs: list[Any], app_ctx: ApplicabilityContext
 ) -> list[str]:
-    ctx = state.get("company_context")
-    applicable = {r if r != "NIS2" else "NIS 2" for r in (_attr(ctx, "applicable_regs", default=[]) or [])}
+    """Regulatory applicability flags (CORR-038-T2: app_ctx is the truth)."""
+    # CORR-038-T2: source from ApplicabilityContext (canonical names)
+    # rather than the v1 ctx.applicable_regs.
+    applicable_set = set(app_ctx.applicable_regs)
     parts: list[str] = []
     parts.append("## 6. REGULATORY APPLICABILITY FLAGS\n")
     rows: list[tuple[str, str, str, str, str]] = []
@@ -530,7 +543,7 @@ def _section_6_regulatory_flags(
             "Places digital products with digital elements on EU market",
         ),
         (
-            "NIS 2",
+            "NIS2",
             "Below employee (8 < 50) and revenue (<€2M < €10M) thresholds",
             "Essential/Important entity AND (>=50 employees OR >=€10M revenue)",
         ),
@@ -540,13 +553,13 @@ def _section_6_regulatory_flags(
             "Financial entity per Art. 2 definition",
         ),
         (
-            "AI Act",
+            "AI_Act",
             "No AI/ML systems; deterministic logic only",
             "AI system provider/deployer; High-risk per Annex II/III",
         ),
     ]
     for name, rationale, threshold in flag_specs:
-        is_app = name in applicable
+        is_app = name in applicable_set
         rows.append(
             (
                 name,
@@ -569,6 +582,80 @@ def _section_6_regulatory_flags(
         )
     )
     parts.append("")
+    # CORR-038-T2: surface the per-regulation clause count from app_ctx
+    if app_ctx.clause_count_per_reg:
+        clause_rows = [
+            (reg, app_ctx.clause_count_per_reg.get(reg, "-"))
+            for reg in app_ctx.applicable_regs
+        ]
+        if clause_rows:
+            parts.append("**Clauses to assess per applicable regulation:**")
+            parts.append(markdown_table(["Regulation", "Clause Count"], clause_rows))
+            parts.append("")
+    parts.append("---\n")
+    return parts
+
+
+def _section_10_tier_and_posture(app_ctx: ApplicabilityContext) -> list[str]:
+    """CORR-038-T2 NEW: tier + obligated parties + declaration gaps."""
+    parts: list[str] = []
+    parts.append("## 10. TIER & COMPLIANCE POSTURE (CORR-038)\n")
+    parts.append(
+        "The following table is the single source of truth for the "
+        "company's compliance posture, derived from the v2 ApplicabilityContext.\n"
+    )
+    # Posture summary
+    parts.append(
+        markdown_table(
+            ["Field", "Value"],
+            [
+                ("Applicable Regulations (computed)", ", ".join(app_ctx.applicable_regs) or "(none)"),
+                ("Declared Applicable (per YAML)", ", ".join(app_ctx.declared_applicable_regs) or "(none)"),
+                ("Declaration Gaps", str(len(app_ctx.declaration_gaps))),
+                (
+                    "Tier",
+                    f"**{app_ctx.tier}**"
+                    + (
+                        " — light-touch (MICRO/SMALL with 1-2 applicable regs)"
+                        if app_ctx.tier == "LOW"
+                        else " — multi-regulation with elevated risk"
+                    ),
+                ),
+            ],
+        )
+    )
+    parts.append("")
+    # Obligated party per reg
+    if app_ctx.obligated_party_per_reg:
+        rows = [
+            (reg, role or "—")
+            for reg, role in app_ctx.obligated_party_per_reg.items()
+            if reg in app_ctx.applicable_regs
+        ]
+        if rows:
+            parts.append("**Obligated Party per Regulation:**")
+            parts.append(
+                markdown_table(["Regulation", "Obligated Party"], rows)
+            )
+            parts.append("")
+    # Declaration gaps (PHASE1_STRATEGY §6: flag, never silently override)
+    if app_ctx.declaration_gaps:
+        parts.append("**⚠ DECLARATION GAPS (review required):**")
+        gap_rows = [
+            (g["regulation"], g["direction"], "yes" if g["computed"] else "no", "yes" if g["declared"] else "no")
+            for g in app_ctx.declaration_gaps
+        ]
+        parts.append(
+            markdown_table(
+                ["Regulation", "Direction", "Computed Applicable", "Declared Applicable"],
+                gap_rows,
+            )
+        )
+        parts.append("")
+        parts.append(
+            "*Per PHASE1_STRATEGY §6: gaps are flagged, not silently "
+            "overridden. Review by the Compliance Lead.*\n"
+        )
     parts.append("---\n")
     return parts
 
@@ -1045,10 +1132,13 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
 
 def _build_frontmatter(state: dict[str, Any]) -> str:
     ctx = state.get("company_context")
+    # CORR-038-T2: surface tier + applicable_regs (canonical names) in
+    # frontmatter so downstream doc 05 can read it without re-deriving.
+    app_ctx = build_applicability_context(state)
     return generate_frontmatter(
         document_id="AEGIS-P1-04",
         title="Company Context Assessment",
-        version=2.1,
+        version=2.2,
         extra={
             "phase": 1,
             "author": "Compliance Lead",
@@ -1061,7 +1151,8 @@ def _build_frontmatter(state: dict[str, Any]) -> str:
                 "01_Company_Context.md",
                 "04a_Architecture_DataInventory.md",
             ],
-            "applicable_regs": list(_attr(ctx, "applicable_regs", default=[]) or []),
+            "applicable_regs": list(app_ctx.applicable_regs),
+            "tier": app_ctx.tier,
         },
     )
 

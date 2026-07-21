@@ -137,6 +137,11 @@ class Phase1Orchestrator:
                 self.state["v2_applicable_regs"] = list(profile.applicable_regs)
                 self.state["v2_declared_regs"] = list(profile.declared_applicable_regs)
                 self.state["v2_obligated_party"] = dict(profile.regulatory.obligated_party_per_reg)
+                # CORR-038-T2/T3: surface rationale + clause_count so
+                # build_applicability_context can read them directly
+                # without re-parsing the YAML.
+                self.state["v2_regulatory_rationale"] = dict(profile.regulatory.applicability_rationale)
+                self.state["v2_clause_count_per_reg"] = dict(profile.regulatory.clause_count_per_reg)
                 logger.debug(
                     "T3a: case_profile loaded — %d stakeholders, %d goals, %d architecture sections",
                     len(profile.stakeholders),

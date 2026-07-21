@@ -16,6 +16,14 @@ Sprint Phase 3 decouple flag:
                                 05, 06, 07, 07b, xlsx) without running MAP
                                 or REDUCE. Useful for baseline validation
                                 and post-MAP-failure recovery.
+
+CORR-038 flag:
+    --run-applicability         Generate ONLY Doc 04 + Doc 05 from the
+                                ApplicabilityContext (v2 source of truth).
+                                Skips MAP / REDUCE / Phase 1B entirely.
+                                No LLM is invoked. Useful for verifying
+                                applicability after a data fix without
+                                waiting for the full pipeline.
 """
 
 import argparse
@@ -144,6 +152,18 @@ def main() -> None:
             "07, 07b, xlsx). Skips MAP and REDUCE entirely. Useful "
             "for verifying baseline artefacts after LOAD when the "
             "MAP/REDUCE stages are broken or too slow."
+        ),
+    )
+    parser.add_argument(
+        "--run-applicability",
+        action="store_true",
+        dest="run_applicability",
+        help=(
+            "CORR-038: Generate ONLY Doc 04 + Doc 05 from the "
+            "ApplicabilityContext (v2 source of truth). Skips MAP, "
+            "REDUCE, and Phase 1B. No LLM is invoked. Useful for "
+            "verifying applicability after a data fix without "
+            "waiting for the full pipeline."
         ),
     )
     parser.add_argument(
@@ -304,6 +324,17 @@ def main() -> None:
         for label, p in paths.items():
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
+    elif args.run_applicability:
+        logger.info(
+            "Non-interactive mode — applicability only (CORR-038; no LLM)"
+        )
+        paths = cmd_run_applicability(
+            orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
+        )
+        logger.info("=== APPLICABILITY DOCS COMPLETE ===")
+        for label, p in paths.items():
+            print(f"  {label}: {p}")
+        print(f"  total: {len(paths)} artefacts")
     else:
         logger.info("Interactive mode — running wizard (CORR-006)")
         from aegis_phase1.v2.cli.menu import run_wizard
@@ -315,6 +346,46 @@ def main() -> None:
             print("  Start it with: ollama serve")
             print("  Or run with --mock-llm for offline mode.")
             sys.exit(2)
+
+
+def cmd_run_applicability(
+    *,
+    orch: "Phase1Orchestrator",
+    case_path: str,
+    prep_path: str,
+    output_path: str,
+) -> dict[str, str]:
+    """CORR-038-T4: render only Doc 04 + Doc 05 from the ApplicabilityContext.
+
+    Skips MAP / REDUCE / Phase 1B entirely. No LLM is invoked. Builds
+    the v2 state via ``orch.load()`` (which runs the v2 loaders + v1-compat
+    shim), then renders Doc 04 (composite) and Doc 05.
+
+    Returns:
+        Mapping ``AEGIS-P1-04`` / ``AEGIS-P1-04b`` / ``AEGIS-P1-04c`` /
+        ``AEGIS-P1-04d`` / ``AEGIS-P1-05`` -> absolute file path.
+    """
+    from aegis_phase1.v2.output.doc_04 import render_doc_04
+    from aegis_phase1.v2.output.doc_05 import render_doc_05
+
+    # Load v2 state (no LLM calls; no MAP / REDUCE).
+    orch.load(case_path, prep_path)
+
+    # Build output dir.
+    out_dir = Path(output_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    paths: dict[str, str] = {}
+    # Doc 04 (composite: 04 + 04b + 04c + 04d).
+    paths.update(render_doc_04(orch.state, str(out_dir), llm_invoker=None))
+    # Doc 05 (per-regulation applicability).
+    paths.update(render_doc_05(orch.state, str(out_dir), llm_invoker=None))
+
+    # Surface in orch state for downstream consumers.
+    orch.state["output_paths"] = dict(orch.state.get("output_paths", {}), **paths)
+
+    logger.info("cmd_run_applicability: wrote %d artefacts to %s", len(paths), out_dir)
+    return paths
 
 
 def cmd_run_all_traced(
