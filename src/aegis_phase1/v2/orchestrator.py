@@ -342,55 +342,35 @@ class Phase1Orchestrator:
         # Local alias used throughout this method body for clarity.
         preprocessing_path = regulatory_baseline_path
 
-        from aegis_phase1.v2.loader.common_loader import CommonLoader
-        from aegis_phase1.v2.loader.preprocessing_loader import PreprocessingLoader
-
         logger.info("=== STAGE 0: LOAD ===")
         start = time.time()
 
-        common_loader = CommonLoader()
-        preprocessing_loader = PreprocessingLoader()
+        # CORR-037-T4c: the v1 loaders (CommonLoader, PreprocessingLoader)
+        # have been removed. v1-shape state keys (company_context,
+        # architecture_inventory, stakeholders, business_goals,
+        # taxonomy_entries, ontology, regulations, preprocessing,
+        # subdomains) are populated exclusively by the shim in
+        # ``_populate_v1_state_keys_from_v2()`` from the v2_* keys.
+        # Consumers can either read v1_* (via the shim) or v2_*
+        # (via the v2 typed models directly). For new code, prefer v2_*.
 
-        common = common_loader.load(case_path)
-        self.state["company_context"] = common.get("company_context")
-        self.state["architecture_inventory"] = common.get("architecture_inventory", {})
-        self.state["stakeholders"] = common.get("stakeholders", [])
-        self.state["business_goals"] = common.get("business_goals", [])
-        self.state["taxonomy_entries"] = common.get("taxonomy_entries", [])
-        self.state["ontology"] = common.get("ontology", {})
-        self.state["regulations"] = common.get("regulations", [])
-
-        subdomains_path = Path(regulatory_baseline_path) / "SubDomains"
-        # CORR-037-T3b (proper): prefer PreprocCatalogLoader (typed Pydantic)
-        # when injected. T3c made the consumer shape-agnostic, so v2 Pydantic
+        # Subdomains: prefer PreprocCatalogLoader (typed Pydantic) when
+        # injected. T3c made the consumer shape-agnostic, so v2 Pydantic
         # Subdomain objects (with hso_hl / hso_per_reg / security_requirements
-        # / pairs) are now transparently normalized to the v1 SubDomainDef
+        # / pairs) are transparently normalized to the v1 SubDomainDef
         # shape by v2.domain.filters.subdomains._summarize.
-        # Fall back to v1 regex-parsed MD loader for backwards
-        # compatibility when no preproc_catalog is injected.
         if self.preproc_catalog is not None:
             subs_list = self.preproc_catalog.load_subdomains()
-            # Re-key the list into dict[str, Subdomain] (Pydantic instances)
-            # to match the v1 state shape (dict keyed by sub-id).
             self.state["subdomains"] = {s.id: s for s in subs_list}
         else:
-            # CORR-037-T4: regex-MD loader was removed.
-            # Fallback when no preproc_catalog is provided: empty dict. New
-            # code should always inject a preproc_catalog.
             logger.warning(
                 "T4: no preproc_catalog injected — state['subdomains'] is empty. "
                 "Inject a PreprocCatalogLoader for the canonical 38 subdomains."
             )
             self.state["subdomains"] = {}
 
-        self.state["preprocessing"] = preprocessing_loader.load(regulatory_baseline_path)
-
-        # CORR-037-T3a: ADDITIVE wiring of v2 typed loaders (opt-in via
-        # constructor). When self.case_profile_loader / self.preproc_catalog
-        # are provided, populate ADDITIONAL state keys (v2_*) for new
-        # consumers (SP-B/C/D/E). The 7 legacy keys above remain untouched
-        # for backwards compatibility with the v1 loaders' consumers.
-        # Migration of consumers from legacy to v2_* happens in T3c.
+        # Populate v2_* state keys + v1 shim (replaces the removed
+        # CommonLoader/PreprocessingLoader output).
         self._load_v2_catalog(case_path)
 
         self.state["current_stage"] = "LOADED"

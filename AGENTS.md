@@ -146,26 +146,32 @@ src/aegis_phase1/          # Main package
 ├── env.py                 # .env loader
 └── v2/                    # Phase 1 v2 pipeline (CORR-037)
     ├── loader/            # PreprocCatalogLoader (preproc_out JSON),
-    │                      # CaseProfileLoader (case input YAML),
-    │                      # + common_loader + preprocessing_loader
-    │                      # (legacy v1 retained for ontology/preprocessing
-    │                      #  until T4b migrates the 8 output consumers)
+    │                      # CaseProfileLoader (case input YAML)
     ├── domain/            # MAP-stage filters and input assembly
-    ├── output/            # 9 doc_*.py renderers + xlsx_generator
+    ├── output/            # 9 doc_*.py renderers + xlsx_generator +
+    │                      # _v1_compat.py (consumer-side shim for
+    │                      # legacy state['company_context'] / state['ontology']
+    │                      # etc. — populated from v2_* keys)
     ├── reduce/            # REDUCE-stage synthesis + Track B proportionality
     ├── orchestrator.py    # 4-stage state machine (LOAD→MAP→REDUCE→OUTPUT)
     ├── runner.py          # CLI entry point
     └── llm.py             # LLM invoker wiring
 ```
 
-**CORR-037-T4:** v1 legacy removed (`graph.py`, `subphases/`, `nodes/`,
-`shared/`, `run_with_iteration.py`, `section_refill.py`, `doc_evaluator.py`,
-plus 4 v2/loader/*.py: ambiguity_loader, article_loader, subdomain_loader,
-yaml_input_loader was RESTORED because common_loader still uses it).
-The remaining `common_loader.py` + `preprocessing_loader.py` provide
-`state['ontology']` and `state['preprocessing']` for the 8 output
-consumers (Doc 04/04a-d/05/06/07/07b + xlsx). Full migration is
-deferred to **T4b** (out of scope for this contract).
+**CORR-037-T4 + T4c: v1 legacy FULLY REMOVED.**
+
+- T4 deleted: `graph.py`, `subphases/`, `nodes/`, `shared/`,
+  `run_with_iteration.py`, `section_refill.py`, `doc_evaluator.py`,
+  plus 4 v2/loader/*.py (ambiguity_loader, article_loader,
+  subdomain_loader, yaml_input_loader, common_loader,
+  preprocessing_loader) and 11 orphan test files (~10500 LOC).
+- The orchestrator's load() reads exclusively from v2 sources
+  (PreprocCatalogLoader + CaseProfileLoader) and populates both
+  v2_* state keys (canonical) and v1_* state keys (via the T4b shim
+  + the output/_v1_compat consumer-side helpers) so the 10 doc_* +
+  xlsx output consumers continue to read familiar v1 keys.
+- Future T4d (out of scope) would migrate consumers to v2_*
+  directly and drop both shims.
 
 ```
 cases/case1-tinytask/
