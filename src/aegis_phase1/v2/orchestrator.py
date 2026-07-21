@@ -682,6 +682,36 @@ class Phase1Orchestrator:
             processor.config = config
         return processor.process(domain_id, self.state)
 
+    def _build_synthesis_context(self) -> None:
+        """CORR-041-T2: build the canonical SynthesisContext from current state.
+
+        Called from :meth:`reduce` (after reduce_synthesis + reduce_compound)
+        and from :meth:`run_phase_1b` (after rationale_by_reg is populated).
+        Writes ``state['v2_synthesis_context']`` for downstream consumers
+        (Doc 04a-d, Doc 07 §5.2/§6.2, parity check).
+
+        Backward-compatible: the v1 shim keys
+        (``state['aggregated_data']['synthesis']`` etc.) are NOT modified;
+        only the new ``v2_synthesis_context`` is added.
+        """
+        try:
+            from aegis_phase1.v2.context.synthesis_context import (
+                build_synthesis_context,
+            )
+
+            ctx = build_synthesis_context(self.state)
+            self.state["v2_synthesis_context"] = ctx
+            logger.debug(
+                "T2: v2_synthesis_context built — status=%s, "
+                "synthesis=%d chars, %d compound events, %d per-reg rationale",
+                ctx.status,
+                len(ctx.synthesis.prose),
+                ctx.compound_event_count(),
+                ctx.per_reg_count(),
+            )
+        except Exception as exc:
+            logger.warning("T2: build_synthesis_context failed: %s", exc)
+
     def _failed_domain_result(self, domain_id: str, exc: Exception) -> dict[str, Any]:
         """Build the FAILED ``DomainResult`` dict for a domain whose processing raised.
 
@@ -807,6 +837,9 @@ class Phase1Orchestrator:
             len(profile_data),
             elapsed,
         )
+        # CORR-041-T2: build canonical SynthesisContext (synthesis +
+        # compound_events + track_b + conflicts + per_reg_rationale)
+        self._build_synthesis_context()
         self._persist_state()
         return self.state
 
@@ -1468,6 +1501,9 @@ class Phase1Orchestrator:
             len(synth_by_reg),
             last_status,
         )
+        # CORR-041-T2: refresh the SynthesisContext with the new
+        # rationale_by_reg data
+        self._build_synthesis_context()
         self._persist_state()
         return self.state
 
