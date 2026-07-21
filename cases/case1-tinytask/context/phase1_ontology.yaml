@@ -1,10 +1,16 @@
+# CORR-036 (2026-07-21): aligned with input/company/classification.yaml
+# (canonical source). Previous values (employees: 50, revenue: 5M,
+# size: small) were a stale snapshot inconsistent with classification.yaml
+# and with 01_Company_Context.md / 05_company_context.csv / the Case_01
+# reference output in Methodology-main. TinyTask is a MICRO case by design
+# (8 employees, EUR 2M revenue, security_fte 0.85).
 company:
-  name: "TinyTask SaaS"
-  sector: "technology"
-  size: "small"
-  employees: 50
-  revenue_eur: 5000000
-  jurisdiction: "Portugal, EU"
+  name: "TinyTask Lda."              # era "TinyTask SaaS"
+  sector: "Technology/Software"      # era "technology"
+  size: "micro"                      # era "small"
+  employees: 8                       # era 50
+  revenue_eur: 2000000               # era 5000000
+  jurisdiction: "Portugal, EU"       # inalterado
   processes_personal_data: true
   places_digital_products_eu: true
   dora_financial_entity: false

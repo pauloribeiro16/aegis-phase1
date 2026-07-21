@@ -1,0 +1,55 @@
+2026-07-21 17:19:57,865 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-21 17:19:57,865 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-21 17:19:57,865 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-21 17:19:57,865 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-21 17:19:57,865 [INFO] aegis_phase1.v2.llm: MOCK_LLM=true → MockInvoker
+2026-07-21 17:19:58,026 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=06bce99602dd16b8ea0fb644c6f48394
+2026-07-21 17:19:58,026 [INFO] __main__: Non-interactive mode — running all stages
+2026-07-21 17:19:58,026 [INFO] aegis_phase1.v2.orchestrator: === RUN ALL STAGES ===
+2026-07-21 17:19:58,027 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-21 17:19:58,038 [INFO] aegis_phase1.v2.loader.common_loader: Loaded case data from YAML input (input/*.yaml)
+2026-07-21 17:19:58,038 [WARNING] aegis_phase1.v2.loader.common_loader: Taxonomy reference not found: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask/00_COMMON/00_Taxonomy_Reference.md
+2026-07-21 17:19:58,038 [WARNING] aegis_phase1.v2.loader.common_loader: Ontology file not found: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask/00_COMMON/phase1_ontology.yaml
+2026-07-21 17:19:58,728 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 0 regs (0.70s)
+2026-07-21 17:19:58,777 [INFO] aegis_phase1.v2.orchestrator: === STAGE 1: MAP ===
+2026-07-21 17:19:58,778 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-01): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,778 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-01): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,785 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-01): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,843 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-02): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,843 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-02): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,843 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-02): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,884 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-03): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,884 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-03): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,884 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-03): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,932 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-04): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,932 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-04): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,939 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-04): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,982 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-05): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,982 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-05): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:58,982 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-05): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,016 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-06): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,017 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-06): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,017 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-06): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,053 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-07): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,053 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-07): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,053 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-07): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,091 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-08): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,091 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-08): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,091 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-08): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,131 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-09): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,131 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-09): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,132 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-09): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,189 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-10): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,189 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-10): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,205 [INFO] aegis_phase1.v2.domain.filters.regs: filter_regs(D-10): ontology empty for domain, falling back to company_context.applicable_regs=['GDPR', 'CRA']
+2026-07-21 17:19:59,248 [INFO] aegis_phase1.v2.orchestrator: MAP complete: 10 domains in 0.47s — statuses={'FAILED': 10}
+2026-07-21 17:19:59,296 [INFO] aegis_phase1.v2.orchestrator: MAP seed_review: 10 review entries at /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask/review/adapted_objectives.yaml
+2026-07-21 17:19:59,296 [ERROR] aegis_phase1.v2.orchestrator: MAP partial failure: 10 domain(s) failed: ['D-01', 'D-02', 'D-03', 'D-04', 'D-05', 'D-06', 'D-07', 'D-08', 'D-09', 'D-10']
+2026-07-21 17:19:59,296 [ERROR] __main__: Pipeline aborted — MAP partial failure: 10 domain(s) failed: ['D-01', 'D-02', 'D-03', 'D-04', 'D-05', 'D-06', 'D-07', 'D-08', 'D-09', 'D-10']
+
+---
+RUNNER EXIT CODE: 2 (MAP partial failure — degraded state, expected per CORR-036 contract §T3)
+---
+STAGE 0 (LOAD): 38 sub-domains, 0 regs loaded in 0.70s
+STAGE 1 (MAP): FAILED — 10/10 domains, 'ontology empty for domain, falling back to company_context.applicable_regs'
+Pipeline aborted at STAGE 1. No stage 1b/1c outputs were produced.
