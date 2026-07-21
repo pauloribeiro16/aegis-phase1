@@ -670,6 +670,23 @@ def cmd_run_reduce(
     # Load v2 state
     orch.load(case_path, prep_path)
 
+    # CORR-043-T3 (Fix 3): precondition guard. ``--run-reduce`` depends
+    # on the MAP stage having already run (``--run-map`` or
+    # ``--run-all``). If Doc 07b (the structured compliance matrix) is
+    # missing, REDUCE has no per-domain LLM input to synthesize. Refuse
+    # to silently produce empty synthesis.
+    output_paths = orch.state.get("output_paths") or {}
+    doc_07b = output_paths.get("07b")
+    if not doc_07b or not Path(doc_07b).exists():
+        logger.error(
+            "cmd_run_reduce: precondition failed — Doc 07b missing.\n"
+            "  The MAP stage must run before REDUCE.\n"
+            "  Fix: run `--run-map` (or `--run-all`) first to produce\n"
+            "  Doc 07b (Structured Compliance Matrix). Then re-run\n"
+            "  `--run-reduce`."
+        )
+        sys.exit(1)
+
     # REDUCE stage (P1C-LLM-03 + P1C-LLM-02 via Phase1Executor)
     try:
         orch.reduce()
