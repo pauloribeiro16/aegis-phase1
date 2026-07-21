@@ -177,7 +177,7 @@ def run_audit(
     subdomains_with_orphan: list[str] = []
     verdict_counts: Counter[str] = Counter()
 
-    for shard in sorted(subdomains_dir.glob("D-*.json")):
+    for shard in sorted(subdomains_dir.rglob("D-*.json")):
         sid = shard.stem
         sd = json.loads(shard.read_text())
         csf_hint = sd.get("csf_hint") or []
