@@ -270,19 +270,23 @@ class Phase1Orchestrator:
     def _has_v2_keys(self) -> bool:
         return any(k.startswith("v2_") for k in self.state)
 
-    def _build_company_context(self, facts: Any) -> dict[str, Any]:
-        """Build a v1-shape company_context dict from v2 CompanyFacts.
+    def _build_company_context(self, facts: Any) -> Any:
+        """CORR-043-T2 (Fix 2): build a CompanyContext Pydantic instance.
 
-        Returns a Pydantic state.CompanyContext.model_dump() (dict). The
-        v1 schema (with required complexity_tier enum + revenue float) is
-        derivable from the v2 facts + a simple tier estimate based on
-        scale + employees.
+        Returns the Pydantic ``state.CompanyContext`` directly (not the
+        ``.model_dump()`` dict). This replaces the CORR-042 inline
+        ``isinstance(ctx, dict)`` shim in ``inputs.py`` with proper
+        Pydantic attribute access.
+
+        Note: the ``state['company_context']`` key in v2 state is a
+        Pydantic CompanyContext instance post-CORR-043-T2. Consumers
+        that need a dict (e.g. for JSON serialization) should call
+        ``.model_dump()`` explicitly. The applicability_context
+        module already does this for the v1 fallback path.
         """
         from aegis_phase1.models import ComplexityTier
         from aegis_phase1.v2.state import CompanyContext as _CC
 
-        # Lazy tier estimate (T4b shim). The proper tier assignment comes
-        # from a follow-up tier-assignment step in SP-B (CORR-038).
         employees = getattr(facts, "employees", 0) or 0
         if employees >= 250:
             tier = ComplexityTier.HIGH.value
@@ -302,7 +306,7 @@ class Phase1Orchestrator:
             complexity_tier=tier,
             security_fte=facts.security_fte or 0.0,
             tech_stack=list(facts.tech_stack or []),
-        ).model_dump()
+        )
 
     def _build_architecture_inventory(self) -> dict[str, list[dict[str, Any]]]:
         """Build v1-shape architecture_inventory (dict[str, list[dict]])."""
@@ -1708,9 +1712,11 @@ class Phase1Orchestrator:
         out: dict[str, list[dict[str, Any]]] = {"tipo2": [], "tipo3": []}
         if self.catalog_loader is None:
             return out
+        # CORR-043-T2 (Fix 2): company_context is a Pydantic CompanyContext
+        # post-CORR-043. Use attribute access. The v1 dict fallback
+        # (".get("tier")") is gone.
         tier = str(
-            company_context.get("complexity_tier")
-            or company_context.get("tier")
+            getattr(company_context, "complexity_tier", None)
             or "LOW"
         )
         try:

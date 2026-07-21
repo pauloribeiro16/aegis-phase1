@@ -154,22 +154,13 @@ def _case_id(state: V2State) -> str:
 
 
 def _project_company_context(ctx: Any) -> dict[str, Any]:
-    """Project the company context to the 7 fields the prompt needs.
+    """Project the CompanyContext Pydantic to the 7 fields the prompt needs.
 
-    CORR-042 inline fix: ctx may be a Pydantic CompanyContext or a
-    dict (v1-compat shim). Handle both.
+    CORR-043-T2 (Fix 2): ctx is a Pydantic CompanyContext (post-CORR-043).
+    Attribute access is used. If a dict sneaks in (e.g. loaded from
+    a persisted state.json from the CORR-042 era), the v1 compat
+    fallback in ``applicability_context.py:232`` handles it.
     """
-    if isinstance(ctx, dict):
-        return {
-            "company_name": ctx.get("company_name") or ctx.get("name") or "",
-            "scale": ctx.get("scale") or ctx.get("complexity_tier") or "LOW",
-            "sector": ctx.get("sector") or "",
-            "employees": ctx.get("employees") or 0,
-            "revenue": ctx.get("revenue") or 0,
-            "security_fte": ctx.get("security_fte") or 0.0,
-            "tech_stack": list(ctx.get("tech_stack") or []),
-            "applicable_regs": list(ctx.get("applicable_regs") or []),
-        }
     return {
         "company_name": ctx.company_name,
         "scale": ctx.scale,
@@ -224,18 +215,10 @@ def _build_track_b_suggestion(
             per_sub.append((sid, inheritability))
         inheritability = "INHERITABLE" if all(i == "INHERITABLE" for _, i in per_sub) else "BUILD_REQUIRED"
 
-    # CORR-042 inline fix: ctx may be dict (v1-compat shim) or Pydantic.
-    # Handle both so the legacy MAP path (assemble_inputs) doesn't crash.
-    if isinstance(ctx, dict):
-        scale_raw = ctx.get('scale') or ctx.get('complexity_tier') or 'LOW'
-        employees_raw = ctx.get('employees') or 0
-        fte_raw = ctx.get('security_fte') or 0.0
-    else:
-        scale_raw = ctx.scale
-        employees_raw = ctx.employees
-        fte_raw = ctx.security_fte
-    scale_norm = _normalise_scale(scale_raw, employees_raw)
-    fte = fte_raw if fte_raw > 0 else 0.0
+    # CORR-043-T2 (Fix 2): ctx is a Pydantic CompanyContext. Attribute
+    # access only (no dict fallback — the shim is gone).
+    scale_norm = _normalise_scale(ctx.scale, ctx.employees)
+    fte = ctx.security_fte if ctx.security_fte > 0 else 0.0
 
     track_b = TrackB()
     tiers: list[str] = []
@@ -272,8 +255,8 @@ def _build_track_b_suggestion(
         "attrs": {
             "inheritability": inheritability,
             "scale": scale_norm,
-            # CORR-042 inline fix: ctx may be dict (v1-compat shim)
-            "scale_original": ctx.get("scale") if isinstance(ctx, dict) else ctx.scale,
+            # CORR-043-T2 (Fix 2): ctx is a Pydantic CompanyContext
+            "scale_original": ctx.scale,
             "priority": _DEFAULT_PRIORITY,
             "by_subdomain": attrs_by_sub,
         },

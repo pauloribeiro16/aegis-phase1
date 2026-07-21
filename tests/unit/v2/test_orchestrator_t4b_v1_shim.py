@@ -37,13 +37,15 @@ def test_shim_populates_company_context(tmp_work_dir: Path) -> None:
     orch._load_v2_catalog("cases/case1-tinytask")
     # The shim is called inside _load_v2_catalog
     assert "company_context" in orch.state
+    # CORR-043-T2 (Fix 2): post-CORR-043, company_context is a Pydantic
+    # CompanyContext (not a dict). Use attribute access.
     cc = orch.state["company_context"]
-    assert cc["company_name"] == "TinyTask Lda."
-    assert cc["employees"] == 8
-    assert cc["revenue"] == 2000000.0
-    assert cc["scale"] == "MICRO"
-    assert cc["applicable_regs"] == ["CRA", "GDPR"]
-    assert cc["complexity_tier"] == "LOW"  # 8 employees < 50
+    assert cc.company_name == "TinyTask Lda."
+    assert cc.employees == 8
+    assert cc.revenue == 2000000.0
+    assert cc.scale == "MICRO"
+    assert list(cc.applicable_regs) == ["CRA", "GDPR"]
+    assert cc.complexity_tier == "LOW"  # 8 employees < 50
 
 
 def test_shim_populates_ontology(tmp_work_dir: Path) -> None:
@@ -147,6 +149,7 @@ def test_shim_is_idempotent(tmp_work_dir: Path) -> None:
     orch._load_v2_catalog("cases/case1-tinytask")
     cc2 = orch.state["company_context"]
     ont2 = orch.state["ontology"]
-    # Idempotent (may have new Pydantic instances but equal content)
-    assert cc1 == cc2
+    # Idempotent (may have new Pydantic instances but equal content).
+    # Use model_dump() so the comparison is content-based (not identity).
+    assert cc1.model_dump() == cc2.model_dump()
     assert ont1 == ont2
