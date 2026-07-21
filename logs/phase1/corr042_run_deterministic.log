@@ -1,0 +1,18 @@
+2026-07-21 22:26:03,464 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-21 22:26:03,464 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-21 22:26:03,464 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-21 22:26:03,464 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-21 22:26:03,688 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=e21fa94f6cbcafe7911990c74cbd1541
+2026-07-21 22:26:03,688 [INFO] __main__: Non-interactive mode — deterministic docs only (skip MAP/REDUCE)
+2026-07-21 22:26:03,688 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-21 22:26:03,768 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 2 regs (0.08s)
+2026-07-21 22:26:03,871 [INFO] aegis_phase1.v2.orchestrator: === STAGE 3a: OUTPUT (DETERMINISTIC) ===
+2026-07-21 22:26:25,337 [INFO] aegis_phase1.v2.orchestrator: OUTPUT (deterministic) complete: 6 artefacts in 21.46s -> /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-21 22:26:25,428 [INFO] __main__: === DETERMINISTIC DOCS COMPLETE ===
+  AEGIS-P1-04: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/04_Company_Context_Assessment_v2.md
+  AEGIS-P1-05: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/05_Regulatory_Applicability_v2.md
+  AEGIS-P1-06: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/06_Clause_Mapping_Matrix_v2.md
+  AEGIS-P1-07: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/07_Structured_Compliance_Matrix_v2.md
+  AEGIS-P1-07b: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/07b_Proportionality_Profile_v2.md
+  AEGIS-P1-XLSX: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/Case_01_Phase1_v16.xlsx
+  total: 6 artefacts

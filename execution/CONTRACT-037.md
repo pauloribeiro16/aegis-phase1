@@ -706,3 +706,17 @@ python -m aegis_phase1.v2.runner --run-all cases/case1-tinytask
   criada a partir do main actualizado. Contrato define T1-T5 com API
   pública, Pydantic models, testes, gates, e estrutura de commits.
   Implementação começa em sessão seguinte.
+
+---
+
+## Verdict pós-execução (CORR-042, 2026-07-21)
+
+**Status:** ✅ PASS
+
+**Evidence:**
+- Run end-to-end REAL (sem MOCK_LLM) com Ollama gemma4:e2b
+- Gates executados em: feature/aegis-p1-corr-042 @ commit de T7
+- Parity report: logs/phase1/corr042_parity_report.md
+- Run logs: logs/phase1/corr042_run_*.log
+- Errors post-mortem: logs/phase1/corr042_errors.md
+Parity 9/9 PASS. CORR-037 (loaders) verde; preproc_catalog + case_profile + v1 deprecation. Tests v2 passam.

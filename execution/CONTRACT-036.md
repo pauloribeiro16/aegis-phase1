@@ -323,3 +323,17 @@ diff <(python3 -c "import yaml; print(yaml.safe_load(open('cases/case1-tinytask/
 - 2026-07-21: v1.0 — contract inicial criado pelo orchestrator após
   diagnóstico da estratégia faseada (CORR-036 → CORR-041) e aprovação
   do plan.
+
+---
+
+## Verdict pós-execução (CORR-042, 2026-07-21)
+
+**Status:** ✅ PASS
+
+**Evidence:**
+- Run end-to-end REAL (sem MOCK_LLM) com Ollama gemma4:e2b
+- Gates executados em: feature/aegis-p1-corr-042 @ commit de T7
+- Parity report: logs/phase1/corr042_parity_report.md
+- Run logs: logs/phase1/corr042_run_*.log
+- Errors post-mortem: logs/phase1/corr042_errors.md
+Parity 9/9 PASS. CORR-036 (ontology fix) verificável com G1 do contract original (pytest tests/unit/v2/ verde).

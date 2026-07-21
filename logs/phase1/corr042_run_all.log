@@ -1,0 +1,47 @@
+2026-07-21 22:42:16,917 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-21 22:42:16,917 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-21 22:42:16,918 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-21 22:42:16,918 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-21 22:42:17,130 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=2869b47f42480b8bea0ffc6775927681
+2026-07-21 22:42:17,131 [INFO] __main__: Non-interactive mode — running all stages
+2026-07-21 22:42:17,131 [INFO] aegis_phase1.v2.orchestrator: === RUN ALL STAGES ===
+2026-07-21 22:42:17,131 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-21 22:42:17,212 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 2 regs (0.08s)
+2026-07-21 22:42:17,315 [INFO] aegis_phase1.v2.orchestrator: === STAGE 1: MAP ===
+2026-07-21 22:42:17,328 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM Phase1Executor instantiated: model=gemma4:e2b (source=llm_invoker, invoker_type=UnifiedInvoker)
+[22:42:43] [ERROR] PYTHON_ERROR ?: 'str' object has no attribute 'get'
+2026-07-21 22:42:43,900 [ERROR] phase1.stdout.phase1: [ERROR] PYTHON_ERROR ?: 'str' object has no attribute 'get'
+[22:43:04] [ERROR] PYTHON_ERROR ?: 'str' object has no attribute 'get'
+2026-07-21 22:43:04,813 [ERROR] phase1.stdout.phase1: [ERROR] PYTHON_ERROR ?: 'str' object has no attribute 'get'
+2026-07-21 22:43:04,813 [WARNING] aegis_phase1.v2.orchestrator: P1C-LLM-01 MAP path failed ('NoneType' object has no attribute 'get') — falling back to legacy loop
+2026-07-21 22:48:03,290 [INFO] aegis_phase1.v2.orchestrator: MAP complete: 10 domains in 345.97s — statuses={'OK': 10}
+2026-07-21 22:48:03,411 [INFO] aegis_phase1.v2.orchestrator: MAP seed_review: 10 review entries at /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask/review/adapted_objectives.yaml
+2026-07-21 22:48:03,411 [INFO] aegis_phase1.v2.orchestrator: === STAGE 1.5: PHASE 1B RATIONALE ===
+[22:48:18] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (14748ms, 2827 tok)
+2026-07-21 22:48:18,260 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (14748ms, 2827 tok)
+[22:48:29] [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (10943ms, 2974 tok)
+2026-07-21 22:48:29,227 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (10943ms, 2974 tok)
+[22:48:42] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (12917ms, 3156 tok)
+2026-07-21 22:48:42,204 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (12917ms, 3156 tok)
+[22:48:54] [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (11935ms, 3102 tok)
+2026-07-21 22:48:54,163 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (11935ms, 3102 tok)
+2026-07-21 22:48:54,163 [INFO] aegis_phase1.v2.orchestrator: Phase 1B RATIONALE complete for 1 regulation(s) (status=?)
+2026-07-21 22:48:54,282 [INFO] aegis_phase1.v2.orchestrator: === STAGE 2: REDUCE ===
+2026-07-21 22:48:54,283 [INFO] aegis_phase1.v2.reduce.concatenator: concatenate: 10 domains -> 38 subdomains, 10 adapted_objectives
+2026-07-21 22:48:54,283 [INFO] aegis_phase1.v2.reduce.merger: merge_requirements: 38 subdomains merged, 0 total requirements kept
+2026-07-21 22:48:54,283 [INFO] aegis_phase1.v2.reduce.conflict_resolver: resolve_conflicts: 0 ambiguities processed (0 resolved, 0 remaining)
+2026-07-21 22:48:54,283 [INFO] aegis_phase1.v2.reduce.proportionality: apply_proportionality: 38 subdomains profiled (scale=MICRO, fte=0.00)
+[22:49:16] [INFO] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → OK (21749ms, 4096 tok)
+2026-07-21 22:49:16,048 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → OK (21749ms, 4096 tok)
+[22:49:28] [INFO] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → OK (12133ms, 3065 tok)
+2026-07-21 22:49:28,211 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → OK (12133ms, 3065 tok)
+2026-07-21 22:49:28,212 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM complete: synthesis=OK, compound_events=OK, status=OK
+2026-07-21 22:49:28,212 [INFO] aegis_phase1.v2.orchestrator: REDUCE complete: 38 subdomains profiled (33.93s)
+2026-07-21 22:49:28,360 [INFO] aegis_phase1.v2.orchestrator: === STAGE 3: OUTPUT (composite) ===
+2026-07-21 22:49:28,360 [INFO] aegis_phase1.v2.orchestrator: === STAGE 3a: OUTPUT (DETERMINISTIC) ===
+2026-07-21 22:49:51,915 [INFO] aegis_phase1.v2.orchestrator: OUTPUT (deterministic) complete: 6 artefacts in 23.56s -> /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-21 22:49:52,015 [INFO] aegis_phase1.v2.orchestrator: === STAGE 3b: OUTPUT (ENHANCED) ===
+2026-07-21 22:51:18,093 [INFO] aegis_phase1.v2.orchestrator: OUTPUT (enhanced) complete: 10 artefacts in 86.08s -> /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-21 22:51:18,196 [INFO] aegis_phase1.v2.orchestrator: === PIPELINE OUTPUT COMPLETE ===
+2026-07-21 22:51:18,196 [INFO] aegis_phase1.v2.orchestrator: === PIPELINE COMPLETE ===
+2026-07-21 22:51:18,196 [INFO] __main__: Pipeline complete

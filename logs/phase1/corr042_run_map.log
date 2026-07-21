@@ -1,0 +1,22 @@
+2026-07-21 22:33:35,811 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-21 22:33:35,812 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-21 22:33:35,812 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-21 22:33:35,812 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-21 22:33:36,028 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=72a078a79fe3b5feffd985f819ba731c
+2026-07-21 22:33:36,028 [INFO] __main__: Non-interactive mode — MAP only (CORR-040; P1C-LLM-01)
+2026-07-21 22:33:36,030 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-21 22:33:36,115 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 2 regs (0.08s)
+2026-07-21 22:33:36,206 [INFO] aegis_phase1.v2.orchestrator: === STAGE 1: MAP ===
+2026-07-21 22:33:36,221 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM Phase1Executor instantiated: model=gemma4:e2b (source=llm_invoker, invoker_type=UnifiedInvoker)
+[22:34:02] [ERROR] PYTHON_ERROR ?: 'str' object has no attribute 'get'
+2026-07-21 22:34:02,685 [ERROR] phase1.stdout.phase1: [ERROR] PYTHON_ERROR ?: 'str' object has no attribute 'get'
+[22:34:23] [ERROR] PYTHON_ERROR ?: 'str' object has no attribute 'get'
+2026-07-21 22:34:23,529 [ERROR] phase1.stdout.phase1: [ERROR] PYTHON_ERROR ?: 'str' object has no attribute 'get'
+2026-07-21 22:34:23,530 [WARNING] aegis_phase1.v2.orchestrator: P1C-LLM-01 MAP path failed ('NoneType' object has no attribute 'get') — falling back to legacy loop
+2026-07-21 22:39:31,453 [INFO] aegis_phase1.v2.orchestrator: MAP complete: 10 domains in 355.25s — statuses={'OK': 10}
+2026-07-21 22:39:31,575 [INFO] aegis_phase1.v2.orchestrator: MAP seed_review: 10 review entries at /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask/review/adapted_objectives.yaml
+2026-07-21 22:39:39,569 [INFO] __main__: cmd_run_map: 10/10 lanes OK, 0 failed, 0 sub_domain_activations, 2 artefacts
+2026-07-21 22:39:39,569 [INFO] __main__: === MAP COMPLETE ===
+  AEGIS-P1-07: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/07_Structured_Compliance_Matrix_v2.md
+  AEGIS-P1-07b: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/07b_Proportionality_Profile_v2.md
+  total: 2 artefacts

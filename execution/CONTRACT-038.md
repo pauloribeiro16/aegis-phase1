@@ -571,3 +571,17 @@ threshold contra `Methodology-main/02_CASES/Case_01_TinyTask_SaaS/01_PHASE1_CONT
   `feature/aegis-p1-corr-038` baseada em main pós-CORR-037. Contrato
   define T1-T5 com API pública, gate criteria, estrutura de commits,
   e risks. Implementação começa em sessão seguinte.
+
+---
+
+## Verdict pós-execução (CORR-042, 2026-07-21)
+
+**Status:** ✅ PASS
+
+**Evidence:**
+- Run end-to-end REAL (sem MOCK_LLM) com Ollama gemma4:e2b
+- Gates executados em: feature/aegis-p1-corr-042 @ commit de T7
+- Parity report: logs/phase1/corr042_parity_report.md
+- Run logs: logs/phase1/corr042_run_*.log
+- Errors post-mortem: logs/phase1/corr042_errors.md
+Parity 9/9 PASS. CORR-038 (ApplicabilityContext + Doc 04/05 + --run-applicability) — Doc 04 + 05 keywords match; applicable_regs == [GDPR, CRA] confirmado.

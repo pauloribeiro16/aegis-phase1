@@ -1,0 +1,23 @@
+2026-07-21 22:26:34,996 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-21 22:26:34,996 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-21 22:26:34,996 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-21 22:26:34,996 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-21 22:26:35,205 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=83728e7b503db12023a360fe681d1462
+2026-07-21 22:26:35,205 [INFO] __main__: Non-interactive mode — Phase 1B only (CORR-039; with LLM)
+2026-07-21 22:26:35,217 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-21 22:26:35,303 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 2 regs (0.09s)
+2026-07-21 22:26:35,410 [INFO] aegis_phase1.v2.orchestrator: === STAGE 1.5: PHASE 1B RATIONALE ===
+2026-07-21 22:26:35,424 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM Phase1Executor instantiated: model=gemma4:e2b (source=llm_invoker, invoker_type=UnifiedInvoker)
+[22:26:51] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (16468ms, 3021 tok)
+2026-07-21 22:26:51,981 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (16468ms, 3021 tok)
+[22:27:02] [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (10262ms, 2999 tok)
+2026-07-21 22:27:02,278 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (10262ms, 2999 tok)
+[22:27:14] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (12018ms, 3156 tok)
+2026-07-21 22:27:14,343 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (12018ms, 3156 tok)
+[22:27:25] [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (11525ms, 3143 tok)
+2026-07-21 22:27:25,891 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (11525ms, 3143 tok)
+2026-07-21 22:27:25,891 [INFO] aegis_phase1.v2.orchestrator: Phase 1B RATIONALE complete for 2 regulation(s) (status=?)
+2026-07-21 22:27:37,082 [INFO] __main__: cmd_run_phase_1b: wrote 1 artefacts to /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1; rationale_by_reg has 2 entries
+2026-07-21 22:27:37,082 [INFO] __main__: === PHASE 1B COMPLETE ===
+  AEGIS-P1-05: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/05_Regulatory_Applicability_v2.md
+  total: 1 artefacts

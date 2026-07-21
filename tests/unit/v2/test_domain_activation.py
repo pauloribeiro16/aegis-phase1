@@ -351,8 +351,10 @@ def test_cmd_run_map_handles_map_failure() -> None:
 
     with tempfile.TemporaryDirectory() as work:
         with tempfile.TemporaryDirectory() as out:
+            from aegis_phase1.v2.llm import MockInvoker
             o = Phase1Orchestrator(
                 work_dir=work,
+                llm_invoker=MockInvoker(),
                 preproc_catalog=PreprocCatalogLoader(preproc_root="preproc_out"),
                 case_profile_loader=CaseProfileLoader(Path("cases/case1-tinytask")),
                 catalog_loader=CatalogLoader(root=get_prompts_root() / "catalogs"),
@@ -383,8 +385,10 @@ def test_cmd_run_map_with_mock_llm_produces_docs() -> None:
 
         with tempfile.TemporaryDirectory() as work:
             with tempfile.TemporaryDirectory() as out:
+                from aegis_phase1.v2.llm import MockInvoker
                 o = Phase1Orchestrator(
                     work_dir=work,
+                    llm_invoker=MockInvoker(),
                     preproc_catalog=PreprocCatalogLoader(preproc_root="preproc_out"),
                     case_profile_loader=CaseProfileLoader(Path("cases/case1-tinytask")),
                     catalog_loader=CatalogLoader(root=get_prompts_root() / "catalogs"),

@@ -1,0 +1,37 @@
+2026-07-21 22:39:46,828 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-21 22:39:46,828 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-21 22:39:46,828 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-21 22:39:46,828 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-21 22:39:47,067 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=5c28075deb42b09a4e23eb4149bebcac
+2026-07-21 22:39:47,067 [INFO] __main__: Non-interactive mode — REDUCE only (CORR-041; P1C-LLM-03/02)
+2026-07-21 22:39:47,067 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-21 22:39:47,157 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 2 regs (0.09s)
+2026-07-21 22:39:47,273 [INFO] aegis_phase1.v2.orchestrator: === STAGE 2: REDUCE ===
+2026-07-21 22:39:47,274 [INFO] aegis_phase1.v2.reduce.concatenator: concatenate: 0 domains -> 0 subdomains, 0 adapted_objectives
+2026-07-21 22:39:47,274 [INFO] aegis_phase1.v2.reduce.merger: merge_requirements: 0 subdomains merged, 0 total requirements kept
+2026-07-21 22:39:47,274 [INFO] aegis_phase1.v2.reduce.conflict_resolver: resolve_conflicts: 0 ambiguities processed (0 resolved, 0 remaining)
+2026-07-21 22:39:47,274 [INFO] aegis_phase1.v2.reduce.proportionality: apply_proportionality: 0 subdomains profiled (scale=MICRO, fte=0.00)
+2026-07-21 22:39:47,288 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM Phase1Executor instantiated: model=gemma4:e2b (source=llm_invoker, invoker_type=UnifiedInvoker)
+[22:40:14] [WARNING] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → SCHEMA_ERROR (27301ms, 4096 tok)
+2026-07-21 22:40:14,608 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → SCHEMA_ERROR (27301ms, 4096 tok)
+[22:40:14]   citation: {'path': 'doc07b_refs', 'message': 'Doc 07b file does not exist: Doc 07b Row A (Evidence Mapping)', 'ref': 'Doc 07b Row A (Evidence Mapping)'}
+2026-07-21 22:40:14,608 [ERROR] phase1.stdout.phase1:   citation: {'path': 'doc07b_refs', 'message': 'Doc 07b file does not exist: Doc 07b Row A (Evidence Mapping)', 'ref': 'Doc 07b Row A (Evidence Mapping)'}
+[22:40:14]   citation: {'path': 'doc07b_refs', 'message': 'Doc 07b file does not exist: Doc 07b Row B (Regulatory Overlap)', 'ref': 'Doc 07b Row B (Regulatory Overlap)'}
+2026-07-21 22:40:14,608 [ERROR] phase1.stdout.phase1:   citation: {'path': 'doc07b_refs', 'message': 'Doc 07b file does not exist: Doc 07b Row B (Regulatory Overlap)', 'ref': 'Doc 07b Row B (Regulatory Overlap)'}
+[22:40:35] [WARNING] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → SCHEMA_ERROR (21162ms, 4096 tok)
+2026-07-21 22:40:35,783 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → SCHEMA_ERROR (21162ms, 4096 tok)
+[22:40:35]   citation: {'path': 'doc07b_refs', 'message': 'Doc 07b file does not exist: Doc 07b Row A (Evidence Mapping)', 'ref': 'Doc 07b Row A (Evidence Mapping)'}
+2026-07-21 22:40:35,783 [ERROR] phase1.stdout.phase1:   citation: {'path': 'doc07b_refs', 'message': 'Doc 07b file does not exist: Doc 07b Row A (Evidence Mapping)', 'ref': 'Doc 07b Row A (Evidence Mapping)'}
+[22:40:35]   citation: {'path': 'doc07b_refs', 'message': 'Doc 07b file does not exist: Doc 07b Row B (Cross-Domain Linkage)', 'ref': 'Doc 07b Row B (Cross-Domain Linkage)'}
+2026-07-21 22:40:35,783 [ERROR] phase1.stdout.phase1:   citation: {'path': 'doc07b_refs', 'message': 'Doc 07b file does not exist: Doc 07b Row B (Cross-Domain Linkage)', 'ref': 'Doc 07b Row B (Cross-Domain Linkage)'}
+[22:40:42] [INFO] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → OK (6907ms, 2639 tok)
+2026-07-21 22:40:42,713 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → OK (6907ms, 2639 tok)
+2026-07-21 22:40:42,714 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM complete: synthesis=OK, compound_events=OK, status=MIXED
+2026-07-21 22:40:42,714 [INFO] aegis_phase1.v2.orchestrator: REDUCE complete: 0 subdomains profiled (55.44s)
+2026-07-21 22:42:10,701 [INFO] __main__: cmd_run_reduce: status=EMPTY, 0 compound events, 0 per-reg rationale, 4 artefacts
+2026-07-21 22:42:10,702 [INFO] __main__: === REDUCE COMPLETE ===
+  AEGIS-P1-04a: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/04a_Architecture_DataInventory_v2.md
+  AEGIS-P1-04b: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/04b_Security_Posture_v2.md
+  AEGIS-P1-04c: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/04c_ThirdParty_Landscape_v2.md
+  AEGIS-P1-04d: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/04d_Org_Roles_RACI_v2.md
+  total: 4 artefacts

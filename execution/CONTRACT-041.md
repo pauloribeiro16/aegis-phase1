@@ -194,3 +194,17 @@ Próximos contracts (pós-sprint):
 ## Change log
 
 - 2026-07-21: v1.0 — contract final da estratégia CORR-036 → CORR-041.
+
+---
+
+## Verdict pós-execução (CORR-042, 2026-07-21)
+
+**Status:** ✅ PASS
+
+**Evidence:**
+- Run end-to-end REAL (sem MOCK_LLM) com Ollama gemma4:e2b
+- Gates executados em: feature/aegis-p1-corr-042 @ commit de T7
+- Parity report: logs/phase1/corr042_parity_report.md
+- Run logs: logs/phase1/corr042_run_*.log
+- Errors post-mortem: logs/phase1/corr042_errors.md
+Parity 9/9 PASS. CORR-041 (SynthesisContext + --run-reduce + parity) — 1 P1C-LLM-03 SCHEMA_ERROR quando --run-reduce em isolamento (Doc 07b não existe); 1 P1C-LLM-02 OK. Em --run-all, P1C-LLM-03 OK (21749ms, 4096 tokens).
