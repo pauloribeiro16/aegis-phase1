@@ -38,6 +38,22 @@ from aegis_phase1.prompts_v2.validator import Phase1Validator
 from aegis_phase1.llm.unified import OllamaUnreachableError, probe_ollama
 
 
+# CORR-042-T3: Specs that require deterministic catalogs.
+# These specs reference tipo2 / tipo3 / scope_overlap / event_templates
+# YAML content during prompt rendering. If self.catalogs is None, the
+# LLM prompt is incomplete and the call would fail silently (returning
+# INSUFFICIENT_EVIDENCE or empty parsed_output). The guard below makes
+# the failure explicit at construction-or-invocation time.
+_CATALOG_REQUIRED_SPECS: frozenset[str] = frozenset({
+    "P1B-LLM-01-INTERPRETATION",      # tipo2 + tipo3
+    "P1B-LLM-02-RATIONALE",          # inherits tipo2/tipo3 from 01
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION",  # scope_overlap_predicates
+    "P1C-LLM-02-COMPOUND-EVENT",      # event_templates
+    # P1C-LLM-03-STRATEGIC-SYNTHESIS does NOT require catalogs
+    # (consumes doc07b as constraint, no tipo2/tipo3/event lookup).
+})
+
+
 class Phase1LLMInvoker:
     """Orchestrates a single Phase 1 LLM call with retry + logging + validation."""
 
@@ -69,6 +85,59 @@ class Phase1LLMInvoker:
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self._langfuse_handler = langfuse_handler
 
+    def _load_catalogs_for(self, prompt_spec_id: str) -> dict[str, list[dict[str, Any]]]:
+        """CORR-042-T3: guard for catalog-dependent Phase 1 LLMs.
+
+        Returns the catalog content for ``prompt_spec_id`` if it is in
+        ``_CATALOG_REQUIRED_SPECS``. Raises ``RuntimeError`` with a
+        helpful message if ``self.catalogs`` is None — preventing the
+        silent-smoking-gun regression of LLM calls being made with
+        empty catalog context.
+
+        For specs not in the set (e.g. P1C-LLM-03), returns an empty
+        dict and does NOT touch ``self.catalogs`` (which may be None).
+
+        Catalog names loaded per spec (matches PROMPTS/P1?-LLM-*.md
+        references and the catalog content of
+        ``00_METHODOLOGY/PROMPTS/catalogs/``):
+          - P1B-LLM-01: tipo2_interpretations, tipo3_derogations
+          - P1B-LLM-02: tipo2, tipo3 (consumes LLM-01's filtered output too)
+          - P1C-LLM-01: scope_overlap_predicates
+          - P1C-LLM-02: event_templates
+          - P1C-LLM-03: (none)
+        """
+        if prompt_spec_id not in _CATALOG_REQUIRED_SPECS:
+            return {}
+        if self.catalogs is None:
+            raise RuntimeError(
+                f"catalog_loader is None but prompt {prompt_spec_id} requires "
+                f"deterministic catalogs (tipo2/tipo3/scope_overlap/event_templates). "
+                f"Wire a CatalogLoader at Phase1LLMInvoker construction time. "
+                f"(CORR-042 anti-regression guard; original smoking gun was "
+                f"v2/orchestrator.py never passing catalog_loader — see CORR-039-T1.)"
+            )
+        out: dict[str, list[dict[str, Any]]] = {}
+        try:
+            if prompt_spec_id == "P1B-LLM-01-INTERPRETATION":
+                out["tipo2"] = self.catalogs.load("tipo2_interpretations")
+                out["tipo3"] = self.catalogs.load("tipo3_derogations")
+            elif prompt_spec_id == "P1B-LLM-02-RATIONALE":
+                out["tipo2"] = self.catalogs.load("tipo2_interpretations")
+                out["tipo3"] = self.catalogs.load("tipo3_derogations")
+            elif prompt_spec_id == "P1C-LLM-01-OVERLAP-CLASSIFICATION":
+                out["scope_overlap_predicates"] = self.catalogs.load(
+                    "scope_overlap_predicates"
+                )
+            elif prompt_spec_id == "P1C-LLM-02-COMPOUND-EVENT":
+                out["event_templates"] = self.catalogs.load("event_templates")
+        except Exception as e:
+            logger.warning(
+                "Catalog load failed for %s: %s — proceeding with empty content",
+                prompt_spec_id, e,
+            )
+            out = {}
+        return out
+
     def invoke(
         self,
         spec_id: str,
@@ -98,6 +167,15 @@ class Phase1LLMInvoker:
         max_retries = max_retries if max_retries is not None else self.DEFAULT_MAX_RETRIES
         invocation_pattern = get_invocation_pattern(spec_id)
         stage = get_stage(spec_id)
+
+        # CORR-042-T3: guard against missing catalog_loader for the
+        # 4 catalog-dependent specs. Raises RuntimeError if a catalog
+        # is required but not wired. No-op for P1C-LLM-03.
+        try:
+            self._load_catalogs_for(spec_id)
+        except RuntimeError:
+            # Re-raise — this is a configuration error, not a recoverable one.
+            raise
 
         if config is None:
             config = {}
