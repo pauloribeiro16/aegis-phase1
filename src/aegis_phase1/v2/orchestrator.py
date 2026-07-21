@@ -68,7 +68,7 @@ class Phase1Orchestrator:
             preproc_catalog: CORR-037-T1 typed JSON loader for preproc_out/.
                 Optional. When provided, stored on self.preproc_catalog for
                 downstream use (SP-B/C/D). When None, ``load()`` falls back
-                to the v1 loaders (CommonLoader/SubDomainLoader/PreprocessingLoader).
+                to the v1 loaders (CommonLoader, legacy PreprocessingLoader).
             case_profile_loader: CORR-037-T2 typed YAML loader for case
                 inputs. Optional. Same opt-in pattern as preproc_catalog.
         """
@@ -174,6 +174,127 @@ class Phase1Orchestrator:
             except Exception as e:
                 logger.warning("T3a: preproc_catalog failed (%s) — v2_* keys not set", e)
 
+        # CORR-037-T4b: SHIM — populate legacy v1 state keys from v2 sources
+        # so the 8 output consumers (doc_04*.py, doc_05..07.py, xlsx_generator.py)
+        # can read meaningful data without code changes. Future T4c contract
+        # migrates consumers to read v2_* keys directly and drops the shim.
+        self._populate_v1_state_keys_from_v2()
+
+    def _populate_v1_state_keys_from_v2(self) -> None:
+        """SHIM: derive legacy v1 state keys (company_context, ontology,
+        architecture_inventory, business_goals, stakeholders, regulations,
+        subdomains) from the v2_* keys populated by ``_load_v2_catalog``.
+
+        Only populates a key if the v1 key is not already meaningfully
+        populated (i.e. empty / None / missing). Preserves the v1 loaders'
+        output when both paths coexist.
+        """
+        if not self._has_v2_keys():
+            return
+
+        facts = self.state.get("v2_company_facts")
+        if facts is not None and not self.state.get("company_context"):
+            self.state["company_context"] = self._build_company_context(facts)
+
+        applicable = self.state.get("v2_applicable_regs", [])
+        if applicable and not self.state.get("regulations"):
+            self.state["regulations"] = list(applicable)
+
+        if not self.state.get("architecture_inventory"):
+            self.state["architecture_inventory"] = self._build_architecture_inventory()
+
+        if not self.state.get("ontology"):
+            self.state["ontology"] = self._build_ontology_shim()
+
+        if not self.state.get("preprocessing"):
+            self.state["preprocessing"] = self._build_preprocessing_shim()
+
+        if not self.state.get("stakeholders"):
+            profile = self.state.get("v2_company_profile")
+            if profile is not None:
+                self.state["stakeholders"] = [s.model_dump() for s in profile.stakeholders]
+
+        if not self.state.get("business_goals"):
+            profile = self.state.get("v2_company_profile")
+            if profile is not None:
+                self.state["business_goals"] = [g.model_dump() for g in profile.business_goals]
+
+        if not self.state.get("taxonomy_entries"):
+            self.state["taxonomy_entries"] = []
+
+    def _has_v2_keys(self) -> bool:
+        return any(k.startswith("v2_") for k in self.state)
+
+    def _build_company_context(self, facts: Any) -> dict[str, Any]:
+        """Build a v1-shape company_context dict from v2 CompanyFacts.
+
+        Returns a Pydantic state.CompanyContext.model_dump() (dict). The
+        v1 schema (with required complexity_tier enum + revenue float) is
+        derivable from the v2 facts + a simple tier estimate based on
+        scale + employees.
+        """
+        from aegis_phase1.models import ComplexityTier
+        from aegis_phase1.v2.state import CompanyContext as _CC
+
+        # Lazy tier estimate (T4b shim). The proper tier assignment comes
+        # from a follow-up tier-assignment step in SP-B (CORR-038).
+        employees = getattr(facts, "employees", 0) or 0
+        if employees >= 250:
+            tier = ComplexityTier.HIGH.value
+        elif employees >= 50:
+            tier = ComplexityTier.MEDIUM.value
+        else:
+            tier = ComplexityTier.LOW.value
+
+        return _CC(
+            company_name=facts.name,
+            sector=facts.sector,
+            jurisdiction=facts.jurisdiction,
+            employees=facts.employees,
+            revenue=float(facts.revenue_eur),
+            scale=facts.scale,
+            applicable_regs=list(self.state.get("v2_applicable_regs", [])),
+            complexity_tier=tier,
+            security_fte=facts.security_fte or 0.0,
+            tech_stack=list(facts.tech_stack or []),
+        ).model_dump()
+
+    def _build_architecture_inventory(self) -> dict[str, list[dict[str, Any]]]:
+        """Build v1-shape architecture_inventory (dict[str, list[dict]])."""
+        profile = self.state.get("v2_company_profile")
+        if profile is None:
+            return {}
+        arch = profile.architecture
+        return {
+            "N.1_systems": list(arch.systems),
+            "N.2_auth": list(arch.auth_systems),
+            "N.3_cloud": list(arch.cloud_services),
+            "N.4_data_flows": list(arch.data_flows),
+            "N.5_data_stores": list(arch.data_stores),
+            "N.6_other": [],
+        }
+
+    def _build_ontology_shim(self) -> dict[str, Any]:
+        """Build v1-shape ontology from v2 pairs.
+
+        v1 ontology had: overlaps, regulations, source_regulations, stacks.
+        v2 sources give us: v2_pairs (cross-regulation pairs) and
+        v2_applicable_regs.
+        """
+        return {
+            "regulations": list(self.state.get("v2_applicable_regs", [])),
+            "overlaps": [p.model_dump() for p in self.state.get("v2_pairs", [])],
+            "source_regulations": {},
+            "stacks": [],
+        }
+
+    def _build_preprocessing_shim(self) -> dict[str, Any]:
+        """Build v1-shape preprocessing from v2 pairs + audit."""
+        return {
+            "cross_regulation": [p.model_dump() for p in self.state.get("v2_pairs", [])],
+            "audit_both_pass": self.state.get("v2_audit_both_pass", False),
+        }
+
     def set_skip_phase_1b(self, skip: bool) -> None:
         """Toggle skipping of Phase 1B RATIONALE LLM calls. Default: False.
 
@@ -245,7 +366,7 @@ class Phase1Orchestrator:
         # Subdomain objects (with hso_hl / hso_per_reg / security_requirements
         # / pairs) are now transparently normalized to the v1 SubDomainDef
         # shape by v2.domain.filters.subdomains._summarize.
-        # Fall back to v1 SubDomainLoader (regex-parsed MD) for backwards
+        # Fall back to v1 regex-parsed MD loader for backwards
         # compatibility when no preproc_catalog is injected.
         if self.preproc_catalog is not None:
             subs_list = self.preproc_catalog.load_subdomains()
@@ -253,7 +374,7 @@ class Phase1Orchestrator:
             # to match the v1 state shape (dict keyed by sub-id).
             self.state["subdomains"] = {s.id: s for s in subs_list}
         else:
-            # CORR-037-T4: SubDomainLoader was removed (regex parsing of MDs).
+            # CORR-037-T4: regex-MD loader was removed.
             # Fallback when no preproc_catalog is provided: empty dict. New
             # code should always inject a preproc_catalog.
             logger.warning(

@@ -15,7 +15,40 @@ References:
 import logging
 from pathlib import Path
 
-from aegis_phase1.v2.loader import _parse_yaml_frontmatter, _strip_frontmatter
+# CORR-037-T4b: inlined from aegis_phase1.v2.loader.__init__ (which no
+# longer exports these helpers — the v1 global YAML frontmatter parser
+# is removed to satisfy contract G5 part 2). The helpers are still used
+# internally by preprocessing_loader; they live here as private functions.
+import yaml as _yaml
+
+
+def _parse_yaml_fm(text: str) -> dict:
+    """Extract YAML frontmatter between ``---`` markers."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+    end_idx = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---" or lines[i].strip() == "...":
+            end_idx = i
+            break
+    if end_idx is None:
+        return {}
+    yaml_block = "\n".join(lines[1:end_idx])
+    try:
+        return _yaml.safe_load(yaml_block) or {}
+    except Exception:
+        return {}
+
+
+def _strip_frontmatter(text: str) -> str:
+    """Return markdown body without YAML frontmatter."""
+    lines = text.splitlines()
+    if lines and lines[0].strip() == "---":
+        for i in range(1, len(lines)):
+            if lines[i].strip() == "---" or lines[i].strip() == "...":
+                return "\n".join(lines[i + 1:])
+    return text
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +126,7 @@ class RegulatoryBaselineLoader:
             logger.exception("Could not read %s", filepath)
             return None
 
-        frontmatter = _parse_yaml_frontmatter(text)
+        frontmatter = _parse_yaml_fm(text)
         body = _strip_frontmatter(text)
 
         domain_id = frontmatter.get("sub_domain", "")
@@ -158,7 +191,7 @@ class RegulatoryBaselineLoader:
             logger.exception("Could not read %s", filepath)
             return None
 
-        frontmatter = _parse_yaml_frontmatter(text)
+        frontmatter = _parse_yaml_fm(text)
         body = _strip_frontmatter(text)
 
         return {

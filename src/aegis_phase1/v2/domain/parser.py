@@ -90,7 +90,7 @@ class OutputParser:
     # Also accept numbered lists "1. text", "2. text"
     _NUMBERED_LINE_RE = re.compile(r"^\s*\d+[\.\)]\s+(.+?)\s*$", re.MULTILINE)
     # Lenient: detect "Key Action Items" or "Key Changes" sections as proxy
-    _ACTION_HEADER_RE = re.compile(
+    _ACTION_HEADER_PAT = re.compile(
         r"(?:KEY ACTION ITEMS|KEY ACTION AREAS|KEY CHANGES|KEY POINTS|ACTION ITEMS|IMPLEMENTATION ROADMAP):",
         re.IGNORECASE,
     )
@@ -188,7 +188,7 @@ class OutputParser:
             if items:
                 return [self._clean_bullet(item) for item in items if self._clean_bullet(item)]
         # Fallback: any "KEY X ITEMS" / "KEY CHANGES" section
-        m = self._ACTION_HEADER_RE.search(text)
+        m = self._ACTION_HEADER_PAT.search(text)
         if m:
             tail = text[m.end():]
             # Stop at next blank line or end
@@ -418,7 +418,7 @@ class ParseResultV3:
 class OutputParserV3:
     """Parser for v1.3 output: 3+ blocks per sub-domain, 5 fields per block."""
 
-    _BLOCK_HEADER_RE = re.compile(
+    _BLOCK_HEADER_PAT = re.compile(
         r"\*\*(?P<label>[A-Za-z0-9 _]+?Objective\.)\*\*\s*\n",
     )
     _FIELD_RE = re.compile(
@@ -427,12 +427,12 @@ class OutputParserV3:
         r"|\n\*\*[A-Za-z]|\Z)",
         re.DOTALL,
     )
-    _CONSIDER_HEADER_RE = re.compile(r"\*\*Considerations\.\*\*\s*\n")
+    _CONSIDER_HEADER_PAT = re.compile(r"\*\*Considerations\.\*\*\s*\n")
     _CONSIDER_BULLET_RE = re.compile(
         r"-\s+(.+?)(?=\n-|\n\*\*|\Z)",
         re.DOTALL,
     )
-    _SUBDOMAIN_HEADER_RE = re.compile(
+    _SUBDOMAIN_HEADER_PAT = re.compile(
         r"^###\s+(D-\d+\.\d+)\s*[—\-]\s*(.+?)\s*$",
         re.MULTILINE,
     )
@@ -446,7 +446,7 @@ class OutputParserV3:
         text = self._strip_code_fences(text)
 
         subdomains: list[SubdomainAdaptationV3] = []
-        matches = list(self._SUBDOMAIN_HEADER_RE.finditer(text))
+        matches = list(self._SUBDOMAIN_HEADER_PAT.finditer(text))
 
         if not matches:
             blocks = self._extract_blocks(text)
@@ -482,7 +482,7 @@ class OutputParserV3:
 
     def _extract_blocks(self, text: str) -> list[ObjectiveBlock]:
         blocks: list[ObjectiveBlock] = []
-        headers = list(self._BLOCK_HEADER_RE.finditer(text))
+        headers = list(self._BLOCK_HEADER_PAT.finditer(text))
         if not headers:
             return blocks
 
@@ -509,7 +509,7 @@ class OutputParserV3:
                     adjustments = value
 
             considerations: list[str] = []
-            cm = self._CONSIDER_HEADER_RE.search(section)
+            cm = self._CONSIDER_HEADER_PAT.search(section)
             if cm:
                 cons_text = section[cm.end():]
                 cons_text = re.split(r"\*\*[A-Za-z]", cons_text, maxsplit=1)[0]
