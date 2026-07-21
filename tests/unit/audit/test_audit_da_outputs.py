@@ -247,7 +247,15 @@ def test_why_equals_note_is_medium(tmp_path: Path) -> None:
 
 
 def test_scope_axis_populated_is_medium(tmp_path: Path) -> None:
-    """MEDIUM: scope axis unexpectedly populated."""
+    """MEDIUM: scope axis unexpectedly populated.
+
+    CORR-035 c6: the parser now always sets scope to '' (per contract).
+    Pre c6, source MDs D-01..D-03 had a populated 3rd column that the
+    parser was reading. The post-c6 behavior strips it. We still
+    detect populated scope IF it appears in the JSON (e.g. via a
+    hand-edited file or a future bug), but for files produced by the
+    build pipeline this finding should be 0.
+    """
     data = _minimal_da(
         pairs=[
             {
@@ -275,7 +283,24 @@ def test_scope_axis_populated_is_medium(tmp_path: Path) -> None:
     p = tmp_path / "x.json"
     p.write_text(json.dumps(data))
     findings = audit_da_file(p)
+    # The audit still flags populated scope (defense in depth).
     assert any(f.code == "SCOPE_AXIS_POPULATED" for f in findings)
+
+
+def test_no_scope_populated_in_real_da_files() -> None:
+    """Regression for CORR-035 c6: post c6, no real DA file has scope
+    populated. The parser hard-codes scope='' in
+    _extract_comparison_sections_domain.
+    """
+    if not DA_DIR.exists():
+        pytest.skip(f"{DA_DIR} not present")
+    proc = _run_audit("--json")
+    payload = json.loads(proc.stdout)
+    leaks = [f for f in payload["findings"] if f["code"] == "SCOPE_AXIS_POPULATED"]
+    assert not leaks, (
+        f"{len(leaks)} DA files still have scope populated post-c6: "
+        + ", ".join(f["path"] for f in leaks[:5])
+    )
 
 
 def test_macro_sub_mismatch_is_medium(tmp_path: Path) -> None:

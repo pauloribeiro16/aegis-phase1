@@ -970,17 +970,18 @@ def _extract_comparison_sections_domain(
 ) -> list[dict[str, Any]]:
     """Build a 2-axis comparison structure for a DomainAnalysis pair.
 
-    The DA pair table has 3 columns:
-      col 0: "**REG** (citation)"
-      col 1: 1-line description of the obligation
-      col 2: scope/angle (entity type, actor, OJ-literal phrases)
+    Per the CORR-034 contract, DA's \`comparison_sections\` model is:
+      - "obligation"  (col 1 of the pair table): populated
+      - "scope"       (always empty in DA): contract-mandated
 
-    We model the comparison as 2 axes:
-      - "obligation"  (col 1): reg_a_value / reg_b_value
-      - "scope"       (col 2): reg_a_value / reg_b_value
-
-    Plus a third axis (optional) when the Why block carries a clear
-    "comparison trigger" (e.g. timeline anchor mentioned in the note).
+    Why "scope" is always empty in DA:
+      - DeepAnalysis has 5 axes (incl. scope) — it is the rich version.
+      - DA is the lite version for the crossregulation matrix; the
+        scope/angle dimension is intentionally NOT modelled here.
+      - Some source MDs (D-01..D-03) carry a 3rd column in the pair
+        table with descriptive scope text, but that text is
+        semi-structured prose, not a structured axis. Stripping it
+        here aligns all 38 files on a single contract.
     """
     rows = _extract_oj_quotes_from_table(block_text)
     reg_a_row = next((r for r in rows if r["regulation"] == reg_a), None)
@@ -995,8 +996,8 @@ def _extract_comparison_sections_domain(
         },
         {
             "axis": "scope",
-            "reg_a_value": reg_a_row["scope"],
-            "reg_b_value": reg_b_row["scope"],
+            "reg_a_value": "",
+            "reg_b_value": "",
         },
     ]
 
