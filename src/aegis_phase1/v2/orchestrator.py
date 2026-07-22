@@ -32,7 +32,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Mapping, cast
 
 from aegis_phase1.v2.state import V2State
 
@@ -325,12 +325,59 @@ class Phase1Orchestrator:
         v1 ontology had: overlaps, regulations, source_regulations, stacks.
         v2 sources give us: v2_pairs (cross-regulation pairs) and
         v2_applicable_regs.
+
+        CORR-044: also populates ``subdomains`` (a v1-shape dict with
+        ``covered`` / ``not_covered`` buckets) so Doc 07/07b can render
+        the 38-row coverage matrix. Reads from
+        ``state["aggregated_data"]["concatenated"]["subdomains"]`` (set
+        by ``reduce_deterministic`` → ``concatenate``) and falls back to
+        an empty dict when the reducer has not run yet (e.g. when called
+        from the load_baseline node).
         """
+        aggregated = self.state.get("aggregated_data") or {}
+        concatenated = aggregated.get("concatenated") if isinstance(aggregated, Mapping) else None
+        concatenated_subdomains = (
+            concatenated.get("subdomains", {}) if isinstance(concatenated, Mapping) else {}
+        )
+
+        covered_entries: list[dict[str, Any]] = []
+        not_covered_entries: list[dict[str, Any]] = []
+        if isinstance(concatenated_subdomains, Mapping) and concatenated_subdomains:
+            for sid, entry in sorted(concatenated_subdomains.items()):
+                if not isinstance(entry, Mapping):
+                    continue
+                if entry.get("llm_status") == "OK" or entry.get("adapted_objective"):
+                    covered_entries.append(
+                        {
+                            "id": sid,
+                            "subdomain_id": sid,
+                            "source_regulations": entry.get("applicable_regs", []),
+                            "layer0_refs": entry.get("layer0_refs", []),
+                        }
+                    )
+                else:
+                    not_covered_entries.append(
+                        {
+                            "id": sid,
+                            "subdomain_id": sid,
+                            "rationale": entry.get("error_reason", "not covered"),
+                        }
+                    )
+
         return {
             "regulations": list(self.state.get("v2_applicable_regs", [])),
             "overlaps": [p.model_dump() for p in self.state.get("v2_pairs", [])],
             "source_regulations": {},
             "stacks": [],
+            "subdomains": {
+                "covered": covered_entries,
+                "not_covered": not_covered_entries,
+            },
+            "coverage_summary": {
+                "total_subdomains": len(covered_entries) + len(not_covered_entries),
+                "covered_count": len(covered_entries),
+                "not_covered_count": len(not_covered_entries),
+            },
         }
 
     def _build_preprocessing_shim(self) -> dict[str, Any]:
@@ -884,6 +931,12 @@ class Phase1Orchestrator:
             "compound_events": None,
         }
         self.state["current_stage"] = "REDUCED"
+        # CORR-044: re-populate the v1 ontology shim now that
+        # ``concatenated.subdomains`` (38 entries) is available. The
+        # shim was first built during load_baseline with empty data;
+        # we overwrite it here so Doc 07/07b see the 38 subdomains
+        # when their render nodes run.
+        self.state["ontology"] = self._build_ontology_shim()
         return profile_data if isinstance(profile_data, dict) else None
 
     def reduce_synthesis(self, *, config: dict[str, Any] | None = None) -> dict[str, Any] | None:
