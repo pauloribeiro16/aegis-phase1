@@ -1,0 +1,10 @@
+trace_id: 9933fb7c0e7ad9402da328ebf99c53df
+url: http://localhost:3000/trace/9933fb7c0e7ad9402da328ebf99c53df
+case: case1-tinytask
+phase: phase1
+tag: corr-044
+run_log: logs/phase1/corr044_run_traced_v4.log
+run_end: 2026-07-22 12:43
+status: NOT_FOUND in Langfuse UI (102 OpenTelemetry transient errors during run; Langfuse OTLP endpoint had Internal Server Error)
+verification: API query at 12:43+ returns "Trace not found within authorized project"
+implication: T4 (Langfuse UI verification) cannot be completed with this trace_id. Earlier run trace_id=c4aa606225edaa2fa80d04e28dbc7dd8 (12:11) had the same issue. This is a Langfuse-server-side issue, not a CORR-044 bug — the runs completed and all 9 outputs were regenerated with content. The trace_id is captured for forensic purposes; the G4 wiring fix and the 38-subdomain output are visible in logs/phase1/corr044_run_traced_v4.log regardless.

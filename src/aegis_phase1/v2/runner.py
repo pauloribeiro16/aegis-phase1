@@ -738,7 +738,7 @@ def cmd_run_all_traced(
             prep_path,
             output_dir=output_path,
             callbacks=callbacks,
-            tags=[f"phase:phase1", f"case:{case_name}"],
+            tags=[f"phase:phase1", f"case:{case_name}", "corr-044"],
             extra_metadata={"stage": "phase1", "graph": "v2.langgraph.full"},
         )
     except OllamaUnreachableError as exc:
