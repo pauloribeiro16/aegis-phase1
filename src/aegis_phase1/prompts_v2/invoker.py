@@ -414,6 +414,24 @@ class Phase1LLMInvoker:
                 parser = parser_cls()
                 parsed_model, error_feedback = parser.parse(raw)
                 if parsed_model is None:
+                    # CORR-053: log raw + error_feedback so debugging
+                    # markdown+regex failures is possible. Previously
+                    # the path was silent and only logged SCHEMA_ERROR
+                    # with no detail. Use format_logger if available
+                    # (similar to RobustParser path above).
+                    if self.format_logger:
+                        self.format_logger.log({
+                            "event": "markdown_parse_error",
+                            "level": "ERROR",
+                            "timestamp": datetime.now(UTC).isoformat(),
+                            "spec_id": spec_id,
+                            "stage": stage,
+                            "attempt": attempt,
+                            "model": self.model,
+                            "raw_response": raw,
+                            "raw_response_length": len(raw),
+                            "error_feedback": error_feedback,
+                        })
                     validation_result = {
                         "valid": False,
                         "errors": [error_feedback],
