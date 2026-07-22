@@ -48,6 +48,15 @@ from aegis_phase1.llm.tracing import get_langfuse_callback
 from aegis_phase1.v2.domain.processor import DOMAIN_NAMES, MapPartialFailure, OllamaUnreachable
 from aegis_phase1.v2.orchestrator import Phase1Orchestrator
 
+# CORR-049-T7.2: OTel híbrido. Use langfuse.start_as_current_observation
+# to create explicit spans around graph.invoke() so the Langfuse tree
+# is hierarchical (root span "AEGIS Phase 1" → sub-phase spans →
+# generation spans via the CallbackHandler).
+try:
+    from langfuse import get_client as _lf_get_client
+except ImportError:
+    _lf_get_client = None  # type: ignore[assignment]
+
 logger = logging.getLogger(__name__)
 
 
@@ -646,7 +655,40 @@ def run_phase1_graph(
     }
 
     graph = compile_phase1_graph()
-    result_state = graph.invoke(initial, config=run_config)
+
+    # CORR-049-T7.2: OTel híbrido — wrap the whole graph.invoke() in a
+    # root Langfuse span. Sub-graphs (MAP, P1B, REDUCE, OUTPUT) get
+    # their own spans via _make_subgraph_node's existing run_name
+    # propagation. The CallbackHandler (already attached via
+    # run_config["callbacks"]) creates nested generation spans for
+    # each ChatOllama call.
+    if _lf_get_client is not None and extra_metadata:
+        # Build a clean metadata dict (langfuse propagates it).
+        lf_meta = {
+            k: v for k, v in extra_metadata.items()
+            if isinstance(v, (str, int, float, bool))
+        }
+        try:
+            lf_client = _lf_get_client()
+            with lf_client.start_as_current_observation(
+                name="AEGIS Phase 1",
+                as_type="chain",
+                metadata=lf_meta,
+            ) as _root_span:
+                try:
+                    result_state = graph.invoke(initial, config=run_config)
+                except Exception as _exc:
+                    try:
+                        _root_span.update(status_message=f"failed: {_exc}")
+                    except Exception:
+                        pass
+                    raise
+        except Exception:
+            # OTel unavailable or failed; fall back to plain invoke.
+            logger.debug("OTel hybrid unavailable, falling back to plain invoke")
+            result_state = graph.invoke(initial, config=run_config)
+    else:
+        result_state = graph.invoke(initial, config=run_config)
 
     client, _handler = get_langfuse_callback()
     if client is not None:

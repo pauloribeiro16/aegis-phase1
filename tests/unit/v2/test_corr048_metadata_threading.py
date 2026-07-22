@@ -253,12 +253,17 @@ def test_invoker_truncates_large_prompts(caplog) -> None:
                 )
 
     user_len = captured.get("user_len", 0)
-    assert user_len <= 11000, (
-        f"CORR-048: truncation failed; user message still {user_len} bytes (expected <= 11000)"
+    # CORR-049-T7.1: cap raised from 10KB (CORR-048) to 512KB. A
+    # 210KB prompt no longer triggers truncation. This test now
+    # asserts that the prompt is forwarded WITHOUT truncation
+    # (under the 512KB cap). A new test in test_corr049_otel_hybrid
+    # covers the >512KB truncation path explicitly.
+    assert user_len > 100000, (
+        f"CORR-049-T7.1: expected prompt NOT to be truncated "
+        f"(210KB < 512KB cap); got user_len={user_len}"
     )
-    warn_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-    assert any("truncated" in m for m in warn_msgs), (
-        f"CORR-048: no truncation WARNING logged; got: {warn_msgs}"
+    assert user_len < 524288, (
+        f"CORR-049-T7.1: prompt exceeds 512KB cap; got {user_len}"
     )
 
 

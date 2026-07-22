@@ -262,12 +262,13 @@ class Phase1LLMInvoker:
         try:
             # 1. Load + render prompt
             prompt = self.prompts.render(spec_id, inputs)
-            # CORR-048: truncate user message if total > 10KB to avoid
-            # Langfuse trace > 80MB render limit. Pre-CORR-048 the
-            # canonical P1C-LLM-01 path produced 211K-token echoes
-            # (post-CORR-045 reduced but still large). Truncation is
-            # last-resort; per-lane filter (CORR-045) is the real fix.
-            MAX_PROMPT_BYTES = 10240
+            # CORR-049-T7.1: cap at 512KB (524288 bytes). Prompts
+            # P1C-LLM-01 are ~211K tokens ≈ 850KB; the practical
+            # ceiling before gemma4:e2b degrades is ~512KB. The
+            # 048 value (10KB) was a 50x underestimate that caused
+            # 57% FORMAT_ERROR rate (truncated 86KB → 4KB → JSON
+            # schema fails to parse).
+            MAX_PROMPT_BYTES = 524288  # 512KB — CORR-049 sweet spot
             sys_len = len(prompt["system"])
             user_len = len(prompt["user"])
             if sys_len + user_len > MAX_PROMPT_BYTES:
@@ -285,18 +286,30 @@ class Phase1LLMInvoker:
                         **prompt,
                         "system": prompt["system"][:system_cap],
                         "user": prompt["user"][: MAX_PROMPT_BYTES - system_cap - 200]
-                        + "\n\n[CORR-048 truncated: input exceeded 10KB]",
+                        + "\n\n[CORR-049 truncated: input exceeded 512KB]",
                     }
                 else:
                     head = prompt["user"][:user_budget]
                     prompt = {
                         **prompt,
-                        "user": head + "\n\n[CORR-048 truncated: input exceeded 10KB]",
+                        "user": head + "\n\n[CORR-049 truncated: input exceeded 512KB]",
                     }
-                logger.warning(
-                    "_attempt(%s): prompt truncated sys=%d user=%d → sys=%d user=%d",
-                    spec_id, sys_len, user_len, len(prompt["system"]), len(prompt["user"]),
+                # CORR-049-T7.1: log INFO (not WARNING) when truncating,
+                # and emit Langfuse flag for trace metadata.
+                logger.info(
+                    "CORR-049-T7: prompt truncated %dB → %dB (spec=%s, cap=%dB)",
+                    sys_len + user_len, MAX_PROMPT_BYTES, spec_id, MAX_PROMPT_BYTES,
                 )
+                # Langfuse flag (best-effort, swallow errors)
+                if self._langfuse_handler is not None:
+                    try:
+                        handler_meta = getattr(self._langfuse_handler, "metadata", None)
+                        if isinstance(handler_meta, dict):
+                            handler_meta["truncated"] = True
+                            handler_meta["original_size_bytes"] = sys_len + user_len
+                            handler_meta["truncated_to_bytes"] = MAX_PROMPT_BYTES
+                    except Exception:
+                        pass
             schema = self.prompts.load(spec_id).get("schema") or {}
 
             # 2. Build Ollama client with optional format constraint
