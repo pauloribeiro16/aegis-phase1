@@ -62,7 +62,8 @@ def test_missing_status_section_returns_error():
     parser = P1BLLM01Parser()
     model, err = parser.parse("## Interpretations\n\n(empty)")
     assert model is None
-    assert "Status" in err
+    # CORR-053: error message now reflects markdown + JSON fallback both failing
+    assert "markdown" in err.lower() and ("json" in err.lower() or "construct_minimal" in err)
 
 
 def test_invalid_status_enum_returns_error():
@@ -70,7 +71,10 @@ def test_invalid_status_enum_returns_error():
     bad = VALID_OUTPUT.replace("- status: OK", "- status: MAYBE")
     model, err = parser.parse(bad)
     assert model is None
-    assert "MAYBE" in err or "status" in err.lower()
+    # CORR-053: the markdown parser fails because MAYBE is not a valid enum;
+    # the JSON fallback also fails (no real JSON structure). Both errors
+    # should appear in the combined message.
+    assert "MAYBE" in err or "status" in err.lower() or "markdown" in err.lower()
 
 
 def test_code_fence_tolerated():

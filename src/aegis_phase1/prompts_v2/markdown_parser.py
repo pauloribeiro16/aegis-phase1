@@ -157,24 +157,150 @@ class P1BLLM01Parser(MarkdownParser):
     _SUBSEC_DER = re.compile(r"^###\s+(DER-\d+)\s*$", re.MULTILINE)
 
     def parse(self, raw: str) -> tuple[Any | None, str]:
+        """Parse the LLM output. Tries markdown first, then JSON as fallback.
+
+        CORR-053: the gemma4:e2b model is too deeply trained to emit JSON for
+        regulatory analysis tasks, ignoring both the base_system rule 4
+        reformulation (CORR-052) and the body-level "Do NOT emit JSON"
+        instruction (CORR-050). So the parser tolerates BOTH formats:
+
+        1. Markdown (preferred, per contract): extracted via regex from
+           `## Status / ## Interpretations / ## Derogations` sections.
+        2. JSON (fallback): if markdown fails, try RobustParser on raw text.
+           If JSON parses AND validates against P1BLLM01Output, return it.
+           Otherwise return combined error.
+
+        Returns (model, "") on success or (None, error_msg) on failure.
+        The invoker injects envelope fields (prompt_spec_id, schema_version,
+        case_id, invocation_pattern) after parse() returns successfully.
+        """
         m = _import_p1b_models()
         text = self._strip_code_fences(raw)
 
+        # Attempt 1: markdown extraction (CORR-050 path)
+        markdown_error = ""
+        try:
+            result = self._parse_markdown(text, m)
+            if result is not None:
+                return result, ""
+            markdown_error = "markdown extraction did not match template"
+        except Exception as e:
+            markdown_error = f"markdown parse exception: {e}"
+
+        # Attempt 2: JSON fallback (CORR-053 path)
+        # First, try a direct json.loads — the gemma4:e2b model emits
+        # well-formed JSON objects, so this should succeed and skip
+        # RobustParser's quirks (e.g. extract_first_array grabbing a
+        # nested `[]` before json_strict can see the outer `{}`).
+        import json as _json
+
+        def _normalize_json(data: Any) -> Any:
+            """Coerce JSON Schema conventions to Pydantic conventions.
+
+            gemma4:e2b follows the legacy JSON Schema (e.g. outputs
+            `applicable: true/false` because the JSON Schema in
+            output_schemas.yaml says `type: boolean`). The Pydantic
+            models in state.py use str enums (YES/NO). This function
+            bridges the two without touching either side.
+            """
+            if isinstance(data, dict):
+                return {k: _normalize_json(v) for k, v in data.items()}
+            if isinstance(data, list):
+                return [_normalize_json(v) for v in data]
+            if isinstance(data, bool):
+                # Stricter check needed because bool is a subclass of int.
+                # This converts `applicable: true` → "YES" / `false` → "NO".
+                return "YES" if data else "NO"
+            return data
+
+        try:
+            stripped = raw.strip()
+            if stripped.startswith("{") and stripped.endswith("}"):
+                json_data = _normalize_json(_json.loads(stripped))
+                if isinstance(json_data, dict):
+                    try:
+                        model = m["P1BLLM01Output"].model_validate(json_data)
+                        return model, ""
+                    except ValidationError as ve:
+                        return None, (
+                            f"markdown parsing failed ({markdown_error}); "
+                            f"JSON parsed directly but Pydantic validation "
+                            f"failed: {ve}"
+                        )
+        except _json.JSONDecodeError:
+            # Not a clean JSON object; fall through to RobustParser
+            pass
+        except Exception as e:
+            logger.exception("Unexpected error in direct JSON path")
+            # Fall through to RobustParser
+
+        # Fallback: RobustParser (handles code fences, partial JSON, etc.)
+        try:
+            from aegis_phase1.prompts_v2.robust_parser import RobustParser
+        except ImportError:
+            RobustParser = None  # type: ignore[assignment]
+
+        if RobustParser is None:
+            return None, (
+                f"markdown parsing failed (and RobustParser not available for "
+                f"JSON fallback): {markdown_error}"
+            )
+
+        try:
+            parse_result = RobustParser.parse(raw)
+            if not parse_result.ok:
+                return None, (
+                    f"markdown parsing failed ({markdown_error}); "
+                    f"JSON parsing also failed: {parse_result.error}"
+                )
+            # CORR-053: if RobustParser used the construct_minimal_object
+            # fallback, the input was garbage and we got a synthetic dict
+            # with placeholders. Reject this — it's not real JSON the LLM
+            # emitted, it's a safety net that masks malformed input.
+            if parse_result.strategy == "construct_minimal_object":
+                return None, (
+                    f"markdown parsing failed ({markdown_error}); "
+                    f"JSON RobustParser fell back to construct_minimal_object "
+                    f"(input has no real JSON structure)"
+                )
+            json_data = parse_result.json
+            if not isinstance(json_data, dict):
+                return None, (
+                    f"markdown parsing failed ({markdown_error}); "
+                    f"JSON parsed but is not a dict (got {type(json_data).__name__})"
+                )
+            # Pydantic validation: extra="ignore" tolerates envelope fields
+            # the LLM might emit (prompt_spec_id, case_id, etc.).
+            # The invoker will overwrite them anyway.
+            try:
+                model = m["P1BLLM01Output"].model_validate(json_data)
+                return model, ""
+            except ValidationError as ve:
+                return None, (
+                    f"markdown parsing failed ({markdown_error}); "
+                    f"JSON parsed but Pydantic validation failed: {ve}"
+                )
+        except Exception as e:
+            logger.exception("Unexpected error in JSON fallback path")
+            return None, (
+                f"markdown parsing failed ({markdown_error}); "
+                f"JSON fallback raised: {e}"
+            )
+
+    def _parse_markdown(self, text: str, m: dict) -> Any | None:
+        """Original markdown parser (CORR-050). Returns model or None.
+
+        Split into a separate method so the JSON fallback (CORR-053) can
+        call it cleanly and capture the markdown error message.
+        """
         # Status section (required)
         status_body = self._extract_section(text, "status")
         if status_body is None:
-            return None, (
-                "Missing '## Status' section. Add it with "
-                "`- status: OK|INSUFFICIENT_EVIDENCE|INDETERMINATE` and "
-                "`- confidence: HIGH|MEDIUM|LOW`."
-            )
+            return None
         status_str = (self._extract_field(status_body, "status") or "").upper()
         conf_str = (self._extract_field(status_body, "confidence") or "").upper()
         if status_str not in {e.value for e in m["P1BLLM01Status"]}:
-            return None, (
-                f"Invalid status '{status_str}'. Must be one of: "
-                "OK, INSUFFICIENT_EVIDENCE, INDETERMINATE."
-            )
+            return None
 
         # Interpretations section
         interpretations: list = []
@@ -183,10 +309,7 @@ class P1BLLM01Parser(MarkdownParser):
             entry_id = self._extract_field(sub_body, "entry_id") or ""
             applicable_str = (self._extract_field(sub_body, "applicable") or "").upper()
             if applicable_str not in {e.value for e in m["P1BLLM01Applicable"]}:
-                return None, (
-                    f"{sub_id}: invalid 'applicable' value '{applicable_str}'. "
-                    "Must be YES or NO."
-                )
+                return None
             rationale = self._extract_field(sub_body, "activation_rationale") or ""
             interpretations.append(m["P1BLLM01Interpretation"](
                 entry_id=entry_id,
@@ -204,10 +327,7 @@ class P1BLLM01Parser(MarkdownParser):
             entry_id = self._extract_field(sub_body, "entry_id") or ""
             verdict_str = (self._extract_field(sub_body, "activation_verdict") or "").upper()
             if verdict_str not in {e.value for e in m["P1BLLM01DerogationVerdict"]}:
-                return None, (
-                    f"{sub_id}: invalid 'activation_verdict' value '{verdict_str}'. "
-                    "Must be ACTIVATED, NOT_ACTIVATED, or INDETERMINATE."
-                )
+                return None
             rationale = self._extract_field(sub_body, "activation_rationale") or ""
             derogations.append(m["P1BLLM01Derogation"](
                 entry_id=entry_id,
@@ -231,9 +351,9 @@ class P1BLLM01Parser(MarkdownParser):
                 interpretations=interpretations,
                 derogations=derogations,
             )
-            return model, ""
-        except ValidationError as e:
-            return None, f"Pydantic validation failed: {e}"
+            return model
+        except ValidationError:
+            return None
 
 
 # Registry of parsers per spec_id (extensible for CORR-051)
