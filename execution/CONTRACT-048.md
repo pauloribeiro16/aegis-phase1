@@ -477,3 +477,17 @@ feature/aegis-p1-corr-048
 - 2026-07-22: v1.0 — contract criado pelo orchestrator (recriado a
   partir do briefing da missão; o ficheiro `CONTRACT-048.md`
   original não foi encontrado no repositório).
+
+---
+
+## Verdict pós-CORR-049 (2026-07-22)
+
+**Status:** PASS (cascade-merged into feature/aegis-p1-corr-049).
+
+**CORR-049 integrou este contract num branch cascade. Detalhes em
+`execution/CONTRACT-049.md` §FASE 1 e `logs/phase1/corr049_parity_report.md`.
+
+**Evidence:** 15/16 quality gates pass; only G11 (concatenate: 0 domains)
+fails, and that is a model-side issue (gemma4:e2b not following schema),
+not a contract-048 fix issue. The 048 work (data path: catalogs/helper/lane
+filter/loader-fields/threading/metadata) is permanent and 100% effective.
