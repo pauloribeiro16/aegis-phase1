@@ -1,0 +1,321 @@
+2026-07-22 17:10:44,865 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-22 17:10:44,865 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-22 17:10:44,865 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-22 17:10:44,865 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-22 17:10:45,073 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=ad131a70d39f445b797545de058e15e7
+2026-07-22 17:10:45,073 [INFO] __main__: Non-interactive mode — running all stages via 18-node LangGraph (CORR-018a)
+2026-07-22 17:10:45,148 [WARNING] langfuse: Propagated attribute 'metadata.subphases_run' value is not a string. Dropping value.
+2026-07-22 17:10:45,152 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-22 17:10:45,236 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 2 regs (0.08s)
+2026-07-22 17:15:59,943 [INFO] aegis_phase1.prompts_v2.validator: CORR-049-T5: loaded 5 schemas from output_schemas.yaml (specs=['P1B-LLM-01-INTERPRETATION', 'P1B-LLM-02-RATIONALE', 'P1C-LLM-01-OVERLAP-CLASSIFICATION', 'P1C-LLM-02-COMPOUND-EVENT', 'P1C-LLM-03-STRATEGIC-SYNTHESIS'])
+2026-07-22 17:15:59,957 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM Phase1Executor instantiated: model=gemma4:e2b (source=llm_invoker, invoker_type=UnifiedInvoker)
+[17:16:18] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (18605ms, 3246 tok)
+2026-07-22 17:16:18,691 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (18605ms, 3246 tok)
+[17:16:18]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:16:18,691 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:16:18]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:16:18,691 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:16:18]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:16:18,691 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:16:18]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:16:18,691 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:16:18]   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+2026-07-22 17:16:18,691 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+[17:16:18]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:16:18,691 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:16:18]   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+2026-07-22 17:16:18,691 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+[17:16:18]   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+2026-07-22 17:16:18,691 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+[17:16:40] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (21368ms, 4096 tok)
+2026-07-22 17:16:40,073 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (21368ms, 4096 tok)
+[17:16:40]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:16:40,073 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:16:40]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:16:40,073 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:16:40]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:16:40,073 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:16:40]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:16:40,073 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:16:40]   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+2026-07-22 17:16:40,073 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+[17:16:40]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:16:40,073 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:16:40]   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+2026-07-22 17:16:40,073 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+[17:16:40]   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+2026-07-22 17:16:40,073 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+[17:16:51] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11521ms, 3088 tok)
+2026-07-22 17:16:51,625 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11521ms, 3088 tok)
+[17:16:51]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:16:51,625 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:16:51]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:16:51,625 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:16:51]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:16:51,625 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:16:51]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:16:51,625 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:16:51]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:16:51,625 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:16:51]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 17:16:51,625 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[17:17:03] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11514ms, 3088 tok)
+2026-07-22 17:17:03,155 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11514ms, 3088 tok)
+[17:17:03]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:17:03,155 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:17:03]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:17:03,155 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:17:03]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:17:03,156 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:17:03]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:17:03,156 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:17:03]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:17:03,156 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:17:03]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 17:17:03,156 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[17:17:16] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13231ms, 3203 tok)
+2026-07-22 17:17:16,464 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13231ms, 3203 tok)
+[17:17:16]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:17:16,464 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:17:16]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:17:16,464 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:17:16]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:17:16,464 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:17:16]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:17:16,464 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:17:16]   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+2026-07-22 17:17:16,464 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+[17:17:16]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:17:16,464 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:17:16]   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+2026-07-22 17:17:16,464 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+[17:17:16]   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+2026-07-22 17:17:16,464 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+[17:17:29] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13265ms, 3250 tok)
+2026-07-22 17:17:29,744 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13265ms, 3250 tok)
+[17:17:29]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:17:29,744 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:17:29]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:17:29,744 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:17:29]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:17:29,744 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:17:29]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:17:29,744 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:17:29]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:17:29,744 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:17:43] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (14146ms, 3298 tok)
+2026-07-22 17:17:43,917 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (14146ms, 3298 tok)
+[17:17:43]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:17:43,917 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:17:43]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:17:43,917 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:17:43]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:17:43,917 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:17:43]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:17:43,917 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:17:43]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:17:43,917 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:17:43]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 17:17:43,917 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[17:17:58] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (14141ms, 3298 tok)
+2026-07-22 17:17:58,075 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (14141ms, 3298 tok)
+[17:17:58]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:17:58,075 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:17:58]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:17:58,075 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:17:58]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:17:58,075 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:17:58]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:17:58,075 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:17:58]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:17:58,075 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:17:58]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 17:17:58,075 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[17:18:19] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (21412ms, 4096 tok)
+2026-07-22 17:18:19,545 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (21412ms, 4096 tok)
+[17:18:19]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:18:19,545 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:18:19]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:18:19,545 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:18:19]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:18:19,545 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:18:19]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:18:19,545 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:18:19]   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+2026-07-22 17:18:19,545 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+[17:18:19]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:18:19,545 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:18:19]   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+2026-07-22 17:18:19,545 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+[17:18:19]   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+2026-07-22 17:18:19,545 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+[17:18:40] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (21434ms, 4096 tok)
+2026-07-22 17:18:40,994 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (21434ms, 4096 tok)
+[17:18:40]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:18:40,994 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:18:40]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:18:40,994 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:18:40]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:18:40,994 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:18:40]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:18:40,994 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:18:40]   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+2026-07-22 17:18:40,994 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+[17:18:40]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:18:40,994 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:18:40]   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+2026-07-22 17:18:40,994 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.interpretations', 'message': "Required field 'interpretations' missing"}
+[17:18:40]   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+2026-07-22 17:18:40,994 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.derogations', 'message': "Required field 'derogations' missing"}
+[17:18:52] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11462ms, 3088 tok)
+2026-07-22 17:18:52,494 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11462ms, 3088 tok)
+[17:18:52]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:18:52,494 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:18:52]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:18:52,494 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:18:52]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:18:52,494 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:18:52]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:18:52,494 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:18:52]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:18:52,494 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:18:52]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 17:18:52,494 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[17:19:03] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11394ms, 3088 tok)
+2026-07-22 17:19:03,902 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11394ms, 3088 tok)
+[17:19:03]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:19:03,902 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:19:03]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:19:03,902 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:19:03]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:19:03,902 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:19:03]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:19:03,902 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:19:03]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:19:03,902 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:19:03]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 17:19:03,902 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[17:19:17] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13200ms, 3250 tok)
+2026-07-22 17:19:17,154 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13200ms, 3250 tok)
+[17:19:17]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:19:17,154 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:19:17]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:19:17,154 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:19:17]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:19:17,154 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:19:17]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:19:17,154 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:19:17]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:19:17,154 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:19:30] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13226ms, 3250 tok)
+2026-07-22 17:19:30,395 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13226ms, 3250 tok)
+[17:19:30]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:19:30,395 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:19:30]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:19:30,395 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:19:30]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:19:30,395 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:19:30]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:19:30,395 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:19:30]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:19:30,395 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:19:44] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (14013ms, 3298 tok)
+2026-07-22 17:19:44,434 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (14013ms, 3298 tok)
+[17:19:44]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:19:44,434 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:19:44]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:19:44,434 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:19:44]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:19:44,434 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:19:44]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:19:44,434 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:19:44]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:19:44,434 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:19:44]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 17:19:44,434 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[17:19:58] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (14035ms, 3298 tok)
+2026-07-22 17:19:58,483 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (14035ms, 3298 tok)
+[17:19:58]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:19:58,483 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:19:58]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:19:58,483 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:19:58]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:19:58,483 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:19:58]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:19:58,483 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:19:58]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:19:58,483 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:19:58]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 17:19:58,483 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 17:19:58,814 [INFO] aegis_phase1.v2.reduce.concatenator: concatenate: 0 domains -> 0 subdomains, 0 adapted_objectives
+2026-07-22 17:19:58,814 [INFO] aegis_phase1.v2.reduce.merger: merge_requirements: 0 subdomains merged, 0 total requirements kept
+2026-07-22 17:19:58,815 [INFO] aegis_phase1.v2.reduce.conflict_resolver: resolve_conflicts: 0 ambiguities processed (0 resolved, 0 remaining)
+2026-07-22 17:19:58,815 [INFO] aegis_phase1.v2.reduce.proportionality: apply_proportionality: 0 subdomains profiled (scale=MICRO, fte=0.00)
+[17:20:17] [WARNING] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → SCHEMA_ERROR (18868ms, 3807 tok)
+2026-07-22 17:20:17,731 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → SCHEMA_ERROR (18868ms, 3807 tok)
+[17:20:17]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:20:17,731 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:20:17]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:20:17,731 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:20:17]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:20:17,731 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:20:17]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:20:17,731 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:20:17]   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+2026-07-22 17:20:17,731 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+[17:20:17]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:20:17,731 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:20:17]   schema: {'path': '$.implications', 'message': "Required field 'implications' missing"}
+2026-07-22 17:20:17,731 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.implications', 'message': "Required field 'implications' missing"}
+[17:20:33] [WARNING] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → SCHEMA_ERROR (15490ms, 3502 tok)
+2026-07-22 17:20:33,235 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → SCHEMA_ERROR (15490ms, 3502 tok)
+[17:20:33]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:20:33,235 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:20:33]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:20:33,235 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:20:33]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:20:33,235 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:20:33]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:20:33,235 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:20:33]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:20:33,235 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:20:33]   schema: {'path': '$.implications', 'message': "Required field 'implications' missing"}
+2026-07-22 17:20:33,235 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.implications', 'message': "Required field 'implications' missing"}
+[17:20:44] [WARNING] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → SCHEMA_ERROR (11621ms, 3114 tok)
+2026-07-22 17:20:44,883 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → SCHEMA_ERROR (11621ms, 3114 tok)
+[17:20:44]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:20:44,883 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:20:44]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:20:44,883 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:20:44]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:20:44,883 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:20:44]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:20:44,883 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:20:44]   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+2026-07-22 17:20:44,883 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+[17:20:44]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:20:44,883 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:20:44]   schema: {'path': '$.positive_events', 'message': "Required field 'positive_events' missing"}
+2026-07-22 17:20:44,883 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.positive_events', 'message': "Required field 'positive_events' missing"}
+[17:20:44]   schema: {'path': '$.negative_events', 'message': "Required field 'negative_events' missing"}
+2026-07-22 17:20:44,883 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.negative_events', 'message': "Required field 'negative_events' missing"}
+[17:20:56] [WARNING] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → SCHEMA_ERROR (11575ms, 3114 tok)
+2026-07-22 17:20:56,472 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → SCHEMA_ERROR (11575ms, 3114 tok)
+[17:20:56]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 17:20:56,472 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[17:20:56]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 17:20:56,472 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[17:20:56]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 17:20:56,472 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[17:20:56]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 17:20:56,472 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[17:20:56]   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+2026-07-22 17:20:56,472 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.status', 'message': "Required field 'status' missing"}
+[17:20:56]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 17:20:56,472 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[17:20:56]   schema: {'path': '$.positive_events', 'message': "Required field 'positive_events' missing"}
+2026-07-22 17:20:56,472 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.positive_events', 'message': "Required field 'positive_events' missing"}
+[17:20:56]   schema: {'path': '$.negative_events', 'message': "Required field 'negative_events' missing"}
+2026-07-22 17:20:56,472 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.negative_events', 'message': "Required field 'negative_events' missing"}
+2026-07-22 17:22:30,101 [INFO] aegis_phase1.v2.context.clause_mapping_context: build_clause_mapping_context: no applicable_regs — returning empty context
+2026-07-22 17:22:40,705 [INFO] __main__: Pipeline complete
