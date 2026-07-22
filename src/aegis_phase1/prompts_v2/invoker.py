@@ -235,7 +235,10 @@ class Phase1LLMInvoker:
         final_status = "FAILED_AFTER_RETRIES"
         if all_attempts and any(a.get("parse_status") == "PARSE_ERROR" for a in all_attempts):
             final_status = "PARSE_ERROR"
-        elif all_attempts and any(a.get("validation", {}).get("schema_errors") for a in all_attempts):
+        elif all_attempts and any(
+            (a.get("validation") or {}).get("schema_errors")
+            for a in all_attempts
+        ):
             final_status = "SCHEMA_ERROR"
 
         return {
@@ -357,6 +360,19 @@ class Phase1LLMInvoker:
                     "error": str(e),
                     "traceback": traceback.format_exc()[:1000],
                     "latency_ms": latency_ms,
+                    # CORR-054: log the full prompts so the user can
+                    # inspect what was actually sent to the model when
+                    # the call fails. This was previously impossible —
+                    # only the lengths were recorded. Full content is
+                    # preserved verbatim (no truncation, no sampling) —
+                    # if the model failed to receive it, the user must
+                    # see exactly what was attempted.
+                    "request": {
+                        "system_prompt": prompt["system"],
+                        "user_prompt": prompt["user"],
+                        "system_prompt_length": len(prompt["system"]),
+                        "user_prompt_length": len(prompt["user"]),
+                    },
                 }
                 if self.llm_logger:
                     self.llm_logger.log(error_event)
@@ -387,6 +403,15 @@ class Phase1LLMInvoker:
                         "raw_response_length": len(raw),
                         "parse_attempts": parse_result.attempts,
                         "final_error": parse_result.error,
+                        # CORR-054: include the prompts that were sent
+                        # so the user can correlate the parse failure
+                        # with the exact request the model saw.
+                        "request": {
+                            "system_prompt": prompt["system"],
+                            "user_prompt": prompt["user"],
+                            "system_prompt_length": len(prompt["system"]),
+                            "user_prompt_length": len(prompt["user"]),
+                        },
                     })
                 return {
                     "ok": False,
@@ -431,6 +456,16 @@ class Phase1LLMInvoker:
                             "raw_response": raw,
                             "raw_response_length": len(raw),
                             "error_feedback": error_feedback,
+                            # CORR-054: include the prompts that were
+                            # sent so the user can correlate the
+                            # markdown parse failure with the exact
+                            # request the model saw.
+                            "request": {
+                                "system_prompt": prompt["system"],
+                                "user_prompt": prompt["user"],
+                                "system_prompt_length": len(prompt["system"]),
+                                "user_prompt_length": len(prompt["user"]),
+                            },
                         })
                     validation_result = {
                         "valid": False,
@@ -474,6 +509,13 @@ class Phase1LLMInvoker:
                 "model": self.model,
                 "attempt": attempt,
                 "request": {
+                    # CORR-054: log the full prompts (system + user)
+                    # so the user can see exactly what was sent to
+                    # the model — not just the lengths. The lengths
+                    # are kept for backward-compat (existing tooling
+                    # that greps for them).
+                    "system_prompt": prompt["system"],
+                    "user_prompt": prompt["user"],
                     "system_prompt_length": len(prompt["system"]),
                     "user_prompt_length": len(prompt["user"]),
                     "temperature": self.DEFAULT_TEMPERATURE,
@@ -514,6 +556,16 @@ class Phase1LLMInvoker:
                 "attempt": attempt,
                 "error": str(e),
                 "traceback": traceback.format_exc()[:1000],
+                # CORR-054: log the full prompts even on catastrophic
+                # failure (e.g. PromptLoader error). If the render
+                # itself blew up, fall back to an empty placeholder so
+                # the event is still well-formed.
+                "request": {
+                    "system_prompt": (prompt.get("system", "") if isinstance(prompt, dict) else ""),
+                    "user_prompt": (prompt.get("user", "") if isinstance(prompt, dict) else ""),
+                    "system_prompt_length": (len(prompt.get("system", "")) if isinstance(prompt, dict) else 0),
+                    "user_prompt_length": (len(prompt.get("user", "")) if isinstance(prompt, dict) else 0),
+                },
             }
             if self.llm_logger:
                 self.llm_logger.log(error_event)
