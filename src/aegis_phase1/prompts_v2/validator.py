@@ -10,10 +10,14 @@ Enforces (per implementation contract):
 
 from __future__ import annotations
 
+import logging
+import re
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 # Minimal JSON Schema validator (no jsonschema dep needed)
 # Implements a subset of JSON Schema Draft 7 sufficient for our schemas
@@ -66,12 +70,108 @@ class Phase1Validator:
                 "(or deprecated alias 'layer0_root')."
             )
         self.regulatory_baseline_root = Path(regulatory_baseline_root)
-        self.output_schemas_path = (
-            Path(output_schemas_path) if output_schemas_path else None
-        )
+        # CORR-049-T5: default to output_schemas.yaml in the PROMPTS dir
+        # adjacent to aegis-phase1 (Methodology-main is a SIBLING repo).
+        if output_schemas_path is None:
+            # aegis-phase1/src/aegis_phase1/prompts_v2/validator.py →
+            # /<root>/aegis-phase1 → /<root>/Methodology-main/...
+            aegis_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+            default_path = (
+                aegis_root
+                / "Methodology-main"
+                / "00_METHODOLOGY"
+                / "PROMPTS"
+                / "output_schemas.yaml"
+            )
+            self.output_schemas_path = default_path
+        else:
+            self.output_schemas_path = Path(output_schemas_path)
         self._schemas: dict[str, Any] = {}
         if self.output_schemas_path and self.output_schemas_path.exists():
-            self._schemas = self._load_yaml_with_frontmatter(self.output_schemas_path)
+            # CORR-049-T5: use the fenced-block parser (the file is
+            # Markdown with ```yaml blocks, one per LLM spec; the
+            # previous _load_yaml_with_frontmatter treated it as
+            # YAML+frontmatter and discarded the body, so
+            # _resolve_schema() always returned {}).
+            self._schemas = self._load_output_schemas(self.output_schemas_path)
+            # Backward-compat: if no fenced blocks were found, fall back
+            # to the old loader (in case the file becomes pure YAML one
+            # day).
+            if not self._schemas:
+                logger.info(
+                    "CORR-049-T5: no fenced blocks found in %s; falling back "
+                    "to legacy _load_yaml_with_frontmatter",
+                    self.output_schemas_path,
+                )
+                self._schemas = self._load_yaml_with_frontmatter(self.output_schemas_path)
+
+    # CORR-049-T5: fenced-block regex for the output_schemas.yaml Markdown file.
+    _FENCED_YAML_RE = re.compile(
+        r"```yaml\s*\n(.*?)\n```",
+        re.DOTALL,
+    )
+
+    @staticmethod
+    def _load_output_schemas(path: Path) -> dict[str, dict[str, Any]]:
+        """CORR-049-T5: load JSON Schemas from output_schemas.yaml.
+
+        The file is NOT pure YAML — it's Markdown with ```yaml fenced
+        code blocks, one per LLM spec. The previous loader treated it
+        as YAML+frontmatter and discarded the body, so
+        ``_resolve_schema()`` always returned ``{}`` (root cause of
+        "0 sub_domain_activations" across all real LLM runs since
+        CORR-045).
+
+        Strategy:
+          1. Find all ```yaml ... ``` fenced blocks.
+          2. ``yaml.safe_load`` each block.
+          3. Index by ``properties.prompt_spec_id.const`` (JSON Schema
+             convention used by the canonical 5 specs).
+
+        Args:
+            path: path to output_schemas.yaml.
+
+        Returns:
+            dict mapping spec_id (e.g. ``"P1B-LLM-01-INTERPRETATION"``)
+            to the parsed JSON Schema dict. Empty dict if file missing
+            or no fenced blocks.
+        """
+        if not path.exists():
+            logger.warning("output_schemas.yaml not found at %s", path)
+            return {}
+
+        text = path.read_text(encoding="utf-8")
+        schemas: dict[str, dict[str, Any]] = {}
+
+        for match in Phase1Validator._FENCED_YAML_RE.finditer(text):
+            block_text = match.group(1)
+            try:
+                parsed = yaml.safe_load(block_text)
+            except yaml.YAMLError as e:
+                logger.debug("skipping fenced block (parse error): %s", e)
+                continue
+            if not isinstance(parsed, dict):
+                continue
+            # Lookup key: properties.prompt_spec_id.const
+            spec_id = (
+                parsed.get("properties", {})
+                .get("prompt_spec_id", {})
+                .get("const")
+            )
+            if spec_id:
+                schemas[spec_id] = parsed
+            else:
+                logger.debug(
+                    "fenced block has no properties.prompt_spec_id.const; "
+                    "keys=%s",
+                    list(parsed.keys())[:5],
+                )
+
+        logger.info(
+            "CORR-049-T5: loaded %d schemas from %s (specs=%s)",
+            len(schemas), path.name, sorted(schemas.keys()),
+        )
+        return schemas
 
     @staticmethod
     def _load_yaml_with_frontmatter(path: Path) -> dict[str, Any]:
