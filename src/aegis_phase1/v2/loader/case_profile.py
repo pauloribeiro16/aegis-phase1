@@ -262,6 +262,22 @@ class CaseProfileLoader:
             raise ValueError(
                 f"Expected 'company' key with mapping in {path}, got {type(company_raw).__name__}"
             )
+        # CORR-046: tech_stack may be at TOP level (case 1 has it outside
+        # the `company:` sub-dict) or inside the `company:` mapping. Accept
+        # both. Pre-CORR-046 the loader only read `company_raw["tech_stack"]`
+        # so the top-level variant was silently dropped.
+        tech_stack_raw = raw.get("tech_stack", company_raw.get("tech_stack", []))
+        if isinstance(tech_stack_raw, str):
+            # Tolerate "AWS, Django, PostgreSQL" style
+            tech_stack_raw = [s.strip() for s in tech_stack_raw.split(",") if s.strip()]
+        if not tech_stack_raw:
+            logger.warning(
+                "_load_company: tech_stack missing in %s (neither top-level "
+                "nor under `company:` block); company.tech_stack will be empty",
+                path,
+            )
+        # Replace the (possibly missing) key so Pydantic sees the right value
+        company_raw = {**company_raw, "tech_stack": tech_stack_raw}
         return CompanyFacts.model_validate(company_raw)
 
     def _load_applicable_regulations(self) -> list[ApplicableRegulation]:
