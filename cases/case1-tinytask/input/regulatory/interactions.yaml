@@ -1,0 +1,49 @@
+# AEGIS Phase 1 — Regulatory Interactions (Layer 3 scans)
+# Required when ≥2 regulations apply (TinyTask: GDPR + CRA).
+# Captures temporal/requirement conflicts, trigger mismatches,
+# and negative analyses (what SHOULD apply but doesn't).
+temporal_conflicts:
+  - id: TI-01
+    type: TEMPORAL
+    regulations: [GDPR, CRA]
+    sub_domains: [D-04.3]
+    description: >
+      GDPR Art. 33 requires 72h breach notification to the DPA;
+      CRA Art. 14 requires 24h for actively exploited vulnerabilities.
+      Single incident may need parallel reporting under both regimes.
+    resolution: >
+      Adopt the maximum-SLA workflow (24h internal escalation) so
+      both regimes are satisfied from the same detection pipeline.
+requirement_conflicts: []       # none identified at intake
+trigger_mismatches: []          # none identified at intake
+negative_analyses:
+  - id: NA-01
+    description: >
+      CRA conformity assessment (Annex VIII) is required for CLASS_I
+      products but no formal assessment programme is in place.
+    expected_regulations: [CRA]
+    severity: MEDIUM
+  - id: NA-02
+    description: >
+      No Data Protection Impact Assessment (DPIA) on file despite
+      systematic large-scale monitoring of EU data subjects.
+    expected_regulations: [GDPR]
+    severity: HIGH
+  - id: NA-03
+    description: >
+      No formal sub-processor register despite 3 cloud providers
+      (AWS, Stripe, Auth0) processing personal data.
+    expected_regulations: [GDPR]
+    severity: MEDIUM
+  - id: NA-04
+    description: >
+      Vulnerability management does not cover CRA Annex I §2
+      handled products (no SBOM, no coordinated disclosure).
+    expected_regulations: [CRA]
+    severity: MEDIUM
+  - id: NA-05
+    description: >
+      No incident response playbook for CRA actively-exploited
+      vuln path (24h SLA differs from GDPR 72h).
+    expected_regulations: [CRA]
+    severity: MEDIUM

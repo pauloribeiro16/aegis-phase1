@@ -1,0 +1,36 @@
+# AEGIS Phase 1 — Role Matrix (5 regulations × role)
+# Captures the company's role per regulation + native compliance
+# status + inherited obligations + notes.
+gdpr:
+  role: controller
+  native_compliance: false
+  inherited_obligations:
+    - Article 30 records of processing
+    - Article 32 security of processing
+    - Article 33 breach notification
+    - Article 35 DPIA (when high-risk)
+  notes: "Verify with company — controllers may have processor addendums with cloud providers"
+cra:
+  role: manufacturer
+  native_compliance: false
+  inherited_obligations:
+    - Annex I essential cybersecurity requirements
+    - Annex VII conformity assessment
+    - Annex VIII CE marking + technical documentation
+    - Article 14 vulnerability handling (24h SLA)
+  notes: "Placing digital products on EU market as manufacturer"
+nis2:
+  role: not_applicable
+  native_compliance: false
+  inherited_obligations: []
+  notes: "TinyTask is not an Annex I/II entity; SaaS provider to NIS2 entities is not directly in scope"
+dora:
+  role: not_applicable
+  native_compliance: false
+  inherited_obligations: []
+  notes: "Not a financial entity; DORA obligations do not apply directly. May be ICT third-party service provider to DORA entities (verify with company)"
+ai_act:
+  role: not_applicable
+  native_compliance: false
+  inherited_obligations: []
+  notes: "No high-risk AI system in current product (verify with company — no biometric categorisation, no critical infrastructure, no education scoring, no employment, no essential services)"
