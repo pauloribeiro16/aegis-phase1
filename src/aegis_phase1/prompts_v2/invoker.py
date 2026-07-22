@@ -179,6 +179,9 @@ class Phase1LLMInvoker:
 
         if config is None:
             config = {}
+        # CORR-048: idempotent attach of Langfuse callback. We attach our
+        # stored handler (if any) but only if not already present in
+        # ``config["callbacks"]`` — prevents double-attach on retry.
         if self._langfuse_handler is not None:
             existing = list(config.get("callbacks") or [])
             if self._langfuse_handler not in existing:
@@ -245,6 +248,24 @@ class Phase1LLMInvoker:
         try:
             # 1. Load + render prompt
             prompt = self.prompts.render(spec_id, inputs)
+            # CORR-048: truncate user message if total > 10KB to avoid
+            # Langfuse trace > 80MB render limit. Pre-CORR-048 the
+            # canonical P1C-LLM-01 path produced 211K-token echoes
+            # (post-CORR-045 reduced but still large). Truncation is
+            # last-resort; per-lane filter (CORR-045) is the real fix.
+            MAX_PROMPT_BYTES = 10240
+            sys_len = len(prompt["system"])
+            user_len = len(prompt["user"])
+            if sys_len + user_len > MAX_PROMPT_BYTES:
+                head = prompt["user"][: MAX_PROMPT_BYTES - sys_len - 200]
+                prompt = {
+                    **prompt,
+                    "user": head + "\n\n[CORR-048 truncated: input exceeded 10KB]",
+                }
+                logger.warning(
+                    "_attempt(%s): prompt truncated sys=%d user=%d → sys=%d user=%d",
+                    spec_id, sys_len, user_len, sys_len, len(prompt["user"]),
+                )
             schema = self.prompts.load(spec_id).get("schema") or {}
 
             # 2. Build Ollama client with optional format constraint
