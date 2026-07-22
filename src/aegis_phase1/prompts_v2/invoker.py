@@ -313,13 +313,19 @@ class Phase1LLMInvoker:
             schema = self.prompts.load(spec_id).get("schema") or {}
 
             # 2. Build Ollama client with optional format constraint
+            from aegis_phase1.prompts_v2.markdown_parser import MARKDOWN_PARSERS
+
             llm_kwargs: dict[str, Any] = {
                 "model": self.model,
                 "base_url": self.base_url,
                 "temperature": self.DEFAULT_TEMPERATURE,
             }
-            if schema:
-                llm_kwargs["format"] = schema  # Ollama accepts dict for JSON Schema
+            # CORR-050: do NOT pass format=schema for specs with a
+            # MarkdownParser. The model is instructed (in the prompt)
+            # to emit markdown; constraining it with JSON Schema fights
+            # the instruction. Legacy specs (no parser) keep format=.
+            if schema and spec_id not in MARKDOWN_PARSERS:
+                llm_kwargs["format"] = schema
             llm = ChatOllama(**llm_kwargs)
 
             # 3. Call LLM
@@ -393,15 +399,47 @@ class Phase1LLMInvoker:
                 }
 
             # 5. Validate
-            output = parse_result.json
-            # Ensure dict
-            if not isinstance(output, dict):
-                # If LLM returned an array, wrap it (e.g. for events)
-                output = {"items": output}
+            # CORR-050: markdown+regex parsing path for LLMs with a
+            # registered MarkdownParser. JSON Schema validator
+            # (Phase1Validator) is bypassed for these specs — Pydantic
+            # models are the new source of truth. Legacy JSON Schema
+            # path kept for the other 4 LLMs (until CORR-051).
+            from aegis_phase1.prompts_v2.markdown_parser import MARKDOWN_PARSERS
 
-            validation_result: dict[str, Any] = {"valid": True, "warnings": []}
-            if self.validator:
-                validation_result = self.validator.validate(spec_id, output, inputs)
+            output = parse_result.json
+            parser_cls = MARKDOWN_PARSERS.get(spec_id)
+            if parser_cls is not None:
+                # markdown+regex path: parse the raw text directly
+                # (the JSON wrapper from RobustParser is discarded).
+                parser = parser_cls()
+                parsed_model, error_feedback = parser.parse(raw)
+                if parsed_model is None:
+                    validation_result = {
+                        "valid": False,
+                        "errors": [error_feedback],
+                        "warnings": [],
+                    }
+                    output = None
+                else:
+                    # CORR-050: inject deterministic envelope fields.
+                    # These are NEVER emitted by the LLM; the invoker
+                    # is the single source of truth.
+                    parsed_model.case_id = inputs.get("case_id", "")
+                    parsed_model.prompt_spec_id = spec_id
+                    parsed_model.schema_version = "1.0.0"
+                    parsed_model.invocation_pattern = invocation_pattern
+                    output = parsed_model.model_dump()
+                    validation_result = {"valid": True, "warnings": []}
+            else:
+                # Legacy JSON Schema path (CORR-051 will convert)
+                if not isinstance(output, dict):
+                    # If LLM returned an array, wrap it (e.g. for events)
+                    output = {"items": output}
+                validation_result = {"valid": True, "warnings": []}
+                if self.validator:
+                    validation_result = self.validator.validate(
+                        spec_id, output, inputs
+                    )
 
             # Token usage (best-effort; Ollama may not always expose it)
             usage = self._extract_usage(response)
