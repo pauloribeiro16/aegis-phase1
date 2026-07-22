@@ -1757,5 +1757,72 @@ class Phase1Orchestrator:
             return [self._make_serializable(v) for v in obj]
         return obj
 
+    def _build_layer0_subdomain_refs(
+        self,
+        subdomain_ids: list[str],
+    ) -> list[dict[str, Any]]:
+        """Build rich ``layer0_subdomain_refs`` from subdomain IDs.
+
+        CORR-045: replaces the previous
+        ``list((state["subdomains"] or {}).keys())`` pattern that passed
+        bare string IDs (crashed the canonical P1C-LLM-01 path with
+        ``'str' object has no attribute 'get'``). Each entry now carries
+        the metadata the P1C-LLM-01 spec requires (objective, pairs,
+        participating_regulations, anchors, csf).
+
+        Args:
+            subdomain_ids: list of subdomain IDs (e.g. ``["D-01.1",
+                "D-01.2"]``).
+
+        Returns:
+            list[dict] with one entry per subdomain_id, ordered by ID.
+            Missing subdomains are skipped (logged at DEBUG). When the
+            ``preproc_catalog`` loader is missing, returns bare ID
+            dicts (P1C-LLM-01 may produce thin output).
+        """
+        if (
+            not hasattr(self, "preproc_catalog")
+            or self.preproc_catalog is None
+        ):
+            logger.warning(
+                "_build_layer0_subdomain_refs: preproc_catalog not loaded; "
+                "returning bare ID dicts (P1C-LLM-01 may produce thin output)"
+            )
+            return [{"sub_domain_id": sid, "title": sid} for sid in subdomain_ids]
+
+        all_subdomains = self.preproc_catalog.load_subdomains()
+        by_id: dict[str, Any] = {s.id: s for s in all_subdomains}
+        refs: list[dict[str, Any]] = []
+        for sid in subdomain_ids:
+            sd = by_id.get(sid)
+            if sd is None:
+                logger.debug(
+                    "subdomain %s not found in preproc_catalog; skipping", sid
+                )
+                continue
+            anchors: list[str] = []
+            for sr in (sd.security_requirements or []):
+                anchors.extend(sr.anchors or [])
+            objective = sd.hso_hl.objective if sd.hso_hl else None
+            refs.append(
+                {
+                    "sub_domain_id": sd.id,
+                    "title": sd.title,
+                    "domain_id": sd.domain_id,
+                    "participating_regulations": list(
+                        sd.participating_regulations or []
+                    ),
+                    "hso_hl_objective": objective,
+                    "objective": objective,
+                    "pairs": [
+                        p.model_dump() if hasattr(p, "model_dump") else p
+                        for p in (sd.pairs or [])
+                    ],
+                    "anchors": sorted(set(anchors)),
+                    "csf": list(sd.csf_hint or []),
+                }
+            )
+        return refs
+
 
 __all__ = ["Phase1Orchestrator"]
