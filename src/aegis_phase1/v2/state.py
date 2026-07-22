@@ -329,6 +329,93 @@ class RegulatoryInteractions(_TolerantModel):
     negative_analyses: list[NegativeAnalysisItem] = Field(default_factory=list)
 
 
+# =============================================================================
+# CORR-050: P1B-LLM-01-INTERPRETATION output models (markdown+regex parsing)
+#
+# Replaces the JSON Schema in output_schemas.yaml as the source of truth
+# for this spec. Envelope fields (prompt_spec_id, schema_version, case_id,
+# invocation_pattern) are injected by the invoker post-parse — the LLM
+# never emits them. Pydantic replaces JSON Schema as the only validator.
+# =============================================================================
+
+
+class P1BLLM01Status(str, Enum):
+    """CORR-050: status values for P1B-LLM-01-INTERPRETATION output."""
+
+    OK = "OK"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    INDETERMINATE = "INDETERMINATE"
+
+
+class P1BLLM01Confidence(str, Enum):
+    """CORR-050: confidence values for P1B-LLM-01-INTERPRETATION output."""
+
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+class P1BLLM01Applicable(str, Enum):
+    """CORR-050: applicable values for P1BLLM01Interpretation."""
+
+    YES = "YES"
+    NO = "NO"
+
+
+class P1BLLM01DerogationVerdict(str, Enum):
+    """CORR-050: activation_verdict values for P1BLLM01Derogation."""
+
+    ACTIVATED = "ACTIVATED"
+    NOT_ACTIVATED = "NOT_ACTIVATED"
+    INDETERMINATE = "INDETERMINATE"
+
+
+class P1BLLM01Interpretation(BaseModel):
+    """One Tipo 2 interpretation entry (parsed from ### INT-NN block)."""
+
+    entry_id: str
+    applicable: P1BLLM01Applicable
+    activation_rationale: str
+    layer0_refs: list[str] = Field(default_factory=list)
+    legal_refs: list[str] = Field(default_factory=list)
+    company_fact_refs: list[str] = Field(default_factory=list)
+
+
+class P1BLLM01Derogation(BaseModel):
+    """One Tipo 3 derogation entry (parsed from ### DER-NN block)."""
+
+    entry_id: str
+    activation_verdict: P1BLLM01DerogationVerdict
+    activation_rationale: str
+    layer0_refs: list[str] = Field(default_factory=list)
+    legal_refs: list[str] = Field(default_factory=list)
+    company_fact_refs: list[str] = Field(default_factory=list)
+
+
+class P1BLLM01Output(BaseModel):
+    """Parsed + validated output of P1B-LLM-01-INTERPRETATION.
+
+    CORR-050: envelope fields (prompt_spec_id, schema_version, case_id,
+    invocation_pattern) are injected by the invoker post-parse — the
+    LLM never emits them. Pydantic replaces JSON Schema as the
+    single source of truth for validation.
+    """
+
+    # Envelope (invoker-injected; LLM never emits)
+    prompt_spec_id: str = "P1B-LLM-01-INTERPRETATION"
+    schema_version: str = "1.0.0"
+    case_id: str = ""
+    invocation_pattern: str = "per_regulation"
+
+    # Content (LLM-emitted, parser-extracted from markdown)
+    status: P1BLLM01Status
+    confidence: P1BLLM01Confidence
+    interpretations: list[P1BLLM01Interpretation] = Field(default_factory=list)
+    derogations: list[P1BLLM01Derogation] = Field(default_factory=list)
+
+    model_config = {"extra": "ignore"}
+
+
 __all__ = [
     "AISystemClass",
     "CRAProductClass",
@@ -339,6 +426,13 @@ __all__ = [
     "ImplementationReadiness",
     "NIS2EntityClass",
     "NegativeAnalysisItem",
+    "P1BLLM01Applicable",
+    "P1BLLM01Confidence",
+    "P1BLLM01Derogation",
+    "P1BLLM01DerogationVerdict",
+    "P1BLLM01Interpretation",
+    "P1BLLM01Output",
+    "P1BLLM01Status",
     "ReadinessState",
     "RegulatoryClassification",
     "RegulatoryConflictType",
