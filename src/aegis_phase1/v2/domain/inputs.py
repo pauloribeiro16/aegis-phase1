@@ -154,13 +154,21 @@ def _case_id(state: V2State) -> str:
 
 
 def _project_company_context(ctx: Any) -> dict[str, Any]:
-    """Project the company context to the 7 fields the prompt needs.
+    """Project the company context to the 7+ fields the prompt needs.
 
     CORR-042 inline fix: ctx may be a Pydantic CompanyContext or a
     dict (v1-compat shim). Handle both.
+
+    CORR-048: extend with the 4 new fields from CORR-047
+    (implementation_readiness, regulatory_classification,
+    role_matrix, regulatory_interactions) when present in the
+    CompanyProfile. Backward-compat: if the 4 fields are not
+    available (legacy v1 state, or older case inputs that lack the
+    new YAMLs), return the original 8-field shape without error.
     """
     if isinstance(ctx, dict):
-        return {
+        # v1-compat shim path (8 fields)
+        base = {
             "company_name": ctx.get("company_name") or ctx.get("name") or "",
             "scale": ctx.get("scale") or ctx.get("complexity_tier") or "LOW",
             "sector": ctx.get("sector") or "",
@@ -170,16 +178,76 @@ def _project_company_context(ctx: Any) -> dict[str, Any]:
             "tech_stack": list(ctx.get("tech_stack") or []),
             "applicable_regs": list(ctx.get("applicable_regs") or []),
         }
-    return {
-        "company_name": ctx.company_name,
-        "scale": ctx.scale,
-        "sector": ctx.sector,
-        "employees": ctx.employees,
-        "revenue": ctx.revenue,
-        "security_fte": ctx.security_fte,
-        "tech_stack": list(ctx.tech_stack or []),
-        "applicable_regs": list(ctx.applicable_regs or []),
-    }
+    else:
+        # Pydantic CompanyContext path
+        base = {
+            "company_name": ctx.company_name,
+            "scale": ctx.scale,
+            "sector": ctx.sector,
+            "employees": ctx.employees,
+            "revenue": ctx.revenue,
+            "security_fte": ctx.security_fte,
+            "tech_stack": list(ctx.tech_stack or []),
+            "applicable_regs": list(ctx.applicable_regs or []),
+        }
+
+    # CORR-048: thread the 4 new fields from CORR-047 if available
+    extra = _extract_corr047_fields(ctx)
+    if extra:
+        base.update(extra)
+    return base
+
+
+def _extract_corr047_fields(ctx: Any) -> dict[str, Any]:
+    """CORR-048: extract the 4 CORR-047 fields from any supported shape.
+
+    Tries 3 paths to maximise compatibility with existing callers:
+
+      1. Direct attribute on ctx (Pydantic CompanyContext or
+         CompanyProfile wrapper).
+      2. v2_company_profile sub-key on dict-shaped state shims.
+      3. Direct key on dict-shaped state shims.
+
+    Each non-None value is serialised via model_dump() if it's a
+    Pydantic model, or via __dict__ if it's a plain object. Returns
+    a dict of serialised fields, or {} if none available.
+
+    Caller must handle backward-compat: if the 4 fields are not
+    populated (e.g. case input lacks the YAMLs), the prompt
+    consumer will see them as missing — which is the correct
+    signal to skip capability/role/interaction sections.
+    """
+    out: dict[str, Any] = {}
+    for field in (
+        "implementation_readiness",
+        "regulatory_classification",
+        "role_matrix",
+        "regulatory_interactions",
+    ):
+        value: Any = None
+        # Path 1: direct attribute (Pydantic)
+        if hasattr(ctx, field):
+            value = getattr(ctx, field)
+        # Path 2: v2_company_profile sub-dict on state shim
+        if value is None and isinstance(ctx, dict):
+            profile = ctx.get("v2_company_profile")
+            if profile is not None and hasattr(profile, field):
+                value = getattr(profile, field)
+        # Path 3: direct dict key
+        if value is None and isinstance(ctx, dict):
+            value = ctx.get(field)
+        if value is None:
+            continue
+        # Serialise Pydantic model
+        if hasattr(value, "model_dump"):
+            value = value.model_dump()
+        elif hasattr(value, "__dict__") and not isinstance(value, (str, int, float, bool, list, dict)):
+            value = {
+                k: v for k, v in value.__dict__.items()
+                if not k.startswith("_")
+            }
+        out[field] = value
+    return out
 
 
 def _build_track_b_suggestion(
