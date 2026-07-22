@@ -164,6 +164,14 @@ def _make_map_node(domain_id: str):
 
     The LangGraph span name is set by ``g.add_node(name=...)``; the
     callable name only affects Python ``__name__``.
+
+    CORR-044: writes the result into ``orch.state["domain_results"]`` so the
+    downstream REDUCE sub-graph (``reduce_deterministic`` → ``concatenate``)
+    sees the populated dict. Without this fan-in write, ``concatenate`` reads
+    ``state.get("domain_results", {}) == {}`` and produces 0 subdomains, which
+    makes every OUTPUT doc empty under ``--run-all-traced``. The orchestrator
+    instance is shared across all nodes via ``configurable["orchestrator"]``,
+    so the mutation is visible to the downstream ``_reduce_det`` node.
     """
     domain_name = DOMAIN_NAMES.get(domain_id, domain_id)
     span_name = f"MAP {domain_id} {domain_name}"
@@ -179,18 +187,26 @@ def _make_map_node(domain_id: str):
             result = orch.map_single_domain(domain_id, config=cfg)
         except MapPartialFailure as exc:
             logger.warning("MAP %s partial failure: %s", domain_id, exc)
+            failure = {
+                "domain_id": domain_id,
+                "llm_status": "FAILED",
+                "error": str(exc),
+            }
+            # CORR-044: write the failure too, so REDUCE has the full picture
+            # (rather than the domain appearing simply absent).
+            orch.state.setdefault("domain_results", {})[domain_id] = failure
             return {
-                "stage_outputs": {
-                    f"map_{domain_id}": {
-                        "domain_id": domain_id,
-                        "llm_status": "FAILED",
-                        "error": str(exc),
-                    }
-                },
+                "stage_outputs": {f"map_{domain_id}": failure},
                 "map_complete": {domain_id: True},
             }
         except OllamaUnreachable:
             raise
+        # CORR-044: fan-in to shared state so REDUCE can read it.
+        orch.state.setdefault("domain_results", {})[domain_id] = result
+        logger.info(
+            "MAP node %s: wrote domain_results[%s] (status=%s)",
+            domain_id, domain_id, result.get("llm_status"),
+        )
         complete = dict(state.get("map_complete") or {})
         complete[domain_id] = True
         return {
