@@ -1,0 +1,9 @@
+# AEGIS Phase 1 — Regulatory Classification (per regulation)
+# 5 enums: NIS2 entity class, DORA Art. 2 entity, CRA product
+# class, AI Act risk class, DORA critical/important ICT.
+# Values come from the regulations themselves, not company input.
+nis2_entity_class: NOT_APPLICABLE         # TinyTask is a SaaS provider, not Annex I/II
+dora_article_2_entity: NOT_APPLICABLE     # not a financial entity
+cra_product_class: CLASS_I                # default for digital products w/ personal data
+ai_system_classification: NOT_APPLICABLE  # no high-risk AI system in scope
+critical_or_important_ict: NOT_APPLICABLE  # DORA not applicable

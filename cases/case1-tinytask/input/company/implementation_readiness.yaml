@@ -1,0 +1,20 @@
+# AEGIS Phase 1 — Implementation Readiness (TinyTask Lda.)
+# 12 readiness areas (IR-01..IR-12), per methodology §6.
+# This file feeds Doc 04b (Security Posture) capability matrix.
+# Values are PLACEHOLDERS — verify with company before applying.
+#
+# IMPORTANT: NO / YES / PARTIAL are YAML-reserved as booleans, so
+# they MUST be quoted (otherwise PyYAML parses them as bool, which
+# then fails Pydantic Enum coercion).
+ciso: "NO"                        # IR-01: verify with company
+dpo: "NO"                         # IR-02: verify with company
+information_security_policy: "PARTIAL"  # IR-03: ad-hoc policies exist
+risk_assessment: "NO"             # IR-04: no formal risk methodology
+incident_response: "PARTIAL"      # IR-05: runbook exists for GDPR 72h
+business_continuity: "NO"         # IR-06: verify with company
+backup: "YES"                     # IR-07: automated daily backups in place
+access_control: "PARTIAL"         # IR-08: RBAC exists, no formal review
+vulnerability_management: "PARTIAL"  # IR-09: dependabot + manual scans
+third_party_risk: "NO"            # IR-10: no formal sub-processor register
+security_awareness: "NO"          # IR-11: no formal training program
+audit_logging: "PARTIAL"          # IR-12: app logs yes, SIEM no
