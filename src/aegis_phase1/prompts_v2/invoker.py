@@ -172,7 +172,16 @@ class Phase1LLMInvoker:
         # 4 catalog-dependent specs. Raises RuntimeError if a catalog
         # is required but not wired. No-op for P1C-LLM-03.
         try:
-            self._load_catalogs_for(spec_id)
+            catalog_inputs = self._load_catalogs_for(spec_id)
+            # CORR-045: merge catalogs into inputs BEFORE render so the
+            # prompt template substitution can interpolate them.
+            # Without this merge, the prompt never sees
+            # scope_overlap_predicates / tipo2 / event_templates even
+            # though _load_catalogs_for loaded them successfully.
+            # Order: inputs on top of catalog_inputs so callers can
+            # override (rare); catalog keys are the new ones.
+            if catalog_inputs:
+                inputs = {**catalog_inputs, **inputs}
         except RuntimeError:
             # Re-raise — this is a configuration error, not a recoverable one.
             raise
