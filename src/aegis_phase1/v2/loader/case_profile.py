@@ -158,6 +158,14 @@ class CompanyProfile(_TolerantModel):
       - SP-B ApplicabilityContext (company + predicates + applicable_regs)
       - SP-C ClauseMappingContext (company + applicable_regs + clause counts)
       - Doc 04/04a/04b/04c/04d (company facts + stakeholders + goals + architecture)
+
+    CORR-047: extended with 4 new fields:
+      - implementation_readiness: 12 IR areas (Doc 04b capability matrix)
+      - regulatory_classification: 5 enums (Doc 05/07 per-regulation state)
+      - role_matrix: 5 regs × role (Doc 05 + Layer 3 analyses)
+      - regulatory_interactions: Layer 3 scans (temporal/requirement/
+        trigger conflicts + negative analyses)
+    All 4 are Optional (None if the corresponding YAML is absent).
     """
 
     case_path: str
@@ -170,6 +178,11 @@ class CompanyProfile(_TolerantModel):
     regulatory: RegulatoryFacts = RegulatoryFacts()
     business_goals: list[BusinessGoal] = Field(default_factory=list)
     stakeholders: list[Stakeholder] = Field(default_factory=list)
+    # CORR-047: 4 new categories (Optional; None if YAML missing)
+    implementation_readiness: Any | None = None
+    regulatory_classification: Any | None = None
+    role_matrix: Any | None = None
+    regulatory_interactions: Any | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +326,89 @@ class CaseProfileLoader:
             non_applicable,
         )
 
+    # -- CORR-047: 4 new categories -------------------------------------
+
+    def _load_implementation_readiness(self) -> Any:
+        """CORR-047: load implementation_readiness.yaml → ImplementationReadiness.
+
+        Tolerates missing file (WARNING + None) and parse errors
+        (WARNING + None) so other categories can still load.
+        """
+        from aegis_phase1.v2.state import ImplementationReadiness
+
+        path = self.input_dir / "company" / "implementation_readiness.yaml"
+        if not path.exists():
+            logger.warning(
+                "_load_implementation_readiness: missing %s; "
+                "implementation_readiness will be None (Doc 04b renders empty capability matrix)",
+                path,
+            )
+            return None
+        try:
+            return ImplementationReadiness.model_validate(self._read_yaml(path))
+        except Exception as e:
+            logger.warning(
+                "_load_implementation_readiness: failed to parse %s: %s; returning None",
+                path, e,
+            )
+            return None
+
+    def _load_regulatory_classification(self) -> Any:
+        """CORR-047: load regulatory_classification.yaml → RegulatoryClassification."""
+        from aegis_phase1.v2.state import RegulatoryClassification
+
+        path = self.input_dir / "company" / "regulatory_classification.yaml"
+        if not path.exists():
+            logger.warning(
+                "_load_regulatory_classification: missing %s; returning None",
+                path,
+            )
+            return None
+        try:
+            return RegulatoryClassification.model_validate(self._read_yaml(path))
+        except Exception as e:
+            logger.warning(
+                "_load_regulatory_classification: failed to parse %s: %s; returning None",
+                path, e,
+            )
+            return None
+
+    def _load_role_matrix(self) -> Any:
+        """CORR-047: load role_matrix.yaml → RoleMatrix."""
+        from aegis_phase1.v2.state import RoleMatrix
+
+        path = self.input_dir / "company" / "role_matrix.yaml"
+        if not path.exists():
+            logger.warning("_load_role_matrix: missing %s; returning None", path)
+            return None
+        try:
+            return RoleMatrix.model_validate(self._read_yaml(path))
+        except Exception as e:
+            logger.warning(
+                "_load_role_matrix: failed to parse %s: %s; returning None", path, e,
+            )
+            return None
+
+    def _load_regulatory_interactions(self) -> Any:
+        """CORR-047: load interactions.yaml → RegulatoryInteractions (Layer 3 scans)."""
+        from aegis_phase1.v2.state import RegulatoryInteractions
+
+        path = self.input_dir / "regulatory" / "interactions.yaml"
+        if not path.exists():
+            logger.warning(
+                "_load_regulatory_interactions: missing %s; returning None",
+                path,
+            )
+            return None
+        try:
+            return RegulatoryInteractions.model_validate(self._read_yaml(path))
+        except Exception as e:
+            logger.warning(
+                "_load_regulatory_interactions: failed to parse %s: %s; returning None",
+                path, e,
+            )
+            return None
+
     # -- main entrypoint --------------------------------------------------
 
     @functools_cache  # noqa: B019  (intentional: case_path is the cache key)
@@ -359,6 +455,11 @@ class CaseProfileLoader:
             regulatory=regulatory_facts,
             business_goals=self._load_business_goals(),
             stakeholders=self._load_stakeholders(),
+            # CORR-047: 4 new categories (each WARNING-tolerant if YAML missing)
+            implementation_readiness=self._load_implementation_readiness(),
+            regulatory_classification=self._load_regulatory_classification(),
+            role_matrix=self._load_role_matrix(),
+            regulatory_interactions=self._load_regulatory_interactions(),
         )
 
 
