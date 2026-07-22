@@ -252,6 +252,74 @@ class CaseProfileLoader:
             raise ValueError(f"Expected list at {path}#{key}, got {type(items).__name__}")
         return items
 
+    @staticmethod
+    def _read_yaml_list_multi(
+        path: Path,
+        key_aliases: list[str],
+    ) -> list[dict[str, Any]]:
+        """CORR-046: read a list from a YAML file under one of several root keys.
+
+        Different case YAMLs use different root-key conventions for what is
+        semantically the same data:
+
+          data_stores.yaml:  "data_stores:"  OR  "stores:"
+          data_flows.yaml:   "data_flows:"   OR  "flows:"
+          cloud_services.yaml: "cloud_services:"  OR  "services:"
+
+        Pre-CORR-046 the loader hard-coded one variant (e.g. "data_stores")
+        and the other variant was silently dropped — prompts received an
+        empty list. This helper tries each alias in order and returns the
+        first non-empty list found, logging WARNING when no alias matches.
+
+        Args:
+            path: Path to the YAML file.
+            key_aliases: Ordered list of root keys to try. First non-empty
+                list wins; empties are skipped (allow legacy keys that are
+                explicitly empty to fall through to the next alias).
+
+        Returns:
+            The list found under the first matching alias; [] if the file
+            is missing or no alias matches.
+        """
+        if not path.exists():
+            logger.warning(
+                "_read_yaml_list_multi: file does not exist: %s; aliases=%s",
+                path, key_aliases,
+            )
+            return []
+        try:
+            data = CaseProfileLoader._read_yaml(path)
+        except Exception as e:
+            logger.warning(
+                "_read_yaml_list_multi: failed to parse %s: %s; returning []",
+                path, e,
+            )
+            return []
+        for key in key_aliases:
+            if key in data:
+                value = data[key]
+                if isinstance(value, list):
+                    if not value:
+                        logger.debug(
+                            "_read_yaml_list_multi: key %r in %s is an empty list "
+                            "(trying next alias if any)",
+                            key, path,
+                        )
+                        # Don't return yet — try the next alias.
+                        continue
+                    return value
+                logger.warning(
+                    "_read_yaml_list_multi: key %r in %s is not a list (got %s); "
+                    "skipping",
+                    key, path, type(value).__name__,
+                )
+                continue
+        logger.warning(
+            "_read_yaml_list_multi: none of aliases %s found in %s; returning []",
+            key_aliases, path,
+        )
+        return []
+
     # -- loaders ----------------------------------------------------------
 
     def _load_company(self) -> CompanyFacts:
@@ -296,12 +364,27 @@ class CaseProfileLoader:
 
     def _load_architecture(self) -> ArchitectureFacts:
         arch_dir = self.input_dir / "architecture"
+        # CORR-046: case 1 YAMLs use 'stores' / 'flows' / 'services' as root
+        # keys; case 2+ may use 'data_stores' / 'data_flows' / 'cloud_services'.
+        # Accept both via _read_yaml_list_multi.
+        data_stores = self._read_yaml_list_multi(
+            arch_dir / "data_stores.yaml", ["data_stores", "stores"],
+        )
+        data_flows = self._read_yaml_list_multi(
+            arch_dir / "data_flows.yaml", ["data_flows", "flows"],
+        )
+        cloud_services = self._read_yaml_list_multi(
+            arch_dir / "cloud_services.yaml", ["cloud_services", "services"],
+        )
+        # systems / auth_systems: case 1 uses 'systems' / 'auth_systems'
+        # (no alias needed for now, but pass via _read_yaml_list for
+        # consistency).
         return ArchitectureFacts(
             systems=self._read_yaml_list(arch_dir / "systems.yaml", "systems"),
             auth_systems=self._read_yaml_list(arch_dir / "auth_systems.yaml", "auth_systems"),
-            cloud_services=self._read_yaml_list(arch_dir / "cloud_services.yaml", "cloud_services"),
-            data_flows=self._read_yaml_list(arch_dir / "data_flows.yaml", "data_flows"),
-            data_stores=self._read_yaml_list(arch_dir / "data_stores.yaml", "data_stores"),
+            cloud_services=cloud_services,
+            data_flows=data_flows,
+            data_stores=data_stores,
         )
 
     def _load_regulatory(self) -> tuple[RegulatoryFacts, list[str], list[str]]:
