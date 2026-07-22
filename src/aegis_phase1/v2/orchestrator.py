@@ -277,6 +277,15 @@ class Phase1Orchestrator:
         v1 schema (with required complexity_tier enum + revenue float) is
         derivable from the v2 facts + a simple tier estimate based on
         scale + employees.
+
+        CORR-049-T6: also embeds the full v2 CompanyProfile (under
+        ``v2_company_profile`` key) and the 4 CORR-047 fields at the
+        top level. Pre-CORR-049 the returned dict was a flat 9-key
+        shape; the downstream ``_extract_corr047_fields`` helper
+        tried 3 paths to find the 4 new fields but none matched the
+        flat shape, so the fields were silently dropped. The bridge
+        here makes Path 2 (``ctx["v2_company_profile"]``) and Path 3
+        (direct top-level keys) work.
         """
         from aegis_phase1.models import ComplexityTier
         from aegis_phase1.v2.state import CompanyContext as _CC
@@ -291,7 +300,7 @@ class Phase1Orchestrator:
         else:
             tier = ComplexityTier.LOW.value
 
-        return _CC(
+        base = _CC(
             company_name=facts.name,
             sector=facts.sector,
             jurisdiction=facts.jurisdiction,
@@ -303,6 +312,29 @@ class Phase1Orchestrator:
             security_fte=facts.security_fte or 0.0,
             tech_stack=list(facts.tech_stack or []),
         ).model_dump()
+
+        # CORR-049-T6: attach the rich CompanyProfile (loaded by
+        # CaseProfileLoader in CORR-047) so _extract_corr047_fields
+        # Path 2 can find the 4 new fields. Also expose the 4 fields
+        # as top-level keys (Path 3 fallback).
+        profile = self.state.get("v2_company_profile")
+        if profile is not None:
+            base["v2_company_profile"] = profile  # Pydantic instance
+            for field in (
+                "implementation_readiness",
+                "regulatory_classification",
+                "role_matrix",
+                "regulatory_interactions",
+            ):
+                value = getattr(profile, field, None)
+                if value is not None:
+                    base[field] = (
+                        value.model_dump()
+                        if hasattr(value, "model_dump")
+                        else value
+                    )
+
+        return base
 
     def _build_architecture_inventory(self) -> dict[str, list[dict[str, Any]]]:
         """Build v1-shape architecture_inventory (dict[str, list[dict]])."""
