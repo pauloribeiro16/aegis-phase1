@@ -230,12 +230,21 @@ def test_run_phase1_graph_propagates_tags() -> None:
     cfg = captured["config"]
     assert "metadata" in cfg, f"metadata missing from run_config: {cfg!r}"
     tags = cfg["metadata"]["langfuse_tags"]
-    # CORR-018b: run_phase1_graph auto-appends subphase:* tags.
+    # CORR-018b (legacy): run_phase1_graph auto-appended subphase:* tags.
+    # CORR-048: per-node stage tags are now added by each
+    # _make_subgraph_node via metadata.langfuse_tags — NOT by the root
+    # graph. The root now propagates ONLY the caller's tags. So
+    # subphase:* tags are absent at the root level; stage:* tags live
+    # on the per-node sub-graph spans (verified by
+    # test_corr048_metadata_threading.py::test_graph_subphase_tags_are_per_node).
     assert tags[:2] == ["phase:test", "case:x"]
-    assert "subphase:map" in tags
-    assert "subphase:1b" in tags
-    assert "subphase:reduce" in tags
-    assert "subphase:output" in tags
+    # Pre-CORR-048 expected subphase:* tags here; post-CORR-048 the
+    # root does NOT auto-append them. The 4 stage:* tags are added
+    # per-node by build_phase1_graph instead.
+    assert "subphase:map" not in tags, (
+        "CORR-048: subphase:* tags no longer auto-appended to root "
+        "(per-node stage:* tags are added by _make_subgraph_node)"
+    )
 
 
 # ─── 7. reduce chain tolerates executor=None ─────────────────────────
