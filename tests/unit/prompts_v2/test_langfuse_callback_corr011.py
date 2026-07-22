@@ -30,13 +30,61 @@ import pytest
 from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
 
 
+# CORR-055 (2026-07-22): the _FakeAIMessage default content changed from
+# '{"items": []}' to valid P1B-LLM-01 markdown. Pre-CORR-050, the validator
+# was a no-op mock and any JSON would yield status=OK. Post-CORR-050, the
+# invoker consults the real MARKDOWN_PARSERS registry; P1B-LLM-01-INTERPRETATION
+# has a registered P1BLLM01Parser that requires '## Status' etc., so the
+# mock must return markdown matching the template. See CONTRACT-055.md.
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 
-class _FakeAIMessage:
-    """Minimal stand-in for ``langchain_core.messages.AIMessage``."""
+# CORR-055: content must be valid P1B-LLM-01 markdown (not '{"items": []}').
+# Before CORR-050, the validator was a no-op and any JSON would pass.
+# After CORR-050, P1B-LLM-01-INTERPRETATION has a registered MarkdownParser
+# that requires '## Status' + '## Interpretations' + '## Derogations' sections.
+_VALID_P1B_LLM_01_MARKDOWN = """## Status
 
-    def __init__(self, content: str = '{"items": []}') -> None:
+- status: OK
+- confidence: HIGH
+
+## Interpretations
+
+### INT-01
+
+- entry_id: TIPO2-TEST
+- applicable: YES
+- activation_rationale: Test rationale for callback wiring verification.
+- layer0_refs: SubDomains/D-04.3.md
+- legal_refs: GDPR Art. 33(1)
+- company_fact_refs: test=true
+
+## Derogations
+
+### DER-01
+
+- entry_id: TIPO3-TEST
+- activation_verdict: NOT_ACTIVATED
+- activation_rationale: Test derogation for callback wiring.
+- layer0_refs: SubDomains/D-04.3.md
+- legal_refs: GDPR Art. 2(2)(c)
+- company_fact_refs: test=true
+"""
+
+
+class _FakeAIMessage:
+    """Minimal stand-in for ``langchain_core.messages.AIMessage``.
+
+    CORR-055: default content is now valid P1B-LLM-01 markdown so the
+    invoker's MarkdownParser succeeds (status=OK). The original
+    '{"items": []}' worked before CORR-050 because the validator was
+    mocked, but post-CORR-050 the parser registry is real and rejects
+    JSON that doesn't match the markdown template.
+    """
+
+    def __init__(self, content: str = _VALID_P1B_LLM_01_MARKDOWN) -> None:
         self.content = content
         self.response_metadata = {}
         self.usage_metadata = {}
