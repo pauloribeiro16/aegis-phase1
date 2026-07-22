@@ -591,7 +591,9 @@ class Phase1Orchestrator:
             case_id=case_id,
             applicable_regs=applicable_regs,
             company_facts=cc,
-            layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
+            layer0_subdomain_refs=self._build_layer0_subdomain_refs(
+                list((self.state.get("subdomains") or {}).keys())
+            ),
         )
         # Translate executor output → DomainResult shape
         results: dict[str, Any] = {}
@@ -953,7 +955,9 @@ class Phase1Orchestrator:
                 track_b_profile=self.state["aggregated_data"].get("profile", {}),
                 applicable_regs=applicable_regs,
                 company_facts=company_context,
-                layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
+                layer0_subdomain_refs=self._build_layer0_subdomain_refs(
+                    list((self.state.get("subdomains") or {}).keys())
+                ),
                 config=config,
             )
         except Exception as exc:
@@ -1595,7 +1599,9 @@ class Phase1Orchestrator:
             company_facts=cc,
             coverage_matrix_row=coverage_rows,
             aggregated_activations=aggregated_activations,
-            layer0_subdomain_refs=list((self.state.get("subdomains") or {}).keys()),
+            layer0_subdomain_refs=self._build_layer0_subdomain_refs(
+                list((self.state.get("subdomains") or {}).keys())
+            ),
             layer0_catalog=layer0_catalog,
             classification={
                 "role": cc.get("role") or cc.get("obligated_party") or "controller",
