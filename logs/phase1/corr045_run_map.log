@@ -1,0 +1,37 @@
+2026-07-22 15:06:12,750 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-22 15:06:12,750 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-22 15:06:12,750 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-22 15:06:12,750 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-22 15:06:12,970 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=6ff54c1d42151fc763faff77aaddf316
+2026-07-22 15:06:12,970 [INFO] __main__: Non-interactive mode — MAP only (CORR-040; P1C-LLM-01)
+2026-07-22 15:06:12,972 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-22 15:06:13,061 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 2 regs (0.09s)
+2026-07-22 15:06:13,171 [INFO] aegis_phase1.v2.orchestrator: === STAGE 1: MAP ===
+2026-07-22 15:06:13,184 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM Phase1Executor instantiated: model=gemma4:e2b (source=llm_invoker, invoker_type=UnifiedInvoker)
+[15:06:40] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (27214ms, 4083 tok)
+2026-07-22 15:06:40,419 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (27214ms, 4083 tok)
+[15:06:58] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (17876ms, 3763 tok)
+2026-07-22 15:06:58,316 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (17876ms, 3763 tok)
+[15:07:05] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (7446ms, 2653 tok)
+2026-07-22 15:07:05,782 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (7446ms, 2653 tok)
+[15:07:20] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (14877ms, 3386 tok)
+2026-07-22 15:07:20,678 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (14877ms, 3386 tok)
+[15:07:32] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (11364ms, 3087 tok)
+2026-07-22 15:07:32,060 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (11364ms, 3087 tok)
+[15:07:54] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (22197ms, 4096 tok)
+2026-07-22 15:07:54,284 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (22197ms, 4096 tok)
+[15:08:09] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (15458ms, 3505 tok)
+2026-07-22 15:08:09,760 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (15458ms, 3505 tok)
+[15:08:31] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (21272ms, 4096 tok)
+2026-07-22 15:08:31,051 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (21272ms, 4096 tok)
+[15:08:49] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (18105ms, 3766 tok)
+2026-07-22 15:08:49,174 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (18105ms, 3766 tok)
+[15:09:10] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (21368ms, 4096 tok)
+2026-07-22 15:09:10,562 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (21368ms, 4096 tok)
+2026-07-22 15:09:10,563 [INFO] aegis_phase1.v2.orchestrator: MAP complete (P1C-LLM-01 canonical): 10 domains in 177.39s — statuses={'OK': 10}
+2026-07-22 15:09:10,681 [INFO] aegis_phase1.v2.orchestrator: MAP seed_review: 10 review entries at /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask/review/adapted_objectives.yaml
+2026-07-22 15:09:26,186 [INFO] __main__: cmd_run_map: 10/10 lanes OK, 0 failed, 0 sub_domain_activations, 2 artefacts
+2026-07-22 15:09:26,186 [INFO] __main__: === MAP COMPLETE ===
+  AEGIS-P1-07: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/07_Structured_Compliance_Matrix_v2.md
+  AEGIS-P1-07b: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/07b_Proportionality_Profile_v2.md
+  total: 2 artefacts

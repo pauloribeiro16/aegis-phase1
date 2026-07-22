@@ -242,15 +242,37 @@ class Phase1Executor:
         Sequential (v1.2 MVP). True parallelism requires switching to
         asyncio.gather() or multiprocessing.Pool — see roadmap.
 
+        CORR-045: filter ``layer0_subdomain_refs`` per lane so each
+        D-XX lane only sees the subdomains whose ``sub_domain_id``
+        starts with ``D-XX.`` (e.g. D-01 lane sees D-01.1, D-01.2, …
+        not all 38). This fixes the 211K-token prompt problem (model
+        was making verbatim echo of all 38 subdomains per lane) and
+        brings the call within the 180s Ollama timeout.
+
         Returns list of 10 lane outputs (one per domain):
             {"lane_id": "D-XX", "status": ..., "sub_domain_activations": [...], ...}
         """
+        # Take a snapshot of layer0_subdomain_refs once; each lane
+        # gets a filtered copy. If absent (legacy caller), pass empty
+        # list — lane will still run, prompt will be thin.
+        all_refs = inputs.get("layer0_subdomain_refs") or []
         lane_outputs: list[dict[str, Any]] = []
         for domain_id in DOMAINS:
+            # CORR-045: per-lane filter. A ref is a dict
+            # (post-_build_layer0_subdomain_refs) with a
+            # ``sub_domain_id`` field; fall back to dict-level domain_id.
+            lane_refs: list[Any] = []
+            if isinstance(all_refs, list):
+                for ref in all_refs:
+                    if isinstance(ref, dict):
+                        sd_id = ref.get("sub_domain_id") or ""
+                        if sd_id.startswith(f"{domain_id}."):
+                            lane_refs.append(ref)
+            lane_inputs = {**inputs, "layer0_subdomain_refs": lane_refs}
             out = self.invoker.invoke(
                 SPEC_OVERLAP,
                 {
-                    **inputs,
+                    **lane_inputs,
                     "case_id": case_id,
                     "domain_id": domain_id,
                     "lane_id": domain_id,
