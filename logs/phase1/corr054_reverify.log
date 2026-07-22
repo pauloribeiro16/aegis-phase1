@@ -1,0 +1,88 @@
+2026-07-22 20:37:42,201 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-22 20:37:42,201 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-22 20:37:42,201 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-22 20:37:42,201 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-22 20:37:42,412 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=d2f38fb8f86709c5d9e08a38758e9dad
+2026-07-22 20:37:42,412 [INFO] __main__: Non-interactive mode — Phase 1B only (CORR-039; with LLM)
+2026-07-22 20:37:42,424 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-22 20:37:42,511 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 2 regs (0.09s)
+2026-07-22 20:37:42,622 [INFO] aegis_phase1.v2.orchestrator: === STAGE 1.5: PHASE 1B RATIONALE ===
+2026-07-22 20:37:42,641 [INFO] aegis_phase1.prompts_v2.validator: CORR-049-T5: loaded 5 schemas from output_schemas.yaml (specs=['P1B-LLM-01-INTERPRETATION', 'P1B-LLM-02-RATIONALE', 'P1C-LLM-01-OVERLAP-CLASSIFICATION', 'P1C-LLM-02-COMPOUND-EVENT', 'P1C-LLM-03-STRATEGIC-SYNTHESIS'])
+2026-07-22 20:37:42,652 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM Phase1Executor instantiated: model=gemma4:e2b (source=llm_invoker, invoker_type=UnifiedInvoker)
+[20:38:00] [ERROR] markdown_parse_error: {"event": "markdown_parse_error", "level": "ERROR", "timestamp": "2026-07-22T19:38:00.065882+00:00", "spec_id": "P1B-LLM-01-INTERPRETATION", "stage": "Phase 1B", "attempt": 1, "model": "gemma4:e2b", "
+2026-07-22 20:38:00,069 [INFO] phase1.stdout.phase1: [ERROR] markdown_parse_error: {"event": "markdown_parse_error", "level": "ERROR", "timestamp": "2026-07-22T19:38:00.065882+00:00", "spec_id": "P1B-LLM-01-INTERPRETATION", "stage": "Phase 1B", "attempt": 1, "model": "gemma4:e2b", "
+[20:38:00] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (17321ms, 3203 tok)
+2026-07-22 20:38:00,072 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (17321ms, 3203 tok)
+[20:38:13] [ERROR] markdown_parse_error: {"event": "markdown_parse_error", "level": "ERROR", "timestamp": "2026-07-22T19:38:13.205984+00:00", "spec_id": "P1B-LLM-01-INTERPRETATION", "stage": "Phase 1B", "attempt": 2, "model": "gemma4:e2b", "
+2026-07-22 20:38:13,209 [INFO] phase1.stdout.phase1: [ERROR] markdown_parse_error: {"event": "markdown_parse_error", "level": "ERROR", "timestamp": "2026-07-22T19:38:13.205984+00:00", "spec_id": "P1B-LLM-01-INTERPRETATION", "stage": "Phase 1B", "attempt": 2, "model": "gemma4:e2b", "
+[20:38:13] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13118ms, 3250 tok)
+2026-07-22 20:38:13,211 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13118ms, 3250 tok)
+[20:38:27] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (13917ms, 3298 tok)
+2026-07-22 20:38:27,157 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (13917ms, 3298 tok)
+[20:38:27]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 20:38:27,157 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[20:38:27]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 20:38:27,157 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[20:38:27]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 20:38:27,157 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[20:38:27]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 20:38:27,157 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[20:38:27]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 20:38:27,157 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[20:38:27]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 20:38:27,157 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[20:38:41] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (13990ms, 3298 tok)
+2026-07-22 20:38:41,165 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (13990ms, 3298 tok)
+[20:38:41]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 20:38:41,165 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[20:38:41]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 20:38:41,165 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[20:38:41]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 20:38:41,165 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[20:38:41]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 20:38:41,165 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[20:38:41]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 20:38:41,165 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[20:38:41]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 20:38:41,165 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[20:38:54] [ERROR] markdown_parse_error: {"event": "markdown_parse_error", "level": "ERROR", "timestamp": "2026-07-22T19:38:54.461228+00:00", "spec_id": "P1B-LLM-01-INTERPRETATION", "stage": "Phase 1B", "attempt": 1, "model": "gemma4:e2b", "
+2026-07-22 20:38:54,464 [INFO] phase1.stdout.phase1: [ERROR] markdown_parse_error: {"event": "markdown_parse_error", "level": "ERROR", "timestamp": "2026-07-22T19:38:54.461228+00:00", "spec_id": "P1B-LLM-01-INTERPRETATION", "stage": "Phase 1B", "attempt": 1, "model": "gemma4:e2b", "
+[20:38:54] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13245ms, 3246 tok)
+2026-07-22 20:38:54,465 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (13245ms, 3246 tok)
+[20:39:15] [ERROR] markdown_parse_error: {"event": "markdown_parse_error", "level": "ERROR", "timestamp": "2026-07-22T19:39:15.724789+00:00", "spec_id": "P1B-LLM-01-INTERPRETATION", "stage": "Phase 1B", "attempt": 2, "model": "gemma4:e2b", "
+2026-07-22 20:39:15,727 [INFO] phase1.stdout.phase1: [ERROR] markdown_parse_error: {"event": "markdown_parse_error", "level": "ERROR", "timestamp": "2026-07-22T19:39:15.724789+00:00", "spec_id": "P1B-LLM-01-INTERPRETATION", "stage": "Phase 1B", "attempt": 2, "model": "gemma4:e2b", "
+[20:39:15] [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (21242ms, 4096 tok)
+2026-07-22 20:39:15,730 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-01-INTERPRETATION → SCHEMA_ERROR (21242ms, 4096 tok)
+[20:39:27] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11389ms, 3088 tok)
+2026-07-22 20:39:27,148 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11389ms, 3088 tok)
+[20:39:27]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 20:39:27,148 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[20:39:27]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 20:39:27,148 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[20:39:27]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 20:39:27,148 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[20:39:27]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 20:39:27,148 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[20:39:27]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 20:39:27,148 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[20:39:27]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 20:39:27,148 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+[20:39:38] [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11402ms, 3088 tok)
+2026-07-22 20:39:38,566 [INFO] phase1.stdout.phase1: [WARNING] LLM_CALL P1B-LLM-02-RATIONALE → SCHEMA_ERROR (11402ms, 3088 tok)
+[20:39:38]   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+2026-07-22 20:39:38,566 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.prompt_spec_id', 'message': "Required field 'prompt_spec_id' missing"}
+[20:39:38]   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+2026-07-22 20:39:38,566 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.schema_version', 'message': "Required field 'schema_version' missing"}
+[20:39:38]   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+2026-07-22 20:39:38,566 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.case_id', 'message': "Required field 'case_id' missing"}
+[20:39:38]   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+2026-07-22 20:39:38,567 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.invocation_pattern', 'message': "Required field 'invocation_pattern' missing"}
+[20:39:38]   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+2026-07-22 20:39:38,567 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.confidence', 'message': "Required field 'confidence' missing"}
+[20:39:38]   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 20:39:38,567 [ERROR] phase1.stdout.phase1:   schema: {'path': '$.synthesis.rationale', 'message': 'String length 0 < minLength 200'}
+2026-07-22 20:39:38,568 [INFO] aegis_phase1.v2.orchestrator: Phase 1B RATIONALE complete for 0 regulation(s) (status=?)
+2026-07-22 20:39:48,715 [INFO] __main__: cmd_run_phase_1b: wrote 1 artefacts to /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1; rationale_by_reg has 0 entries
+2026-07-22 20:39:48,715 [INFO] __main__: === PHASE 1B COMPLETE ===
+  AEGIS-P1-05: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1/versions/05_Regulatory_Applicability_v2.md
+  total: 1 artefacts
