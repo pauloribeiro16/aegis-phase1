@@ -525,28 +525,39 @@ def build_phase1_graph() -> StateGraph:
     reduce_compiled = build_subphase_reduce()
     output_compiled = build_subphase_output()
 
+    # CORR-048: per-subphase tags (each node carries ONLY its own
+    # stage tag + relevant domain/regulation). Pre-CORR-048 all 4
+    # subphase tags were applied to every node, defeating filtering.
     g.add_node(
         "subphase_map",
         _make_subgraph_node(
-            map_compiled, "MAP Sub-Phase", {"subphase": "map"}
+            map_compiled,
+            "MAP Sub-Phase",
+            {"subphase": "map", "langfuse_tags": ["stage:map"]},
         ),
     )
     g.add_node(
         "subphase_1b",
         _make_subgraph_node(
-            p1b_compiled, "P1B Sub-Phase", {"subphase": "1b"}
+            p1b_compiled,
+            "P1B Sub-Phase",
+            {"subphase": "1b", "langfuse_tags": ["stage:1b"]},
         ),
     )
     g.add_node(
         "subphase_reduce",
         _make_subgraph_node(
-            reduce_compiled, "REDUCE Sub-Phase", {"subphase": "reduce"}
+            reduce_compiled,
+            "REDUCE Sub-Phase",
+            {"subphase": "reduce", "langfuse_tags": ["stage:reduce"]},
         ),
     )
     g.add_node(
         "subphase_output",
         _make_subgraph_node(
-            output_compiled, "OUTPUT Sub-Phase", {"subphase": "output"}
+            output_compiled,
+            "OUTPUT Sub-Phase",
+            {"subphase": "output", "langfuse_tags": ["stage:output"]},
         ),
     )
 
@@ -589,9 +600,12 @@ def run_phase1_graph(
             instances (typically the Langfuse handler).
         tags: Optional Langfuse tags propagated via
             ``metadata.langfuse_tags`` (e.g. ``["phase:phase1", "case:..."]``).
-            The 4 sub-phase tags (``subphase:map``, ``subphase:1b``,
-            ``subphase:reduce``, ``subphase:output``) are added
-            automatically on top of the caller's tags.
+            Sub-phase tags (``stage:map``, ``stage:1b``, …) are added
+            per-node inside the sub-graph node factories
+            (``_make_subgraph_node``); the caller should NOT add them
+            here. Pre-CORR-048 the 4 subphase tags were hardcoded in
+            this function, which caused every node span to carry all 4
+            tags (misleading for filtering).
         extra_metadata: Additional run metadata merged into
             ``config["metadata"]``.
 
@@ -601,12 +615,11 @@ def run_phase1_graph(
         ``stage_outputs`` with one entry per executed node across all
         sub-phases).
     """
-    full_tags = list(tags or []) + [
-        "subphase:map",
-        "subphase:1b",
-        "subphase:reduce",
-        "subphase:output",
-    ]
+    # CORR-048: pass caller's tags through unchanged. Sub-phase tags
+    # are added per-node by _make_subgraph_node so each span only
+    # carries the tags relevant to ITS stage (e.g. MAP D-01 carries
+    # ``stage:map`` and ``domain:D-01`` but NOT ``stage:1b``).
+    full_tags = list(tags or [])
 
     run_config: dict[str, Any] = {
         "configurable": {"orchestrator": orchestrator},

@@ -731,6 +731,14 @@ def cmd_run_all_traced(
     case_name = Path(case_path).name
     callbacks = [orch._langfuse_handler] if orch._langfuse_handler else None
 
+    # CORR-048: structured run metadata. UUID per run; tags scoped to
+    # phase + case (no internal ticket IDs like corr-XXX which leak
+    # into the public Langfuse UI).
+    import uuid as _uuid
+    run_id = str(_uuid.uuid4())
+    run_id_short = run_id[:8]
+    trace_name = f"AEGIS Phase 1 - {case_name} - {run_id_short}"
+
     try:
         run_phase1_graph(
             orch,
@@ -738,8 +746,22 @@ def cmd_run_all_traced(
             prep_path,
             output_dir=output_path,
             callbacks=callbacks,
+            # CORR-048: ONLY phase + case tags. Subphase-specific tags
+            # (stage:map, domain:D-XX, regulation:GDPR) are added by
+            # each node internally in graph.py.
             tags=[f"phase:phase1", f"case:{case_name}"],
-            extra_metadata={"stage": "phase1", "graph": "v2.langgraph.full"},
+            # CORR-048: structured metadata. run_id is the same UUID
+            # written to corr048_langfuse_trace_id.txt so the trace
+            # can be matched to the log file.
+            extra_metadata={
+                "stage": "phase1",
+                "graph": "v2.langgraph.full",
+                "model": "gemma4:e2b",
+                "case": case_name,
+                "run_id": run_id,
+                "trace_name": trace_name,
+                "subphases_run": ["map", "1b", "reduce", "output"],
+            },
         )
     except OllamaUnreachableError as exc:
         print(f"⚠ Ollama not reachable at {exc.base_url}.")
