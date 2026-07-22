@@ -369,6 +369,17 @@ def _make_output_node(node_name: str):
     Each node invokes the orchestrator's granular render method (added in
     CORR-018b) with the ``config`` propagated so nested LLM calls name
     their GENERATION span after this node.
+
+    CORR-044: passes ``orch.state`` (the shared orchestrator instance dict)
+    to the render method, not the LangGraph per-node ``state`` arg. The
+    LangGraph state only carries the keys that were explicitly written via
+    the node return dict (e.g. ``stage_outputs`` + ``*_complete``); it does
+    NOT carry the v2_* keys (v2_applicable_regs, v2_srs, v2_company_facts,
+    etc.) populated by ``_load_v2_catalog`` or the orch.state mutations
+    from MAP / REDUCE. Passing ``orch.state`` instead ensures renderers
+    see the full canonical state — fixing the G8 "0 rows" failure
+    (Doc 06/07/07b rendered empty because the renderers read v2_* /
+    ``state["ontology"]`` from the wrong dict).
     """
     span_name = _OUTPUT_RUN_NAMES[node_name]
     method_name = _output_method_for(node_name)
@@ -382,7 +393,10 @@ def _make_output_node(node_name: str):
         )
         output_dir = state.get("output_dir", "output/phase1") or "output/phase1"
         method = getattr(orch, method_name)
-        result = method(state, output_dir, config=cfg)
+        # CORR-044: pass orch.state (shared instance) — not the LangGraph
+        # per-node state, which is a copy without the v2_* / domain_results
+        # / aggregated_data mutations performed by LOAD/MAP/REDUCE.
+        result = method(orch.state, output_dir, config=cfg)
         complete = dict(state.get("output_complete") or {})
         complete[node_name] = True
         return {
