@@ -1,0 +1,58 @@
+2026-07-22 16:07:49,575 [INFO] __main__: AEGIS Phase 1 v2 Pipeline starting
+2026-07-22 16:07:49,575 [INFO] __main__: Case path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/cases/case1-tinytask
+2026-07-22 16:07:49,575 [INFO] __main__: Regulatory Baseline path: /home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-07-22 16:07:49,575 [INFO] __main__: Output path: /home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/output/phase1
+2026-07-22 16:07:49,799 [INFO] aegis_phase1.llm.tracing: [tracing] Langfuse enabled host=http://localhost:3000 case=default phase=phase1 trace_id=374e7e6cb19fd5e1c4d5a3d5e54f9e60
+2026-07-22 16:07:49,799 [INFO] __main__: Non-interactive mode — running all stages via 18-node LangGraph (CORR-018a)
+2026-07-22 16:07:49,876 [WARNING] langfuse: Propagated attribute 'metadata.subphases_run' value is not a string. Dropping value.
+2026-07-22 16:07:49,881 [INFO] aegis_phase1.v2.orchestrator: === STAGE 0: LOAD ===
+2026-07-22 16:07:49,972 [INFO] aegis_phase1.v2.orchestrator: LOAD complete: 38 sub-domains, 2 regs (0.09s)
+2026-07-22 16:12:53,759 [INFO] aegis_phase1.v2.orchestrator: REDUCE-LLM Phase1Executor instantiated: model=gemma4:e2b (source=llm_invoker, invoker_type=UnifiedInvoker)
+2026-07-22 16:12:53,849 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-01-INTERPRETATION): prompt truncated sys=12525 user=42127 → sys=6144 user=3939
+[16:13:06] [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:06,426 [ERROR] phase1.stdout.phase1: [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:06,427 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-01-INTERPRETATION): prompt truncated sys=12525 user=42127 → sys=6144 user=3939
+[16:13:12] [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:12,917 [ERROR] phase1.stdout.phase1: [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:12,931 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-02-RATIONALE): prompt truncated sys=12875 user=42117 → sys=6144 user=3939
+[16:13:20] [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:20,161 [ERROR] phase1.stdout.phase1: [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:20,161 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-02-RATIONALE): prompt truncated sys=12875 user=42117 → sys=6144 user=3939
+[16:13:26] [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:26,334 [ERROR] phase1.stdout.phase1: [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:26,401 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-01-INTERPRETATION): prompt truncated sys=12525 user=86078 → sys=6144 user=3939
+[16:13:35] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (9032ms, 4096 tok)
+2026-07-22 16:13:35,445 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (9032ms, 4096 tok)
+2026-07-22 16:13:35,458 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-02-RATIONALE): prompt truncated sys=12875 user=86068 → sys=6144 user=3939
+[16:13:44] [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (8912ms, 4096 tok)
+2026-07-22 16:13:44,381 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (8912ms, 4096 tok)
+2026-07-22 16:13:44,418 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-01-INTERPRETATION): prompt truncated sys=12525 user=42127 → sys=6144 user=3939
+[16:13:51] [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:51,674 [ERROR] phase1.stdout.phase1: [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:51,675 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-01-INTERPRETATION): prompt truncated sys=12525 user=42127 → sys=6144 user=3939
+[16:13:58] [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:58,221 [ERROR] phase1.stdout.phase1: [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:13:58,233 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-02-RATIONALE): prompt truncated sys=12875 user=42117 → sys=6144 user=3939
+[16:14:05] [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:14:05,484 [ERROR] phase1.stdout.phase1: [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:14:05,485 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-02-RATIONALE): prompt truncated sys=12875 user=42117 → sys=6144 user=3939
+[16:14:11] [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:14:11,701 [ERROR] phase1.stdout.phase1: [ERROR] FORMAT_ERROR  (raw_len=0)
+2026-07-22 16:14:11,741 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-01-INTERPRETATION): prompt truncated sys=12525 user=86078 → sys=6144 user=3939
+[16:14:20] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (9071ms, 4096 tok)
+2026-07-22 16:14:20,824 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (9071ms, 4096 tok)
+2026-07-22 16:14:20,835 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1B-LLM-02-RATIONALE): prompt truncated sys=12875 user=86068 → sys=6144 user=3939
+[16:14:29] [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (8915ms, 4096 tok)
+2026-07-22 16:14:29,762 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (8915ms, 4096 tok)
+2026-07-22 16:14:30,102 [INFO] aegis_phase1.v2.reduce.concatenator: concatenate: 0 domains -> 0 subdomains, 0 adapted_objectives
+2026-07-22 16:14:30,102 [INFO] aegis_phase1.v2.reduce.merger: merge_requirements: 0 subdomains merged, 0 total requirements kept
+2026-07-22 16:14:30,102 [INFO] aegis_phase1.v2.reduce.conflict_resolver: resolve_conflicts: 0 ambiguities processed (0 resolved, 0 remaining)
+2026-07-22 16:14:30,102 [INFO] aegis_phase1.v2.reduce.proportionality: apply_proportionality: 0 subdomains profiled (scale=MICRO, fte=0.00)
+2026-07-22 16:14:30,137 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1C-LLM-03-STRATEGIC-SYNTHESIS): prompt truncated sys=14089 user=1337 → sys=6144 user=1380
+[16:14:45] [INFO] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → OK (15624ms, 3960 tok)
+2026-07-22 16:14:45,778 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-03-STRATEGIC-SYNTHESIS → OK (15624ms, 3960 tok)
+2026-07-22 16:14:45,789 [WARNING] aegis_phase1.prompts_v2.invoker: _attempt(P1C-LLM-02-COMPOUND-EVENT): prompt truncated sys=13433 user=2602 → sys=6144 user=2645
+[16:14:57] [INFO] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → OK (11863ms, 4096 tok)
+2026-07-22 16:14:57,664 [INFO] phase1.stdout.phase1: [INFO] LLM_CALL P1C-LLM-02-COMPOUND-EVENT → OK (11863ms, 4096 tok)
+2026-07-22 16:16:31,346 [INFO] aegis_phase1.v2.context.clause_mapping_context: build_clause_mapping_context: no applicable_regs — returning empty context
+2026-07-22 16:16:41,983 [INFO] __main__: Pipeline complete
