@@ -234,7 +234,15 @@ def main() -> None:
     parser.add_argument(
         "--model",
         default="gemma4:e4b",  # CORR-056 (2026-07-23)
-        help="Ollama model name (default: gemma4:e4b)",
+        help="Model name (default: gemma4:e4b). For HF transformers, "
+             "use 'hf:org/repo' or 'org/repo' (auto-detected).",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=["ollama", "transformers", "auto"],
+        default="auto",  # CORR-056: auto-detect from model name
+        help="LLM provider (default: auto-detect from --model). "
+             "'transformers' uses HuggingFace transformers (no Ollama needed).",
     )
     parser.add_argument(
         "--retry-failed",

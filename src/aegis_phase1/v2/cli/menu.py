@@ -44,7 +44,15 @@ DEFAULT_REGULATORY_BASELINE_PATH = str(
 )
 DEFAULT_OUTPUT_DIR = "output/phase1"
 DEFAULT_MODEL = "gemma4:e4b"  # CORR-056 (2026-07-23): switched from gemma4:e2b
-MODEL_CHOICES = ["gemma4:e4b", "gemma4:e2b", "Custom..."]
+# CORR-056: HF transformers models use "hf:org/repo" prefix to opt into
+# the transformers provider (instead of Ollama).
+MODEL_CHOICES = [
+    "gemma4:e4b",
+    "gemma4:e2b",
+    "hf:google/gemma-4-E2B-it",
+    "hf:google/gemma-4-E4B-it",
+    "Custom...",
+]
 
 
 def _log_action(action: str, **data) -> None:

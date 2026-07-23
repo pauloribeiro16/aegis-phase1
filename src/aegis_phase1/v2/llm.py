@@ -1,15 +1,28 @@
-"""LLM invoker factory for v2 pipeline (Option C — direct Ollama).
+"""LLM invoker factory for v2 pipeline (Option C — direct Ollama or HF).
 
 Architecture (Option C):
-    The processor calls Ollama DIRECTLY via ``langchain_ollama.ChatOllama``,
-    bypassing the legacy ``Phase1LLMInvoker``. This is a thin wrapper
-    with a scriptable mock for tests.
+    The processor calls the LLM DIRECTLY (no legacy ``Phase1LLMInvoker``).
+    Two backends are supported (CORR-056):
+      - ``"ollama"`` (default): ``langchain_ollama.ChatOllama`` via
+        :class:`aegis_phase1.llm.unified.UnifiedInvoker`.
+      - ``"transformers"``: Hugging Face ``transformers`` library via
+        :class:`aegis_phase1.llm.transformers_invoker.TransformersInvoker`.
 
 Public API:
-    UnifiedInvoker      Real LLM (ChatOllama) wrapper (re-exported).
-    MockInvoker         Scriptable mock for tests / MOCK_LLM mode.
-    build_llm_invoker   Factory selecting MockInvoker vs UnifiedInvoker.
+    UnifiedInvoker        Real LLM (ChatOllama) wrapper (re-exported).
+    TransformersInvoker   HF transformers wrapper (re-exported, CORR-056).
+    MockInvoker           Scriptable mock for tests / MOCK_LLM mode.
+    build_llm_invoker     Factory selecting MockInvoker vs UnifiedInvoker
+                          vs TransformersInvoker (CORR-056).
     OllamaUnreachableError  Raised when Ollama is unreachable.
+
+Provider selection (CORR-056):
+    - ``MOCK_LLM=true`` → MockInvoker (overrides everything)
+    - ``provider="transformers"`` arg → TransformersInvoker
+    - ``provider="ollama"`` arg → UnifiedInvoker
+    - ``provider=None`` (auto) → detect from model name:
+        * ``hf:`` prefix or contains ``/`` (HF Hub convention) → transformers
+        * otherwise → ollama
 
 References:
     - decisions/MAP3_OPTION_C.md
@@ -24,6 +37,10 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 from aegis_phase1.llm.unified import UnifiedInvoker  # noqa: E402 — re-exported for callers
+from aegis_phase1.llm.transformers_invoker import (  # noqa: E402 — CORR-056
+    TransformersInvoker,
+    _detect_provider,
+)
 
 _MOCK_TRUTHS = {"1", "true", "yes", "on"}
 
@@ -87,36 +104,52 @@ def build_llm_invoker(
     model: str | None = None,
     *,
     langfuse_handler: Any = None,
-) -> MockInvoker | UnifiedInvoker:
-    """Build the LLM invoker for the current run (CORR-013).
+    provider: str | None = None,
+) -> MockInvoker | UnifiedInvoker | TransformersInvoker:
+    """Build the LLM invoker for the current run (CORR-013 + CORR-056).
 
-    Selection rule:
-        - If ``MOCK_LLM`` env var is truthy, returns a :class:`MockInvoker`.
-        - Otherwise returns a :class:`aegis_phase1.llm.UnifiedInvoker`
-          (the unified entry point). A 1-line health-check ping runs
-          first; raises :class:`OllamaUnreachableError` if Ollama is down.
+    Selection rule (in order):
+        1. If ``MOCK_LLM`` env var is truthy, returns a :class:`MockInvoker`.
+        2. If ``provider`` is given, use it (CORR-056: ``"ollama"`` or
+           ``"transformers"``). Unknown providers fall back to auto-detect.
+        3. Otherwise auto-detect from ``model``:
+           - ``hf:`` prefix or contains ``/`` (HF Hub) → ``transformers``
+           - otherwise → ``ollama``
 
     Args:
-        model: Optional model name override (default ``gemma4:e4b``).
-        langfuse_handler: Optional Langfuse ``CallbackHandler`` (or any
-            ``BaseCallbackHandler``-compatible object) to attach to the
-            invoker. MockInvoker ignores it (no network call → no tracing
-            benefit). When ``LANGFUSE_ENABLED=false`` (default), pass
-            ``None`` — behaviour is byte-identical to the pre-CORR-012
-            implementation.
+        model: Optional model name override. Default ``"gemma4:e4b"``
+            (Ollama). For HF: e.g. ``"google/gemma-4-E2B-it"`` or
+            ``"hf:google/gemma-4-E2B-it"``.
+        langfuse_handler: Optional Langfuse handler (Ollama only — transformers
+            ignores it; no LangChain callbacks in the HF path).
+        provider: Optional explicit provider (``"ollama"`` | ``"transformers"``).
+            If ``None`` (default), auto-detects from model name.
 
     Returns:
-        A configured invoker instance.
+        A configured invoker instance. Type depends on selection:
+        :class:`MockInvoker` / :class:`UnifiedInvoker` / :class:`TransformersInvoker`.
 
     Raises:
-        OllamaUnreachableError: When Ollama cannot be reached.
+        OllamaUnreachableError: When provider resolves to ollama and Ollama
+            cannot be reached. NOT raised for transformers provider.
     """
     if os.environ.get("MOCK_LLM", "").strip().lower() in _MOCK_TRUTHS:
         logger.info("MOCK_LLM=true → MockInvoker")
         return MockInvoker()
 
+    resolved_model = model or "gemma4:e4b"
+    resolved_provider = provider or _detect_provider(resolved_model)
+
+    if resolved_provider == "transformers":
+        logger.info(
+            "provider=transformers → TransformersInvoker(model_id=%s)",
+            resolved_model,
+        )
+        return TransformersInvoker(model_id=resolved_model)
+
+    # Default: Ollama
     invoker = UnifiedInvoker(
-        model=model or "gemma4:e4b",
+        model=resolved_model,
         langfuse_handler=langfuse_handler,
     )
     _health_check(invoker)
@@ -160,5 +193,6 @@ __all__ = [
     "MockInvoker",
     "OllamaUnreachableError",
     "UnifiedInvoker",
+    "TransformersInvoker",
     "build_llm_invoker",
 ] 

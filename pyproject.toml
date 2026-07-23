@@ -32,6 +32,11 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0.0",
     "jsonschema>=4.0.0",
+    # CORR-056 (2026-07-23): HuggingFace transformers provider (opt-in).
+    # Required for `google/gemma-4-E2B-it` and similar HF Hub models.
+    "transformers>=4.55.0",
+    "accelerate>=1.0.0",
+    "huggingface-hub>=0.25.0",
 ]
 
 [project.optional-dependencies]
