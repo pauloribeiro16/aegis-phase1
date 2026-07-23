@@ -242,6 +242,10 @@ class UnifiedInvoker:
             base_url=self.base_url,
             timeout=self.timeout,
             num_ctx=self.num_ctx,
+            # CORR-056: force all model layers onto GPU (gemma4:e2b fits
+            # in 7.6GB VRAM; default `num_gpu=None` lets Ollama decide,
+            # which under-uses VRAM on small models).
+            num_gpu=99,
         )
         self._heavy: Any | None = None
         self._ollama_reachable: bool | None = None
