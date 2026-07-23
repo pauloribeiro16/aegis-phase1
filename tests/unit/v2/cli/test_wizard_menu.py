@@ -65,8 +65,8 @@ def test_wizard_real_mode_prompts_model():
     paths, (mock_select, _) = _run_wizard_with_beaupy(
         orch,
         case="Case 01 - TinyTask SaaS (GDPR, CRA)",
-        mode="Real (Ollama + gemma4:e2b)",
-        model="gemma4:e2b",
+        mode="Real (Ollama + gemma4:e4b)",
+        model="gemma4:e4b",
         confirm="Run pipeline",
     )
     # 4 beaupy.select calls: case, mode, model, confirm

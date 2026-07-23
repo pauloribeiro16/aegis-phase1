@@ -43,7 +43,7 @@ is gitignored.
 
 Usage::
 
-    python scripts/d10_2_experiment.py --model gemma4:e2b
+    python scripts/d10_2_experiment.py --model gemma4:e4b
     python scripts/d10_2_experiment.py --model gemma4:26b --output-dir logs/phase1/v2/d10_2
 """
 
@@ -577,7 +577,7 @@ def _gate_cell(value: Any) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--model", required=True, help="Ollama model tag (e.g. gemma4:e2b).")
+    parser.add_argument("--model", required=True, help="Ollama model tag (e.g. gemma4:e4b).")
     parser.add_argument(
         "--output-dir",
         default=str(DEFAULT_OUTPUT_DIR),

@@ -2,7 +2,7 @@
 
 Run manually with: PYTHONPATH=src pytest tests/unit/test_phase1_e2e_ollama.py -v
 
-Requires: Ollama running with gemma4:e2b model pulled.
+Requires: Ollama running with gemma4:e4b model pulled.
 """
 import os
 import socket
@@ -36,7 +36,7 @@ def test_e2e_real_ollama_case_01_gdpr():
 
     Asserts:
       - Status is OK or INSUFFICIENT_EVIDENCE (NOT FAILED_AFTER_RETRIES)
-      - Latency < 60s (gemma4:e2b cold start can be slow)
+      - Latency < 60s (gemma4:e4b cold start can be slow)
       - Logs are written
     """
     from aegis_phase1.prompts_v2 import get_invoker

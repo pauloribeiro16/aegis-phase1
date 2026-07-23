@@ -43,7 +43,7 @@ def _make_invoker(catalog_loader):
         catalog_loader=catalog_loader,
         llm_logger=llm_logger,
         format_logger=MagicMock(spec=JSONLLogger),
-        model="gemma4:e2b",
+        model="gemma4:e4b",
         base_url="http://localhost:11434",
     )
 

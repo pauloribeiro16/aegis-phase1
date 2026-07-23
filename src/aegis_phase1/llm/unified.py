@@ -202,7 +202,7 @@ class UnifiedInvoker:
         _heavy: Lazily-built ``Phase1LLMInvoker`` for the heavy path.
     """
 
-    DEFAULT_MODEL = "gemma4:e2b"
+    DEFAULT_MODEL = "gemma4:e4b"  # CORR-056 (2026-07-23): switched from gemma4:e2b
     DEFAULT_BASE_URL = "http://localhost:11434"
     DEFAULT_TIMEOUT = 120
     DEFAULT_NUM_CTX = 32768  # AEGIS-P1-CORR-022: match spec (docs/LLM_ARCHITECTURE_DECISION.md)

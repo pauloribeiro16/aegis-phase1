@@ -1,7 +1,7 @@
 """End-to-end smoke test for Phase 1 v1.2 LLM invoker.
 
 Usage:
-    # Run smoke test (requires Ollama running with gemma4:e2b):
+    # Run smoke test (requires Ollama running with gemma4:e4b):
     pytest tests/unit/prompts_v2/test_smoke_e2e.py -v
 
     # Skip if Ollama not available:

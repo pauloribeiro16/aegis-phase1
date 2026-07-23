@@ -1,6 +1,6 @@
 """CORR-053: schema-tolerant parser tests for P1BLLM01Parser.
 
-The gemma4:e2b model emits JSON for regulatory analysis tasks, ignoring
+The gemma4:e4b model emits JSON for regulatory analysis tasks, ignoring
 prompt-level "Do NOT emit JSON" instructions (CORR-050) and even the
 base_system_prompt.md rule 4 reformulation (CORR-052). So the parser
 now tries markdown first, then JSON as fallback.
@@ -71,7 +71,7 @@ VALID_MARKDOWN = """## Status
 """
 
 
-# Sample full JSON output (what gemma4:e2b actually emits)
+# Sample full JSON output (what gemma4:e4b actually emits)
 VALID_JSON = """{
   "prompt_spec_id": "P1B-LLM-01-INTERPRETATION",
   "schema_version": "1.0.0",

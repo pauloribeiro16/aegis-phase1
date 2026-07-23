@@ -1,4 +1,4 @@
-"""Tests for RobustParser — multi-strategy JSON parser for gemma4:e2b outputs."""
+"""Tests for RobustParser — multi-strategy JSON parser for gemma4:e4b outputs."""
 
 from __future__ import annotations
 

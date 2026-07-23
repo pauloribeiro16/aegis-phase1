@@ -11,7 +11,7 @@ after the CORR-022 prompt trim changes. It is the orchestrator's
      company-applicable regulation codes** (``{GDPR, CRA}`` for
      TinyTask). Anything else (NIS2 / DORA / AI_Act) is a leak from the
      upstream applicability filter.
-  3. The real Ollama LLM (``gemma4:e2b``) produces parseable
+  3. The real Ollama LLM (``gemma4:e4b``) produces parseable
      ``ADAPTED_OBJECTIVE / KEY_ADJUSTMENTS / CONFIDENCE`` output.
   4. The output respects the **qualitative quality gates** on legal
      anchors, prohibited regulation tokens, prohibited generic-consulting
@@ -202,7 +202,7 @@ def _load_state(case_path: Path, preproc_path: Path):
 
 
 def _build_invoker():
-    """Build the real Ollama ``UnifiedInvoker`` (gemma4:e2b).
+    """Build the real Ollama ``UnifiedInvoker`` (gemma4:e4b).
 
     Exits with status 1 if Ollama cannot be reached — the deterministic
     evidence (section sizes + §4 filter) is preserved earlier in the
@@ -210,7 +210,7 @@ def _build_invoker():
     """
     from aegis_phase1.v2.llm import OllamaUnreachableError, build_llm_invoker
 
-    model = "gemma4:e2b"
+    model = "gemma4:e4b"  # CORR-056 (2026-07-23): switched from gemma4:e2b
     logger.info("Building Ollama invoker (model=%s, timeout=%ds)...", model, LLM_TIMEOUT_SECONDS)
     try:
         return build_llm_invoker(model=model)

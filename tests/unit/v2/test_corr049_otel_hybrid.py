@@ -53,7 +53,7 @@ def test_run_phase1_graph_creates_root_span(mock_lf_get_client) -> None:
                 output_dir="/o",
                 callbacks=None,
                 tags=["phase:phase1"],
-                extra_metadata={"model": "gemma4:e2b", "case": "case1-tinytask", "run_id": "abc"},
+                extra_metadata={"model": "gemma4:e4b", "case": "case1-tinytask", "run_id": "abc"},
             )
 
     # Assert: start_as_current_observation was called once with
@@ -64,7 +64,7 @@ def test_run_phase1_graph_creates_root_span(mock_lf_get_client) -> None:
     assert call_kwargs["as_type"] == "chain"
     # Metadata propagated (only string/int/float/bool values).
     assert call_kwargs["metadata"]["case"] == "case1-tinytask"
-    assert call_kwargs["metadata"]["model"] == "gemma4:e2b"
+    assert call_kwargs["metadata"]["model"] == "gemma4:e4b"
 
 
 @patch("aegis_phase1.v2.graph._lf_get_client")
@@ -89,7 +89,7 @@ def test_run_phase1_graph_falls_back_when_otel_unavailable(mock_lf_get_client) -
                 output_dir="/o",
                 callbacks=None,
                 tags=["phase:phase1"],
-                extra_metadata={"model": "gemma4:e2b"},
+                extra_metadata={"model": "gemma4:e4b"},
             )
 
     # Plain invoke still called

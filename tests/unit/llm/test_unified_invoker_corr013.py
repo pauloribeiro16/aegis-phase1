@@ -332,8 +332,14 @@ def test_invoke_dispatches_to_raw_when_inputs_is_not_dict():
     assert result == {"raw": "hi", "status": "OK"}
 
 
-def test_default_model_is_2b():
-    """CORR-020: default model switched from gemma4:e4b to gemma4:e2b."""
+def test_default_model_is_4b():
+    """CORR-056: default model switched from gemma4:e2b to gemma4:e4b.
+
+    History: CORR-020 (2026-07-20) had switched the default from
+    gemma4:e4b to gemma4:e2b (smaller, faster). CORR-056 (2026-07-23)
+    reverts to gemma4:e4b per user direction — better quality, similar
+    latency budget under MOCK_LLM=false.
+    """
     from aegis_phase1.llm.unified import UnifiedInvoker
 
-    assert UnifiedInvoker.DEFAULT_MODEL == "gemma4:e2b"
+    assert UnifiedInvoker.DEFAULT_MODEL == "gemma4:e4b"

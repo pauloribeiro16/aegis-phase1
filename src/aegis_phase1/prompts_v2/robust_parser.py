@@ -1,6 +1,6 @@
 """Multi-strategy JSON parser for LLM outputs.
 
-gemma4:e2b (and similar small quantized models) frequently produce:
+gemma4:e4b (and similar small quantized models) frequently produce:
 - Markdown-fenced JSON (```json ... ```)
 - JSON wrapped in prose
 - Trailing commas

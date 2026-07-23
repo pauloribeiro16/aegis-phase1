@@ -49,7 +49,7 @@ def test_select_case_writes_history(tmp_path, monkeypatch):
 def test_select_mode_writes_history(tmp_path, monkeypatch):
     from scripts import run_phase1
     monkeypatch.setattr(run_phase1, "MENU_HISTORY", tmp_path / "menu.jsonl")
-    monkeypatch.setattr("scripts.run_phase1.beaupy.select", MagicMock(return_value="Real (Ollama + gemma4:e2b, slow)"))
+    monkeypatch.setattr("scripts.run_phase1.beaupy.select", MagicMock(return_value="Real (Ollama + gemma4:e4b, slow)"))
     run_phase1.select_mode()
     assert "Real" in run_phase1.CONFIG["mode"]
 

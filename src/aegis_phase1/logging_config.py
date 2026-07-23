@@ -121,8 +121,8 @@ def format_kv(**kwargs: Any) -> str:
     Skips None values. Quotes strings with spaces. Truncates long values.
 
     Example:
-        >>> format_kv(model="gemma4:e2b", prompt_len=5721, status="ok")
-        'model=gemma4:e2b prompt_len=5721 status=ok'
+        >>> format_kv(model="gemma4:e4b", prompt_len=5721, status="ok")
+        'model=gemma4:e4b prompt_len=5721 status=ok'
     """
     parts: list[str] = []
     for k, v in kwargs.items():

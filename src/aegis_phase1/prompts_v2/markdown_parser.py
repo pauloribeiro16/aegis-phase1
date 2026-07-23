@@ -159,7 +159,7 @@ class P1BLLM01Parser(MarkdownParser):
     def parse(self, raw: str) -> tuple[Any | None, str]:
         """Parse the LLM output. Tries markdown first, then JSON as fallback.
 
-        CORR-053: the gemma4:e2b model is too deeply trained to emit JSON for
+        CORR-053: the gemma4:e4b model is too deeply trained to emit JSON for
         regulatory analysis tasks, ignoring both the base_system rule 4
         reformulation (CORR-052) and the body-level "Do NOT emit JSON"
         instruction (CORR-050). So the parser tolerates BOTH formats:
@@ -188,7 +188,7 @@ class P1BLLM01Parser(MarkdownParser):
             markdown_error = f"markdown parse exception: {e}"
 
         # Attempt 2: JSON fallback (CORR-053 path)
-        # First, try a direct json.loads — the gemma4:e2b model emits
+        # First, try a direct json.loads — the gemma4:e4b model emits
         # well-formed JSON objects, so this should succeed and skip
         # RobustParser's quirks (e.g. extract_first_array grabbing a
         # nested `[]` before json_strict can see the outer `{}`).
@@ -197,7 +197,7 @@ class P1BLLM01Parser(MarkdownParser):
         def _normalize_json(data: Any) -> Any:
             """Coerce JSON Schema conventions to Pydantic conventions.
 
-            gemma4:e2b follows the legacy JSON Schema (e.g. outputs
+            gemma4:e4b follows the legacy JSON Schema (e.g. outputs
             `applicable: true/false` because the JSON Schema in
             output_schemas.yaml says `type: boolean`). The Pydantic
             models in state.py use str enums (YES/NO). This function

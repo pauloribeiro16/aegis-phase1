@@ -216,7 +216,7 @@ def test_invoker_truncates_large_prompts(caplog) -> None:
         catalog_loader=MagicMock(),
         llm_logger=MagicMock(spec=JSONLLogger),
         format_logger=MagicMock(spec=JSONLLogger),
-        model="gemma4:e2b",
+        model="gemma4:e4b",
         base_url="http://localhost:11434",
     )
 

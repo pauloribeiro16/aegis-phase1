@@ -67,7 +67,7 @@ CASES = {
 
 MODES = [
     "Mock (no Ollama, fast, uses fixtures in data/)",
-    "Real (Ollama + gemma4:e2b, slow)",
+    "Real (Ollama + gemma4:e4b, slow)",
 ]
 
 SCOPES = [

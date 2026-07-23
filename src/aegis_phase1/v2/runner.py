@@ -7,7 +7,7 @@ Usage:
 
 Sprint MAP-3 flags:
     --mock-llm                  Set MOCK_LLM=true (use MockInvoker).
-    --model NAME                Ollama model (default: gemma4:e2b).
+    --model NAME                Ollama model (default: gemma4:e4b).
     --retry-failed D-04,D-07    After --run-all, re-process failed domains.
     --map-only                  Run only the MAP stage (skip REDUCE/OUTPUT).
 
@@ -184,7 +184,7 @@ def main() -> None:
         help=(
             "CORR-039: Run Phase 1B (P1B-LLM-01 + P1B-LLM-02 per "
             "applicable_reg) and render Doc 05 with per-reg rationale. "
-            "Requires MOCK_LLM=true or Ollama running with gemma4:e2b."
+            "Requires MOCK_LLM=true or Ollama running with gemma4:e4b."
         ),
     )
     parser.add_argument(
@@ -194,7 +194,7 @@ def main() -> None:
         help=(
             "CORR-040: Run the MAP stage (P1C-LLM-01 per domain "
             "D-01..D-10) and render Doc 07 + Doc 07b. Requires "
-            "MOCK_LLM=true or Ollama running with gemma4:e2b."
+            "MOCK_LLM=true or Ollama running with gemma4:e4b."
         ),
     )
     parser.add_argument(
@@ -205,7 +205,7 @@ def main() -> None:
             "CORR-041: Run the REDUCE stage (P1C-LLM-03 strategic "
             "synthesis + P1C-LLM-02 compound events) and re-render "
             "Doc 04a + Doc 04b + Doc 04c + Doc 04d. Requires "
-            "MOCK_LLM=true or Ollama running with gemma4:e2b."
+            "MOCK_LLM=true or Ollama running with gemma4:e4b."
         ),
     )
     parser.add_argument(
@@ -233,8 +233,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="gemma4:e2b",
-        help="Ollama model name (default: gemma4:e2b)",
+        default="gemma4:e4b",  # CORR-056 (2026-07-23)
+        help="Ollama model name (default: gemma4:e4b)",
     )
     parser.add_argument(
         "--retry-failed",
@@ -537,7 +537,7 @@ def cmd_run_phase_1b(
     populates into ``state['aggregated_data']['rationale_by_reg']``.
 
     Requires either ``MOCK_LLM=true`` / ``--mock-llm`` (returns a
-    stub response) or a running Ollama with ``gemma4:e2b``.
+    stub response) or a running Ollama with ``gemma4:e4b``.
 
     Returns:
         Mapping ``AEGIS-P1-05`` -> absolute file path (re-rendered
@@ -756,7 +756,7 @@ def cmd_run_all_traced(
             extra_metadata={
                 "stage": "phase1",
                 "graph": "v2.langgraph.full",
-                "model": "gemma4:e2b",
+                "model": "gemma4:e4b",
                 "case": case_name,
                 "run_id": run_id,
                 "trace_name": trace_name,

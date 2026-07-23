@@ -62,7 +62,7 @@ _CATALOG_REQUIRED_SPECS: frozenset[str] = frozenset({
 class Phase1LLMInvoker:
     """Orchestrates a single Phase 1 LLM call with retry + logging + validation."""
 
-    DEFAULT_MODEL = "gemma4:e2b"
+    DEFAULT_MODEL = "gemma4:e4b"  # CORR-056 (2026-07-23): switched from gemma4:e2b
     DEFAULT_BASE_URL = "http://localhost:11434"
     DEFAULT_TIMEOUT = 180  # 3 min for local inference
     DEFAULT_MAX_RETRIES = 2
@@ -267,7 +267,7 @@ class Phase1LLMInvoker:
             prompt = self.prompts.render(spec_id, inputs)
             # CORR-049-T7.1: cap at 512KB (524288 bytes). Prompts
             # P1C-LLM-01 are ~211K tokens ≈ 850KB; the practical
-            # ceiling before gemma4:e2b degrades is ~512KB. The
+            # ceiling before gemma4:e4b degrades is ~512KB. The
             # 048 value (10KB) was a 50x underestimate that caused
             # 57% FORMAT_ERROR rate (truncated 86KB → 4KB → JSON
             # schema fails to parse).

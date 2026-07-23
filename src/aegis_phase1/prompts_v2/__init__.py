@@ -15,7 +15,7 @@ Public API:
     Phase1LLMInvoker - single LLM call with parse retry + schema validation
     Phase1Validator  - post-generation deterministic validation
     JSONLLogger      - structured logging (JSONL + stdout)
-    RobustParser     - multi-strategy JSON parser (handles gemma4:e2b format issues)
+    RobustParser     - multi-strategy JSON parser (handles gemma4:e4b format issues)
     TrackB           - deterministic tier assignment per proportionality_model.md section 5
 """
 
