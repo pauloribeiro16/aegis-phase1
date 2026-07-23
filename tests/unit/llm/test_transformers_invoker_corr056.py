@@ -336,3 +336,109 @@ def test_build_llm_invoker_mock_overrides_provider(monkeypatch):
         model="google/gemma-4-E2B-it", provider="transformers"
     )
     assert isinstance(inv, MockInvoker)
+
+
+# ─── GPU memory optimisation (CORR-056 extension) ──────────────────────
+
+
+def test_max_memory_uses_90_percent_of_vram_by_default(monkeypatch):
+    """_max_memory caps GPU usage at gpu_memory_utilization (default 0.9) of total VRAM."""
+    _install_transformers_stub(monkeypatch)
+    import torch
+
+    # Fake CUDA available + 7.6GB total VRAM (RTX 2070)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    fake_props = MagicMock()
+    fake_props.total_memory = 7.6 * 1024**3  # 7.6 GiB in bytes
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _idx: fake_props)
+
+    from aegis_phase1.llm.transformers_invoker import TransformersInvoker
+
+    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    budget = inv._max_memory()
+    assert budget is not None
+    assert 0 in budget
+    assert "cpu" in budget
+    # 7.6 * 0.9 - 0.2 (safety) = 6.64 GiB → formatted as "6.6GiB"
+    assert "GiB" in budget[0]
+    assert float(budget[0].rstrip("GiB")) < 7.6  # below total
+    assert float(budget[0].rstrip("GiB")) >= 1.0  # above the 1GiB floor
+
+
+def test_max_memory_respects_custom_utilization(monkeypatch):
+    """gpu_memory_utilization=0.7 caps at 70% of VRAM."""
+    _install_transformers_stub(monkeypatch)
+    import torch
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    fake_props = MagicMock()
+    fake_props.total_memory = 8.0 * 1024**3
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _idx: fake_props)
+
+    from aegis_phase1.llm.transformers_invoker import TransformersInvoker
+
+    inv = TransformersInvoker(
+        "google/gemma-4-E2B-it", gpu_memory_utilization=0.7
+    )
+    budget = inv._max_memory()
+    # 8.0 * 0.7 - 0.2 = 5.4 GiB
+    assert float(budget[0].rstrip("GiB")) == pytest.approx(5.4, abs=0.1)
+
+
+def test_max_memory_returns_none_without_cuda(monkeypatch):
+    """No CUDA → max_memory=None (let accelerate default to full CPU)."""
+    _install_transformers_stub(monkeypatch)
+    import torch
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+    from aegis_phase1.llm.transformers_invoker import TransformersInvoker
+
+    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    assert inv._max_memory() is None
+
+
+def test_default_attn_implementation_is_sdpa(monkeypatch):
+    """attn_implementation defaults to 'sdpa' (memory-efficient attention)."""
+    _install_transformers_stub(monkeypatch)
+    from aegis_phase1.llm.transformers_invoker import TransformersInvoker
+
+    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    assert inv.attn_implementation == "sdpa"
+
+
+def test_default_dtype_is_auto_resolves_to_bfloat16(monkeypatch):
+    """dtype='auto' (default) → torch.bfloat16 in _ensure_loaded (Gemma 4 native)."""
+    _install_transformers_stub(monkeypatch)
+    import torch
+
+    fake_tokenizer = MagicMock()
+    fake_model = MagicMock()
+    fake_model.parameters.return_value = iter([MagicMock(device="cpu")])
+    fake_tokenizer.return_value = MagicMock()
+    fake_tokenizer.return_value.input_ids = MagicMock(shape=(-1, 1))
+    fake_tokenizer.return_value.to.return_value = fake_tokenizer.return_value
+    fake_model.generate.return_value = MagicMock()
+    fake_model.generate.return_value.__getitem__.return_value = MagicMock(shape=(-1, 1))
+    fake_tokenizer.apply_chat_template.return_value = "<chat>"
+    fake_tokenizer.decode.return_value = "ok"
+
+    import sys
+    fake_tf = sys.modules["transformers"]
+    fake_tf.AutoTokenizer.from_pretrained.return_value = fake_tokenizer
+    fake_tf.AutoModelForCausalLM.from_pretrained.return_value = fake_model
+
+    from aegis_phase1.llm.transformers_invoker import TransformersInvoker
+
+    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv.invoke("hi")
+
+    # dtype='auto' → resolved to torch.bfloat16
+    from_pretrained_kwargs = fake_tf.AutoModelForCausalLM.from_pretrained.call_args.kwargs
+    assert from_pretrained_kwargs["dtype"] == torch.bfloat16
+    # attn_implementation='sdpa' (default) threaded through
+    assert from_pretrained_kwargs["attn_implementation"] == "sdpa"
+    # max_memory threaded through
+    assert "max_memory" in from_pretrained_kwargs
+    # low_cpu_mem_usage=True
+    assert from_pretrained_kwargs["low_cpu_mem_usage"] is True

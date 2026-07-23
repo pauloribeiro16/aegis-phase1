@@ -116,7 +116,31 @@ class TransformersInvoker:
         cache_dir: str | None = None,
         device_map: str | None = None,
         dtype: str | None = None,
+        attn_implementation: str | None = None,
+        gpu_memory_utilization: float | None = None,
     ) -> None:
+        """Build a TransformersInvoker.
+
+        Args:
+            model_id: HF Hub model identifier (e.g. ``"google/gemma-4-E2B-it"``).
+                The ``hf:`` prefix is accepted and stripped.
+            max_new_tokens: Max tokens to generate per call. Default 1024.
+            enable_thinking: Whether to enable Gemma 4's native thinking mode.
+                Default ``False`` (matches Phase 1's non-reasoning expectations).
+            cache_dir: HF cache directory. Default: ``$HF_HOME`` or the
+                CORR-056 default on the 500G disk.
+            device_map: Device map for ``from_pretrained``. Default ``"auto"``
+                (GPU if available, else CPU).
+            dtype: torch dtype string (``"auto"``, ``"bfloat16"``, ``"float16"``).
+                Default ``"auto"`` (resolves to ``torch.bfloat16``).
+            attn_implementation: Attention implementation. Default ``"sdpa"``
+                (Scaled Dot-Product Attention; ~30% less VRAM than eager).
+                Pass ``"eager"`` if SDPA is not supported on your GPU.
+            gpu_memory_utilization: Fraction of GPU VRAM (0-1) to use for
+                model weights. Default 0.9 (leaves 10% for KV cache +
+                activations during generate). Increase to 0.95 if you
+                see headroom; lower to 0.7 if you OOM during generate.
+        """
         self.model = _strip_hf_prefix(model_id)
         self.model_id = self.model
         self.max_new_tokens = max_new_tokens or self.DEFAULT_MAX_NEW_TOKENS
@@ -128,11 +152,46 @@ class TransformersInvoker:
         )
         self.device_map = device_map or self.DEFAULT_DEVICE_MAP
         self.dtype = dtype or self.DEFAULT_DTYPE
+        self.attn_implementation = attn_implementation or "sdpa"
+        self.gpu_memory_utilization = (
+            gpu_memory_utilization
+            if gpu_memory_utilization is not None
+            else 0.9
+        )
 
         # Lazy-loaded on first invoke() call.
         self._tokenizer: Any = None
         self._model: Any = None
         self._device: Any | None = None
+
+    def _max_memory(self) -> dict[Any, str] | None:
+        """Compute the ``max_memory`` budget for ``from_pretrained``.
+
+        Returns:
+            ``{"0": "<X>GiB", "cpu": "30GiB"}`` when CUDA is available —
+            accelerates distributes layers to fit within these caps, putting
+            the maximum possible on GPU without OOM during generate.
+
+            ``None`` when CUDA is unavailable (lets accelerate default to
+            full CPU).
+
+        The GPU cap is computed from
+        ``total_VRAM * self.gpu_memory_utilization`` minus a 200MB safety
+        margin for activations. 30 GiB on CPU is the standard
+        accelerate-suggested budget for laptops.
+        """
+        import torch
+
+        if not torch.cuda.is_available():
+            return None
+        try:
+            total = torch.cuda.get_device_properties(0).total_memory
+        except Exception:
+            return None
+        # Convert bytes → GiB, apply utilization, subtract 200MB safety
+        budget_gib = (total / 1024**3) * self.gpu_memory_utilization - 0.2
+        budget_gib = max(1.0, budget_gib)  # never below 1GiB
+        return {0: f"{budget_gib:.1f}GiB", "cpu": "30GiB"}
 
     @property
     def device(self) -> Any:
@@ -151,38 +210,87 @@ class TransformersInvoker:
         chain), which we don't need for Phase 1's text-only regulatory
         analysis. The tokenizer is shared across ``gemma``/``gemma2``/
         ``gemma3``/``gemma4`` so text-only inference works correctly.
+
+        Loading strategy (CORR-056, optimised for max GPU usage):
+          - ``torch_dtype=torch.bfloat16`` (halves VRAM vs FP32; Gemma 4
+            is trained in BF16 — no precision loss)
+          - ``attn_implementation="sdpa"`` (Scaled Dot-Product Attention;
+            ~30% less VRAM than the eager default on supported GPUs)
+          - ``max_memory={"0": "<X>GiB", "cpu": "30GiB"}`` (cap GPU usage
+            to leave headroom for KV cache during generate; remainder
+            offloaded to CPU. Without this, accelerate's "auto" tends
+            to over-offload.)
+          - ``device_map="auto"`` (accelerate distributes layers per
+            the ``max_memory`` budget)
+          - ``low_cpu_mem_usage=True`` (avoid peak RAM spike during load)
         """
         if self._model is not None and self._tokenizer is not None:
             return
 
+        import torch
+
         logger.info(
-            "TransformersInvoker: loading model_id=%s (cache_dir=%s, device_map=%s)",
+            "TransformersInvoker: loading model_id=%s (cache_dir=%s, device_map=%s, "
+            "dtype=%s, attn=%s, max_memory=%s)",
             self.model_id,
             self.cache_dir,
             self.device_map,
+            self.dtype,
+            self.attn_implementation,
+            self._max_memory(),
         )
+
+        # Free any cached allocations from previous loads
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         # Import here to keep module import cheap (avoid pulling torch on every import)
         from transformers import AutoTokenizer, AutoModelForCausalLM
 
         self._tokenizer = AutoTokenizer.from_pretrained(
             self.model_id, cache_dir=self.cache_dir
         )
+
+        # Resolve dtype: "auto" → torch.bfloat16 (the CORR-056 default; Gemma 4
+        # was trained in BF16, so no precision loss).
+        torch_dtype: Any
+        if self.dtype == "auto":
+            torch_dtype = torch.bfloat16
+        elif isinstance(self.dtype, str):
+            torch_dtype = getattr(torch, self.dtype)
+        else:
+            torch_dtype = self.dtype
+
         # AutoModelForCausalLM (not AutoModelForMultimodalLM) — the LM head
         # works on text tokens alone, regardless of the multimodal wrapper.
         self._model = AutoModelForCausalLM.from_pretrained(
             self.model_id,
-            dtype=self.dtype,
+            dtype=torch_dtype,
             device_map=self.device_map,
             cache_dir=self.cache_dir,
+            attn_implementation=self.attn_implementation,
+            max_memory=self._max_memory(),
+            low_cpu_mem_usage=True,
         )
         # Refresh device after model load (model may live on cuda:0, cuda:1, etc.)
         try:
             self._device = next(self._model.parameters()).device
         except StopIteration:
             pass
-        logger.info(
-            "TransformersInvoker: model loaded on device=%s", self._device
-        )
+        # Report actual GPU usage so the user sees the split
+        if torch.cuda.is_available():
+            used = torch.cuda.memory_allocated() / 1024**3
+            total = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            logger.info(
+                "TransformersInvoker: model loaded on device=%s — "
+                "GPU memory: %.1fGB / %.1fGB (%.0f%% of VRAM)",
+                self._device, used, total, 100 * used / total,
+            )
+        else:
+            logger.info(
+                "TransformersInvoker: model loaded on device=%s (CPU only — no CUDA)",
+                self._device,
+            )
 
     def invoke(
         self,
