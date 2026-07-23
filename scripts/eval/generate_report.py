@@ -122,7 +122,14 @@ def main():
     })
 
     for e in entries:
-        spec = e.get("spec_id", "UNKNOWN")
+        # CORR-058: tolerant spec extraction. Legacy jsonl uses top-level
+        # `prompt_spec_id` (898/1844 entries); new jsonl uses `spec_id`.
+        spec = (
+            e.get("spec_id")
+            or e.get("prompt_spec_id")
+            or (e.get("metadata") or {}).get("prompt_spec_id")
+            or "UNKNOWN"
+        )
         status = e.get("status", "UNKNOWN")
         spec_data = per_spec[spec]
         spec_data["total"] += 1

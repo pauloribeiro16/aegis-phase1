@@ -92,14 +92,17 @@ tail -f slurm-eval-corr057-*.out
 ### Phase 5 — Recolher resultados
 
 ```bash
-# No Deucalion
-ls -la results/corr057-*/
-cat results/corr057-*/corr057_eval_report.md
+# Step 1 (no Deucalion): criar tarball dos resultados
+ssh paulinho@login.deucalion.macc.fccn.pt
+cd ~/aegis-kg
+tar czf ~/corr057-results-$(date +%Y%m%d).tgz results/corr057-*/
+exit
 
-# Workstation — rsync de volta
-rsync -avz --progress \
-    paulinho@login.deucalion.macc.fccn.pt:~/aegis-kg/results/corr057-* \
-    /home/epmq-cyber/Área\ de\ Trabalho/projects/aegis-phase1/results/
+# Step 2 (workstation): trazer tarball e extrair
+scp paulinho@login.deucalion.macc.fccn.pt:~/corr057-results-*.tgz /tmp/
+mkdir -p "/home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/results"
+tar xzf /tmp/corr057-results-*.tgz -C "/home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/"
+cat "/home/epmq-cyber/Área de Trabalho/projects/aegis-phase1/results/corr057-*/corr057_eval_report.md"
 ```
 
 ## O que esperar / não esperar
