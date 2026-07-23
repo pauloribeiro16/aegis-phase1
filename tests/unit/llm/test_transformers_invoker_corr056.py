@@ -442,3 +442,54 @@ def test_default_dtype_is_auto_resolves_to_bfloat16(monkeypatch):
     assert "max_memory" in from_pretrained_kwargs
     # low_cpu_mem_usage=True
     assert from_pretrained_kwargs["low_cpu_mem_usage"] is True
+
+
+def test_invoke_with_system_prompt_separate_role(monkeypatch):
+    """system_prompt= arg is passed as a separate 'system' role message (CORR-056 v2).
+
+    This is the FAIR-comparison path: same as langchain's SystemMessage
+    for Ollama, so the P1B-LLM-01 system spec is honoured as a system
+    role instead of being merged into user content.
+    """
+    _install_transformers_stub(monkeypatch)
+    from aegis_phase1.llm.transformers_invoker import TransformersInvoker
+
+    tf = sys.modules["transformers"]
+    tokenizer = tf.AutoTokenizer.from_pretrained.return_value
+    _mocked_tokenizer_with_to(tokenizer, n_input_tokens=1)
+    tokenizer.decode.return_value = "ok"
+    model = tf.AutoModelForCausalLM.from_pretrained.return_value
+    _mocked_model_with_generate(model, n_output_tokens=1)
+
+    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv.invoke("user message", system_prompt="you are a compliance analyst")
+
+    call_args = tokenizer.apply_chat_template.call_args
+    messages = call_args[0][0]
+    assert len(messages) == 2
+    assert messages[0]["role"] == "system"
+    assert messages[0]["content"] == "you are a compliance analyst"
+    assert messages[1]["role"] == "user"
+    assert messages[1]["content"] == "user message"
+
+
+def test_invoke_without_system_prompt_keeps_legacy_user_only(monkeypatch):
+    """Without system_prompt= (default), behaviour is the legacy single-user path."""
+    _install_transformers_stub(monkeypatch)
+    from aegis_phase1.llm.transformers_invoker import TransformersInvoker
+
+    tf = sys.modules["transformers"]
+    tokenizer = tf.AutoTokenizer.from_pretrained.return_value
+    _mocked_tokenizer_with_to(tokenizer, n_input_tokens=1)
+    tokenizer.decode.return_value = "ok"
+    model = tf.AutoModelForCausalLM.from_pretrained.return_value
+    _mocked_model_with_generate(model, n_output_tokens=1)
+
+    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv.invoke("just a user message")
+
+    call_args = tokenizer.apply_chat_template.call_args
+    messages = call_args[0][0]
+    assert len(messages) == 1
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "just a user message"

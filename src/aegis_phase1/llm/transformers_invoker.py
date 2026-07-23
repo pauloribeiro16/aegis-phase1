@@ -297,20 +297,23 @@ class TransformersInvoker:
         prompt: str,
         feedback: str = "",
         *,
+        system_prompt: str | None = None,
         config: Any = None,
     ) -> dict[str, Any]:
         """Run one text-only chat completion.
 
         Args:
-            prompt: The full user prompt (system + user content joined).
-                CORR-056: Phase 1 sends the rendered ``system + user``
-                template as a single string. We wrap it in a
-                ``[{"role": "user", "content": prompt}]`` message and let
-                the chat template handle the system role.
+            prompt: The user message content.
             feedback: Optional error feedback from a previous failed
                 attempt (Phase 1 retry path). When non-empty, appended
                 to the user content with a ``[Previous attempt failed]``
                 marker.
+            system_prompt: Optional system message (CORR-056 fair-comparison
+                mode). When supplied, the chat template receives
+                ``[{"role": "system", ...}, {"role": "user", ...}]``,
+                so the system role is honoured instead of being merged
+                into the user content. When ``None`` (default), the
+                behaviour is the legacy single-user-message path.
             config: Accepted for signature parity with
                 :class:`UnifiedInvoker`. Not used by transformers (no
                 LangChain callbacks); ignored.
@@ -329,6 +332,15 @@ class TransformersInvoker:
                 f"Please try again with the correct format."
             )
 
+        # Build the messages list — system role is preserved when supplied.
+        if system_prompt is not None:
+            messages: list[dict[str, str]] = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ]
+        else:
+            messages = [{"role": "user", "content": user_content}]
+
         # Gemma 4 tokenizer has apply_chat_template; build the chat-formatted
         # text string and tokenize it. For thinking mode, the tokenizer handles
         # the special control tokens automatically.
@@ -337,7 +349,7 @@ class TransformersInvoker:
         chat_text: str
         try:
             chat_text = self._tokenizer.apply_chat_template(
-                [{"role": "user", "content": user_content}],
+                messages,
                 tokenize=False,
                 add_generation_prompt=True,
                 enable_thinking=self.enable_thinking,
@@ -345,7 +357,7 @@ class TransformersInvoker:
         except TypeError:
             # Older tokenizer signature without enable_thinking kwarg.
             chat_text = self._tokenizer.apply_chat_template(
-                [{"role": "user", "content": user_content}],
+                messages,
                 tokenize=False,
                 add_generation_prompt=True,
             )
