@@ -1085,17 +1085,19 @@ class Phase1Orchestrator:
             return None
 
         # CORR-059: defense-in-depth. Even without MOCK_LLM env var, if the
-        # invoker is itself a MockInvoker (or any mock marking _is_mock=True),
-        # short-circuit. Prevents tests that wire MockInvoker but forget the
-        # env var from firing real Ollama calls (which hang forever when
-        # Ollama is down). Type-name check avoids import cycle with v2.llm.
-        invoker_cls = type(self.llm_invoker).__name__
-        if invoker_cls == "MockInvoker" or getattr(
-            self.llm_invoker, "_is_mock", False
-        ):
+        # invoker is a real MockInvoker, short-circuit. Prevents tests that
+        # wire MockInvoker but forget the env var from firing real Ollama calls
+        # (which hang forever when Ollama is down). Class-name check is used
+        # instead of isinstance to avoid import cycle with v2.llm, and instead
+        # of getattr(_is_mock) because MagicMock auto-creates attributes
+        # (would false-positive on any MagicMock, breaking legitimate tests
+        # like test_reduce_propagates_model_from_llm_invoker that use MagicMock
+        # to exercise the real reduce path).
+        invoker_cls_name = type(self.llm_invoker).__name__
+        if invoker_cls_name == "MockInvoker":
             logger.info(
                 "REDUCE-LLM skipped: llm_invoker is %s (mock detected)",
-                invoker_cls,
+                invoker_cls_name,
             )
             return None
 
