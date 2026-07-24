@@ -1772,6 +1772,12 @@ class Phase1Orchestrator:
             "aggregated_data": {},
             "output_paths": {},
             "errors": [],
+            # CORR-061 S3a: raw markdown capture per LLM spec.
+            # Populated by the invoker after each LLM call (wiring lands
+            # in S3b/S4) as ``state["per_spec_markdown"][spec_id] = raw_response``.
+            # The 9 doc renderers (S3b) will consume this directly instead
+            # of the typed dicts in ``domain_results`` / ``aggregated_data``.
+            "per_spec_markdown": {},
         }
 
     def _persist_state(self) -> None:
