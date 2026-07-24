@@ -341,23 +341,30 @@ class UnifiedInvoker:
         *,
         feedback: str = "",
         config: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Polymorphic dispatcher.
 
         Distinguishes the two call-site shapes by the type of ``inputs``:
 
-        - ``invoke(spec_id, inputs_dict)`` → :meth:`invoke_spec` (heavy)
-        - ``invoke(prompt)`` /
-          ``invoke(prompt, feedback="...", config={...})`` →
+        - ``invoke(spec_id, inputs_dict, state=state)` → :meth:`invoke_spec` (heavy)
+        - ``invoke(prompt, feedback="...", config={...})` →
           :meth:`invoke_raw` (light)
 
         This preserves backward compatibility with both
-        ``Phase1LLMInvoker.invoke(spec_id, inputs)`` (heavy) and
+        ``Phase1LLMInvoker.invoke(spec_id, inputs, state=state)`` (heavy) and
         ``UnifiedInvoker.invoke_raw(prompt)`` (light) without changing any
         caller in the tree.
+
+        CORR-062 S1 fix: ``state`` kwarg was added to the 9 call sites in
+        ``phase1_executor.py`` during CORR-061 S3b but the dispatcher
+        signature and forward were not updated; this is the 2-line
+        forwarder that closes the gap.
         """
         if isinstance(inputs, dict):
-            return self.invoke_spec(prompt_or_spec_id, inputs, config=config)
+            return self.invoke_spec(
+                prompt_or_spec_id, inputs, config=config, state=state
+            )
         return self.invoke_raw(
             prompt_or_spec_id,
             feedback=feedback,
