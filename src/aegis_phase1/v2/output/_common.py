@@ -261,6 +261,88 @@ __all__ = [
     "generate_frontmatter",
     "markdown_table",
     "next_version",
+    "render_per_spec_markdown_appendix",
     "safe_get",
     "write_output",
 ]
+
+
+# CORR-061 S3b: canonical spec list used by the appendix and by the
+# per-section markdown reads below. Kept in declaration order
+# (1B-01 → 1B-02 → 1C-01 → 1C-02 → 1C-03) so the rendered appendix
+# always lists specs in the same order across the 9 docs.
+PER_SPEC_MD_SPECS: tuple[str, ...] = (
+    "P1B-LLM-01-INTERPRETATION",
+    "P1B-LLM-02-RATIONALE",
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+    "P1C-LLM-02-COMPOUND-EVENT",
+    "P1C-LLM-03-STRATEGIC-SYNTHESIS",
+)
+
+
+def get_per_spec_markdown(state: Any, spec_id: str) -> str:
+    """CORR-061 S3b: read the raw markdown for one spec from pipeline state.
+
+    Reads ``state["per_spec_markdown"][spec_id]``. Returns the empty
+    string when the key is absent (deterministic-only / mock / pre-LLM
+    run) so the caller can decide whether to render a placeholder or
+    skip the section. Never raises; the renderers are best-effort by
+    design (Q3 audit finding).
+    """
+    if not isinstance(state, Mapping):
+        return ""
+    bucket = state.get("per_spec_markdown")
+    if not isinstance(bucket, Mapping):
+        return ""
+    raw = bucket.get(spec_id)
+    return raw if isinstance(raw, str) else ""
+
+
+def render_per_spec_markdown_appendix(state: Any) -> list[str]:
+    """CORR-061 S3b: render the 'Appendix: Source LLM Responses' block.
+
+    Dumps every entry of ``state["per_spec_markdown"]`` as a markdown
+    sub-section keyed by spec_id. Used by all 9 doc renderers to give
+    reviewers a single place to inspect the raw LLM output (instead of
+    parsing the per-section narrative invoker calls).
+
+    Behaviour:
+      - Missing or empty ``per_spec_markdown`` → emits a single
+        placeholder line so the appendix is always present (per the
+        contract: "Add an 'Appendix' section at the end of each doc").
+      - Each present spec is wrapped in a level-3 header so the
+        appendix is grep-friendly.
+      - Multi-call specs (P1B-LLM-01/02 concatenated per reg, P1C-LLM-01
+        concatenated per domain) are dumped verbatim — the per-call
+        boundary is the ``\\n\\n---\\n\\n`` separator inserted by
+        :meth:`Phase1LLMInvoker._capture_per_spec_markdown`.
+    """
+    parts: list[str] = []
+    parts.append("\n## Appendix: Source LLM Responses\n")
+    parts.append(
+        "Raw markdown responses captured by the S3b invoker wiring. "
+        "Each subsection corresponds to one of the 5 canonical Phase 1 "
+        "LLM specs. Multi-call specs (P1B-LLM-01/02 per regulation, "
+        "P1C-LLM-01 per domain) are concatenated with a horizontal "
+        "rule (``---``) between calls. When a spec did not run (mock "
+        "mode, deterministic-only, or invoker failure) the section "
+        "shows a ``(no LLM response)`` placeholder.\n"
+    )
+    has_any = False
+    for spec_id in PER_SPEC_MD_SPECS:
+        raw = get_per_spec_markdown(state, spec_id)
+        parts.append(f"\n### {spec_id}\n")
+        if raw:
+            has_any = True
+            parts.append(raw.rstrip() + "\n")
+        else:
+            parts.append("_(no LLM response for this spec)_\n")
+    if not has_any:
+        parts.append(
+            "\n> **No LLM responses were captured for this run.** "
+            "The pipeline ran in deterministic-only / mock mode "
+            "(`MOCK_LLM=true` or no `llm_invoker` configured). "
+            "Re-run with `MOCK_LLM=false` and Ollama reachable to "
+            "populate this appendix.\n"
+        )
+    return parts

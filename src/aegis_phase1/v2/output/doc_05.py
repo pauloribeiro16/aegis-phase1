@@ -35,7 +35,9 @@ from typing import Any
 
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
+    get_per_spec_markdown,
     markdown_table,
+    render_per_spec_markdown_appendix,
     write_output,
 )
 from aegis_phase1.v2.context.applicability_context import (
@@ -43,6 +45,13 @@ from aegis_phase1.v2.context.applicability_context import (
     build_applicability_context,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
+
+# CORR-061 S3b: spec IDs that this doc consumes from
+# ``state["per_spec_markdown"]``. Kept local to the doc so the
+# spec-to-doc mapping is grep-friendly (see the S3b report for the
+# full mapping table).
+_SPEC_STRATEGIC = "P1C-LLM-03-STRATEGIC-SYNTHESIS"
+_SPEC_RATIONALE = "P1B-LLM-02-RATIONALE"
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +162,12 @@ def render_doc_05(
         _section_7_regulatory_gaps(ontology, subdomains)
     )
     parts.extend(_section_8_input_to_phase_2(state))
+
+    # CORR-061 S3b: dump every captured per-spec markdown at the end
+    # of the doc so reviewers can see the raw LLM output without
+    # grepping the orchestrator state file. See
+    # :func:`render_per_spec_markdown_appendix`.
+    parts.extend(render_per_spec_markdown_appendix(state))
 
     body = "\n".join(parts)
     frontmatter = _build_frontmatter(state, regs)
@@ -481,6 +496,23 @@ def _section_6_strategic_implications(
     *,
     config: dict[str, Any] | None = None,
 ) -> list[str]:
+    """§6 STRATEGIC IMPLICATIONS — CORR-061 S3b: now consumes P1C-LLM-03 markdown.
+
+    S3a (and prior): the §6.1 Narrative was rendered via
+    :func:`render_mandatory_narrative` (the legacy narrative invoker
+    path) which has no direct spec mapping. S3b replaces this with a
+    read from ``state["per_spec_markdown"]["P1C-LLM-03-STRATEGIC-SYNTHESIS"]``
+    so the strategic narrative is sourced from the canonical 5-LLM
+    pipeline. The deterministic implication table (§6) is unchanged
+    (it is a heuristic over applicable_regs, not LLM-derived).
+
+    When P1C-LLM-03 has not run (deterministic-only / mock / executor
+    failure), a PENDING REVIEW marker is emitted so reviewers can
+    identify the gap at a glance. The ``llm_invoker`` parameter is
+    retained for backward compatibility with existing tests but is
+    unused on the S3b happy path (P1C-LLM-03 is invoked by the
+    executor, not by the renderer).
+    """
     parts: list[str] = []
     parts.append("## 6. STRATEGIC IMPLICATIONS\n")
     parts.append(
@@ -504,34 +536,73 @@ def _section_6_strategic_implications(
         )
     )
     parts.append("")
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_strategic_prompt(state, rows),
-        section_id="doc_05.section_6.strategic_narrative",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
     parts.append("### 6.1 Narrative\n")
-    parts.append(narrative.rstrip() + "\n")
+    # CORR-061 S3b: consume P1C-LLM-03 raw markdown from
+    # ``state["per_spec_markdown"]`` (wiring lives in
+    # :meth:`Phase1LLMInvoker._capture_per_spec_markdown`).
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        # Fallback to the legacy narrative invoker when the spec has
+        # not been captured yet. The narrative invoker itself returns
+        # a PENDING REVIEW marker when the LLM is unavailable, so the
+        # net behaviour for a missing P1C-LLM-03 response is a
+        # greppable PENDING block.
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_strategic_prompt(state, rows),
+            section_id="doc_05.section_6.strategic_narrative",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append(narrative.rstrip() + "\n")
     return parts
 
 
 def _render_rationale_by_reg_section(state: dict[str, Any]) -> str:
     """Render §6.1b 'Per-Regulation Rationale (LLM-02 RATIONALE)'.
 
-    Reads ``state["aggregated_data"]["rationale_by_reg"]`` — populated
-    by :meth:`Phase1Orchestrator.run_phase_1b` (which delegates to
-    :class:`Phase1Executor.run_phase_1b` and the P1B-LLM-02
-    RATIONALE spec).
+    CORR-061 S3b: now reads from
+    ``state["per_spec_markdown"]["P1B-LLM-02-RATIONALE"]`` instead of
+    ``state["aggregated_data"]["rationale_by_reg"]``. The legacy
+    typed-state read is preserved as a fallback so deterministic-only
+    runs (where the executor is unavailable but the orchestrator
+    previously populated the typed state) still render sensibly.
 
-    The stored shape is ``{regulation_code: synthesis_dict}`` where
-    ``synthesis_dict`` carries the parsed ``rationale``,
-    ``implications`` and ``gaps`` blocks emitted by the LLM. When the
-    key is missing / None (deterministic-only run, ``--skip-phase-1b``
-    or ``MOCK_LLM``), the function emits a deterministic
-    ``PENDING REVIEW`` placeholder so downstream pipelines can detect
-    the gap deterministically via a grep for the marker.
+    Pre-S3b behaviour: parsed the structured
+    ``{reg_code: synthesis_dict}`` payload, iterated per regulation,
+    and rendered rationale + implications + gaps as labelled sections.
+
+    S3b behaviour: dump the raw markdown response of P1B-LLM-02 (one
+    call per applicable regulation, concatenated with ``---``) under
+    the same §6.1b header. The structured-fields parsing path is
+    removed because the markdown-only contract is the source of
+    truth.
     """
+    spec_md = get_per_spec_markdown(state, _SPEC_RATIONALE)
+    if spec_md:
+        parts: list[str] = []
+        parts.append("\n### 6.1b Per-Regulation Rationale (LLM-02 RATIONALE)\n")
+        parts.append(
+            "Per-regulation rationale + implications + gaps. Generated by "
+            "P1B-LLM-02 RATIONALE. Cross-references Doc 04 facts + "
+            "Regulatory Baseline articles. NO boilerplate "
+            "(per-validation invariant).\n"
+        )
+        parts.append(
+            "*Source: P1B-LLM-02 RATIONALE | "
+            "multi-call concat (one section per applicable regulation, "
+            "separated by `---`)*\n\n"
+        )
+        parts.append(spec_md.rstrip() + "\n")
+        return "".join(parts)
+
+    # Fallback: legacy typed-state path. Kept for the case where the
+    # executor populated ``state["aggregated_data"]["rationale_by_reg"]``
+    # but the S3b wiring (P1B-LLM-02 → per_spec_markdown) did not
+    # capture the raw response (e.g. older executor versions, mock
+    # test paths).
     agg = state.get("aggregated_data")
     rationale_data = (
         agg.get("rationale_by_reg") if isinstance(agg, Mapping) else None
@@ -548,8 +619,8 @@ def _render_rationale_by_reg_section(state: dict[str, Any]) -> str:
             "(`MOCK_LLM=false` and Ollama running) to populate this section.\n"
         )
 
-    parts: list[str] = []
-    parts.append("\n### 6.1b Per-Regulation Rationale (LLM-02 RATIONALE)\n")
+    parts = []
+    parts.append("\n### 6.1b Per-Regulation Rationale (LLM-02 RATIONALE) [legacy typed-state fallback]\n")
     parts.append(
         "Per-regulation rationale + implications + gaps. Generated by "
         "P1B-LLM-02 RATIONALE. Cross-references Doc 04 facts + "
