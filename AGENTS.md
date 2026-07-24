@@ -89,6 +89,7 @@ All logs are gitignored (see `.gitignore`).
 ```bash
 # Setup (shared venv — all packages pre-installed)
 source ../shared-venv/bin/activate
+# CANONICAL VENV: ../shared-venv is the only one (symlink → data-disk epmq/shared-venv, has langfuse). Project .venv, /tmp/aegis_venv, and the orphan venvs/shared-venv are off-limits.
 cp .env.example .env          # edit LLM settings
 
 # OR fresh install:
