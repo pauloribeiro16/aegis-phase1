@@ -36,6 +36,7 @@ from aegis_phase1.prompts_v2.loader import PromptLoader
 from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 from aegis_phase1.prompts_v2.robust_parser import RobustParser
 from aegis_phase1.prompts_v2.validator import Phase1Validator
+from aegis_phase1.validator import ContentValidator
 from aegis_phase1.llm.unified import OllamaUnreachableError, probe_ollama
 
 # CORR-048: module-level logger. Required for the prompt truncation
@@ -72,7 +73,7 @@ class Phase1LLMInvoker:
         self,
         prompt_loader: PromptLoader,
         catalog_loader: CatalogLoader | None = None,
-        validator: Phase1Validator | None = None,
+        validator: Phase1Validator | ContentValidator | None = None,
         llm_logger: JSONLLogger | None = None,
         format_logger: JSONLLogger | None = None,
         model: str | None = None,
@@ -82,7 +83,12 @@ class Phase1LLMInvoker:
     ) -> None:
         self.prompts = prompt_loader
         self.catalogs = catalog_loader
-        self.validator = validator
+        # CORR-061 S2: default to ContentValidator (markdown-only
+        # content-length check) instead of None. Callers can still
+        # pass Phase1Validator explicitly for strict JSON-Schema
+        # validation (legacy path; the source lives in
+        # _archive/corr061/validator.py).
+        self.validator = validator if validator is not None else ContentValidator()
         self.llm_logger = llm_logger
         self.format_logger = format_logger
         self.model = model or self.DEFAULT_MODEL
@@ -490,9 +496,26 @@ class Phase1LLMInvoker:
                     output = {"items": output}
                 validation_result = {"valid": True, "warnings": []}
                 if self.validator:
-                    validation_result = self.validator.validate(
-                        spec_id, output, inputs
-                    )
+                    if isinstance(self.validator, ContentValidator):
+                        # CORR-061 S2: markdown-only path.
+                        # ContentValidator checks raw text length,
+                        # not JSON Schema. Convert its dataclass
+                        # result to the dict shape the rest of
+                        # this method expects.
+                        case_id = (inputs or {}).get("case_id") if inputs else None
+                        _cv = self.validator.validate(
+                            raw, spec_id=spec_id, case_id=case_id,
+                        )
+                        validation_result = {
+                            "valid": _cv.status == "OK",
+                            "errors": list(_cv.errors),
+                            "warnings": list(_cv.warnings),
+                        }
+                    else:
+                        # Legacy JSON Schema path (Phase1Validator)
+                        validation_result = self.validator.validate(
+                            spec_id, output, inputs
+                        )
 
             # Token usage (best-effort; Ollama may not always expose it)
             usage = self._extract_usage(response)
