@@ -31,8 +31,22 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from aegis_phase1.v2.output._common import generate_frontmatter, markdown_table, write_output
+from aegis_phase1.v2.output._common import (
+    generate_frontmatter,
+    get_per_spec_markdown,
+    markdown_table,
+    render_per_spec_markdown_appendix,
+    write_output,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
+
+# CORR-061 S3b: this doc consumes P1C-LLM-03-STRATEGIC-SYNTHESIS for
+# the §5 Reporting Lines and §9 Escalation Paths narratives. Pre-S3b
+# both sections went through the legacy narrative invoker; S3b
+# switches them to read from
+# ``state["per_spec_markdown"]["P1C-LLM-03-STRATEGIC-SYNTHESIS"]``
+# with a fallback to the legacy path.
+_SPEC_STRATEGIC = "P1C-LLM-03-STRATEGIC-SYNTHESIS"
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +211,8 @@ def _build_body(
     parts.extend(_section_version_history(state))
     parts.extend(_section_approval(state))
     parts.extend(_section_see_also(state))
+    # CORR-061 S3b: append the per-spec markdown appendix.
+    parts.extend(render_per_spec_markdown_appendix(state))
     return "\n".join(parts)
 
 
@@ -416,15 +432,27 @@ def _section_reporting_lines(
     )
     parts.append("```\n")
 
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_reporting_lines_prompt(state),
-        section_id="doc_04d.section_5.reporting_lines",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
-    parts.append("**Plain-text description:**\n")
-    parts.append(narrative.rstrip() + "\n")
+    # CORR-061 S3b: §5 Reporting Lines narrative now reads
+    # P1C-LLM-03 raw markdown from ``state["per_spec_markdown"]``
+    # with a fallback to the legacy narrative invoker. The
+    # markdown is shared with the §9 Escalation Paths narrative
+    # — both sections consume the same spec output. The narrative
+    # invoker fallback renders a PENDING REVIEW marker when no
+    # LLM is configured so reviewers can identify the gap.
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append("**Plain-text description (P1C-LLM-03):**\n")
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_reporting_lines_prompt(state),
+            section_id="doc_04d.section_5.reporting_lines",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append("**Plain-text description:**\n")
+        parts.append(narrative.rstrip() + "\n")
     return parts
 
 
@@ -587,16 +615,28 @@ def _section_escalation_paths(
     *,
     config: dict[str, Any] | None = None,
 ) -> list[str]:
+    """§9 Escalation Paths — CORR-061 S3b: consumes P1C-LLM-03 markdown.
+
+    The same raw markdown as §5 is used here (both sections draw on
+    the strategic synthesis). If P1C-LLM-03 has not been captured,
+    the legacy narrative invoker is used as a fallback (it returns
+    PENDING REVIEW when no LLM is configured).
+    """
     parts: list[str] = []
     parts.append("## 9. Escalation Paths\n")
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_escalation_prompt(state),
-        section_id="doc_04d.section_9.escalation_paths",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
-    parts.append(narrative.rstrip() + "\n")
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append("*(P1C-LLM-03 STRATEGIC-SYNTHESIS — same source as §5 Reporting Lines)*\n\n")
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_escalation_prompt(state),
+            section_id="doc_04d.section_9.escalation_paths",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append(narrative.rstrip() + "\n")
     return parts
 
 

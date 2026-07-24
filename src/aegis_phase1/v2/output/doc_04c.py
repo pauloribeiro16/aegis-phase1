@@ -30,8 +30,22 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from aegis_phase1.v2.output._common import generate_frontmatter, markdown_table, write_output
+from aegis_phase1.v2.output._common import (
+    generate_frontmatter,
+    get_per_spec_markdown,
+    markdown_table,
+    render_per_spec_markdown_appendix,
+    write_output,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
+
+# CORR-061 S3b: this doc consumes P1C-LLM-03-STRATEGIC-SYNTHESIS for
+# the §5.1 Concentration Risk Narrative. Pre-S3b the section went
+# through the legacy narrative invoker (no canonical 5-spec source);
+# S3b switches it to read from
+# ``state["per_spec_markdown"]["P1C-LLM-03-STRATEGIC-SYNTHESIS"]``
+# with a fallback to the legacy path when the spec has not run.
+_SPEC_STRATEGIC = "P1C-LLM-03-STRATEGIC-SYNTHESIS"
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +142,8 @@ def _build_body(
     parts.extend(_section_version_history(state))
     parts.extend(_section_approval(state))
     parts.extend(_section_see_also(state))
+    # CORR-061 S3b: append the per-spec markdown appendix.
+    parts.extend(render_per_spec_markdown_appendix(state))
     return "\n".join(parts)
 
 
@@ -334,16 +350,24 @@ def _section_risk_classification(
         "uses managed cloud services exclusively.\n"
     )
 
-    # Optional narrative
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_risk_narrative_prompt(state, cloud, rows),
-        section_id="doc_04c.section_5.concentration_risk_narrative",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
+    # CORR-061 S3b: §5.1 Concentration Risk Narrative now reads
+    # P1C-LLM-03 raw markdown from ``state["per_spec_markdown"]``
+    # (the legacy narrative invoker is retained as a fallback so
+    # the deterministic-only / mock / pre-LLM path still renders
+    # a PENDING REVIEW marker via the narrative helper).
     parts.append("### 5.1 Concentration Risk Narrative\n")
-    parts.append(narrative.rstrip() + "\n")
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_risk_narrative_prompt(state, cloud, rows),
+            section_id="doc_04c.section_5.concentration_risk_narrative",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append(narrative.rstrip() + "\n")
     return parts
 
 

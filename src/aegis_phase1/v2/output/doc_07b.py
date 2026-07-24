@@ -33,7 +33,9 @@ from typing import Any
 from aegis_phase1.prompts_v2.track_b import TrackB
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
+    get_per_spec_markdown,
     markdown_table,
+    render_per_spec_markdown_appendix,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -43,6 +45,13 @@ logger = logging.getLogger(__name__)
 _FILENAME = "07b_Proportionality_Profile.md"
 _MAX_FRAGMENT_BYTES = 4000
 _MOCK_TRUTHS = {"1", "true", "yes", "on"}
+
+# CORR-061 S3b: spec consumed by this doc.
+# - P1C-LLM-01 → §5.1 Cross-Check Narrative. Pre-S3b this went
+#   through the legacy narrative invoker; S3b switches it to read
+#   from ``state["per_spec_markdown"]["P1C-LLM-01-OVERLAP-CLASSIFICATION"]``
+#   with a fallback to the legacy path.
+_SPEC_OVERLAP = "P1C-LLM-01-OVERLAP-CLASSIFICATION"
 
 
 def render_doc_07b(
@@ -83,6 +92,8 @@ def render_doc_07b(
     parts.extend(_section_6_key_adjustments(profile))
     parts.extend(_section_7_gate_p_readiness(state, profile, not_covered))
     parts.extend(_section_8_version_history())
+    # CORR-061 S3b: append the per-spec markdown appendix.
+    parts.extend(render_per_spec_markdown_appendix(state))
 
     body = "\n".join(parts)
     frontmatter = _build_frontmatter(state, applicable)
@@ -273,15 +284,26 @@ def _section_5_cross_check(
             )
         )
     parts.append("")
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_cross_check_prompt(state, cross_rows),
-        section_id="doc_07b.section_5.cross_check_narrative",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
+    # CORR-061 S3b: §5.1 Cross-Check Narrative now reads
+    # P1C-LLM-01 raw markdown from ``state["per_spec_markdown"]``
+    # with a fallback to the legacy narrative invoker. The
+    # markdown is the full per-domain overlap classification
+    # (concatenated across the 10 D-XX lanes) which is exactly
+    # what the cross-check narrative needs to anchor the
+    # recommendation list.
     parts.append("### 5.1 Narrative\n")
-    parts.append(narrative.rstrip() + "\n")
+    spec_md = get_per_spec_markdown(state, _SPEC_OVERLAP)
+    if spec_md:
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_cross_check_prompt(state, cross_rows),
+            section_id="doc_07b.section_5.cross_check_narrative",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append(narrative.rstrip() + "\n")
     return parts
 
 

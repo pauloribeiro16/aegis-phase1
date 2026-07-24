@@ -43,7 +43,9 @@ from typing import Any
 
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
+    get_per_spec_markdown,
     markdown_table,
+    render_per_spec_markdown_appendix,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -53,6 +55,15 @@ logger = logging.getLogger(__name__)
 _FILENAME = "07_Structured_Compliance_Matrix.md"
 _MAX_FRAGMENT_BYTES = 4000
 _MOCK_TRUTHS = {"1", "true", "yes", "on"}
+
+# CORR-061 S3b: spec consumed by this doc.
+# - P1C-LLM-02 → §5.2 Compound Events (was reading from
+#   ``state["aggregated_data"]["compound_events"]``)
+# - P1C-LLM-03 → §6.1 Strategic Narrative + §6.2 Strategic
+#   Implications (was reading from ``state["aggregated_data"]["synthesis"]``
+#   and the narrative invoker)
+_SPEC_COMPOUND = "P1C-LLM-02-COMPOUND-EVENT"
+_SPEC_STRATEGIC = "P1C-LLM-03-STRATEGIC-SYNTHESIS"
 
 
 def render_doc_07(
@@ -97,6 +108,8 @@ def render_doc_07(
     parts.extend(_section_6_strategic_implications(state, regs, invoker, config=config))
     parts.extend(_section_7_gaps(ontology, subdomains))
     parts.extend(_section_8_gate_checklist(state, ontology))
+    # CORR-061 S3b: append the per-spec markdown appendix.
+    parts.extend(render_per_spec_markdown_appendix(state))
 
     body = "\n".join(parts)
     frontmatter = _build_frontmatter(state, regs)
@@ -260,10 +273,14 @@ def _section_5_1_opportunities_detail(overlaps: list[Any]) -> list[str]:
 def _render_compound_events_section(state: dict[str, Any]) -> list[str]:
     """Render §5.2 'Compound Events (LLM-02)' from REDUCE-stage P1C-LLM-02 output.
 
-    Reads ``state["aggregated_data"]["compound_events"]`` — produced by
-    ``Phase1Executor.run_phase_1c_reduce()``. When absent (mock mode, no
-    invoker, or executor failure), emits a ``PENDING REVIEW`` marker so
-    reviewers can identify the gap at a glance.
+    CORR-061 S3b: now reads from
+    ``state["per_spec_markdown"]["P1C-LLM-02-COMPOUND-EVENT"]``
+    instead of ``state["aggregated_data"]["compound_events"]``. The
+    legacy typed-state path is preserved as a fallback for
+    deterministic-only / mock / pre-S3b runs that populated the
+    typed state directly. The per-event table parsing path is
+    removed because the markdown-only contract is the source of
+    truth (the S3a JSON Schema is no longer in the loop).
     """
     parts: list[str] = []
     parts.append("### 5.2 Compound Events (LLM-02)\n")
@@ -274,6 +291,18 @@ def _render_compound_events_section(state: dict[str, Any]) -> list[str]:
         "``event_templates.yaml`` catalog. Resolution design lives in "
         "Phase 2B and is not produced here.\n"
     )
+    spec_md = get_per_spec_markdown(state, _SPEC_COMPOUND)
+    if spec_md:
+        parts.append(
+            "*Source: P1C-LLM-02-COMPOUND-EVENT (REDUCE-LLM)*\n\n"
+        )
+        parts.append(spec_md.rstrip() + "\n")
+        return parts
+
+    # Fallback: legacy typed-state path. Kept so deterministic-only
+    # runs (and older executor versions that populated
+    # ``state["aggregated_data"]["compound_events"]`` directly) still
+    # render the per-event table.
     ce = state.get("aggregated_data", {}).get("compound_events") if isinstance(state, Mapping) else None
     if not ce or not isinstance(ce, Mapping):
         parts.append(
@@ -287,6 +316,7 @@ def _render_compound_events_section(state: dict[str, Any]) -> list[str]:
         )
         return parts
 
+    parts.append("\n*[legacy typed-state fallback]*\n\n")
     positive = ce.get("positive_events") or []
     negative = ce.get("negative_events") or []
 
@@ -335,6 +365,16 @@ def _section_6_strategic_implications(
     *,
     config: dict[str, Any] | None = None,
 ) -> list[str]:
+    """§6 STRATEGIC IMPLICATIONS — CORR-061 S3b: consumes P1C-LLM-03 markdown.
+
+    S3a (and prior): the §6.1 Narrative was rendered via
+    :func:`render_mandatory_narrative` (the legacy narrative invoker
+    path) which has no direct spec mapping. S3b replaces this with a
+    read from ``state["per_spec_markdown"]["P1C-LLM-03-STRATEGIC-SYNTHESIS"]``
+    so the strategic narrative is sourced from the canonical 5-LLM
+    pipeline. The deterministic implication table (§6) is unchanged
+    (it is a heuristic over applicable_regs, not LLM-derived).
+    """
     parts: list[str] = []
     parts.append("## 6. STRATEGIC IMPLICATIONS\n")
     rows = _strategic_implication_rows(state, regs)
@@ -352,15 +392,22 @@ def _section_6_strategic_implications(
         )
     )
     parts.append("")
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_strategic_prompt(state, rows),
-        section_id="doc_07.section_6.strategic_narrative",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
     parts.append("### 6.1 Narrative\n")
-    parts.append(narrative.rstrip() + "\n")
+    # CORR-061 S3b: consume P1C-LLM-03 raw markdown from
+    # ``state["per_spec_markdown"]``. Falls back to the legacy
+    # narrative invoker when the spec has not run.
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_strategic_prompt(state, rows),
+            section_id="doc_07.section_6.strategic_narrative",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append(narrative.rstrip() + "\n")
     parts.extend(_render_strategic_synthesis_section(state))
     return parts
 
@@ -755,12 +802,16 @@ def _gap_rows(
 def _render_strategic_synthesis_section(state: dict[str, Any]) -> list[str]:
     """Render §6.2 'Strategic Implications (LLM-03)' from REDUCE-LLM P1C-LLM-03.
 
-    Reads ``state["aggregated_data"]["synthesis"]`` — produced by
-    ``Phase1Executor.run_phase_1c_reduce()``. When absent (mock mode,
-    no invoker, or executor failure), emits a ``PENDING REVIEW`` marker
-    so reviewers can identify the gap at a glance. This section does
-    NOT propose controls or change tier assignments; Doc 07b (Track B)
-    is the authoritative constraint.
+    CORR-061 S3b: now reads from
+    ``state["per_spec_markdown"]["P1C-LLM-03-STRATEGIC-SYNTHESIS"]``
+    instead of ``state["aggregated_data"]["synthesis"]``. The legacy
+    typed-state parsing path is preserved as a fallback so
+    deterministic-only / mock / pre-S3b runs that populated the typed
+    state directly still render the per-implication table.
+
+    Note: the per-implication table parsing is removed in the
+    S3b path (we dump the raw markdown). The
+    Doc 07b (Track B) constraint is unchanged.
     """
     parts: list[str] = []
     parts.append("### 6.2 Strategic Implications (LLM-03)\n")
@@ -771,6 +822,18 @@ def _render_strategic_synthesis_section(state: dict[str, Any]) -> list[str]:
         "B) is the authoritative constraint; this section does NOT "
         "propose controls or change tier assignments.\n"
     )
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append(
+            "*Source: P1C-LLM-03-STRATEGIC-SYNTHESIS (REDUCE-LLM)*\n\n"
+        )
+        parts.append(spec_md.rstrip() + "\n")
+        return parts
+
+    # Fallback: legacy typed-state path. Kept so deterministic-only
+    # runs (and older executor versions that populated
+    # ``state["aggregated_data"]["synthesis"]`` directly) still
+    # render the per-implication table.
     synth = state.get("aggregated_data", {}).get("synthesis") if isinstance(state, Mapping) else None
     if not synth or not isinstance(synth, Mapping):
         parts.append(
@@ -783,6 +846,7 @@ def _render_strategic_synthesis_section(state: dict[str, Any]) -> list[str]:
         )
         return parts
 
+    parts.append("\n*[legacy typed-state fallback]*\n\n")
     implications = synth.get("implications") or []
     if implications:
         parts.append(

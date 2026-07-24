@@ -34,8 +34,22 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from aegis_phase1.v2.output._common import markdown_table, write_output
+from aegis_phase1.v2.output._common import (
+    get_per_spec_markdown,
+    markdown_table,
+    render_per_spec_markdown_appendix,
+    write_output,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
+
+# CORR-061 S3b: spec consumed by this doc (the appendix always lists
+# all 5; only the per-section reads use a specific id). Per the
+# S3b mapping, Doc 04a consumes P1C-LLM-02-COMPOUND-EVENT for the
+# synthesis commentary on architecture impact. No markdown is wired
+# to §1 / §1.2 because those are narrative-invoker sections with no
+# canonical 5-spec source — they fall back to PENDING REVIEW via the
+# narrative helper.
+_SPEC_COMPOUND = "P1C-LLM-02-COMPOUND-EVENT"
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +127,14 @@ def _build_body(
     parts.extend(_section_2_data_inventory(state, inventory, llm_invoker))
     parts.extend(_section_3_compliance_mapping(state, active, inactive, inventory))
     parts.extend(_section_4_gate(state, inventory, active, applicable))
+    # CORR-061 S3b: append the per-spec markdown appendix. The §1
+    # and §1.2 narrative sections in this doc do NOT have a
+    # corresponding spec in the 5-spec model — they go through the
+    # legacy narrative invoker (render_mandatory_narrative). The
+    # appendix gives reviewers a single place to see all 5 spec
+    # outputs (mostly empty for this doc, but present for grep
+    # consistency with the other 8 docs).
+    parts.extend(render_per_spec_markdown_appendix(state))
     return "\n".join(parts)
 
 

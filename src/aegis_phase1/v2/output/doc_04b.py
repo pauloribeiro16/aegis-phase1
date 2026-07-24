@@ -31,9 +31,25 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from aegis_phase1.v2.output._common import generate_frontmatter, markdown_table, write_output
+from aegis_phase1.v2.output._common import (
+    generate_frontmatter,
+    get_per_spec_markdown,
+    markdown_table,
+    render_per_spec_markdown_appendix,
+    write_output,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
 from aegis_phase1.v2.review.loader import load_review
+
+# CORR-061 S3b: this doc consumes P1C-LLM-01-OVERLAP-CLASSIFICATION
+# (the per-domain overlap data that was previously read as typed
+# state from ``state["domain_results"][domain_id]``). The §3
+# per-domain Notes narrative continues to use the legacy
+# render_mandatory_narrative() invoker (no canonical 5-spec source
+# for a free-form "Notes" prompt); the per-domain adapted objective
+# is now a single hoisted section showing the raw spec markdown
+# instead of being rendered 10 times in the per-domain loop.
+_SPEC_OVERLAP = "P1C-LLM-01-OVERLAP-CLASSIFICATION"
 
 logger = logging.getLogger(__name__)
 
@@ -422,6 +438,15 @@ def _build_body(
     parts.extend(_section_purpose(state))
     parts.extend(_section_methodology(state))
     parts.extend(_section_per_domain(state, llm_invoker, config=config))
+    # CORR-061 S3b: hoist the P1C-LLM-01 raw markdown out of the
+    # per-domain loop. Pre-S3b, the per-domain Adapted Objective
+    # subsection was rendered 10 times (once per D-XX) by reading
+    # ``state["domain_results"][domain_id]`` — duplicating the same
+    # spec output. S3b dumps the spec markdown once in a hoisted
+    # section after the per-domain loop. The per-domain deterministic
+    # content (maturity, controls, target, gap, Notes narrative)
+    # is unchanged.
+    parts.extend(_section_3b_overlap_classification(state))
     parts.extend(_section_summary(state))
     parts.extend(_section_top_gaps(state))
     parts.extend(_section_consistency(state))
@@ -429,6 +454,8 @@ def _build_body(
     parts.extend(_section_version_history(state))
     parts.extend(_section_approval(state))
     parts.extend(_section_see_also(state))
+    # CORR-061 S3b: append the per-spec markdown appendix.
+    parts.extend(render_per_spec_markdown_appendix(state))
     return "\n".join(parts)
 
 
@@ -509,11 +536,59 @@ def _section_per_domain(
             config=config,
         )
         parts.append(f"**Notes**: {notes}\n")
+        # CORR-061 S3b: the per-domain Adapted Objective subsection
+        # previously read ``state["domain_results"][domain_id]`` (the
+        # structured P1C-LLM-01 output for that lane). That data
+        # source is now hoisted to §3b as raw markdown. The
+        # subsection header is preserved (per the S3b "do NOT change
+        # template structure" invariant) but the body is replaced
+        # with a per-domain placeholder pointing reviewers to §3b
+        # where the raw spec markdown lives. The human-review
+        # workflow that uses the adapted_objective + edited_text
+        # fields is unaffected — the data is still in
+        # ``state["domain_results"]`` and the helper
+        # :func:`_section_adapted_objective` is still exported.
         domain_result = domain_results.get(domain_id) or {}
         if domain_result:
             review_entry = review.get(domain_id) if isinstance(review, Mapping) else None
-            parts.append(_section_adapted_objective(domain_id, domain_result, review_entry))
+            parts.append(_section_adapted_objective_placeholder(domain_id, review_entry))
     return parts
+
+
+def _section_adapted_objective_placeholder(
+    domain_id: str,
+    review_entry: Mapping[str, Any] | None = None,
+) -> str:
+    """Render a per-domain placeholder for the Adapted Objective subsection.
+
+    Replaces the S3a behaviour (which read
+    ``state["domain_results"][domain_id]`` and rendered the
+    structured ``adapted_subdomains`` / ``adapted_objective`` text
+    here) with a deterministic placeholder pointing reviewers at
+    the hoisted §3b section. The full human-review workflow
+    (REJECTED/EDITED/APPROVED markers, PENDING RE-GENERATION
+    hints) is preserved for backwards compat — the review YAML
+    is still authoritative for sign-off.
+    """
+    parts: list[str] = []
+    parts.append(f"\n#### {domain_id} — Adapted Objective")
+    parts.append("")
+    status = "PENDING"
+    if isinstance(review_entry, Mapping):
+        status = str(review_entry.get("status", "PENDING") or "PENDING")
+    parts.append(
+        f"*Source: P1C-LLM-01 OVERLAP-CLASSIFICATION (per-domain slice) "
+        f"| review status: {status}*"
+    )
+    parts.append("")
+    parts.append(
+        f"_(per-domain LLM response not rendered here in S3b — see "
+        f"**§3b LLM Source — P1C-LLM-01 Overlap Classification** for "
+        f"the raw concatenated spec markdown, or the **Appendix** "
+        f"for the full per-spec dump)_"
+    )
+    parts.append("")
+    return "\n".join(parts)
 
 
 def _section_adapted_objective(
@@ -712,6 +787,51 @@ def _load_review_for_state(state: Mapping[str, Any]) -> dict[str, dict]:
         logger.debug("doc_04b: load_review failed for %s — %s", case_path, exc)
         return {}
     return review if isinstance(review, dict) else {}
+
+
+def _section_3b_overlap_classification(state: dict[str, Any]) -> list[str]:
+    """§3b 'LLM Source — P1C-LLM-01 Overlap Classification' (CORR-061 S3b).
+
+    Renders the raw markdown response of P1C-LLM-01 (per-domain
+    overlap classification, concatenated across the 10 D-XX lanes)
+    into a single section. Replaces the pre-S3b pattern of reading
+    ``state["domain_results"][domain_id]`` 10 times in the per-domain
+    loop and rendering a structured Adapted Objective per domain.
+
+    When P1C-LLM-01 has not been captured (deterministic-only / mock /
+    executor failure), the section shows a PENDING marker so reviewers
+    can identify the gap. The per-domain deterministic loop (§3) is
+    unchanged; the per-domain Notes narrative continues to use
+    :func:`render_mandatory_narrative` and falls back to its own
+    PENDING marker on missing LLM.
+    """
+    parts: list[str] = []
+    parts.append("## 3b. LLM Source — P1C-LLM-01 Overlap Classification\n")
+    parts.append(
+        "Raw markdown response of P1C-LLM-01 OVERLAP-CLASSIFICATION, "
+        "concatenated across the 10 D-XX lanes (separated by ``---``). "
+        "Pre-S3b this data was rendered 10 times in the §3 per-domain "
+        "loop as a structured Adapted Objective subsection. S3b hoists "
+        "the raw spec output to this single section so the markdown-only "
+        "contract is the source of truth; the §3 per-domain loop is now "
+        "deterministic + narrative-only.\n"
+    )
+    spec_md = get_per_spec_markdown(state, _SPEC_OVERLAP)
+    if spec_md:
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        parts.append(
+            "> **[PENDING REVIEW — P1C-LLM-01 OVERLAP-CLASSIFICATION "
+            "not yet captured]**\n"
+            "> Section ID: `doc_04b.section_3_b.overlap_classification`\n"
+            "> \n"
+            "> This section requires P1C-LLM-01 (per-domain overlap "
+            "classification, called once per D-XX lane). Re-run the "
+            "pipeline with a real LLM configured (`MOCK_LLM=false` and "
+            "Ollama running) to populate this section. Reviewers can "
+            "also consult the Appendix for the raw LLM output.\n"
+        )
+    return parts
 
 
 def _section_summary(state: dict[str, Any]) -> list[str]:
