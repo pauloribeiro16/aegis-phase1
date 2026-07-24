@@ -229,7 +229,7 @@ def test_run_phase_1c_map_filters_layer0_subdomain_refs_by_lane() -> None:
     captured_inputs_per_call: list[dict] = []
 
     class _FakeInvoker:
-        def invoke(self, spec_id, inputs, max_retries=None, config=None):
+        def invoke(self, spec_id, inputs, max_retries=None, config=None, state=None):
             # Record the inputs the lane received.
             captured_inputs_per_call.append(
                 {"spec_id": spec_id, "lane_id": inputs.get("lane_id"), "inputs": inputs}

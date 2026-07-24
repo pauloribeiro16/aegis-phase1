@@ -155,6 +155,7 @@ class Phase1LLMInvoker:
         inputs: dict[str, Any],
         max_retries: int | None = None,
         config: RunnableConfig | None = None,
+        state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Invoke a Phase 1 LLM with full orchestration.
 
@@ -162,6 +163,16 @@ class Phase1LLMInvoker:
             spec_id: Canonical Phase 1 LLM ID (e.g. "P1B-LLM-01-INTERPRETATION")
             inputs: Dict of input data (case_facts, regulation, applicable_regs, etc.)
             max_retries: Override default retry count
+            config: Optional LangChain RunnableConfig (callbacks, run_name, etc.)
+            state: Optional pipeline state. When provided, the raw markdown
+                response of each successful attempt is appended to
+                ``state["per_spec_markdown"][spec_id]`` (CORR-061 S3b). For
+                multi-call specs (P1B-LLM-01/02 are called per regulation;
+                P1C-LLM-01 is called per domain) the per-call raw responses
+                are concatenated with a ``\\n\\n---\\n\\n`` separator so the
+                downstream doc renderers see the full spec output in a
+                single string. Pass ``None`` (default) to disable capture
+                (e.g. in tests that don't have an orchestrator state).
 
         Returns:
             {
@@ -226,6 +237,15 @@ class Phase1LLMInvoker:
             all_attempts.append(attempt_result)
 
             if attempt_result["ok"]:
+                # CORR-061 S3b: capture the raw markdown response to
+                # ``state["per_spec_markdown"][spec_id]`` so the doc
+                # renderers can consume it directly instead of the
+                # legacy typed dicts. Only fires when the caller
+                # passes ``state`` (test paths pass None).
+                if state is not None:
+                    self._capture_per_spec_markdown(
+                        state, spec_id, attempt_result,
+                    )
                 return {
                     "status": "OK",
                     "spec_id": spec_id,
@@ -565,6 +585,11 @@ class Phase1LLMInvoker:
                 "validation": validation_result,
                 "latency_ms": latency_ms,
                 "usage": usage,
+                # CORR-061 S3b: thread the raw markdown response back
+                # to ``invoke()`` so it can be captured into
+                # ``state["per_spec_markdown"][spec_id]``. Was previously
+                # not returned — only the parsed structured output was.
+                "raw_response": raw,
             }
 
         except Exception as e:
@@ -599,6 +624,58 @@ class Phase1LLMInvoker:
                 "validation": None,
                 "parsed_output": None,
             }
+
+    @staticmethod
+    def _capture_per_spec_markdown(
+        state: dict[str, Any],
+        spec_id: str,
+        attempt_result: dict[str, Any],
+    ) -> None:
+        """CORR-061 S3b: append the successful attempt's raw markdown to ``state``.
+
+        Writes to ``state["per_spec_markdown"][spec_id]``. The
+        ``per_spec_markdown`` dict is initialised at orchestrator-load time
+        (see ``Phase1Orchestrator._init_state``) as a
+        ``dict[spec_id, str]`` so a missing key here means the state
+        was not initialised — we initialise it lazily and log a warning.
+
+        For specs invoked multiple times (P1B-LLM-01/02 per regulation,
+        P1C-LLM-01 per domain), each successful call appends its raw
+        response with a markdown horizontal-rule separator
+        (``\\n\\n---\\n\\n``) so the renderer sees the full spec output
+        in a single string. The first call's response is stored verbatim
+        (no leading separator).
+
+        Args:
+            state: Pipeline state (mutated in place).
+            spec_id: Canonical Phase 1 LLM ID.
+            attempt_result: The successful attempt's return value
+                (carries ``raw_response``; threaded through from
+                :meth:`_attempt` since S3b).
+        """
+        raw = attempt_result.get("raw_response")
+        if not raw:
+            return
+
+        bucket = state.setdefault("per_spec_markdown", {})
+        if not isinstance(bucket, dict):
+            logger.warning(
+                "CORR-061 S3b: state['per_spec_markdown'] is not a dict "
+                "(type=%s); re-initialising — downstream renderers may miss "
+                "previous responses",
+                type(bucket).__name__,
+            )
+            bucket = {}
+            state["per_spec_markdown"] = bucket
+
+        existing = bucket.get(spec_id)
+        if isinstance(existing, str) and existing:
+            # Subsequent call for the same spec — append with a
+            # horizontal-rule separator so reviewers can grep the
+            # boundary between lanes.
+            bucket[spec_id] = existing + "\n\n---\n\n" + raw
+        else:
+            bucket[spec_id] = raw
 
     @staticmethod
     def _extract_usage(response: Any) -> dict[str, Any]:

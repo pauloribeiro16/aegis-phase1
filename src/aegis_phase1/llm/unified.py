@@ -306,6 +306,7 @@ class UnifiedInvoker:
         inputs: dict[str, Any],
         *,
         config: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Heavy path — load prompt, render, invoke, parse, validate, log, retry.
 
@@ -315,6 +316,15 @@ class UnifiedInvoker:
         the Langfuse handler baked into its constructor, matching CORR-011
         semantics.
 
+        Args:
+            spec_id: Canonical Phase 1 LLM ID.
+            inputs: Forwarded to the heavy invoker as prompt inputs.
+            config: Optional LangChain RunnableConfig.
+            state: Optional pipeline state (CORR-061 S3b). When provided,
+                the raw markdown response is captured into
+                ``state["per_spec_markdown"][spec_id]``. Pass ``None`` to
+                disable capture (test paths).
+
         Probes Ollama before delegating (cached for
         ``_PROBE_TTL_SECONDS``); raises :class:`OllamaUnreachableError`
         when down — no retry, no log spam (CORR-015). The heavy child also
@@ -322,7 +332,7 @@ class UnifiedInvoker:
         """
         self._ensure_ollama("invoke_spec")
         heavy = self._get_heavy()
-        return heavy.invoke(spec_id, inputs)
+        return heavy.invoke(spec_id, inputs, config=config, state=state)
 
     def invoke(
         self,

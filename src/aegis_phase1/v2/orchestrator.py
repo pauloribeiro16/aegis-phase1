@@ -632,6 +632,7 @@ class Phase1Orchestrator:
         lane_outputs = executor.run_phase_1c_map(
             case_id=case_id,
             applicable_regs=applicable_regs,
+            state=self.state,
             company_facts=cc,
             layer0_subdomain_refs=self._build_layer0_subdomain_refs(
                 list((self.state.get("subdomains") or {}).keys())
@@ -1001,6 +1002,7 @@ class Phase1Orchestrator:
                     list((self.state.get("subdomains") or {}).keys())
                 ),
                 config=config,
+                state=self.state,
             )
         except Exception as exc:
             logger.warning("REDUCE-LLM failed (continuing): %s", exc)
@@ -1668,6 +1670,7 @@ class Phase1Orchestrator:
                 "basis": "Doc 04 §5",
             },
             config=config,
+            state=self.state,
         )
 
         if not isinstance(result, dict):
