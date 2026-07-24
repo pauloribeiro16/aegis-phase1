@@ -217,11 +217,33 @@ class Phase1LLMInvoker:
         # CORR-048: idempotent attach of Langfuse callback. We attach our
         # stored handler (if any) but only if not already present in
         # ``config["callbacks"]`` — prevents double-attach on retry.
+        # CORR-062 S1 v5 fix: ``config["callbacks"]`` may be a list (legacy
+        # call sites, tests) OR a ``BaseCallbackManager`` (LangChain
+        # ``RunnableConfig`` set by ``with_config()`` / ``bind()`` in graph
+        # executor paths — see ``phase1_executor.py:run``). The previous
+        # ``list(config.get("callbacks") or [])`` raised
+        # ``TypeError: 'CallbackManager' object is not iterable`` on the
+        # v4 run when called from the LangGraph path. Defensive read:
         if self._langfuse_handler is not None:
-            existing = list(config.get("callbacks") or [])
-            if self._langfuse_handler not in existing:
-                existing.append(self._langfuse_handler)
-            config = {**config, "callbacks": existing}
+            _cbs = config.get("callbacks")
+            if _cbs is None:
+                _existing: list = []
+            elif isinstance(_cbs, list):
+                _existing = list(_cbs)
+            elif hasattr(_cbs, "handlers"):
+                # BaseCallbackManager — combine regular + inheritable handlers
+                _existing = list(getattr(_cbs, "handlers", []) or []) + list(
+                    getattr(_cbs, "inheritable_handlers", []) or []
+                )
+            else:
+                # Unknown container type — best-effort iterate
+                try:
+                    _existing = list(_cbs)
+                except TypeError:
+                    _existing = []
+            if self._langfuse_handler not in _existing:
+                _existing.append(self._langfuse_handler)
+            config = {**config, "callbacks": _existing}
 
         if not probe_ollama(base_url=self.base_url):
             raise OllamaUnreachableError(self.base_url, "Phase1LLMInvoker.invoke")
