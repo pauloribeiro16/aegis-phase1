@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -79,9 +80,21 @@ def get_layer0_root() -> Path:
 
 
 def get_logs_dir() -> Path:
-    """Return the logs/phase1/ directory (creates if missing)."""
-    _DEFAULT_LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    return _DEFAULT_LOGS_DIR
+    """Return the logs directory for the current run (creates if missing).
+
+    Resolution order (CORR-060 multi-model support):
+      1. ``$AEGIS_LOG_DIR`` env var (set by the runner with the
+         model-specific subdir, e.g. ``logs/phase1/gemma4_e2b``). This is
+         how the v2 runner splits logs by model so we can compare
+         multi-model runs.
+      2. The legacy default ``<repo>/logs/phase1`` (cwd-independent,
+         repo-relative).
+
+    Always creates the directory if missing.
+    """
+    base = Path(os.environ.get("AEGIS_LOG_DIR", _DEFAULT_LOGS_DIR))
+    base.mkdir(parents=True, exist_ok=True)
+    return base
 
 
 def get_validator(

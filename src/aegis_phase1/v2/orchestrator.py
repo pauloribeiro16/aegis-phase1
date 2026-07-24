@@ -93,7 +93,17 @@ class Phase1Orchestrator:
         # Set in _load_v2_catalog — see T1 branch below.
         self._skip_reduce_llms = False
         self._skip_phase_1b = False
-        self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
+        # CORR-060 (multi-model eval): when the runner sets AEGIS_LOG_DIR
+        # to a per-model subdir (e.g. logs/phase1/gemma4_e2b), the MAP
+        # per-domain jsonl files land under that model dir, not under
+        # <work_dir>/logs/... . Falls back to legacy <work_dir>/logs/...
+        # when AEGIS_LOG_DIR is unset.
+        import os as _os
+        _log_base = _os.environ.get("AEGIS_LOG_DIR")
+        if _log_base:
+            self.log_dir = Path(_log_base) / "v2" / "map"
+        else:
+            self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
 
         try:
             from aegis_phase1.llm.tracing import get_langfuse_callback

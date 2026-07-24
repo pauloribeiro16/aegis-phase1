@@ -43,16 +43,38 @@ DEFAULT_PREPROC = str(_DEFAULT_PROJECTS / "Methodology-main" / "00_METHODOLOGY" 
 DEFAULT_OUTPUT = "output/phase1"
 
 
-def setup_logging(level: str = "INFO") -> None:
-    """Configure logging for the v2 pipeline."""
-    log_dir = Path("logs") / "phase1" / "v2"
+def _sanitize_model_tag(model: str) -> str:
+    """Map a model name to a filesystem-safe tag (CORR-060).
+
+    Examples:
+        ``gemma4:e2b``     -> ``gemma4_e2b``
+        ``hf:org/repo``    -> ``hf_org_repo``
+        ``org/repo``       -> ``org_repo``
+        ``llama3.1:8b``    -> ``llama3.1_8b``
+    """
+    import re as _re
+    return _re.sub(r"[^A-Za-z0-9._-]+", "_", model).strip("_") or "default"
+
+
+def setup_logging(level: str = "INFO", model_tag: str = "default") -> None:
+    """Configure logging for the v2 pipeline.
+
+    CORR-060 (multi-model eval): pipeline.log goes under
+    ``logs/phase1/<model_tag>/v2/`` so each model has its own log file.
+    """
+    import os as _os
+    _log_base = _os.environ.get("AEGIS_LOG_DIR")
+    if _log_base:
+        log_dir = Path(_log_base) / "v2"
+    else:
+        log_dir = Path("logs") / "phase1" / "v2"
     log_dir.mkdir(parents=True, exist_ok=True)
 
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         handlers=[
-            logging.FileHandler(str(log_dir / "pipeline.log"), encoding="utf-8"),
+            logging.FileHandler(str(log_dir / f"pipeline_{model_tag}.log"), encoding="utf-8"),
             logging.StreamHandler(sys.stdout),
         ],
     )
@@ -258,11 +280,20 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    setup_logging("DEBUG" if args.verbose else "INFO")
+    # CORR-060 (multi-model eval): set per-model log dir BEFORE
+    # setup_logging() and the factory/orchestrator imports so all
+    # jsonl log files (llm-calls, format-errors, MAP per-domain, v2
+    # pipeline.log) land under logs/phase1/<model_tag>/.
+    import os as _os
+    _model_tag = _sanitize_model_tag(args.model)
+    _log_base = _os.environ.get("AEGIS_LOG_BASE", "logs/phase1")
+    _os.environ["AEGIS_LOG_DIR"] = str(Path(_log_base) / _model_tag)
+    logger.info("Per-model log dir: %s", _os.environ["AEGIS_LOG_DIR"])
+
+    setup_logging("DEBUG" if args.verbose else "INFO", model_tag=_model_tag)
     logger.info("AEGIS Phase 1 v2 Pipeline starting")
 
     if args.mock_llm:
-        import os as _os
         _os.environ["MOCK_LLM"] = "true"
 
     # Resolve effective Regulatory Baseline path with deprecation handling.
