@@ -46,3 +46,11 @@ LANGFUSE_PROMPT_LABELS = ["production"]
 # Project metadata
 PROJECT_NAME = "aegis-kg-eval"
 TRACE_NAME = "aegis-kg-unified-eval"
+
+# Output directories (CORR-061 S4)
+# Default base for the per-call raw capture. The invoker writes
+# ``<RAW_OUTPUT_DIR>/<spec_id>/<UTC-timestamp>__attempt<N>.{md,json}``
+# for every LLM attempt (success or failure), so the run can be audited
+# offline. Override at runtime via the ``AEGIS_RAW_OUTPUT_DIR`` env
+# var (e.g. for tests that want an isolated tmp dir).
+RAW_OUTPUT_DIR = "output/phase1/raw"

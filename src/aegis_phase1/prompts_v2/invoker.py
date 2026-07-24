@@ -17,16 +17,20 @@ Flow per call:
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import time
 import traceback
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from langchain_core.runnables.config import RunnableConfig
 
+from aegis_phase1.config.defaults import RAW_OUTPUT_DIR
 from aegis_phase1.prompts_v2.catalog import CatalogLoader
 from aegis_phase1.prompts_v2.llm_inventory import (
     get_invocation_pattern,
@@ -402,6 +406,20 @@ class Phase1LLMInvoker:
                 }
                 if self.llm_logger:
                     self.llm_logger.log(error_event)
+                # CORR-061 S4: capture every attempt to disk, even on
+                # connection / timeout failures. The raw response is
+                # empty here — that itself is signal.
+                self._persist_raw_call(
+                    spec_id=spec_id,
+                    attempt=attempt,
+                    prompt_system=prompt["system"],
+                    prompt_user=prompt["user"],
+                    raw_response="",
+                    status="PYTHON_ERROR",
+                    latency_ms=latency_ms,
+                    model=self.model,
+                    error=str(e),
+                )
                 return {
                     "ok": False,
                     "parse_status": "PYTHON_ERROR",
@@ -439,6 +457,20 @@ class Phase1LLMInvoker:
                             "user_prompt_length": len(prompt["user"]),
                         },
                     })
+                # CORR-061 S4: capture every attempt — the raw
+                # response landed but failed to parse; we still want
+                # it on disk so reviewers can see what the model said.
+                self._persist_raw_call(
+                    spec_id=spec_id,
+                    attempt=attempt,
+                    prompt_system=prompt["system"],
+                    prompt_user=prompt["user"],
+                    raw_response=raw,
+                    status="PARSE_ERROR",
+                    latency_ms=latency_ms,
+                    model=self.model,
+                    error=parse_result.error,
+                )
                 return {
                     "ok": False,
                     "parse_status": "PARSE_ERROR",
@@ -578,6 +610,23 @@ class Phase1LLMInvoker:
             if self.llm_logger:
                 self.llm_logger.log(call_event)
 
+            # CORR-061 S4: persist every attempt — success (status=OK)
+            # and validation failure (status=SCHEMA_ERROR) both go to
+            # disk so reviewers can audit what the model produced.
+            self._persist_raw_call(
+                spec_id=spec_id,
+                attempt=attempt,
+                prompt_system=prompt["system"],
+                prompt_user=prompt["user"],
+                raw_response=raw,
+                status=status,
+                latency_ms=latency_ms,
+                model=self.model,
+                error=None if validation_result["valid"] else str(
+                    validation_result.get("errors") or "validation failed"
+                ),
+            )
+
             return {
                 "ok": validation_result["valid"],
                 "parse_status": "PARSED",
@@ -617,6 +666,20 @@ class Phase1LLMInvoker:
             }
             if self.llm_logger:
                 self.llm_logger.log(error_event)
+            # CORR-061 S4: capture even catastrophic failures. If
+            # ``prompt`` was never bound (render itself blew up) we
+            # write empty placeholders so the file is well-formed.
+            self._persist_raw_call(
+                spec_id=spec_id,
+                attempt=attempt,
+                prompt_system=(prompt.get("system", "") if isinstance(prompt, dict) else ""),
+                prompt_user=(prompt.get("user", "") if isinstance(prompt, dict) else ""),
+                raw_response="",
+                status="PYTHON_ERROR",
+                latency_ms=0.0,
+                model=self.model,
+                error=str(e),
+            )
             return {
                 "ok": False,
                 "parse_status": "PYTHON_ERROR",
@@ -676,6 +739,126 @@ class Phase1LLMInvoker:
             bucket[spec_id] = existing + "\n\n---\n\n" + raw
         else:
             bucket[spec_id] = raw
+
+    @staticmethod
+    def _persist_raw_call(
+        spec_id: str,
+        attempt: int,
+        prompt_system: str,
+        prompt_user: str,
+        raw_response: str,
+        status: str,
+        latency_ms: float,
+        model: str,
+        error: str | None = None,
+    ) -> None:
+        """CORR-061 S4: persist every LLM attempt to disk for offline audit.
+
+        Writes TWO files under ``<AEGIS_RAW_OUTPUT_DIR>/<spec_id>/``:
+
+          * ``<UTC-timestamp>__attempt<N>.md``  — YAML frontmatter with
+            metadata, the full system + user prompts (clearly delimited
+            by ``## Prompt (system)`` / ``## Prompt (user)``), and the
+            raw model response. This is the human-review artefact.
+          * ``<UTC-timestamp>__attempt<N>.json`` — the same metadata as
+            structured JSON, plus a 200-char preview of the raw response
+            (the full body is in the ``.md`` to keep the JSON small).
+            This is the programmatic-access artefact.
+
+        Both files are always written; the JSON omits the full prompt
+        body on purpose so the index stays small even for very long
+        prompts (P1C-LLM-01 prompts are ~850KB).
+
+        The base directory is resolved from the ``AEGIS_RAW_OUTPUT_DIR``
+        env var, falling back to the canonical default
+        :data:`aegis_phase1.config.defaults.RAW_OUTPUT_DIR`
+        (``output/phase1/raw``). The directory is created lazily
+        (mkdir -p) on every call — capture works even on the very
+        first attempt of a fresh run.
+
+        Timestamp format: ``YYYY-MM-DDTHH-MM-SS`` in **UTC** (matches
+        the existing ``datetime.now(UTC)`` usage elsewhere in this
+        module; deterministic and timezone-independent for cross-team
+        review).
+
+        Errors during persistence are swallowed with a warning — the
+        run must not be aborted just because disk capture failed. The
+        in-memory state capture (S3b ``_capture_per_spec_markdown``)
+        remains the primary in-process record.
+
+        Args:
+            spec_id: Canonical Phase 1 LLM ID (e.g. ``P1B-LLM-01-INTERPRETATION``).
+            attempt: 1-based attempt number within the retry loop.
+            prompt_system: Full system prompt sent to the model.
+            prompt_user: Full user prompt sent to the model.
+            raw_response: Raw model response (may be empty on connection failure).
+            status: Attempt status (``OK``, ``SCHEMA_ERROR``, ``PARSE_ERROR``,
+                ``PYTHON_ERROR``, ``INSUFFICIENT_EVIDENCE``, …).
+            latency_ms: Wall-clock latency in milliseconds.
+            model: Model tag (e.g. ``gemma4:e2b``).
+            error: Optional human-readable error string; included in
+                frontmatter and JSON when set.
+        """
+        try:
+            base_dir = Path(os.environ.get("AEGIS_RAW_OUTPUT_DIR", RAW_OUTPUT_DIR))
+            spec_dir = base_dir / spec_id
+            spec_dir.mkdir(parents=True, exist_ok=True)
+
+            timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
+            md_path = spec_dir / f"{timestamp}__attempt{attempt}.md"
+            json_path = spec_dir / f"{timestamp}__attempt{attempt}.json"
+
+            # YAML frontmatter + prompt + raw response
+            fm_lines = [
+                "---",
+                f"spec_id: {spec_id}",
+                f"attempt: {attempt}",
+                f"model: {model}",
+                f"status: {status}",
+                f"latency_ms: {latency_ms}",
+                f"timestamp: {timestamp}",
+            ]
+            if error:
+                # Use a quoted scalar so newlines / colons in error
+                # text don't break YAML parsing during offline review.
+                escaped = str(error).replace("\n", " ").replace('"', "'")
+                fm_lines.append(f'error: "{escaped}"')
+            fm_lines.append("---")
+            fm_lines.append("")
+
+            md_content = "\n".join(fm_lines) + "\n"
+            md_content += "## Prompt (system)\n\n"
+            md_content += (prompt_system or "(empty)") + "\n\n"
+            md_content += "## Prompt (user)\n\n"
+            md_content += (prompt_user or "(empty)") + "\n\n"
+            md_content += "## Raw response\n\n"
+            md_content += (raw_response or "(empty)") + "\n"
+
+            md_path.write_text(md_content, encoding="utf-8")
+
+            json_content = {
+                "spec_id": spec_id,
+                "attempt": attempt,
+                "model": model,
+                "status": status,
+                "latency_ms": latency_ms,
+                "timestamp": timestamp,
+                "prompt_system_chars": len(prompt_system or ""),
+                "prompt_user_chars": len(prompt_user or ""),
+                "raw_response_chars": len(raw_response or ""),
+                "raw_response_preview": (raw_response or "")[:200],
+                "error": error,
+            }
+            json_path.write_text(
+                json.dumps(json_content, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as _persist_err:
+            # Never let a capture failure abort the run — log and move on.
+            logger.warning(
+                "CORR-061 S4: failed to persist raw call for %s attempt %d: %s",
+                spec_id, attempt, _persist_err,
+            )
 
     @staticmethod
     def _extract_usage(response: Any) -> dict[str, Any]:
