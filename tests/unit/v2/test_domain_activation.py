@@ -342,34 +342,43 @@ def test_run_map_flag_registered() -> None:
 
 def test_cmd_run_map_handles_map_failure() -> None:
     """cmd_run_map catches MapPartialFailure and continues to render."""
-    from aegis_phase1.prompts_v2.catalog import CatalogLoader
-    from aegis_phase1.prompts_v2.factory import get_prompts_root
-    from aegis_phase1.v2.loader.case_profile import CaseProfileLoader
-    from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader
-    from aegis_phase1.v2.orchestrator import Phase1Orchestrator
-    from aegis_phase1.v2.runner import cmd_run_map
+    # CORR-059: MUST set MOCK_LLM=true (matches sibling test below). Without it,
+    # _get_phase1_executor() does NOT short-circuit and fires real P1C-LLM-01
+    # calls against localhost:11434 (Ollama down) → hang forever → pytest never
+    # returns. See defense-in-depth in orchestrator._get_phase1_executor
+    # (isinstance MockInvoker check).
+    os.environ["MOCK_LLM"] = "true"
+    try:
+        from aegis_phase1.prompts_v2.catalog import CatalogLoader
+        from aegis_phase1.prompts_v2.factory import get_prompts_root
+        from aegis_phase1.v2.loader.case_profile import CaseProfileLoader
+        from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader
+        from aegis_phase1.v2.orchestrator import Phase1Orchestrator
+        from aegis_phase1.v2.runner import cmd_run_map
 
-    with tempfile.TemporaryDirectory() as work:
-        with tempfile.TemporaryDirectory() as out:
-            from aegis_phase1.v2.llm import MockInvoker
-            o = Phase1Orchestrator(
-                work_dir=work,
-                llm_invoker=MockInvoker(),
-                preproc_catalog=PreprocCatalogLoader(preproc_root="preproc_out"),
-                case_profile_loader=CaseProfileLoader(Path("cases/case1-tinytask")),
-                catalog_loader=CatalogLoader(root=get_prompts_root() / "catalogs"),
-            )
-            # Should not raise even when MAP fails (pre-existing bug)
-            paths = cmd_run_map(
-                orch=o,
-                case_path="cases/case1-tinytask",
-                prep_path="",
-                output_path=out,
-            )
-            # Doc 07 + Doc 07b should still be rendered
-            assert "AEGIS-P1-07" in paths or len(paths) >= 1, (
-                f"cmd_run_map should produce at least 1 artefact even on MAP failure, got {paths}"
-            )
+        with tempfile.TemporaryDirectory() as work:
+            with tempfile.TemporaryDirectory() as out:
+                from aegis_phase1.v2.llm import MockInvoker
+                o = Phase1Orchestrator(
+                    work_dir=work,
+                    llm_invoker=MockInvoker(),
+                    preproc_catalog=PreprocCatalogLoader(preproc_root="preproc_out"),
+                    case_profile_loader=CaseProfileLoader(Path("cases/case1-tinytask")),
+                    catalog_loader=CatalogLoader(root=get_prompts_root() / "catalogs"),
+                )
+                # Should not raise even when MAP fails (pre-existing bug)
+                paths = cmd_run_map(
+                    orch=o,
+                    case_path="cases/case1-tinytask",
+                    prep_path="",
+                    output_path=out,
+                )
+                # Doc 07 + Doc 07b should still be rendered
+                assert "AEGIS-P1-07" in paths or len(paths) >= 1, (
+                    f"cmd_run_map should produce at least 1 artefact even on MAP failure, got {paths}"
+                )
+    finally:
+        del os.environ["MOCK_LLM"]
 
 
 def test_cmd_run_map_with_mock_llm_produces_docs() -> None:

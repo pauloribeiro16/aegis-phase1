@@ -1084,6 +1084,21 @@ class Phase1Orchestrator:
             logger.info("REDUCE-LLM skipped: MOCK_LLM env var set")
             return None
 
+        # CORR-059: defense-in-depth. Even without MOCK_LLM env var, if the
+        # invoker is itself a MockInvoker (or any mock marking _is_mock=True),
+        # short-circuit. Prevents tests that wire MockInvoker but forget the
+        # env var from firing real Ollama calls (which hang forever when
+        # Ollama is down). Type-name check avoids import cycle with v2.llm.
+        invoker_cls = type(self.llm_invoker).__name__
+        if invoker_cls == "MockInvoker" or getattr(
+            self.llm_invoker, "_is_mock", False
+        ):
+            logger.info(
+                "REDUCE-LLM skipped: llm_invoker is %s (mock detected)",
+                invoker_cls,
+            )
+            return None
+
         cached = getattr(self, "_phase1_executor_cached", None)
         if cached is not None:
             return cast("Phase1Executor", cached)

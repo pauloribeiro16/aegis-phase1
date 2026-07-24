@@ -71,19 +71,19 @@ check "3. orchestrator imports OK" \
 check "4. executor imports OK" \
     '.venv/bin/python -c "from aegis_phase1.prompts_v2.phase1_executor import Phase1Executor"'
 
-# Check 5: Test collection has NO errors (negated grep -> 0 when no errors found)
-# Skip pytest-based checks when AEGIS_NO_INNER_PYTEST is set (used by tests/unit)
+# CORR-059: merged former checks 5 + 6 into one. The previous check 5 ran
+# `pytest --co -q` (collection only) and check 6 ran the full suite (which
+# re-collects). The collection check is redundant — if collection fails with
+# ModuleNotFoundError, the full run's summary line won't match `passed` and
+# check 6 fails anyway. Removing check 5 saves one full collection pass
+# (~30-90s). Parallelism (-n auto) comes from pyproject.toml addopts.
+#
+# Skip when AEGIS_NO_INNER_PYTEST is set (used by tests/unit themselves).
 if [[ "${AEGIS_NO_INNER_PYTEST:-0}" == "1" ]]; then
-    check "5. Test collection clean (no ModuleNotFoundError) [SKIPPED]" \
-        'true'
-    check "6. All tests pass [SKIPPED]" \
+    check "5. All v2 tests pass [SKIPPED]" \
         'true'
 else
-    check "5. Test collection clean (no ModuleNotFoundError)" \
-        '! .venv/bin/pytest tests/unit/v2/ --co -q 2>&1 | grep -qE "ERROR|ModuleNotFoundError"'
-
-    # Check 6: All tests pass (final pytest summary line contains "passed" with no failure markers)
-    check "6. All tests pass" \
+    check "5. All v2 tests pass (collection + run, parallel via xdist)" \
         '.venv/bin/pytest tests/unit/v2/ -q --tb=no 2>&1 | tail -1 | grep -qE "^[0-9]+ (passed|deselected|skipped)"'
 fi
 
