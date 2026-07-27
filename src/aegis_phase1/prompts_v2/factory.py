@@ -136,6 +136,7 @@ def get_invoker(
     prompts_root: Path | None = None,
     regulatory_baseline_root: Path | None = None,
     layer0_root: Path | None = None,
+    provider: str = "ollama",  # CORR-062 S2: "ollama" | "minimax"
 ) -> Any:
     """Get a fully-wired UnifiedInvoker with default config (CORR-013).
 
@@ -146,6 +147,12 @@ def get_invoker(
     The returned object is a ``aegis_phase1.llm.UnifiedInvoker``; the
     legacy ``Phase1LLMInvoker`` is still constructed internally as a
     child for the heavy path (strangler pattern, removed in CORR-014).
+
+    CORR-062 S2: ``provider`` defaults to ``"ollama"`` for backward
+    compat. Pass ``"minimax"`` to wire ChatMinimax (M3/M2.7 via the
+    Mavis gateway); the ``base_url`` default then flips to the gateway
+    endpoint, and the heavy child (Phase1LLMInvoker) also routes through
+    ChatMinimax.
     """
     import os
     import warnings
@@ -192,5 +199,6 @@ def get_invoker(
         base_url=base_url,
         langfuse_handler=_langfuse_handler,
         prompts_root=prompts,
+        provider=provider,  # CORR-062 S2
     )
     return invoker

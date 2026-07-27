@@ -269,6 +269,10 @@ class UnifiedInvoker:
                 timeout=self.timeout,
                 max_tokens=self.max_tokens,
             )
+            logger.info(
+                "UnifiedInvoker.__init__: provider=minimax, chat=%s model=%s base_url=%s",
+                type(self.chat).__name__, self.chat.model, self.chat.base_url,
+            )
         else:
             from langchain_ollama import ChatOllama
 
@@ -281,6 +285,10 @@ class UnifiedInvoker:
                 # in 7.6GB VRAM; default `num_gpu=None` lets Ollama decide,
                 # which under-uses VRAM on small models).
                 num_gpu=99,
+            )
+            logger.info(
+                "UnifiedInvoker.__init__: provider=ollama, chat=%s model=%s base_url=%s",
+                type(self.chat).__name__, self.model, self.base_url,
             )
         self._heavy: Any | None = None
         self._ollama_reachable: bool | None = None

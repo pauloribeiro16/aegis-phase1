@@ -1130,7 +1130,10 @@ class Phase1Orchestrator:
             from aegis_phase1.prompts_v2.factory import get_invoker
             from aegis_phase1.prompts_v2.phase1_executor import invoker_to_executor
 
-            p1_invoker = get_invoker(model=configured_model)
+            p1_invoker = get_invoker(
+                model=configured_model,
+                provider=getattr(self.llm_invoker, "provider", "ollama"),
+            )
             executor = invoker_to_executor(p1_invoker)
             self._phase1_executor_cached = executor
             logger.info(
