@@ -788,7 +788,7 @@ def _build_frontmatter(state: dict[str, Any], applicable: list[str]) -> str:
         "updated": now,
         "author": "Executor",
         "status": "DRAFT",
-        "case_study": getattr(ctx, "company_name", "UNKNOWN") if ctx else "UNKNOWN",
+        "case_study": _safe_attr(ctx, "company_name", "UNKNOWN"),
         "inputs": [
             "04_Company_Context_Assessment.md",
             "05_Regulatory_Applicability.md",
