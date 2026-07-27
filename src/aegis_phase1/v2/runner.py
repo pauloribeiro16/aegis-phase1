@@ -482,7 +482,11 @@ def main() -> None:
         try:
             run_wizard(orch, case_path, prep_path, output_path)
         except OllamaUnreachableError as exc:
-            logger.error(
+            # CORR-064: logger.exception emits the full Python traceback
+            # so the operator can see which call raised and why — the
+            # original S1 crash (PID 3033454, 3149128) showed the bare
+            # "LLM backend not reachable" message with no stack.
+            logger.exception(
                 "LLM backend not reachable at %s. Start with `ollama serve` "
                 "or pass --mock-llm for offline mode.",
                 exc.base_url,
@@ -803,7 +807,10 @@ def cmd_run_all_traced(
             },
         )
     except OllamaUnreachableError as exc:
-        logger.error(
+        # CORR-064: logger.exception emits the full Python traceback
+        # (caller chain, file/line, exception class) — the bare
+        # logger.error was hiding the actual failure mode.
+        logger.exception(
             "LLM backend not reachable at %s. Start with `ollama serve` "
             "or pass --mock-llm for offline mode.",
             exc.base_url,
