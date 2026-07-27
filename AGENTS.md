@@ -418,3 +418,99 @@ Add a new entry to this table when:
   NIS2 starts using the `-M` suffix)
 
 The next person to onboard something will read this section first.
+
+---
+
+## 12. Pipeline Input Contract (CORR-070 — MANDATORY 2026-07-28)
+
+> **Why this exists.** During the cross-case payload audit
+> (`execution/CROSS-CASE-LLM-PAYLOAD-AUDIT.md`), we found that 22/58
+> LLM calls were silently losing the `layer0_catalog` (tipo2 + tipo3)
+> to a 512KB CORR-049 cap, AND `P1B-LLM-02` was called without
+> `p1b_llm_01_outputs` wired. These are silent regressions — nothing
+> in the unit test suite catches them. The input contract makes
+> regressions **loud**.
+
+### 12.1 What the contract declares
+
+For every spec in the registry (`PROMPTS/P*-LLM-*.md`), the contract
+declares the **required** top-level keys, `company_facts` keys,
+`classification` keys, and `layer0_catalog` keys that MUST be present
+in the inputs dict built by `run_p1b_single` /
+`run_phase_1c_map` / `run_phase_1c_reduce`. Source of truth:
+
+```
+tests/fixtures/pipeline_inputs_golden/_schema.json
+```
+
+The schema covers the 5 canonical LLM specs:
+`P1B-LLM-01-INTERPRETATION`, `P1B-LLM-02-RATIONALE`,
+`P1C-LLM-01-OVERLAP-CLASSIFICATION`, `P1C-LLM-02-COMPOUND-EVENT`,
+`P1C-LLM-03-STRATEGIC-SYNTHESIS`.
+
+### 12.2 How verification works (two layers)
+
+| Layer | Where | What | Failure mode |
+|---|---|---|---|
+| **Structural** | `tests/unit/prompts_v2/test_pipeline_inputs.py::TestPipelineInputsStructural` | Asserts schema-declared keys are present in every golden file | **HARD FAIL** (CI gate) |
+| **Golden drift** | `tests/unit/prompts_v2/test_pipeline_inputs.py::TestPipelineInputsGoldenDrift` | Compares current keys/sizes against golden, logs unexpected changes | **WARN** (logged only) |
+
+The CI gate runs both:
+```bash
+bash .hooks/ci-pipeline-inputs.sh
+```
+
+If the structural layer fails, the script exits 1 with a message
+explaining the fix.
+
+### 12.3 When to regenerate the golden files
+
+You MUST regenerate when:
+- A new spec is added to `PROMPTS/`
+- A new test case is added to `cases/`
+- The orchestrator's `run_p1b_single` / `run_phase_1c_map` /
+  `run_phase_1c_reduce` changes (intentional input additions, etc.)
+- The catalog loader's filter logic changes
+- A new LLM field is added to the inputs (e.g. `c03_strategic_synthesis`)
+
+```bash
+# 1. Update _schema.json with the new required fields
+# 2. Regenerate
+python _regenerate_pipeline_inputs_golden.py
+# 3. Review the diff (git diff tests/fixtures/pipeline_inputs_golden/)
+# 4. Commit both the schema and the regenerated files
+git add tests/fixtures/pipeline_inputs_golden/ _schema.json
+git commit -m "chore: regenerate pipeline-inputs golden for <reason>"
+```
+
+### 12.4 When the gate fails — what to do
+
+The CI gate will print:
+```
+FAIL: structural assertions failed (<rc>)
+  Required fields are missing from one or more spec inputs.
+  If the pipeline change is intentional:
+    1. Update tests/fixtures/pipeline_inputs_golden/_schema.json
+    2. Run: python _regenerate_pipeline_inputs_golden.py
+    3. Commit both
+```
+
+**Two failure modes:**
+1. **Field accidentally removed from `run_p1b_single`** — restore the
+   field in the orchestrator. The schema is the source of truth, not
+   the orchestrator.
+2. **Field intentionally added/removed** — update the schema first,
+   then regenerate. The PR description should justify the schema
+   change.
+
+### 12.5 Known issues at v1.0.0
+
+| Bug | Specs affected | Status |
+|---|---|---|
+| **BUG-A** (CORR-070): CORR-049 512KB cap truncates `layer0_catalog` + `# TASK` in P1B-LLM-01/02 | All 22 P1B calls (3 cases × ~3.7 regs × 2 specs) | Tracked separately — fix out of scope for the contract |
+| **BUG-B** (CORR-070): P1B-LLM-02 called without `p1b_llm_01_outputs` | All 11 P1B-02 calls | Schema declares required; WARN-only until fixed |
+
+The contract makes these bugs **visible** but does not fix them. The
+fix for BUG-B is 5 LOC in `phase1_executor.py:207-217`. BUG-A requires
+prompt template work (compact sub-domain refs or reorder catalog
+before refs).
