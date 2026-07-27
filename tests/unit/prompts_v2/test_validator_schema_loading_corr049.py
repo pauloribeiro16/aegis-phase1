@@ -20,12 +20,17 @@ from aegis_phase1.prompts_v2.validator import Phase1Validator
 
 # Phase1Validator requires regulatory_baseline_root; use the canonical
 # Methodology-main path which is required for the LLM specs.
+# CORR-069 S1: also pass output_schemas_path so _schemas is populated
+# (otherwise _resolve_schema returns {} and the tests fail).
 @pytest.fixture(scope="module")
 def validator() -> Phase1Validator:
     return Phase1Validator(
         regulatory_baseline_root=Path(
             "/home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PREPROCESSING"
-        )
+        ),
+        output_schemas_path=Path(
+            "/home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PROMPTS/output_schemas.yaml"
+        ),
     )
 
 
