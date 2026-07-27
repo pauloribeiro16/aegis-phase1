@@ -573,11 +573,17 @@ class Phase1Orchestrator:
             try:
                 result = self.map_single_domain(did, processor=processor)
             except LLMUnreachable as exc:
-                logger.error("MAP aborted — Ollama unreachable on %s: %s", did, exc)
-                self.state["domain_results"] = results
-                self.state["current_stage"] = "MAP_FAILED"
-                self._persist_state()
-                raise
+                # CORR-064 S5.2b: do NOT abort the entire MAP. Mark
+                # this domain as failed and continue with the rest.
+                # The chat_minimax retry (S5.1) already tried 3 times
+                # before propagating the exception; if it still
+                # reached here, the failure is likely fatal but
+                # shouldn't poison the other 9 domains.
+                logger.exception(
+                    "MAP raised LLMUnreachable for %s — marking as failed and continuing",
+                    did,
+                )
+                result = self._failed_domain_result(did, exc)
             except Exception as exc:
                 logger.exception("MAP raised for %s: %s", did, exc)
                 result = self._failed_domain_result(did, exc)
