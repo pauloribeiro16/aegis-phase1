@@ -177,9 +177,19 @@ def get_invoker(
     logs = get_logs_dir()
 
     model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
-    base_url = base_url or os.getenv(
-        "OLLAMA_BASE_URL", UnifiedInvoker.DEFAULT_BASE_URL
-    )
+    # CORR-067 S3 (follow-up): when provider=minimax, don't pass an
+    # Ollama-derived base_url — UnifiedInvoker.__init__ already
+    # resolves to the M3 gateway URL when base_url is None and
+    # provider=minimax (see unified.py:243-247). Passing the Ollama
+    # default would override the gateway and cause Phase1Executor
+    # calls (P1B-01/02, P1C-01/02/03) to fail with a
+    # connection-refused (no Ollama running on localhost:11434).
+    if provider == "minimax":
+        base_url = base_url  # honour explicit override only
+    else:
+        base_url = base_url or os.getenv(
+            "OLLAMA_BASE_URL", UnifiedInvoker.DEFAULT_BASE_URL
+        )
 
     prompt_loader = PromptLoader(root=prompts)
     catalog_loader = CatalogLoader(root=prompts / "catalogs")
