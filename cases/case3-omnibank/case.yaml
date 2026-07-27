@@ -1,0 +1,24 @@
+# aegis-phase1 case configuration
+case: "case3"
+name: "OmniBank Financial Systems"
+complexity: "maximum"
+applicable_regulations:
+  - "GDPR"
+  - "CRA"
+  - "NIS2"
+  - "DORA"
+  - "AIACT"
+
+llm:
+  provider: "minimax"
+  base_url: "https://api.minimax.io/anthropic"
+  model: "MiniMax-M3"
+  temperature: 0.1
+  num_ctx: 8192
+  timeout: 120
+
+phases:
+  phase1:
+    data_path: "data/phase1"
+    templates_path: "templates/phase1"
+    output_path: "output/phase1"

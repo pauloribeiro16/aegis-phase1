@@ -1,0 +1,20 @@
+# AEGIS Phase 1 — Regulatory Applicability (Case 02 — SecureBorder Solutions)
+# Sourced from Layer 1 decision tree (Methodology-main reference).
+applicable_regulations:
+  - GDPR
+  - CRA
+  - NIS2
+  - AI_Act
+non_applicable_regulations:
+  - DORA
+applicability_rationale:
+  GDPR: processes_personal_data = true (biometric + special category)
+  CRA: places_digital_products_eu = true (eGate kiosks, Critical class)
+  NIS2: security_sector + employees_50 = true (Essential Entity Supplier)
+  DORA: not_financial_entity
+  AI_Act: high_risk_ai_annex_iii = true (border control, biometric AI)
+clause_count:
+  GDPR: 28
+  CRA: 26
+  NIS2: 29
+  AI_Act: 29

@@ -1,0 +1,24 @@
+# Stakeholders (Case 03 — OmniBank Financial Systems)
+# PLACEHOLDER for the test run — actual stakeholders in PROJECT_STATE.md §4
+stakeholders:
+  - id: SH-01
+    role: Chief Executive Officer (CEO)
+    responsibilities: [executive_sponsor, accountability, ecb_supervised]
+  - id: SH-02
+    role: Chief Information Security Officer (CISO)
+    responsibilities: [security_lead, dedicated_org_100_plus]
+  - id: SH-03
+    role: Data Protection Officer (DPO)
+    responsibilities: [gdpr_compliance, bafin_oversight]
+  - id: SH-04
+    role: Chief Risk Officer (CRO)
+    responsibilities: [dora_ict_risk, operational_resilience]
+  - id: SH-05
+    role: Head of AI / ML
+    responsibilities: [ai_act_compliance, credit_scoring_governance, omnibank_ai]
+  - id: SH-06
+    role: Head of Compliance
+    responsibilities: [baFin_reporting, ecb_supervision]
+  - id: SH-07
+    role: Internal Audit Director
+    responsibilities: [iso_27001_audit, dora_internal_audit]

@@ -1,0 +1,43 @@
+# AEGIS Phase 1 — Company Classification (Case 03 — OmniBank Financial Systems)
+# Sourced from Methodology-main/02_CASES/Case_03_OmniBank_Financial/00_COMMON/01_Company_Context.md
+company:
+  name: OmniBank Financial Systems S.A.
+  legal_structure: Société Anonyme (S.A.)
+  sector: Banking & Financial Services
+  jurisdiction: Germany (EU)
+  employees: 5000
+  revenue_eur: 1500000000
+  scale: LARGE
+  security_fte: 100.0
+  criticality_level: critical
+tech_stack:
+  - Mainframe (on-premise)
+  - EU cloud
+  - PostgreSQL
+  - Custom AI/ML platform
+applicable_regulations:
+  - id: REG-GDPR
+    abbreviation: GDPR
+    applicable: true
+    obligated_party: controller
+    reason: processes_personal_data = true (customer PII, financial transactions, credit scores)
+  - id: REG-CRA
+    abbreviation: CRA
+    applicable: true
+    obligated_party: manufacturer
+    reason: places_digital_products_eu = true (mobile app + web platform, Default class)
+  - id: REG-NIS2
+    abbreviation: NIS2
+    applicable: true
+    obligated_party: essential_entity
+    reason: banking_sector_annex_i = true + employees_50 = true
+  - id: REG-DORA
+    abbreviation: DORA
+    applicable: true
+    obligated_party: financial_entity
+    reason: credit_institution = true per Art. 2(1) (credit institution, payment service provider)
+  - id: REG-AI_Act
+    abbreviation: AI_Act
+    applicable: true
+    obligated_party: deployer
+    reason: high_risk_ai_annex_iii = true (credit scoring AI, Annex III financial access)

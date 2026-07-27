@@ -1,0 +1,18 @@
+# Business Goals (Case 02 — SecureBorder Solutions)
+# PLACEHOLDER for the test run — full goals available in PROJECT_STATE.md §3
+goals:
+  - id: BG-01
+    description: GDPR-compliant biometric data processing
+    priority: HIGH
+  - id: BG-02
+    description: CRA Critical class certification (notified body)
+    priority: HIGH
+  - id: BG-03
+    description: NIS 2 essential entity compliance (24h SLA)
+    priority: HIGH
+  - id: BG-04
+    description: AI Act high-risk conformity (Annex III border control)
+    priority: HIGH
+  - id: BG-05
+    description: 99.99% uptime SLA (airport operations)
+    priority: HIGH

@@ -1,0 +1,18 @@
+# Business Goals (Case 03 — OmniBank Financial Systems)
+# PLACEHOLDER for the test run — full goals available in PROJECT_STATE.md §3
+goals:
+  - id: BG-01
+    description: GDPR-compliant PII processing at scale
+    priority: HIGH
+  - id: BG-02
+    description: CRA Default class compliance (mobile + web)
+    priority: MEDIUM
+  - id: BG-03
+    description: NIS 2 Essential Entity compliance
+    priority: HIGH
+  - id: BG-04
+    description: DORA Financial Entity compliance (38 clauses, ICT risk management)
+    priority: HIGH
+  - id: BG-05
+    description: AI Act Annex III credit scoring conformity
+    priority: HIGH

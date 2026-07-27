@@ -688,10 +688,30 @@ class Phase1Orchestrator:
                         "layer0_refs": sd.get("layer0_refs", []),
                     }
                 )
+            # CORR-068 S1: also populate the legacy "subdomains" field from
+            # adapted_v3 so downstream consumers (concatenator.py,
+            # reduce_synthesis() lane_outputs) see the actual sub-domain
+            # activations instead of an empty list. Pre-S1 the field was
+            # hardcoded to [] which cascaded into Track B seeing 0
+            # subdomains and the reduce-stage LLMs receiving empty
+            # aggregated_activations.
+            legacy_subdomains = [
+                {
+                    "subdomain_id": sd.get("sub_domain_id", ""),
+                    "id": sd.get("sub_domain_id", ""),
+                    "reg_pair": list(sd.get("reg_pair", []) or []),
+                    "company_scope_verdict": sd.get("company_scope_verdict", ""),
+                    "regulatory_baseline_relationship": sd.get(
+                        "regulatory_baseline_relationship", ""
+                    ),
+                    "layer0_refs": list(sd.get("layer0_refs", []) or []),
+                }
+                for sd in adapted_v3
+            ]
             results[did] = {
                 "domain_id": did,
                 "domain_name": DOMAIN_NAMES.get(did, did),
-                "subdomains": [],
+                "subdomains": legacy_subdomains,
                 "coverage": "SUBSTANTIVE" if adapted_v3 else "NOT_ADDRESSED",
                 "cross_regulation": [],
                 "llm_status": "OK" if status == "OK" else "FAILED",
