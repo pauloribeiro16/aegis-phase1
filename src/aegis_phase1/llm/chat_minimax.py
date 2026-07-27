@@ -75,9 +75,9 @@ DEFAULT_MAX_TOKENS = 4096
 # CORR-062 S2 (2026-07-27): the MiniMax Token Plan has a per-second
 # rate limit (no public doc on the exact number; user-flagged during
 # the S1 run that 18 calls in 91ms was a bad pattern). We enforce a
-# minimum interval between successive chat calls — default 1.0s, so
-# 1 call/sec. Override via the ``MINIMAX_MIN_INTERVAL`` env var (float,
-# seconds) — set to 0.0 to disable the throttle entirely.
+# minimum interval between successive chat calls — default 5.0s, so
+# max 12 calls/min. Override via the ``MINIMAX_MIN_INTERVAL`` env var
+# (float, seconds) — set to 0.0 to disable the throttle entirely.
 #
 # Module-level lock + last-call timestamp so the throttle is process-
 # wide (not per-instance) — multiple UnifiedInvoker objects in the
@@ -118,7 +118,7 @@ class ChatMinimax(BaseChatModel):
     timeout: float = DEFAULT_TIMEOUT
     max_tokens: int = DEFAULT_MAX_TOKENS
     temperature: float = 0.0
-    min_interval: float = 1.0  # CORR-062 S2: throttle between calls
+    min_interval: float = 5.0  # CORR-062 S2: throttle between calls (5s default)
 
     @model_validator(mode="after")
     def _resolve_min_interval(self) -> "ChatMinimax":
@@ -127,16 +127,16 @@ class ChatMinimax(BaseChatModel):
         ``MINIMAX_MIN_INTERVAL`` (float, seconds) overrides the default
         without touching code. Set to ``0.0`` to disable the throttle.
         Reads the env only when the caller passed the field-default value
-        (1.0) so explicit ``min_interval=...`` constructor args win.
+        (5.0) so explicit ``min_interval=...`` constructor args win.
         """
-        if self.min_interval == 1.0:
+        if self.min_interval == 5.0:
             env_val = os.environ.get("MINIMAX_MIN_INTERVAL")
             if env_val is not None:
                 try:
                     self.min_interval = float(env_val)
                 except ValueError:
                     logger.warning(
-                        "ChatMinimax: invalid MINIMAX_MIN_INTERVAL=%r, keeping 1.0",
+                        "ChatMinimax: invalid MINIMAX_MIN_INTERVAL=%r, keeping 5.0",
                         env_val,
                     )
         return self
