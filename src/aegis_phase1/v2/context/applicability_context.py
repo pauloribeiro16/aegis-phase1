@@ -244,14 +244,19 @@ def build_applicability_context(state: dict[str, Any]) -> ApplicabilityContext:
     # Prefer v2's pre-computed list if present
     v2_applicable_pre: list[str] = list(state.get("v2_applicable_regs", []))
 
-    # Authoritative computation (re-derive from predicates)
+    # Authoritative computation:
+    # CORR-068 S2: user-declared applicability (v2_applicable_regs, populated
+    # from classification.yaml by CaseProfileLoader) takes priority over
+    # the sector-heuristic. The heuristic is a FALLBACK for cases where
+    # the loader didn't run (e.g., persisted state.json from a pre-CORR-061
+    # era without v2_company_facts).
     applicable_computed = _compute_applicable_regs(predicates)
-    if not applicable_computed and (v1_applicable_from_cc or v2_applicable_pre):
-        # Fallback: use the pre-computed list (e.g., from a
-        # persisted state.json without v2_company_facts)
-        applicable_computed = sorted(
-            set(v1_applicable_from_cc) | set(v2_applicable_pre)
-        )
+    if v2_applicable_pre:
+        # User has declared applicability — trust it.
+        applicable_computed = list(v2_applicable_pre)
+    elif not applicable_computed and v1_applicable_from_cc:
+        # Fallback: pre-CORR-061 v1 state with applicable_regs in company_context
+        applicable_computed = sorted(v1_applicable_from_cc)
 
     # Declared: from regulatory.applicable (preferred) or v2_declared_regs
     # (added in T2) or v2_applicable_pre
