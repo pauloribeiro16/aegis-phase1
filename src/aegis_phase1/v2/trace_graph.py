@@ -249,7 +249,25 @@ def run_orchestrator_graph(
     }
 
     graph = compile_orchestrator_graph()
-    result_state = graph.invoke(initial, config=run_config)
+    logger.info("STAGE: graph.invoke starting (18-node LangGraph)")
+    import time as _time
+    _t0 = _time.monotonic()
+    try:
+        result_state = graph.invoke(initial, config=run_config)
+    except Exception:
+        # CORR-063 S2: previously the S1 (PID 3033454) died silently
+        # after the 21st LLM call. The runner had no try/except here
+        # so any unhandled exception aborted the process with no
+        # traceback in the log. Re-raise after logging the full
+        # exception chain so the operator can see exactly which node
+        # crashed and why.
+        logger.exception(
+            "graph.invoke raised after %.1fs — pipeline aborted", _time.monotonic() - _t0
+        )
+        raise
+    logger.info(
+        "STAGE: graph.invoke complete in %.1fs", _time.monotonic() - _t0
+    )
 
     client, _handler = get_langfuse_callback()
     if client is not None:
