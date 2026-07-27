@@ -61,18 +61,23 @@ def _detect_provider(model: str | None) -> str:
     """Auto-detect provider from model name.
 
     Returns ``"transformers"`` if the model name contains ``/`` (HF Hub
-    convention: ``org/repo``) or has the ``hf:`` prefix; otherwise
-    ``"ollama"`` (default).
+    convention: ``org/repo``) or has the ``hf:`` prefix;
+    ``"minimax"`` if it has the ``minimax/`` prefix (M-series models
+    via the Mavis gateway — CORR-062 S2); otherwise ``"ollama"`` (default).
 
     >>> _detect_provider("google/gemma-4-E2B-it")
     'transformers'
     >>> _detect_provider("hf:google/gemma-4-E2B-it")
     'transformers'
+    >>> _detect_provider("minimax/MiniMax-M3")
+    'minimax'
     >>> _detect_provider("gemma4:e4b")
     'ollama'
     """
     if not model:
         return "ollama"
+    if model.startswith("minimax/"):
+        return "minimax"
     if model.startswith("hf:") or "/" in model:
         return "transformers"
     return "ollama"

@@ -215,17 +215,39 @@ class UnifiedInvoker:
         timeout: int | None = None,
         num_ctx: int | None = None,
         langfuse_handler: Any | None = None,
-        prompt_loader: Any | None = None,
-        catalog_loader: Any | None = None,
-        validator: Any | None = None,
-        llm_logger: Any | None = None,
-        format_logger: Any | None = None,
+        prompt_loader: Any = None,
+        catalog_loader: Any = None,
+        validator: Any = None,
+        llm_logger: Any = None,
+        format_logger: Any = None,
         prompts_root: Any = None,
+        provider: str = "ollama",
+        api_key: str | None = None,
+        max_tokens: int | None = None,
     ) -> None:
-        from langchain_ollama import ChatOllama
+        # CORR-062 S2: ``provider`` selects the chat backend. The default
+        # stays "ollama" for backward compat (existing tests + recovery
+        # modes all use the local Ollama daemon). Pass "minimax" to use
+        # the M-series models (M2.7 / M3) via the Mavis gateway.
+        self.provider = provider
+        self.api_key = api_key or ""
+        self.max_tokens = max_tokens or 4096
 
         self.model = model or self.DEFAULT_MODEL
-        self.base_url = base_url or self.DEFAULT_BASE_URL
+
+        # CORR-062 S2: when provider=minimax and no explicit base_url is
+        # given, fall back to the Mavis gateway (the Anthropic-Messages
+        # endpoint) instead of the Ollama default. ``ChatMinimax`` has
+        # its own DEFAULT_BASE_URL, but we resolve here so the rest of
+        # the pipeline (e.g. log paths) sees the right URL too.
+        if base_url:
+            self.base_url = base_url
+        elif provider == "minimax":
+            from aegis_phase1.llm.chat_minimax import DEFAULT_BASE_URL
+            self.base_url = DEFAULT_BASE_URL
+        else:
+            self.base_url = self.DEFAULT_BASE_URL
+
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self.num_ctx = num_ctx or self.DEFAULT_NUM_CTX
         self._langfuse_handler = langfuse_handler
@@ -237,16 +259,29 @@ class UnifiedInvoker:
         self.format_logger = format_logger
         self._prompts_root = prompts_root
 
-        self.chat = ChatOllama(
-            model=self.model,
-            base_url=self.base_url,
-            timeout=self.timeout,
-            num_ctx=self.num_ctx,
-            # CORR-056: force all model layers onto GPU (gemma4:e2b fits
-            # in 7.6GB VRAM; default `num_gpu=None` lets Ollama decide,
-            # which under-uses VRAM on small models).
-            num_gpu=99,
-        )
+        if provider == "minimax":
+            from aegis_phase1.llm.chat_minimax import ChatMinimax
+
+            self.chat = ChatMinimax(
+                model=self.model,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=self.timeout,
+                max_tokens=self.max_tokens,
+            )
+        else:
+            from langchain_ollama import ChatOllama
+
+            self.chat = ChatOllama(
+                model=self.model,
+                base_url=self.base_url,
+                timeout=self.timeout,
+                num_ctx=self.num_ctx,
+                # CORR-056: force all model layers onto GPU (gemma4:e2b fits
+                # in 7.6GB VRAM; default `num_gpu=None` lets Ollama decide,
+                # which under-uses VRAM on small models).
+                num_gpu=99,
+            )
         self._heavy: Any | None = None
         self._ollama_reachable: bool | None = None
         self._ollama_probe_ts: float = 0.0

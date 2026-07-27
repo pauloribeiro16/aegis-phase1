@@ -261,10 +261,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--provider",
-        choices=["ollama", "transformers", "auto"],
+        choices=["ollama", "transformers", "minimax", "auto"],
         default="auto",  # CORR-056: auto-detect from model name
         help="LLM provider (default: auto-detect from --model). "
-             "'transformers' uses HuggingFace transformers (no Ollama needed).",
+             "'transformers' uses HuggingFace transformers (no Ollama needed). "
+             "'minimax' uses the MiniMax M-series (M2.7/M3) via the Mavis "
+             "gateway (CORR-062 S2). Auth: MAVIS_ACCESS_TOKEN env var.",
     )
     parser.add_argument(
         "--retry-failed",
