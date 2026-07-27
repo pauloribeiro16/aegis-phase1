@@ -297,7 +297,13 @@ class P1BLLM01Parser(MarkdownParser):
         status_body = self._extract_section(text, "status")
         if status_body is None:
             return None
-        status_str = (self._extract_field(status_body, "status") or "").upper()
+        # CORR-065: the prompt template uses `- applicable: YES/NO/INDETERMINATE`
+        # under `## Status`, not `- status: ...`. Accept both for resilience.
+        status_str = (
+            self._extract_field(status_body, "status")
+            or self._extract_field(status_body, "applicable")
+            or ""
+        ).upper()
         conf_str = (self._extract_field(status_body, "confidence") or "").upper()
         if status_str not in {e.value for e in m["P1BLLM01Status"]}:
             return None
@@ -305,38 +311,90 @@ class P1BLLM01Parser(MarkdownParser):
         # Interpretations section
         interpretations: list = []
         interp_body = self._extract_section(text, "interpretations") or ""
-        for sub_id, sub_body in self._split_subsections(interp_body, self._SUBSEC_INT):
-            entry_id = self._extract_field(sub_body, "entry_id") or ""
-            applicable_str = (self._extract_field(sub_body, "applicable") or "").upper()
-            if applicable_str not in {e.value for e in m["P1BLLM01Applicable"]}:
-                return None
-            rationale = self._extract_field(sub_body, "activation_rationale") or ""
-            interpretations.append(m["P1BLLM01Interpretation"](
-                entry_id=entry_id,
-                applicable=m["P1BLLM01Applicable"](applicable_str),
-                activation_rationale=rationale,
-                layer0_refs=self._extract_list_field(sub_body, "layer0_refs"),
-                legal_refs=self._extract_list_field(sub_body, "legal_refs"),
-                company_fact_refs=self._extract_list_field(sub_body, "company_fact_refs"),
-            ))
+        interp_subs = self._split_subsections(interp_body, self._SUBSEC_INT)
+        if interp_subs:
+            # Original CORR-050 format: `### INT-NN` sub-sections
+            for sub_id, sub_body in interp_subs:
+                entry_id = self._extract_field(sub_body, "entry_id") or ""
+                applicable_str = (self._extract_field(sub_body, "applicable") or "").upper()
+                if applicable_str not in {e.value for e in m["P1BLLM01Applicable"]}:
+                    return None
+                rationale = self._extract_field(sub_body, "activation_rationale") or ""
+                interpretations.append(m["P1BLLM01Interpretation"](
+                    entry_id=entry_id,
+                    applicable=m["P1BLLM01Applicable"](applicable_str),
+                    activation_rationale=rationale,
+                    layer0_refs=self._extract_list_field(sub_body, "layer0_refs"),
+                    legal_refs=self._extract_list_field(sub_body, "legal_refs"),
+                    company_fact_refs=self._extract_list_field(sub_body, "company_fact_refs"),
+                ))
+        else:
+            # CORR-065: bullet-list fallback. Some models (notably
+            # MiniMax-M3) emit `## Interpretations` as a flat bullet
+            # list of `- ENTRY_ID (VERDICT): rationale...` instead of
+            # `### INT-NN` sub-sections. Accept that shape as long as
+            # the verdict token is a known P1BLLM01Applicable value.
+            _BULLET_RE = re.compile(
+                r"^- \s*([A-Z][A-Z0-9_]+(?:-[A-Z0-9_]+)*)\s*"
+                r"\((YES|NO|INDETERMINATE)\)\s*:\s*(.+?)(?=\n- |\n## |\Z)",
+                re.MULTILINE | re.DOTALL,
+            )
+            for m_b in _BULLET_RE.finditer(interp_body):
+                entry_id, verdict, rationale = (
+                    m_b.group(1).strip(),
+                    m_b.group(2).strip().upper(),
+                    m_b.group(3).strip(),
+                )
+                interpretations.append(m["P1BLLM01Interpretation"](
+                    entry_id=entry_id,
+                    applicable=m["P1BLLM01Applicable"](verdict),
+                    activation_rationale=rationale,
+                    layer0_refs=[],
+                    legal_refs=[],
+                    company_fact_refs=[],
+                ))
 
         # Derogations section
         derogations: list = []
         der_body = self._extract_section(text, "derogations") or ""
-        for sub_id, sub_body in self._split_subsections(der_body, self._SUBSEC_DER):
-            entry_id = self._extract_field(sub_body, "entry_id") or ""
-            verdict_str = (self._extract_field(sub_body, "activation_verdict") or "").upper()
-            if verdict_str not in {e.value for e in m["P1BLLM01DerogationVerdict"]}:
-                return None
-            rationale = self._extract_field(sub_body, "activation_rationale") or ""
-            derogations.append(m["P1BLLM01Derogation"](
-                entry_id=entry_id,
-                activation_verdict=m["P1BLLM01DerogationVerdict"](verdict_str),
-                activation_rationale=rationale,
-                layer0_refs=self._extract_list_field(sub_body, "layer0_refs"),
-                legal_refs=self._extract_list_field(sub_body, "legal_refs"),
-                company_fact_refs=self._extract_list_field(sub_body, "company_fact_refs"),
-            ))
+        der_subs = self._split_subsections(der_body, self._SUBSEC_DER)
+        if der_subs:
+            # Original CORR-050 format: `### DER-NN` sub-sections
+            for sub_id, sub_body in der_subs:
+                entry_id = self._extract_field(sub_body, "entry_id") or ""
+                verdict_str = (self._extract_field(sub_body, "activation_verdict") or "").upper()
+                if verdict_str not in {e.value for e in m["P1BLLM01DerogationVerdict"]}:
+                    return None
+                rationale = self._extract_field(sub_body, "activation_rationale") or ""
+                derogations.append(m["P1BLLM01Derogation"](
+                    entry_id=entry_id,
+                    activation_verdict=m["P1BLLM01DerogationVerdict"](verdict_str),
+                    activation_rationale=rationale,
+                    layer0_refs=self._extract_list_field(sub_body, "layer0_refs"),
+                    legal_refs=self._extract_list_field(sub_body, "legal_refs"),
+                    company_fact_refs=self._extract_list_field(sub_body, "company_fact_refs"),
+                ))
+        else:
+            # CORR-065: bullet-list fallback (symmetric to interpretations)
+            _BULLET_RE_DER = re.compile(
+                r"^- \s*([A-Z][A-Z0-9_]+(?:-[A-Z0-9_]+)*)\s*"
+                r"\((ACTIVATED|NOT_ACTIVATED|INDETERMINATE)\)\s*:\s*(.+?)(?=\n- |\n## |\Z)",
+                re.MULTILINE | re.DOTALL,
+            )
+            for m_b in _BULLET_RE_DER.finditer(der_body):
+                entry_id, verdict, rationale = (
+                    m_b.group(1).strip(),
+                    m_b.group(2).strip().upper(),
+                    m_b.group(3).strip(),
+                )
+                derogations.append(m["P1BLLM01Derogation"](
+                    entry_id=entry_id,
+                    activation_verdict=m["P1BLLM01DerogationVerdict"](verdict),
+                    activation_rationale=rationale,
+                    layer0_refs=[],
+                    legal_refs=[],
+                    company_fact_refs=[],
+                ))
 
         # Build envelope-less model; envelope injected by invoker
         try:
@@ -356,7 +414,85 @@ class P1BLLM01Parser(MarkdownParser):
             return None
 
 
-# Registry of parsers per spec_id (extensible for CORR-051)
+class GenericMarkdownParser(MarkdownParser):
+    """CORR-066: spec-agnostic markdown parser.
+
+    Captures the canonical ``## Status`` block (with ``- applicable:``
+    and ``- confidence:`` fields) and stores every other ``## Section``
+    body verbatim in ``sections[section_name]``. Used for the 4 LLMs
+    that don't have a hand-rolled parser yet:
+
+      - P1B-LLM-02-RATIONALE
+      - P1C-LLM-01-OVERLAP-CLASSIFICATION
+      - P1C-LLM-02-COMPOUND-EVENT
+      - P1C-LLM-03-STRATEGIC-SYNTHESIS
+
+    The raw markdown is also captured in
+    ``state['per_spec_markdown'][spec_id]`` (CORR-061 S3b) for
+    renderers that want the original text.
+    """
+
+    # Accept any ``## Section`` header — the parser is spec-agnostic.
+    _H2_SPLIT_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+
+    def parse(self, raw: str) -> tuple[Any | None, str]:
+        text = self._strip_code_fences(raw)
+        m = _import_p1b_models()
+
+        # Find all ## section headers and split the body between them
+        matches = list(self._H2_SPLIT_RE.finditer(text))
+        if not matches:
+            return None, "no `## Section` headers found in markdown"
+
+        sections: dict[str, str] = {}
+        for i, m_h in enumerate(matches):
+            section_name = m_h.group(1).strip()
+            body_start = m_h.end()
+            body_end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            sections[section_name] = text[body_start:body_end].strip()
+
+        # Extract Status fields (fall back to applicable per the
+        # CORR-065 fix that accepts both `- status:` and
+        # `- applicable:` under `## Status`).
+        status_body = sections.get("Status", "")
+        status_str = (
+            self._extract_field(status_body, "status")
+            or self._extract_field(status_body, "applicable")
+            or ""
+        ).upper() or "OK"
+        conf_str = (self._extract_field(status_body, "confidence") or "MEDIUM").upper()
+
+        try:
+            status = m["P1BLLM01Status"](status_str)
+        except ValueError:
+            # Unknown status token — fall back to INDETERMINATE
+            status = m["P1BLLM01Status"].INDETERMINATE
+        try:
+            confidence = m["P1BLLM01Confidence"](conf_str)
+        except ValueError:
+            confidence = m["P1BLLM01Confidence"].MEDIUM
+
+        from aegis_phase1.v2.state import GenericMarkdownOutput
+
+        return GenericMarkdownOutput(
+            status=status,
+            confidence=confidence,
+            sections=sections,
+        ), ""
+
+
+# Registry of parsers per spec_id (extensible for CORR-051/CORR-066)
 MARKDOWN_PARSERS: dict[str, type[MarkdownParser]] = {
     "P1B-LLM-01-INTERPRETATION": P1BLLM01Parser,
+    # CORR-066: the 4 LLMs below don't yet have spec-specific parsers
+    # (writing them is a separate contract — P1B-02 has its own
+    # section/subsection structure, P1C-01 emits per-domain bullets,
+    # etc). For now, the GenericMarkdownParser captures `## Status`
+    # and stores every other `## Section` body verbatim in
+    # `sections[section_name]` so the v2 orchestrator and doc
+    # renderers can consume the raw markdown.
+    "P1B-LLM-02-RATIONALE": GenericMarkdownParser,
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION": GenericMarkdownParser,
+    "P1C-LLM-02-COMPOUND-EVENT": GenericMarkdownParser,
+    "P1C-LLM-03-STRATEGIC-SYNTHESIS": GenericMarkdownParser,
 }

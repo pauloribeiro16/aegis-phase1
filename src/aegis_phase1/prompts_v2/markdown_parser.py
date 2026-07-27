@@ -23,8 +23,9 @@ No new logic lives here — this file is a pure re-export.
 
 from aegis_phase1._archive.corr061.markdown_parser import (  # noqa: F401
     MARKDOWN_PARSERS,
+    GenericMarkdownParser,
     MarkdownParser,
     P1BLLM01Parser,
 )
 
-__all__ = ["MARKDOWN_PARSERS", "MarkdownParser", "P1BLLM01Parser"]
+__all__ = ["MARKDOWN_PARSERS", "GenericMarkdownParser", "MarkdownParser", "P1BLLM01Parser"]
