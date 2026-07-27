@@ -326,10 +326,27 @@ class UnifiedInvoker:
                 )
             )
 
+        # CORR-063 S3: DEBUG-level entry log. Visible only with
+        # --log-level DEBUG. Does NOT log prompt content (privacy +
+        # size — can be 10+ KB for AEGIS prompts).
+        logger.debug(
+            "invoke_raw called: prompt_len=%d feedback=%s chat=%s",
+            len(prompt), bool(feedback), type(self.chat).__name__,
+        )
+
         cfg = _merge_handler_into_config(self._langfuse_handler, config)
         try:
+            import time as _time
+            _t0 = _time.monotonic()
             resp = self.chat.invoke(msgs, config=cfg)
+            elapsed = _time.monotonic() - _t0
             usage = _extract_usage(resp)
+            logger.debug(
+                "invoke_raw result: status=OK in %.2fs, raw_len=%d, "
+                "input=%d output=%d",
+                elapsed, len(resp.content),
+                usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0),
+            )
             return {
                 "raw": str(resp.content),
                 "status": "OK",
@@ -337,6 +354,7 @@ class UnifiedInvoker:
             }
         except Exception as exc:
             logger.warning("UnifiedInvoker.invoke_raw failed: %s", exc)
+            logger.debug("invoke_raw traceback:", exc_info=True)
             return {
                 "raw": "",
                 "status": "FAILED_AFTER_RETRIES",

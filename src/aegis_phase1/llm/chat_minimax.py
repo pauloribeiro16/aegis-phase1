@@ -197,15 +197,38 @@ class ChatMinimax(BaseChatModel):
             "content-type": "application/json",
         }
 
-        logger.info(
-            "ChatMinimax POST %s model=%s max_tokens=%d messages=%d",
+        # CORR-063 S3: DEBUG-level request log — visible only with
+        # --log-level DEBUG. NEVER logs the auth headers (x-api-key /
+        # Authorization) or the system prompt body (privacy + size).
+        logger.debug(
+            "ChatMinimax POST %s model=%s max_tokens=%d messages=%d system_len=%d",
             url, self.model, self.max_tokens, len(converted),
+            len(system_prompt) if system_prompt else 0,
         )
 
-        with httpx.Client(timeout=self.timeout) as client:
-            resp = client.post(url, json=body, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
+        import time as _time
+        _t0 = _time.monotonic()
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                resp = client.post(url, json=body, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as exc:
+            logger.debug(
+                "ChatMinimax HTTP error after %.2fs: %s: %s",
+                _time.monotonic() - _t0, type(exc).__name__, str(exc)[:200],
+            )
+            raise
+        elapsed = _time.monotonic() - _t0
+        usage = data.get("usage", {}) or {}
+        logger.debug(
+            "ChatMinimax response: status=%d in %.2fs, "
+            "input_tokens=%d output_tokens=%d stop_reason=%s",
+            resp.status_code, elapsed,
+            int(usage.get("input_tokens", 0) or 0),
+            int(usage.get("output_tokens", 0) or 0),
+            data.get("stop_reason"),
+        )
 
         return ChatResult(generations=[ChatGeneration(message=self._parse_response(data))])
 
