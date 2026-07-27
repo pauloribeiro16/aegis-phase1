@@ -56,51 +56,28 @@ def _sanitize_model_tag(model: str) -> str:
     return _re.sub(r"[^A-Za-z0-9._-]+", "_", model).strip("_") or "default"
 
 
-def setup_logging(level: str = "INFO", model_tag: str = "default") -> None:
-    """Configure logging for the v2 pipeline.
-
-    CORR-060 (multi-model eval): pipeline.log goes under
-    ``logs/phase1/<model_tag>/v2/`` so each model has its own log file.
-    """
-    import os as _os
-    _log_base = _os.environ.get("AEGIS_LOG_DIR")
-    if _log_base:
-        log_dir = Path(_log_base) / "v2"
-    else:
-        log_dir = Path("logs") / "phase1" / "v2"
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[
-            logging.FileHandler(str(log_dir / f"pipeline_{model_tag}.log"), encoding="utf-8"),
-            logging.StreamHandler(sys.stdout),
-        ],
-    )
-
-    logging.getLogger("aegis_phase1.v2.output").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_04a").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_04b").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_04c").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_04d").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_05").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_07").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_07b").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.xlsx_generator").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output._common").setLevel(logging.WARNING)
-
-
 def main() -> None:
     from aegis_phase1.v2.domain.processor import MapPartialFailure
     from aegis_phase1.v2.llm import build_llm_invoker
     from aegis_phase1.v2.orchestrator import Phase1Orchestrator
+    from aegis_phase1.utils.logging import setup_logging
 
     parser = argparse.ArgumentParser(description="AEGIS Phase 1 v2 Pipeline")
     parser.add_argument(
         "--case",
         default=DEFAULT_CASE,
         help="Case directory path",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging verbosity. DEBUG = verbose (HTTP req/res, raw LLM I/O). Default: INFO.",
+    )
+    parser.add_argument(
+        "--log-file",
+        default=None,
+        help="Optional path to also write logs to a file. Default: stderr only.",
     )
     parser.add_argument(
         "--regulatory-baseline-path",
@@ -292,7 +269,18 @@ def main() -> None:
     _os.environ["AEGIS_LOG_DIR"] = str(Path(_log_base) / _model_tag)
     logger.info("Per-model log dir: %s", _os.environ["AEGIS_LOG_DIR"])
 
-    setup_logging("DEBUG" if args.verbose else "INFO", model_tag=_model_tag)
+    # CORR-063 S1: --log-level flag takes priority; --verbose is a
+    # backward-compat shortcut for --log-level DEBUG. The file path
+    # is the per-model pipeline log (CORR-060 compat) unless the user
+    # explicitly passes --log-file.
+    effective_level = args.log_level
+    if args.verbose and args.log_level == "INFO":
+        effective_level = "DEBUG"
+    setup_logging(
+        level=effective_level,
+        model_tag=_model_tag,
+        log_file=args.log_file,
+    )
     logger.info("AEGIS Phase 1 v2 Pipeline starting")
 
     if args.mock_llm:
@@ -486,9 +474,11 @@ def main() -> None:
         try:
             run_wizard(orch, case_path, prep_path, output_path)
         except OllamaUnreachableError as exc:
-            print(f"⚠ Ollama not reachable at {exc.base_url}.")
-            print("  Start it with: ollama serve")
-            print("  Or run with --mock-llm for offline mode.")
+            logger.error(
+                "LLM backend not reachable at %s. Start with `ollama serve` "
+                "or pass --mock-llm for offline mode.",
+                exc.base_url,
+            )
             sys.exit(2)
 
 
@@ -805,9 +795,11 @@ def cmd_run_all_traced(
             },
         )
     except OllamaUnreachableError as exc:
-        print(f"⚠ Ollama not reachable at {exc.base_url}.")
-        print("  Start it with: ollama serve")
-        print("  Or run with --mock-llm for offline mode.")
+        logger.error(
+            "LLM backend not reachable at %s. Start with `ollama serve` "
+            "or pass --mock-llm for offline mode.",
+            exc.base_url,
+        )
         return 2
     return 0
 
