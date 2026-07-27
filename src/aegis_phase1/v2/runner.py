@@ -35,7 +35,7 @@ import aegis_phase1.env  # noqa: F401 — load .env via env.py module-import sid
 
 logger = logging.getLogger(__name__)
 
-from aegis_phase1.llm.unified import OllamaUnreachableError  # noqa: E402 — placed after logger
+from aegis_phase1.llm.unified import LLMUnreachableError  # noqa: E402 — placed after logger
 
 _DEFAULT_PROJECTS = Path(__file__).resolve().parents[4]
 DEFAULT_CASE = str(_DEFAULT_PROJECTS / "Methodology-main" / "02_CASES" / "Case_01_TinyTask_SaaS")
@@ -481,7 +481,7 @@ def main() -> None:
 
         try:
             run_wizard(orch, case_path, prep_path, output_path)
-        except OllamaUnreachableError as exc:
+        except LLMUnreachableError as exc:
             # CORR-064: logger.exception emits the full Python traceback
             # so the operator can see which call raised and why — the
             # original S1 crash (PID 3033454, 3149128) showed the bare
@@ -767,7 +767,7 @@ def cmd_run_all_traced(
 
     Returns:
         Process-style exit code: ``0`` on success, ``2`` on
-        ``OllamaUnreachableError`` (re-raised so the CLI can also map it).
+        ``LLMUnreachableError`` (re-raised so the CLI can also map it).
     """
     from aegis_phase1.v2.graph import run_phase1_graph
 
@@ -806,7 +806,7 @@ def cmd_run_all_traced(
                 "subphases_run": ["map", "1b", "reduce", "output"],
             },
         )
-    except OllamaUnreachableError as exc:
+    except LLMUnreachableError as exc:
         # CORR-064: logger.exception emits the full Python traceback
         # (caller chain, file/line, exception class) — the bare
         # logger.error was hiding the actual failure mode.

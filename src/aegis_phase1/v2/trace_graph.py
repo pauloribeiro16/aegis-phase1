@@ -58,7 +58,7 @@ from langgraph.graph import END, START, StateGraph  # noqa: E402
 
 from aegis_phase1.v2.domain.processor import (  # noqa: E402
     MapPartialFailure,
-    OllamaUnreachable,
+    LLMUnreachable,
 )
 from aegis_phase1.v2.graph import (  # noqa: E402,F401 — re-export new names
     Phase1GraphState,
@@ -222,7 +222,7 @@ def run_orchestrator_graph(
         The final :class:`OrchestratorRunState` produced by LangGraph.
 
     Raises:
-        OllamaUnreachable: When the LLM is unreachable during MAP.
+        LLMUnreachable: When the LLM is unreachable during MAP.
         MapPartialFailure: When ≥1 domain ends with status FAILED after
             retries (same semantics as :meth:`Phase1Orchestrator.run_all`).
     """

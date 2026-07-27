@@ -14,7 +14,7 @@ Public API:
     MockInvoker           Scriptable mock for tests / MOCK_LLM mode.
     build_llm_invoker     Factory selecting MockInvoker vs UnifiedInvoker
                           vs TransformersInvoker (CORR-056).
-    OllamaUnreachableError  Raised when Ollama is unreachable.
+    LLMUnreachableError  Raised when Ollama is unreachable.
 
 Provider selection (CORR-056):
     - ``MOCK_LLM=true`` → MockInvoker (overrides everything)
@@ -54,7 +54,7 @@ _DEFAULT_OK_RESPONSE = (
 )
 
 
-class OllamaUnreachableError(Exception):
+class LLMUnreachableError(Exception):
     """Raised when Ollama is unreachable at startup health-check."""
 
 
@@ -134,7 +134,7 @@ def build_llm_invoker(
         :class:`MockInvoker` / :class:`UnifiedInvoker` / :class:`TransformersInvoker`.
 
     Raises:
-        OllamaUnreachableError: When provider resolves to ollama and Ollama
+        LLMUnreachableError: When provider resolves to ollama and Ollama
         cannot be reached. NOT raised for transformers or minimax providers.
     """
     if os.environ.get("MOCK_LLM", "").strip().lower() in _MOCK_TRUTHS:
@@ -166,7 +166,10 @@ def build_llm_invoker(
         invoker = UnifiedInvoker(
             model=bare_model,
             langfuse_handler=langfuse_handler,
-            provider="minimax",
+            provider="minimax",  # CORR-062 S2: critical — without this the
+                                 # UnifiedInvoker falls back to ChatOllama at
+                                 # localhost:11434, sending M3 model names to
+                                 # the local Ollama → 404.
         )
         return invoker
 
@@ -186,7 +189,7 @@ def _health_check(invoker: UnifiedInvoker) -> None:
     heavy LLM call so a missing Ollama fails immediately.
 
     Raises:
-        OllamaUnreachableError: When the probe fails.
+        LLMUnreachableError: When the probe fails.
     """
     import urllib.request
     from urllib.error import URLError
@@ -199,13 +202,13 @@ def _health_check(invoker: UnifiedInvoker) -> None:
         )
         with urllib.request.urlopen(req, timeout=3) as resp:
             if resp.status != 200:
-                raise OllamaUnreachableError(
+                raise LLMUnreachableError(
                     f"Ollama returned HTTP {resp.status} at {invoker.base_url}"
                 )
-    except OllamaUnreachableError:
+    except LLMUnreachableError:
         raise
     except (URLError, TimeoutError, ConnectionError, OSError) as exc:
-        raise OllamaUnreachableError(
+        raise LLMUnreachableError(
             f"Cannot reach Ollama at {invoker.base_url}: {exc}. "
             f"Set MOCK_LLM=true to use mock mode, or run "
             f"`ollama serve` + `ollama pull gemma4:e4b`."
@@ -214,7 +217,7 @@ def _health_check(invoker: UnifiedInvoker) -> None:
 
 __all__ = [
     "MockInvoker",
-    "OllamaUnreachableError",
+    "LLMUnreachableError",
     "UnifiedInvoker",
     "TransformersInvoker",
     "build_llm_invoker",

@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 _PROBE_TTL_SECONDS = 30.0
 
 
-class OllamaUnreachableError(RuntimeError):
+class LLMUnreachableError(RuntimeError):
     """Raised when Ollama is not reachable at the configured base_url.
 
     Distinct from connection-during-invocation: this is detected BEFORE any
@@ -313,7 +313,7 @@ class UnifiedInvoker:
 
         Probes Ollama before invocation (cached for
         ``_PROBE_TTL_SECONDS``) and raises
-        :class:`OllamaUnreachableError` immediately when down — no retry,
+        :class:`LLMUnreachableError` immediately when down — no retry,
         no log spam (CORR-015).
         """
         self._ensure_ollama("invoke_raw")
@@ -387,7 +387,7 @@ class UnifiedInvoker:
                 disable capture (test paths).
 
         Probes Ollama before delegating (cached for
-        ``_PROBE_TTL_SECONDS``); raises :class:`OllamaUnreachableError`
+        ``_PROBE_TTL_SECONDS``); raises :class:`LLMUnreachableError`
         when down — no retry, no log spam (CORR-015). The heavy child also
         re-probes as defense-in-depth.
         """
@@ -470,7 +470,7 @@ class UnifiedInvoker:
         return self._heavy
 
     def _ensure_ollama(self, source: str) -> None:
-        """Probe the chat backend; raise ``OllamaUnreachableError`` if down.
+        """Probe the chat backend; raise ``LLMUnreachableError`` if down.
 
         Caches the probe result for ``_PROBE_TTL_SECONDS`` to avoid probing
         on every invocation when many calls happen in sequence.
@@ -494,18 +494,18 @@ class UnifiedInvoker:
             and (now - self._ollama_probe_ts) < _PROBE_TTL_SECONDS
         ):
             if not self._ollama_reachable:
-                raise OllamaUnreachableError(self.base_url, source)
+                raise LLMUnreachableError(self.base_url, source)
             return
         reachable = probe_ollama(self.base_url)
         self._ollama_reachable = reachable
         self._ollama_probe_ts = now
         if not reachable:
-            raise OllamaUnreachableError(self.base_url, source)
+            raise LLMUnreachableError(self.base_url, source)
 
 
 __all__ = [
     "UnifiedInvoker",
-    "OllamaUnreachableError",
+    "LLMUnreachableError",
     "probe_ollama",
     "_extract_usage",
     "_merge_handler_into_config",

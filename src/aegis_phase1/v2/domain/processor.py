@@ -7,13 +7,13 @@ appended to the next prompt. The invoker's contract is::
     invoker.invoke(prompt: str, feedback: str = "") -> dict
         # returns {"raw": str, "status": "OK" | "FAILED_AFTER_RETRIES"}
 
-Network or Ollama failures propagate as :class:`OllamaUnreachable`
+Network or Ollama failures propagate as :class:`LLMUnreachable`
 so the orchestrator can abort the whole MAP stage — there is no
 silent fallback.
 
 Public API:
     DomainProcessor.process(domain_id, state) -> DomainResult
-    OllamaUnreachable    fatal LLM failure
+    LLMUnreachable    fatal LLM failure
     MapPartialFailure    raised by the orchestrator when ≥1 domain fails
     DOMAIN_NAMES         D-XX → human-readable name
 """
@@ -53,7 +53,7 @@ DOMAIN_NAMES: dict[str, str] = {
 # ─── Exceptions ────────────────────────────────────────────────────────
 
 
-class OllamaUnreachable(Exception):
+class LLMUnreachable(Exception):
     """Fatal: the LLM is unreachable. Propagates to abort MAP."""
 
 
@@ -119,7 +119,7 @@ class DomainProcessor:
             success or ``"FAILED"`` when all retries are exhausted.
 
         Raises:
-            OllamaUnreachable: When the invoker raises (network/Ollama
+            LLMUnreachable: When the invoker raises (network/Ollama
                 down). The orchestrator catches this to abort MAP.
         """
         domain_id = domain_id.upper()
@@ -142,7 +142,7 @@ class DomainProcessor:
                 )
             except Exception as exc:
                 logger.error("LLM invoke raised for %s: %s", domain_id, exc)
-                raise OllamaUnreachable(str(exc)) from exc
+                raise LLMUnreachable(str(exc)) from exc
 
             last_raw = response.get("raw") or ""
             status = response.get("status", "FAILED")
@@ -378,5 +378,5 @@ __all__ = [
     "DOMAIN_NAMES",
     "DomainProcessor",
     "MapPartialFailure",
-    "OllamaUnreachable",
+    "LLMUnreachable",
 ]

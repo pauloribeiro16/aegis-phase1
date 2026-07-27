@@ -41,7 +41,7 @@ from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 from aegis_phase1.prompts_v2.robust_parser import RobustParser
 from aegis_phase1.prompts_v2.validator import Phase1Validator
 from aegis_phase1.validator import ContentValidator
-from aegis_phase1.llm.unified import OllamaUnreachableError, probe_ollama
+from aegis_phase1.llm.unified import LLMUnreachableError, probe_ollama
 
 # CORR-048: module-level logger. Required for the prompt truncation
 # warning (line ~250) and any other logger calls in this file.
@@ -256,7 +256,7 @@ class Phase1LLMInvoker:
             config = {**config, "callbacks": _existing}
 
         if not probe_ollama(base_url=self.base_url):
-            raise OllamaUnreachableError(self.base_url, "Phase1LLMInvoker.invoke")
+            raise LLMUnreachableError(self.base_url, "Phase1LLMInvoker.invoke")
 
         all_attempts: list[dict[str, Any]] = []
         total_start = time.time()

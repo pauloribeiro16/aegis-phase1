@@ -5,7 +5,7 @@ Each stage updates V2State and persists to work/state.json.
 
 MAP stage (Sprint MAP-3):
     - Sequential processing (per-domain, one at a time).
-    - Ollama network failures propagate as ``OllamaUnreachable``.
+    - Ollama network failures propagate as ``LLMUnreachable``.
     - Per-domain parse failures accumulate; ``MapPartialFailure`` is
       raised at the end if any domain is still ``FAILED``.
     - ``retry_failed()`` re-processes a chosen subset of failed domains.
@@ -507,7 +507,7 @@ class Phase1Orchestrator:
         DomainActivationContext) don't change.
 
         Raises:
-            OllamaUnreachable: Propagated from ``map_single_domain`` when
+            LLMUnreachable: Propagated from ``map_single_domain`` when
                 the LLM is unreachable. The whole MAP stage aborts.
             MapPartialFailure: When ≥1 domain ends with status FAILED
                 (after retries). The state is persisted before raising.
@@ -518,7 +518,7 @@ class Phase1Orchestrator:
         from aegis_phase1.v2.domain.processor import (
             DomainProcessor,
             MapPartialFailure,
-            OllamaUnreachable,
+            LLMUnreachable,
         )
 
         # CORR-040-T2: try the canonical P1C-LLM-01 path first
@@ -572,7 +572,7 @@ class Phase1Orchestrator:
         for did in domain_ids:
             try:
                 result = self.map_single_domain(did, processor=processor)
-            except OllamaUnreachable as exc:
+            except LLMUnreachable as exc:
                 logger.error("MAP aborted — Ollama unreachable on %s: %s", did, exc)
                 self.state["domain_results"] = results
                 self.state["current_stage"] = "MAP_FAILED"
@@ -708,7 +708,7 @@ class Phase1Orchestrator:
         Invokes ``processor.process(domain_id, state)`` and returns the
         ``DomainResult``-shaped dict. Does NOT catch exceptions; the
         caller (legacy ``map_domains`` or a LangGraph node in S2) owns
-        the try/except policy and ``OllamaUnreachable`` propagation.
+        the try/except policy and ``LLMUnreachable`` propagation.
 
         Args:
             domain_id: Domain identifier (e.g. ``"D-04"``).

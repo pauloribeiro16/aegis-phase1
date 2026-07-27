@@ -14,7 +14,7 @@ Behaviour contract:
   5. Callbacks passed via ``config={"callbacks": [...]}`` are
      forwarded to the compiled graph's ``.invoke``.
   6. ``tags`` argument is converted to ``metadata.langfuse_tags``.
-  7. ``OllamaUnreachable`` raised inside an orchestrator method
+  7. ``LLMUnreachable`` raised inside an orchestrator method
      propagates out of ``graph.invoke``.
   8. With ``LANGFUSE_ENABLED=false``, ``get_langfuse_callback()``
      returns ``(None, None)`` and the run completes without invoking
@@ -191,20 +191,20 @@ def test_tags_propagated_to_metadata_langfuse_tags():
     assert cfg["metadata"]["langfuse_tags"] == ["phase:test", "case:x"]
 
 
-# ─── 7. OllamaUnreachable propagates through the graph ───────────────
+# ─── 7. LLMUnreachable propagates through the graph ───────────────
 
 
 def test_orchestrator_unreachable_propagates_after_load():
-    """An OllamaUnreachable raised by a stage method propagates to the caller."""
-    from aegis_phase1.v2.domain.processor import OllamaUnreachable
+    """An LLMUnreachable raised by a stage method propagates to the caller."""
+    from aegis_phase1.v2.domain.processor import LLMUnreachable
     from aegis_phase1.v2.trace_graph import compile_orchestrator_graph
 
     orch = MagicMock(name="orchestrator")
     orch.state = {"current_stage": "INIT"}
-    orch.map_domains.side_effect = OllamaUnreachable("test: down")
+    orch.map_domains.side_effect = LLMUnreachable("test: down")
 
     graph = compile_orchestrator_graph()
-    with pytest.raises(OllamaUnreachable, match="down"):
+    with pytest.raises(LLMUnreachable, match="down"):
         graph.invoke(
             {"case_path": "/x", "regulatory_baseline_path": "/b", "v2_state": {}},
             config={"configurable": {"orchestrator": orch}},

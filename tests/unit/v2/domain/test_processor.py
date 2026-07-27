@@ -7,7 +7,7 @@ Coverage:
     - test_ok_first_try                 first attempt succeeds
     - test_parse_fail_retry_with_feedback  parse fails twice then succeeds
     - test_retries_exhausted_returns_failed  all retries fail
-    - test_ollama_exception_raises_OllamaUnreachable
+    - test_ollama_exception_raises_LLMUnreachable
     - test_input_assembly_failure_returns_failed
     - test_subdomain_summary_includes_subdomains
     - test_coverage_substantive_when_two_regs
@@ -26,7 +26,7 @@ from aegis_phase1.v2.domain.processor import (
     DOMAIN_NAMES,
     DomainProcessor,
     MapPartialFailure,
-    OllamaUnreachable,
+    LLMUnreachable,
 )
 from aegis_phase1.v2.llm import MockInvoker
 
@@ -78,7 +78,7 @@ INVALID_OUTPUT_NO_HEADINGS = (
 
 
 class _ExplodingInvoker:
-    """Invoker that always raises — used to test OllamaUnreachable."""
+    """Invoker that always raises — used to test LLMUnreachable."""
 
     def __init__(self, exc: Exception | None = None) -> None:
         self.exc = exc or ConnectionError("Ollama not reachable")
@@ -232,12 +232,12 @@ def test_all_retries_returning_failed_status_returns_failed(mock_state) -> None:
 # ─── Fatal LLM error ───────────────────────────────────────────────────
 
 
-def test_ollama_exception_raises_OllamaUnreachable(mock_state) -> None:
-    """A raising invoker → OllamaUnreachable propagates (no fallback)."""
+def test_ollama_exception_raises_LLMUnreachable(mock_state) -> None:
+    """A raising invoker → LLMUnreachable propagates (no fallback)."""
     invoker = _ExplodingInvoker(ConnectionError("localhost:11434 refused"))
     proc = DomainProcessor(llm_invoker=invoker, log_dir=None, max_retries=3)
 
-    with pytest.raises(OllamaUnreachable) as exc_info:
+    with pytest.raises(LLMUnreachable) as exc_info:
         proc.process("D-04", mock_state)
 
     assert "localhost:11434" in str(exc_info.value)
