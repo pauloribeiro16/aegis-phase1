@@ -78,10 +78,15 @@ def test_unified_invoker_init_defaults():
     assert invoker.base_url == "http://localhost:11434"
     assert invoker.timeout == 120
     assert invoker._heavy is None
+    # CORR-069 S3: UnifiedInvoker now also passes num_ctx=32768 and
+    # num_gpu=99 to ChatOllama (CORR-056 defaults to force all model
+    # layers onto GPU). Update the assertion to expect these kwargs.
     MockChatOllama.assert_called_once_with(
         model="gemma4:e4b",
         base_url="http://localhost:11434",
         timeout=120,
+        num_ctx=32768,
+        num_gpu=99,
     )
 
 

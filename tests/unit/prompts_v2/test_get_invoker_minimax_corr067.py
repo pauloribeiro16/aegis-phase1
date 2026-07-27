@@ -12,20 +12,13 @@ None so UnifiedInvoker.__init__ resolves to the M3 gateway URL
 (https://api.minimax.io/anthropic).
 """
 import logging
-import os
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
-
-# Ensure provider=minimax path is tested
-os.environ.setdefault("LANGFUSE_ENABLED", "false")
-os.environ.setdefault("MOCK_LLM", "true")
-# Force OLLAMA_BASE_URL to a value that should be IGNORED when
-# provider=minimax, to make sure the fix actually works.
-os.environ["OLLAMA_BASE_URL"] = "http://should-be-ignored:9999"
-os.environ["OLLAMA_MODEL"] = "should-be-ignored-model"
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +27,25 @@ logging.basicConfig(level=logging.INFO)
 # ────────────────────────────────────────────────────────────────────
 # S3: get_invoker() with provider=minimax
 # ────────────────────────────────────────────────────────────────────
+
+# CORR-069 S3: use an autouse fixture with monkeypatch instead of
+# module-level setenv. Previously the module-level `os.environ["..."] = ...`
+# (lines 25-28) polluted the process env and leaked into other tests
+# in the same xdist worker, breaking test_load_case_config_typed (which
+# asserts OLLAMA_MODEL == "gemma4:e4b" from .env).
+@pytest.fixture(autouse=True)
+def _isolate_ollama_env(monkeypatch):
+    """Force OLLAMA_BASE_URL and OLLAMA_MODEL to a value that should
+    be IGNORED when provider=minimax, to make sure the fix works.
+    monkeypatch automatically restores the original values after
+    each test, preventing global env pollution across tests.
+    """
+    monkeypatch.setenv("LANGFUSE_ENABLED", "false")
+    monkeypatch.setenv("MOCK_LLM", "true")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://should-be-ignored:9999")
+    monkeypatch.setenv("OLLAMA_MODEL", "should-be-ignored-model")
+    yield
+
 
 def test_get_invoker_minimax_uses_m3_gateway_not_ollama():
     """When provider=minimax, get_invoker() must NOT use OLLAMA_BASE_URL.
@@ -73,20 +85,23 @@ def test_get_invoker_minimax_explicit_base_url_honoured():
     )
 
 
-def test_get_invoker_ollama_uses_ollama_base_url():
-    """provider=ollama (default) still uses OLLAMA_BASE_URL — no regression."""
+def test_get_invoker_ollama_uses_ollama_base_url(monkeypatch):
+    """provider=ollama (default) still uses OLLAMA_BASE_URL — no regression.
+
+    CORR-069 S3: use monkeypatch to set OLLAMA_BASE_URL for the duration
+    of this test. Previously the test used os.environ directly with a
+    try/finally, which polluted global state and was the root cause of
+    the test_load_case_config_typed flakiness.
+    """
     from aegis_phase1.prompts_v2.factory import get_invoker
 
-    # Set the env var AFTER import so it's used by get_invoker()
-    os.environ["OLLAMA_BASE_URL"] = "http://test-ollama:12345"
-    try:
-        invoker = get_invoker(provider="ollama")
-        assert invoker.provider == "ollama"
-        assert "test-ollama:12345" in invoker.base_url, (
-            f"ollama path didn't pick up OLLAMA_BASE_URL: {invoker.base_url!r}"
-        )
-    finally:
-        os.environ["OLLAMA_BASE_URL"] = "http://should-be-ignored:9999"
+    # Override the autouse fixture's OLLAMA_BASE_URL for this test only.
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://test-ollama:12345")
+    invoker = get_invoker(provider="ollama")
+    assert invoker.provider == "ollama"
+    assert "test-ollama:12345" in invoker.base_url, (
+        f"ollama path didn't pick up OLLAMA_BASE_URL: {invoker.base_url!r}"
+    )
 
 
 def test_get_invoker_minimax_ignores_ollama_model_env():
