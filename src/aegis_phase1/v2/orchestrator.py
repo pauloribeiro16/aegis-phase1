@@ -59,6 +59,7 @@ class Phase1Orchestrator:
         preproc_catalog: "PreprocCatalogLoader | None" = None,
         case_profile_loader: "CaseProfileLoader | None" = None,
         catalog_loader: "CatalogLoader | None" = None,
+        run_id: str | None = None,
     ):
         """Initialize the orchestrator.
 
@@ -108,9 +109,18 @@ class Phase1Orchestrator:
         try:
             from aegis_phase1.llm.tracing import get_langfuse_callback
 
-            _, self._langfuse_handler = get_langfuse_callback()
+            # CORR-063 S4: pass run_id to Langfuse so the 18 traces
+            # of this run share session_id and are groupable in the
+            # UI. If not provided, tracing.py generates a UUID.
+            _, self._langfuse_handler = get_langfuse_callback(run_id=run_id)
+            self.run_id = run_id or (
+                self._langfuse_handler.trace_context.get("session_id")
+                if self._langfuse_handler and hasattr(self._langfuse_handler, "trace_context")
+                else None
+            )
         except Exception:  # noqa: BLE001 — tracing is optional
             self._langfuse_handler = None
+            self.run_id = run_id
 
         if (
             self._langfuse_handler is not None

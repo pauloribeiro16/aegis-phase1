@@ -330,12 +330,20 @@ def main() -> None:
     preproc_catalog = PreprocCatalogLoader(preproc_root="preproc_out")
     case_profile_loader = CaseProfileLoader(Path(args.case))
     catalog_loader = CatalogLoader(root=get_prompts_root() / "catalogs")
+    # CORR-063 S4: a single run_id is shared between the orchestrator's
+    # Langfuse session_id (set in Phase1Orchestrator.__init__) and
+    # the run_phase1_graph metadata. Generating it here keeps both
+    # usages pointing at the same UUID.
+    import uuid as _uuid_top
+    _run_id = str(_uuid_top.uuid4())
     orch = Phase1Orchestrator(
         llm_invoker=llm_invoker,
         preproc_catalog=preproc_catalog,
         case_profile_loader=case_profile_loader,
         catalog_loader=catalog_loader,
+        run_id=_run_id,
     )
+    logger.info("Run ID: %s (used as Langfuse session_id)", _run_id)
     if args.skip_reduce_llms:
         orch.set_skip_reduce_llms(True)
     if getattr(args, "skip_phase_1b", False):

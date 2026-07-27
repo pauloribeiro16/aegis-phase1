@@ -54,15 +54,24 @@ def test_handler_carry_trace_context(monkeypatch):
     fake_client.create_trace_id.assert_called_once_with()
 
     # ★ THE KEY ASSERTION: CallbackHandler was constructed with trace_context
+    # containing trace_id. CORR-063 S4 also adds session_id and user_id
+    # so the 18 traces of a single S1 run are groupable in the UI.
     args, kwargs = FakeHandler.call_args
     assert "trace_context" in kwargs, "CallbackHandler must receive trace_context"
-    assert kwargs["trace_context"] == {"trace_id": "test-trace-abc123"}
+    tc = kwargs["trace_context"]
+    assert tc["trace_id"] == "test-trace-abc123"
+    assert "session_id" in tc, "trace_context must include session_id (CORR-063 S4)"
+    assert tc["user_id"] == "case01", "trace_context user_id = case_name"
     assert client is fake_client
     assert handler is fake_handler
 
 
 def test_handler_tags_attached_case_and_phase():
-    """Tags ['phase:phase1', 'case:case01'] set on the handler instance."""
+    """Tags ['phase:phase1', 'case:case01', 'run:xxxxxxxx'] set on the handler.
+
+    CORR-063 S4: added the ``run:`` tag (8-char prefix of the per-run
+    UUID) so the 18 traces of one run are also filterable by tag.
+    """
     fake_client = MagicMock()
     fake_client.create_trace_id.return_value = "trace-1"
     fake_handler = MagicMock()
@@ -72,11 +81,15 @@ def test_handler_tags_attached_case_and_phase():
          patch("langfuse.langchain.CallbackHandler", return_value=fake_handler):
         _, handler = get_langfuse_callback(case_name="case01", phase="phase1")
 
-    assert sorted(handler.tags) == ["case:case01", "phase:phase1"]
+    # The run: tag is dynamic (UUID), so we just check it has the right prefix.
+    assert len(handler.tags) == 3
+    assert "case:case01" in handler.tags
+    assert "phase:phase1" in handler.tags
+    assert any(t.startswith("run:") for t in handler.tags)
 
 
 def test_handler_tags_omit_missing_case():
-    """When case_name is empty, the case: tag is NOT added; phase: tag still is."""
+    """When case_name is empty, the case: tag is NOT added; phase: and run: are."""
     fake_client = MagicMock()
     fake_client.create_trace_id.return_value = "trace-1"
     fake_handler = MagicMock()
@@ -86,7 +99,9 @@ def test_handler_tags_omit_missing_case():
          patch("langfuse.langchain.CallbackHandler", return_value=fake_handler):
         _, handler = get_langfuse_callback(case_name="", phase="phase1")
 
-    assert handler.tags == ["phase:phase1"]
+    assert "phase:phase1" in handler.tags
+    assert not any(t.startswith("case:") for t in handler.tags)
+    assert any(t.startswith("run:") for t in handler.tags)
 
 
 def test_master_switch_off_returns_none(monkeypatch):
