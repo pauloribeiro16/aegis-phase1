@@ -133,19 +133,63 @@ class DomainProcessor:
         feedback = ""
         last_raw: str | None = None
 
+        # CORR-064 S6: wrap each LLM call in a Langfuse CHAIN context
+        # so the GENERATION (created by the langchain callback) becomes
+        # a CHILD of this CHAIN rather than a sibling. Without this
+        # wrapper, the CHAIN and GENERATION appeared at the same
+        # level in the Langfuse UI (both children of the langgraph
+        # node span), making the structure hard to navigate.
+        from aegis_phase1.llm.tracing import _lf_get_client
+        _lf_client = _lf_get_client() if _lf_get_client is not None else None
+
         for attempt in range(self.max_retries):
             prompt = render_prompt(inputs, feedback=feedback)
 
-            try:
-                response = self.llm_invoker.invoke(
-                    prompt, feedback=feedback, config=self.config
+            # Open a CHAIN context so the LLM call's GENERATION nests
+            # underneath. Falls back to a no-op context manager if
+            # Langfuse is disabled or not installed.
+            from contextlib import nullcontext
+            if _lf_client is not None:
+                _ctx = _lf_client.start_as_current_observation(
+                    as_type="chain",
+                    name=f"MAP {domain_id}",
+                    input={"domain_id": domain_id, "attempt": attempt + 1, "feedback": bool(feedback)},
                 )
-            except Exception as exc:
-                logger.error("LLM invoke raised for %s: %s", domain_id, exc)
-                raise LLMUnreachable(str(exc)) from exc
+            else:
+                _ctx = nullcontext()
 
-            last_raw = response.get("raw") or ""
-            status = response.get("status", "FAILED")
+            try:
+                with _ctx as chain_span:
+                    try:
+                        response = self.llm_invoker.invoke(
+                            prompt, feedback=feedback, config=self.config
+                        )
+                    except Exception as exc:
+                        logger.error("LLM invoke raised for %s: %s", domain_id, exc)
+                        raise LLMUnreachable(str(exc)) from exc
+
+                    last_raw = response.get("raw") or ""
+                    status = response.get("status", "FAILED")
+                    # Annotate the chain with the result so the
+                    # Langfuse UI shows the outcome (status, raw_len)
+                    # even on failure paths.
+                    if chain_span is not None and hasattr(chain_span, "update"):
+                        try:
+                            chain_span.update(
+                                output={
+                                    "status": status,
+                                    "raw_len": len(last_raw),
+                                    "attempt": attempt + 1,
+                                }
+                            )
+                        except Exception:
+                            pass  # never let annotation break the run
+            except LLMUnreachable:
+                # Re-raise without closing the chain context (it's
+                # already closed by the `with` block — but the inner
+                # raise happens inside the `with`, so the context
+                # manager has cleaned up).
+                raise
 
             if status != "OK":
                 feedback = f"LLM returned status={status}. Try again."

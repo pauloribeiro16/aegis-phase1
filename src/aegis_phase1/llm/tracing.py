@@ -39,6 +39,23 @@ def _invalidate_langfuse_cache() -> None:
     _langfuse_cache_key = None
 
 
+def _lf_get_client() -> Any:
+    """Return the cached Langfuse client, or None if not initialized.
+
+    Useful for callers that want to start their own observations
+    (e.g. wrapping an LLM call in a CHAIN context, CORR-064 S6) and
+    need access to the same client that the rest of the tracing
+    layer is using.
+
+    Returns None when Langfuse is disabled, credentials are missing,
+    or get_langfuse_callback() has not been called yet in this process.
+    """
+    if _langfuse_cache is None:
+        return None
+    client, _handler = _langfuse_cache
+    return client
+
+
 def get_langfuse_callback(
     case_name: str = "default",
     phase: str = "phase1",

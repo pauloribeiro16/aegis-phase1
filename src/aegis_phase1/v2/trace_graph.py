@@ -39,7 +39,11 @@ defeat that introspection and silently drop ``config`` to its default
 ``None`` inside every node, breaking the orchestrator handoff.
 """
 
+import logging
+
 import warnings
+
+logger = logging.getLogger(__name__)
 
 warnings.warn(
     "aegis_phase1.v2.trace_graph is deprecated; use aegis_phase1.v2.graph "
