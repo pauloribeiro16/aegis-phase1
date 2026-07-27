@@ -206,19 +206,74 @@ class ChatMinimax(BaseChatModel):
             len(system_prompt) if system_prompt else 0,
         )
 
+        # CORR-064 S5.1: retry on transient errors (5xx, 408, 429,
+        # connection error, timeout). Exponential backoff 1s/2s/4s.
+        # Do NOT retry on 4xx (auth, bad request, forbidden) — those
+        # are operator errors that won't fix themselves. Max 3 attempts
+        # (1 initial + 2 retries) before giving up. Set
+        # ``CHAT_MINIMAX_MAX_RETRIES=0`` to disable (for tests).
         import time as _time
+        import os as _os
+        max_retries = int(_os.environ.get("CHAT_MINIMAX_MAX_RETRIES", "2"))
+        _TRANSIENT_STATUS = {408, 429, 500, 502, 503, 504, 529}
+        _TRANSIENT_EXC = (
+            httpx.ConnectError,
+            httpx.ConnectTimeout,
+            httpx.ReadError,
+            httpx.ReadTimeout,
+            httpx.PoolTimeout,
+        )
+
         _t0 = _time.monotonic()
-        try:
-            with httpx.Client(timeout=self.timeout) as client:
-                resp = client.post(url, json=body, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-        except Exception as exc:
-            logger.debug(
-                "ChatMinimax HTTP error after %.2fs: %s: %s",
-                _time.monotonic() - _t0, type(exc).__name__, str(exc)[:200],
-            )
-            raise
+        resp = None
+        data = None
+        for attempt in range(1 + max_retries):
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    resp = client.post(url, json=body, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                break  # success
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                is_transient = status in _TRANSIENT_STATUS
+                if not is_transient or attempt == max_retries:
+                    logger.debug(
+                        "ChatMinimax HTTP error after %.2fs: status=%d (attempt %d/%d, transient=%s)",
+                        _time.monotonic() - _t0, status, attempt + 1,
+                        max_retries + 1, is_transient,
+                    )
+                    raise
+                wait = 2 ** attempt
+                logger.warning(
+                    "ChatMinimax transient error: status=%d (attempt %d/%d); retrying in %ds",
+                    status, attempt + 1, max_retries + 1, wait,
+                )
+                _time.sleep(wait)
+            except _TRANSIENT_EXC as exc:
+                if attempt == max_retries:
+                    logger.debug(
+                        "ChatMinimax connection error after %.2fs: %s (attempt %d/%d)",
+                        _time.monotonic() - _t0, type(exc).__name__,
+                        attempt + 1, max_retries + 1,
+                    )
+                    raise
+                wait = 2 ** attempt
+                logger.warning(
+                    "ChatMinimax connection error: %s (attempt %d/%d); retrying in %ds",
+                    type(exc).__name__, attempt + 1, max_retries + 1, wait,
+                )
+                _time.sleep(wait)
+            except Exception as exc:
+                # Non-transient (parse error, programming bug). No retry.
+                logger.debug(
+                    "ChatMinimax non-transient error after %.2fs: %s: %s",
+                    _time.monotonic() - _t0, type(exc).__name__, str(exc)[:200],
+                )
+                raise
+        if resp is None or data is None:
+            # Defensive: should never reach here, but satisfy the type-checker.
+            raise RuntimeError("ChatMinimax._generate: no response after retries")
         elapsed = _time.monotonic() - _t0
         usage = data.get("usage", {}) or {}
         logger.debug(
