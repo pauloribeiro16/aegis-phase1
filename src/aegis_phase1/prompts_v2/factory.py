@@ -176,17 +176,20 @@ def get_invoker(
     baseline = regulatory_baseline_root or get_regulatory_baseline_root()
     logs = get_logs_dir()
 
-    model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
-    # CORR-067 S3 (follow-up): when provider=minimax, don't pass an
-    # Ollama-derived base_url — UnifiedInvoker.__init__ already
-    # resolves to the M3 gateway URL when base_url is None and
-    # provider=minimax (see unified.py:243-247). Passing the Ollama
-    # default would override the gateway and cause Phase1Executor
-    # calls (P1B-01/02, P1C-01/02/03) to fail with a
-    # connection-refused (no Ollama running on localhost:11434).
+    # CORR-067 S3 (follow-up): when provider=minimax, don't pull
+    # Ollama-derived env vars (OLLAMA_MODEL, OLLAMA_BASE_URL) — those
+    # belong to the Ollama path. UnifiedInvoker.__init__ resolves to
+    # the M3 gateway URL and the M3 default model when no explicit
+    # values are given. Passing Ollama defaults would override the
+    # gateway (causing connection-refused on localhost:11434) or
+    # the model name (causing the gateway to reject the request).
     if provider == "minimax":
-        base_url = base_url  # honour explicit override only
+        from aegis_phase1.llm.chat_minimax import DEFAULT_MODEL as M3_DEFAULT_MODEL
+        # honour explicit overrides only
+        model = model or M3_DEFAULT_MODEL
+        base_url = base_url
     else:
+        model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
         base_url = base_url or os.getenv(
             "OLLAMA_BASE_URL", UnifiedInvoker.DEFAULT_BASE_URL
         )
