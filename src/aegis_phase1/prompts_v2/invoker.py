@@ -84,6 +84,7 @@ class Phase1LLMInvoker:
         base_url: str | None = None,
         timeout: int | None = None,
         langfuse_handler: Any | None = None,
+        provider: str = "ollama",  # CORR-062 S2: "ollama" | "minimax"
     ) -> None:
         self.prompts = prompt_loader
         self.catalogs = catalog_loader
@@ -96,7 +97,16 @@ class Phase1LLMInvoker:
         self.llm_logger = llm_logger
         self.format_logger = format_logger
         self.model = model or self.DEFAULT_MODEL
-        self.base_url = base_url or self.DEFAULT_BASE_URL
+        # CORR-062 S2: when provider=minimax, use the Mavis gateway
+        # base URL (M3 Token Plan endpoint), not Ollama's localhost.
+        if base_url:
+            self.base_url = base_url
+        elif provider == "minimax":
+            from aegis_phase1.llm.chat_minimax import DEFAULT_BASE_URL as _MINIMAX_URL
+            self.base_url = _MINIMAX_URL
+        else:
+            self.base_url = self.DEFAULT_BASE_URL
+        self.provider = provider
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self._langfuse_handler = langfuse_handler
 
@@ -367,7 +377,9 @@ class Phase1LLMInvoker:
                         pass
             schema = self.prompts.load(spec_id).get("schema") or {}
 
-            # 2. Build Ollama client with optional format constraint
+            # 2. Build the chat client. CORR-062 S2: provider-aware —
+            #    provider="minimax" → ChatMinimax (M3/M2.7 via Mavis
+            #    gateway); otherwise ChatOllama (legacy local path).
             from aegis_phase1.prompts_v2.markdown_parser import MARKDOWN_PARSERS
 
             llm_kwargs: dict[str, Any] = {
@@ -381,7 +393,18 @@ class Phase1LLMInvoker:
             # the instruction. Legacy specs (no parser) keep format=.
             if schema and spec_id not in MARKDOWN_PARSERS:
                 llm_kwargs["format"] = schema
-            llm = ChatOllama(**llm_kwargs)
+            if self.provider == "minimax":
+                # ChatMinimax has its own DEFAULT_BASE_URL; don't pass
+                # base_url= here (we already set self.base_url to the
+                # gateway URL in __init__, which ChatMinimax will pick
+                # up via the constructor below).
+                from aegis_phase1.llm.chat_minimax import ChatMinimax
+                llm = ChatMinimax(
+                    model=self.model,
+                    base_url=self.base_url,
+                )
+            else:
+                llm = ChatOllama(**llm_kwargs)
 
             # 3. Call LLM
             start = time.time()

@@ -439,6 +439,7 @@ class UnifiedInvoker:
             format_logger=self.format_logger,
             model=self.model,
             langfuse_handler=self._langfuse_handler,
+            provider=self.provider,  # CORR-062 S2: pass through to heavy
         )
         return self._heavy
 
