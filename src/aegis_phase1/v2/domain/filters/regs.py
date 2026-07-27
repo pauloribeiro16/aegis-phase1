@@ -155,12 +155,19 @@ def _domain_source_regs_from_state_subdomains(state: V2State, domain_id: str) ->
         if not isinstance(sid, str) or not sid.startswith(prefix):
             continue
         # Pydantic Subdomain object
-        if hasattr(sub, "source_regulations"):
+        if hasattr(sub, "participating_regulations"):
+            sr = sub.participating_regulations or []
+        elif hasattr(sub, "source_regulations"):
             sr = sub.source_regulations or []
         elif hasattr(sub, "applies_to"):
             sr = sub.applies_to or []
         elif isinstance(sub, dict):
-            sr = sub.get("source_regulations") or sub.get("applies_to") or []
+            sr = (
+                sub.get("participating_regulations")
+                or sub.get("source_regulations")
+                or sub.get("applies_to")
+                or []
+            )
         else:
             sr = []
         for r in sr:

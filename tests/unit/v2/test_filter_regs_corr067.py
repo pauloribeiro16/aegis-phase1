@@ -160,6 +160,7 @@ def _fake_subdomain(sid: str, domain_id: str, source_regs: list[str]):
     return SimpleNamespace(
         id=sid,
         domain_id=domain_id,
-        source_regulations=source_regs,
-        applies_to=source_regs,
+        participating_regulations=source_regs,  # canonical name (CORR-067 S4)
+        source_regulations=source_regs,         # alias for legacy
+        applies_to=source_regs,                 # alias for legacy
     )
