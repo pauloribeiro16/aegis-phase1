@@ -543,8 +543,12 @@ class Phase1Orchestrator:
                 self._seed_review_after_map(results)
                 failed = [d for d, r in results.items() if r.get("llm_status") == "FAILED"]
                 if failed:
+                    # CORR-067 S2: pass failed_domains to the exception
+                    # so the runner can decide between graceful partial
+                    # docs and hard abort based on a threshold.
                     raise MapPartialFailure(
-                        f"{len(failed)} domain(s) failed: {failed}"
+                        f"{len(failed)} domain(s) failed: {failed}",
+                        failed_domains=failed,
                     )
                 return self.state
             except MapPartialFailure:
@@ -612,7 +616,13 @@ class Phase1Orchestrator:
                 len(failed_domains),
                 failed_domains,
             )
-            raise MapPartialFailure(f"{len(failed_domains)} domain(s) failed: {failed_domains}")
+            # CORR-067 S2: pass failed_domains to the exception so the
+            # runner can decide between graceful partial docs and hard
+            # abort based on a threshold.
+            raise MapPartialFailure(
+                f"{len(failed_domains)} domain(s) failed: {failed_domains}",
+                failed_domains=failed_domains,
+            )
         return self.state
 
     def _map_domains_via_p1c_llm_01(

@@ -58,7 +58,18 @@ class LLMUnreachable(Exception):
 
 
 class MapPartialFailure(Exception):
-    """One or more domains failed. Blocks advance to REDUCE."""
+    """One or more domains failed. Blocks advance to REDUCE.
+
+    CORR-067 S2: now carries the list of failed domain IDs so the
+    runner can decide between graceful partial-doc generation
+    (1-2 failures out of 10) and hard abort (≥5 failures). The
+    ``failed_domains`` attribute is always a list (possibly empty for
+    backwards compat, but new code paths always populate it).
+    """
+
+    def __init__(self, message: str, failed_domains: list[str] | None = None) -> None:
+        super().__init__(message)
+        self.failed_domains: list[str] = list(failed_domains or [])
 
 
 # ─── Processor ─────────────────────────────────────────────────────────

@@ -35,6 +35,11 @@ import aegis_phase1.env  # noqa: F401 — load .env via env.py module-import sid
 
 logger = logging.getLogger(__name__)
 
+# CORR-067 S2: threshold (out of 10 domains) at which MAP partial
+# failure becomes a hard abort. Below this, the runner continues to
+# OUTPUT and renders docs with the successful domain results.
+MAP_ABORT_THRESHOLD = 5
+
 from aegis_phase1.llm.unified import LLMUnreachableError  # noqa: E402 — placed after logger
 
 _DEFAULT_PROJECTS = Path(__file__).resolve().parents[4]
@@ -354,8 +359,22 @@ def main() -> None:
         try:
             orch.run_all(case_path, prep_path, output_path)
         except MapPartialFailure as exc:
-            logger.error("Pipeline aborted — MAP partial failure: %s", exc)
-            sys.exit(2)
+            # CORR-067 S2: see threshold handling in run_all_traced
+            # branch above.
+            failed = list(exc.failed_domains or [])
+            n_failed = len(failed)
+            n_total = 10
+            if n_failed >= MAP_ABORT_THRESHOLD:
+                logger.error(
+                    "Pipeline aborted — MAP mostly failed (%d/%d domains): %s",
+                    n_failed, n_total, failed,
+                )
+                sys.exit(2)
+            if n_failed:
+                logger.warning(
+                    "MAP partial failure (%d/%d domains failed: %s) — continuing",
+                    n_failed, n_total, failed,
+                )
         if args.retry_failed:
             domains = [d.strip() for d in args.retry_failed.split(",") if d.strip()]
             if domains:
@@ -378,8 +397,32 @@ def main() -> None:
                 output_path=output_path,
             )
         except MapPartialFailure as exc:
-            logger.error("Pipeline aborted — MAP partial failure: %s", exc)
-            sys.exit(2)
+            # CORR-067 S2: threshold-based partial-failure handling.
+            # 1-2 domain failures (out of 10) are tolerable — the
+            # OUTPUT stage can still render useful docs with the 8-9
+            # successful domain results. ≥5 failures means MAP is
+            # essentially broken (LLM unreachable, schema drift, etc.)
+            # and we should hard-abort. The threshold is exported as
+            # a constant below for testability.
+            failed = list(exc.failed_domains or [])
+            n_failed = len(failed)
+            n_total = 10
+            if n_failed >= MAP_ABORT_THRESHOLD:
+                logger.error(
+                    "Pipeline aborted — MAP mostly failed (%d/%d domains): %s",
+                    n_failed, n_total, failed,
+                )
+                sys.exit(2)
+            if n_failed:
+                logger.warning(
+                    "MAP partial failure (%d/%d domains failed: %s) — "
+                    "continuing with %d results",
+                    n_failed, n_total, failed, n_total - n_failed,
+                )
+                # Force rc=0 so we don't sys.exit below; the OUTPUT
+                # stage already handles missing domain_results
+                # gracefully (it falls back to deterministic docs).
+                rc = 0
         if rc != 0:
             sys.exit(rc)
         if args.retry_failed:
@@ -398,8 +441,25 @@ def main() -> None:
         try:
             orch.map_domains()
         except MapPartialFailure as exc:
-            logger.error("MAP partial failure: %s", exc)
-            sys.exit(2)
+            # CORR-067 S2: same threshold handling. map_only always
+            # exits with the appropriate code based on failure count.
+            failed = list(exc.failed_domains or [])
+            n_failed = len(failed)
+            n_total = 10
+            if n_failed >= MAP_ABORT_THRESHOLD:
+                logger.error(
+                    "MAP mostly failed (%d/%d domains): %s",
+                    n_failed, n_total, failed,
+                )
+                sys.exit(2)
+            if n_failed:
+                logger.warning(
+                    "MAP partial failure (%d/%d domains failed: %s) — done",
+                    n_failed, n_total, failed,
+                )
+                # Partial failure is reported but not fatal in map_only
+                # mode — return 0 so callers can inspect the persisted
+                # state. They can grep for MAP_FAILED markers.
         if args.retry_failed:
             domains = [d.strip() for d in args.retry_failed.split(",") if d.strip()]
             if domains:
