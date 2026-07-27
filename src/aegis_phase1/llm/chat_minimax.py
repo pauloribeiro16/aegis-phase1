@@ -5,21 +5,26 @@ of the pipeline (parser, validator, executor) is **model-agnostic**:
 ``UnifiedInvoker.invoke`` and ``invoke_spec`` work unchanged regardless
 of whether the chat is Ollama or MiniMax.
 
-Speaks the Anthropic Messages protocol because ``config.yaml`` declares
-``npm: @ai-sdk/anthropic`` for the ``minimax`` provider
-(``~/.mavis/config.yaml``). Request shape::
+Speaks the Anthropic Messages protocol. Per the MiniMax Token Plan docs
+(``https://platform.minimax.io/docs/token-plan/quickstart`` and
+``/docs/api-reference/text-anthropic-api``), the M3 / M-series models
+are served at the Anthropic-compatible base URL::
 
-    POST {base_url}/messages
-    Headers:
-      x-api-key: <api_key>
-      anthropic-version: 2023-06-01
-    Body:
-      {
-        "model": "MiniMax-M3",
-        "max_tokens": 4096,
-        "messages": [{"role": "user", "content": "..."}],
-        "system": "..."   # optional
-      }
+    Base URL:    https://api.minimax.io/anthropic
+    Endpoint:    POST {base_url}/v1/messages
+    Models:      MiniMax-M3, MiniMax-M2.7, MiniMax-M2.7-highspeed
+    Auth:        Authorization: Bearer <sk-cp-... token plan key>
+    Required hdr: anthropic-version: 2023-06-01
+    Required hdr: content-type: application/json
+
+Request body (Anthropic Messages)::
+
+    {
+      "model": "MiniMax-M3",
+      "max_tokens": 4096,
+      "messages": [{"role": "user", "content": "..."}],
+      "system": "..."   # optional
+    }
 
 Response shape (Anthropic Messages)::
 
@@ -53,7 +58,13 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_BASE_URL = "https://agent.minimax.io/mavis/api/v1/llm/v1"
+# CORR-062 S2: corrected 2026-07-27 after MiniMax API docs review.
+# The previous URL (``https://agent.minimax.io/mavis/api/v1/llm/v1``)
+# was the Mavis agent gateway, which uses a different auth system
+# (MAVIS_ACCESS_TOKEN env, not the Token Plan). The Token Plan key
+# (sk-cp-...) targets the Anthropic-compatible endpoint documented at
+# https://platform.minimax.io/docs/api-reference/text-anthropic-api.
+DEFAULT_BASE_URL = "https://api.minimax.io/anthropic"
 DEFAULT_MODEL = "MiniMax-M3"
 DEFAULT_TIMEOUT = 120
 DEFAULT_MAX_TOKENS = 4096
@@ -114,9 +125,16 @@ class ChatMinimax(BaseChatModel):
         if stop:
             body["stop_sequences"] = stop
 
-        url = f"{self.base_url.rstrip('/')}/messages"
+        url = f"{self.base_url.rstrip('/')}/v1/messages"
+        # Defensive: send BOTH Anthropic-style (x-api-key) and OpenAI-style
+        # (Authorization: Bearer). The Mavis gateway is a proxy and some
+        # routes accept one or the other depending on the underlying
+        # upstream. Including both never hurts and avoids 401s from
+        # header-shape mismatches.
+        api_key = self._resolve_api_key()
         headers = {
-            "x-api-key": self._resolve_api_key(),
+            "x-api-key": api_key,
+            "Authorization": f"Bearer {api_key}",
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
         }
