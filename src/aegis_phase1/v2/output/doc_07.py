@@ -94,6 +94,46 @@ def render_doc_07(
     coverage_summary = ontology.get("coverage_summary", {}) if isinstance(ontology, Mapping) else {}
     overlaps = ontology.get("overlaps", []) if isinstance(ontology, Mapping) else []
     clauses = ontology.get("clause_mappings", []) if isinstance(ontology, Mapping) else []
+    # CORR-067 S5: when the ontology shim is empty (no 'subdomains.covered'
+    # list), fall back to state["subdomains"] (dict[id, Subdomain] from
+    # preproc_catalog). Normalize to the v1 SubDomainDef shape with
+    # 'covered' and 'not_covered' keys so _matrix_rows can iterate.
+    if isinstance(subdomains, Mapping) and not subdomains.get("covered") and not subdomains.get("not_covered"):
+        v2_subs = state.get("subdomains") or {}
+        if isinstance(v2_subs, dict) and v2_subs:
+            covered_list: list[dict] = []
+            for sid, sd in v2_subs.items():
+                if not isinstance(sid, str):
+                    continue
+                # Pydantic Subdomain object
+                pr = (
+                    getattr(sd, "participating_regulations", None)
+                    or getattr(sd, "source_regulations", None)
+                    or getattr(sd, "applies_to", None)
+                    or []
+                )
+                if isinstance(sd, dict):
+                    pr = (
+                        sd.get("participating_regulations")
+                        or sd.get("source_regulations")
+                        or sd.get("applies_to")
+                        or []
+                    )
+                name = (
+                    getattr(sd, "title", None)
+                    or getattr(sd, "name", None)
+                    or (sd.get("title") if isinstance(sd, dict) else None)
+                    or sid
+                )
+                covered_list.append(
+                    {
+                        "id": sid,
+                        "name": str(name),
+                        "participating_regulations": list(pr) if pr else [],
+                    }
+                )
+            if covered_list:
+                subdomains = {"covered": covered_list, "not_covered": []}
 
     use_llm = _should_use_llm(llm_invoker)
     invoker = llm_invoker if use_llm else None
