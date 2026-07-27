@@ -49,12 +49,15 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+import time
 from typing import Any, Optional, Sequence
 
 import httpx
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
+from pydantic import model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +71,33 @@ DEFAULT_BASE_URL = "https://api.minimax.io/anthropic"
 DEFAULT_MODEL = "MiniMax-M3"
 DEFAULT_TIMEOUT = 120
 DEFAULT_MAX_TOKENS = 4096
+
+# CORR-062 S2 (2026-07-27): the MiniMax Token Plan has a per-second
+# rate limit (no public doc on the exact number; user-flagged during
+# the S1 run that 18 calls in 91ms was a bad pattern). We enforce a
+# minimum interval between successive chat calls — default 1.0s, so
+# 1 call/sec. Override via the ``MINIMAX_MIN_INTERVAL`` env var (float,
+# seconds) — set to 0.0 to disable the throttle entirely.
+#
+# Module-level lock + last-call timestamp so the throttle is process-
+# wide (not per-instance) — multiple UnifiedInvoker objects in the
+# same Python process would otherwise bypass it.
+_throttle_lock = threading.Lock()
+_last_call_ts: list[float] = [0.0]
+
+
+def _throttle(min_interval: float) -> None:
+    """Sleep until at least ``min_interval`` seconds have passed since
+    the last ``_throttle`` call. No-op when ``min_interval <= 0``.
+    """
+    if min_interval <= 0:
+        return
+    with _throttle_lock:
+        now = time.monotonic()
+        wait = _last_call_ts[0] + min_interval - now
+        if wait > 0:
+            time.sleep(wait)
+        _last_call_ts[0] = time.monotonic()
 
 
 class ChatMinimax(BaseChatModel):
@@ -88,6 +118,28 @@ class ChatMinimax(BaseChatModel):
     timeout: float = DEFAULT_TIMEOUT
     max_tokens: int = DEFAULT_MAX_TOKENS
     temperature: float = 0.0
+    min_interval: float = 1.0  # CORR-062 S2: throttle between calls
+
+    @model_validator(mode="after")
+    def _resolve_min_interval(self) -> "ChatMinimax":
+        """Resolve the effective ``min_interval`` from env if not explicit.
+
+        ``MINIMAX_MIN_INTERVAL`` (float, seconds) overrides the default
+        without touching code. Set to ``0.0`` to disable the throttle.
+        Reads the env only when the caller passed the field-default value
+        (1.0) so explicit ``min_interval=...`` constructor args win.
+        """
+        if self.min_interval == 1.0:
+            env_val = os.environ.get("MINIMAX_MIN_INTERVAL")
+            if env_val is not None:
+                try:
+                    self.min_interval = float(env_val)
+                except ValueError:
+                    logger.warning(
+                        "ChatMinimax: invalid MINIMAX_MIN_INTERVAL=%r, keeping 1.0",
+                        env_val,
+                    )
+        return self
 
     # ─── BaseChatModel interface ─────────────────────────────────────
 
@@ -111,6 +163,12 @@ class ChatMinimax(BaseChatModel):
         run_manager: Any = None,
         **kwargs: Any,
     ) -> ChatResult:
+        # CORR-062 S2: throttle between calls so we don't trip the
+        # MiniMax Token Plan rate limit. Module-level lock makes the
+        # throttle process-wide (multiple UnifiedInvoker instances
+        # would otherwise bypass it). min_interval=0 disables.
+        _throttle(self.min_interval)
+
         system_prompt, converted = self._convert_messages(messages)
 
         body: dict[str, Any] = {

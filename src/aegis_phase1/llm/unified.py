@@ -443,11 +443,24 @@ class UnifiedInvoker:
         return self._heavy
 
     def _ensure_ollama(self, source: str) -> None:
-        """Probe Ollama; raise ``OllamaUnreachableError`` if down.
+        """Probe the chat backend; raise ``OllamaUnreachableError`` if down.
 
         Caches the probe result for ``_PROBE_TTL_SECONDS`` to avoid probing
         on every invocation when many calls happen in sequence.
+
+        CORR-062 S2: the probe is provider-aware. For the Ollama path we
+        GET ``/api/version``; for the MiniMax path we skip the probe
+        entirely (the Mavis gateway has no equivalent version endpoint,
+        and the LLM call itself will fail-fast with an HTTP error if
+        the API is down).
         """
+        # CORR-062 S2: MiniMax / Mavis gateway has no ``/api/version``
+        # equivalent — skip the probe. The first real call will surface
+        # any network / auth / model errors as HTTPStatusError, which
+        # invoke_raw / invoke_spec already handle.
+        if self.provider == "minimax":
+            return
+
         now = time.time()
         if (
             self._ollama_reachable is not None
