@@ -312,7 +312,9 @@ def test_invoke_dispatches_to_spec_when_inputs_is_dict():
 
     result = invoker.invoke("P1B-LLM-01", {"x": 1})
 
-    invoker.invoke_spec.assert_called_once_with("P1B-LLM-01", {"x": 1}, config=None)
+    invoker.invoke_spec.assert_called_once_with(
+        "P1B-LLM-01", {"x": 1}, config=None, state=None
+    )
     invoker.invoke_raw.assert_not_called()
     assert result == {"status": "OK"}
 
