@@ -329,7 +329,7 @@ def main() -> None:
     logger.info("Regulatory Baseline path: %s", prep_path)
     logger.info("Output path: %s", output_path)
 
-    llm_invoker = build_llm_invoker(model=args.model)
+    llm_invoker = build_llm_invoker(model=args.model, provider=args.provider)
     # CORR-039-T1: inject typed loaders so _load_v2_catalog actually
     # populates v2_subdomains / v2_srs / v2_sos / v2_pairs / v2_catalog_*.
     # Pre-CORR-039 the runner passed only llm_invoker — every v2_* key
