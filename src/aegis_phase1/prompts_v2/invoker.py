@@ -255,7 +255,10 @@ class Phase1LLMInvoker:
                 _existing.append(self._langfuse_handler)
             config = {**config, "callbacks": _existing}
 
-        if not probe_ollama(base_url=self.base_url):
+        # CORR-064 fix: Ollama probe only meaningful for the Ollama
+        # provider. Calling it on the MiniMax gateway URL would 404
+        # at /api/tags and raise a spurious LLMUnreachableError.
+        if self.provider == "ollama" and not probe_ollama(base_url=self.base_url):
             raise LLMUnreachableError(self.base_url, "Phase1LLMInvoker.invoke")
 
         all_attempts: list[dict[str, Any]] = []
