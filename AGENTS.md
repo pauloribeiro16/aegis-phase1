@@ -503,18 +503,30 @@ FAIL: structural assertions failed (<rc>)
    then regenerate. The PR description should justify the schema
    change.
 
-### 12.5 Known issues at v1.1.0
+### 12.5 Known issues at v1.2.0
 
 | Bug | Specs affected | Status |
 |---|---|---|
 | **BUG-A** (CORR-070): CORR-049 512KB cap truncates `layer0_catalog` + `# TASK` in P1B-LLM-01/02 | All 22 P1B calls (3 cases × ~3.7 regs × 2 specs) | **FIXED in CORR-071** — per-reg filter in `run_phase_1b` (`phase1_executor.py:204-218`) drops refs from 38 → 12-27 per lane. P1B payload 575K → 116-190K. The CORR-070 reorder workaround was removed as redundant. |
 | **BUG-B** (CORR-070): P1B-LLM-02 called without `p1b_llm_01_outputs` | All 11 P1B-02 calls | **FIXED in CORR-070** — `out_01.parsed_output` now wired in `run_phase_1b` (line 237). |
+| **CORR-072-1**: Stakeholder cross-case leakage in Doc 04 §3 (TinyTask org/email rendered for OmniBank rows by `_augment_influence` ID match) | Doc 04 §3.1, §3.2 in all 3 cases (most visible in case 3) | **FIXED in CORR-072** — `_augment_influence` (`doc_04.py`) only inherits `influence`/`interest` from TinyTask baseline. `organisation`, `contact`, `responsibilities` are case-specific and never inherit. |
+| **CORR-072-2**: Doc 04d §3 Regulation-Level Owner hardcoded NIS2/DORA/AI_Act as NO when `state["regulations"]` empty | Doc 04d §3 + frontmatter when state["regulations"] absent | **FIXED in CORR-072** — fallback reads `build_applicability_context(state)` (CORR-038 source-of-truth). |
+| **CORR-072-3**: Doc 04a §1 Technical Architecture header duplicated | All cases (rendering bug) | **FIXED in CORR-072** — `_strip_section_header()` helper strips leading `## N.` from M3 narrative before template appends. |
+| **CORR-072-4**: Doc 04b/04c/04d `active_subdomains: 0` when ontology empty | Doc 04b/c/d frontmatter + §6 consistency check | **FIXED in CORR-072** — fallback to `len(state["subdomains"])` when `ontology.subdomains.covered` empty. |
 
-Both bugs fixed as of v1.1.0 (CORR-071). The contract now guards
+Bugs BUG-A and BUG-B fixed as of v1.1.0 (CORR-071). The contract guards
 the fix via `TestRunPhase1BPerRegFilter` (`tests/unit/prompts_v2/test_phase1_executor.py`):
 a hard assertion that each P1B lane sees only refs where the lane
 regulation is in `participating_regulations`. If the filter is removed
 or loosened, the test fails with 7 distinct invariant violations.
+
+CORR-072 bugs fixed as of v1.2.0. Guarded by
+`TestStakeholderLeakageRegression` (`tests/unit/v2/output/test_doc_04_stakeholder_leakage.py`,
+7 tests) which validates that `_augment_influence` does not inherit
+case-specific fields and that Doc 04 §3 renders without TinyTask leakage.
+Manual verification of fixes #2-#5 done via `_verify_corr072.py`
+(24 assertions all pass); full integration verification (full pipeline
+re-run for 3 cases) deferred to a follow-up contract.
 
 The CORR-070 contract remains useful as a structural contract
 (top-level keys, company_facts keys, classification keys,
