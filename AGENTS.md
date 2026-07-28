@@ -503,14 +503,21 @@ FAIL: structural assertions failed (<rc>)
    then regenerate. The PR description should justify the schema
    change.
 
-### 12.5 Known issues at v1.0.0
+### 12.5 Known issues at v1.1.0
 
 | Bug | Specs affected | Status |
 |---|---|---|
-| **BUG-A** (CORR-070): CORR-049 512KB cap truncates `layer0_catalog` + `# TASK` in P1B-LLM-01/02 | All 22 P1B calls (3 cases × ~3.7 regs × 2 specs) | Tracked separately — fix out of scope for the contract |
-| **BUG-B** (CORR-070): P1B-LLM-02 called without `p1b_llm_01_outputs` | All 11 P1B-02 calls | Schema declares required; WARN-only until fixed |
+| **BUG-A** (CORR-070): CORR-049 512KB cap truncates `layer0_catalog` + `# TASK` in P1B-LLM-01/02 | All 22 P1B calls (3 cases × ~3.7 regs × 2 specs) | **FIXED in CORR-071** — per-reg filter in `run_phase_1b` (`phase1_executor.py:204-218`) drops refs from 38 → 12-27 per lane. P1B payload 575K → 116-190K. The CORR-070 reorder workaround was removed as redundant. |
+| **BUG-B** (CORR-070): P1B-LLM-02 called without `p1b_llm_01_outputs` | All 11 P1B-02 calls | **FIXED in CORR-070** — `out_01.parsed_output` now wired in `run_phase_1b` (line 237). |
 
-The contract makes these bugs **visible** but does not fix them. The
-fix for BUG-B is 5 LOC in `phase1_executor.py:207-217`. BUG-A requires
-prompt template work (compact sub-domain refs or reorder catalog
-before refs).
+Both bugs fixed as of v1.1.0 (CORR-071). The contract now guards
+the fix via `TestRunPhase1BPerRegFilter` (`tests/unit/prompts_v2/test_phase1_executor.py`):
+a hard assertion that each P1B lane sees only refs where the lane
+regulation is in `participating_regulations`. If the filter is removed
+or loosened, the test fails with 7 distinct invariant violations.
+
+The CORR-070 contract remains useful as a structural contract
+(top-level keys, company_facts keys, classification keys,
+layer0_catalog keys) — those layers are unchanged. The semantic
+filter is enforced by the executor + this new test, not by the
+structural contract (per user preference: no ornamental thresholds).
