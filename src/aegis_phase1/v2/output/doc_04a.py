@@ -138,6 +138,45 @@ def _build_body(
     return "\n".join(parts)
 
 
+def _strip_section_header(narrative: str, *header_patterns: str) -> str:
+    """Strip a leading markdown section header from a narrative if present.
+
+    CORR-072: the M3 model sometimes emits its own ``## N. Section``
+    header at the start of narratives even though the doc template already
+    provides the header (we add it in ``parts.append("## 1. ...\n")``).
+    Result was duplicated headers in Doc 04a §1 and §1.2. This helper
+    strips any leading ``## N. <pattern>`` or ``### N.M <pattern>`` line
+    so the template owns the header.
+
+    Args:
+        narrative: Generated narrative text.
+        header_patterns: One or more substring patterns that identify a
+            header to strip (e.g. ``"Technical Architecture"``,
+            ``"Network Topology"``). Case-insensitive; matches if the
+            leading non-empty line is a ``#`` heading containing the
+            pattern.
+
+    Returns:
+        The narrative with the leading header line removed (and any
+        blank lines after it collapsed).
+    """
+    if not narrative or not header_patterns:
+        return narrative
+    lines = narrative.splitlines()
+    idx = 0
+    while idx < len(lines) and not lines[idx].strip():
+        idx += 1
+    if idx >= len(lines):
+        return narrative
+    first = lines[idx].strip()
+    if not first.startswith("#"):
+        return narrative
+    lower = first.lower()
+    if any(pat.lower() in lower for pat in header_patterns):
+        lines = lines[:idx] + lines[idx + 1:]
+    return "\n".join(lines).lstrip("\n")
+
+
 def _section_1_technical_architecture(
     state: dict[str, Any],
     inventory: dict[str, list[dict]],
@@ -155,6 +194,7 @@ def _section_1_technical_architecture(
         max_chars=_MAX_FRAGMENT_BYTES,
         config=config,
     )
+    narrative = _strip_section_header(narrative, "Technical Architecture")
     parts.append(narrative.rstrip() + "\n")
 
     parts.append("### 1.1 System Inventory\n")
@@ -169,6 +209,7 @@ def _section_1_technical_architecture(
         max_chars=_MAX_FRAGMENT_BYTES,
         config=config,
     )
+    topology = _strip_section_header(topology, "Network Topology", "Technical Architecture")
     parts.append(topology.rstrip() + "\n")
 
     parts.append("### 1.3 Cloud Services\n")

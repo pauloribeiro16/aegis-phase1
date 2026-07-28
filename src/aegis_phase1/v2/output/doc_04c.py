@@ -615,12 +615,19 @@ def _next_review_date() -> str:
 
 
 def _active_subdomain_count(state: dict[str, Any]) -> int:
+    """Number of active sub-domains.
+
+    CORR-072: prefer the ontology ``subdomains.covered`` list, but fall
+    back to ``state['subdomains']`` when the ontology is empty/absent.
+    Mirrors the fix in doc_04b and doc_04d so the three docs agree.
+    """
     ont = state.get("ontology") or {}
     subdomains = ont.get("subdomains") if isinstance(ont, Mapping) else None
-    if not isinstance(subdomains, Mapping):
-        return 0
-    covered = subdomains.get("covered") or []
-    return len(covered) if isinstance(covered, list) else 0
+    if isinstance(subdomains, Mapping):
+        covered = subdomains.get("covered") or []
+        if isinstance(covered, list) and covered:
+            return len(covered)
+    return len(state.get("subdomains") or {})
 
 
 def _total_subdomain_count(state: dict[str, Any]) -> int:

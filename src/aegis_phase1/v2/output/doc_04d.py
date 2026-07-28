@@ -308,12 +308,30 @@ def _section_regulation_level(state: dict[str, Any]) -> list[str]:
             owner = _regulation_owner(abbrev, reg)
         rows.append((abbrev, applicable, owner))
     if not rows:
+        # CORR-072: source applicable_regs from applicability_context
+        # (CORR-038 source-of-truth) instead of using the stale
+        # TinyTask fallback that hardcoded NIS2/DORA/AI Act as NO.
+        try:
+            from aegis_phase1.v2.context.applicability_context import (
+                build_applicability_context,
+            )
+            app_ctx = build_applicability_context(state)
+            applicable_set = set(app_ctx.applicable_regs)
+        except Exception:
+            applicable_set = set(
+                _attr(state.get("company_context"), "applicable_regs", default=[]) or []
+            )
         rows = [
-            ("GDPR", "YES", "Compliance Lead (CEO/DPO)"),
-            ("CRA", "YES", "Engineering Lead (CTO/CISO)"),
-            ("NIS2", "NO", "n/a (not applicable)"),
-            ("DORA", "NO", "n/a (not applicable)"),
-            ("AI Act", "NO", "n/a (not applicable)"),
+            ("GDPR", "YES" if "GDPR" in applicable_set else "NO",
+             "Compliance Lead (CEO/DPO)" if "GDPR" in applicable_set else "n/a (not applicable)"),
+            ("CRA", "YES" if "CRA" in applicable_set else "NO",
+             "Engineering Lead (CTO/CISO)" if "CRA" in applicable_set else "n/a (not applicable)"),
+            ("NIS2", "YES" if "NIS2" in applicable_set else "NO",
+             "Operations Lead (COO)" if "NIS2" in applicable_set else "n/a (not applicable)"),
+            ("DORA", "YES" if "DORA" in applicable_set else "NO",
+             "Operations Lead (COO/CRO)" if "DORA" in applicable_set else "n/a (not applicable)"),
+            ("AI Act", "YES" if "AI_Act" in applicable_set else "NO",
+             "Head of AI/ML + DPO" if "AI_Act" in applicable_set else "n/a (not applicable)"),
         ]
     parts.append(markdown_table(headers, rows))
     parts.append("")
@@ -881,7 +899,17 @@ def _should_use_llm(llm_invoker: Any | None) -> bool:
 
 def _build_frontmatter(state: dict[str, Any]) -> str:
     ctx = state.get("company_context")
-    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    # CORR-072: prefer the canonical applicability context (CORR-038
+    # source-of-truth) over the legacy company_context.applicable_regs
+    # which can be stale in case 3 (OmniBank) and similar complex cases.
+    try:
+        from aegis_phase1.v2.context.applicability_context import (
+            build_applicability_context,
+        )
+        app_ctx = build_applicability_context(state)
+        applicable = list(app_ctx.applicable_regs)
+    except Exception:
+        applicable = _attr(ctx, "applicable_regs", default=[]) or []
     inactive = _inactive_subdomain_ids(state)
     active = _active_subdomain_count(state)
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -921,12 +949,20 @@ def _build_frontmatter(state: dict[str, Any]) -> str:
 
 
 def _active_subdomain_count(state: dict[str, Any]) -> int:
+    """Number of active sub-domains.
+
+    CORR-072: prefer the ontology ``subdomains.covered`` list (canonical
+    source-of-truth), but fall back to ``state['subdomains']`` when the
+    ontology is empty or absent. Same fallback logic as Doc 04b's
+    ``_active_count``.
+    """
     ont = state.get("ontology") or {}
     subdomains = ont.get("subdomains") if isinstance(ont, Mapping) else None
-    if not isinstance(subdomains, Mapping):
-        return 0
-    covered = subdomains.get("covered") or []
-    return len(covered) if isinstance(covered, list) else 0
+    if isinstance(subdomains, Mapping):
+        covered = subdomains.get("covered") or []
+        if isinstance(covered, list) and covered:
+            return len(covered)
+    return len(state.get("subdomains") or {})
 
 
 def _attr(obj: Any, name: str, default: Any = None) -> Any:

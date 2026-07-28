@@ -974,12 +974,21 @@ def _stakeholders(state: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _augment_influence(s: dict[str, str]) -> dict[str, str]:
-    """Inherit influence / interest / engagement from baseline when missing."""
+    """Inherit influence / interest from baseline when missing.
+
+    CORR-072: previously also inherited ``organisation``, ``contact`` and
+    ``responsibilities`` from the TinyTask baseline by ID match. That caused
+    cross-case stakeholder leakage (case 3 OmniBank rendering showed
+    ``TinyTask Lda.`` and ``cto@tinytask.pt`` because the case 3 YAML had
+    matching IDs SH-01..SH-07 but lacked the case-specific contact info).
+    Only influence/interest — which are template metadata, not case-specific
+    facts — are safe to inherit.
+    """
     if s.get("influence") and s.get("interest") and s.get("influence") != "-":
         return s
     for baseline in _TINYTASK_STAKEHOLDERS:
         if baseline["id"] == s.get("id"):
-            for field in ("influence", "interest", "organisation", "contact", "responsibilities"):
+            for field in ("influence", "interest"):
                 if not s.get(field) or s.get(field) == "-":
                     s[field] = baseline.get(field, s.get(field, "-"))
             break

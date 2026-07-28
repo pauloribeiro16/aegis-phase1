@@ -1232,13 +1232,22 @@ def _controls_for(domain_id: str, state: dict[str, Any]) -> list[dict[str, str]]
 
 
 def _active_count(state: dict[str, Any]) -> int:
-    """Number of active sub-domains from ontology."""
+    """Number of active sub-domains.
+
+    CORR-072: prefer the ontology ``subdomains.covered`` list (canonical
+    source-of-truth), but fall back to ``state['subdomains']`` when the
+    ontology is empty or absent. This matches Doc 04a's
+    ``_active_subdomains`` logic and prevents the ``active_subdomains: 0``
+    bug seen in case 3 (OmniBank) where the ontology was not populated
+    but the sub-domain dict was.
+    """
     ont = state.get("ontology") or {}
     subdomains = ont.get("subdomains") if isinstance(ont, Mapping) else None
-    if not isinstance(subdomains, Mapping):
-        return 0
-    covered = subdomains.get("covered") or []
-    return len(covered) if isinstance(covered, list) else 0
+    if isinstance(subdomains, Mapping):
+        covered = subdomains.get("covered") or []
+        if isinstance(covered, list) and covered:
+            return len(covered)
+    return len(state.get("subdomains") or {})
 
 
 def _total_count(state: dict[str, Any]) -> int:
