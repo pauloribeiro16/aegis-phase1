@@ -211,6 +211,14 @@ class Phase1Executor:
                     "case_id": case_id,
                     "lane_id": reg,
                     "applicable_regs": [reg],
+                    # CORR-070 Bug B: P1B-LLM-02-RATIONALE spec
+                    # requires p1b_llm_01_outputs (the P1B-LLM-01
+                    # parsed output) to ground the rationale. Wire
+                    # it from the captured out_01 (the immediately
+                    # prior SPEC_INTERPRETATION call). Defensive
+                    # fallback `or {}` so a failed P1B-01 doesn't
+                    # crash the rationale call.
+                    "p1b_llm_01_outputs": (out_01.get("parsed_output") or {}),
                 },
                 config=config,
                 state=state,
