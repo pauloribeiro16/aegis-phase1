@@ -1,0 +1,32 @@
+tier: MICRO
+roles:
+  - role: CEO (also DPO)
+    person: Founder #1
+    reports_to: Board
+    fte: "0.2 DPO + 0.8 CEO (combined 1.0)"
+    backup: CTO (acting DPO)
+    regulations: [GDPR, AI_Act, CRA]
+    notes: Voluntary DPO designation per Art. 37(4)
+  - role: CTO
+    person: Founder #2
+    reports_to: Board
+    fte: "1.0"
+    backup: CEO (acting CTO)
+    regulations: [CRA, NIS2, DORA]
+    notes: Engineering lead + security champion
+  - role: Engineering Team
+    person: Engineers
+    reports_to: CTO
+    fte: "5-10"
+    backup: CTO
+    regulations: [CRA]
+    notes: Implementation + secure development
+  - role: Customer Support
+    person: Support Lead
+    reports_to: CEO
+    fte: "0.5"
+    backup: CEO
+    regulations: [GDPR]
+    notes: User data handling
+contact_patterns:
+  placeholder: "{role}@{company_slug}.example"

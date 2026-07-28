@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DataFlow",
+  "type": "object",
+  "required": ["id", "source", "destination"],
+  "properties": {
+    "id": {"type": "string"},
+    "source": {"type": "string"},
+    "destination": {"type": "string"},
+    "data_types": {"type": "array", "items": {"type": "string"}},
+    "pii": {"type": "boolean"},
+    "cross_border": {"type": "boolean"},
+    "legal_basis": {"type": "string"},
+    "regulation": {"type": "string"},
+    "notes": {"type": "string"}
+  }
+}

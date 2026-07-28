@@ -1,0 +1,27 @@
+# Tier classification rules. Single source of truth.
+# Read by src/aegis_phase1/data/loader.py:load_proportionality_rules()
+# Used by: classify_tier(employees, sector, applicable_regs) → str
+
+default_thresholds:
+  by_employees:
+    MICRO: 10
+    SMALL: 50
+    MEDIUM: 250
+    LARGE: 1000
+    MAX: null
+
+sector_overrides:
+  Banking & Financial Services:
+    min_tier: LARGE
+    note: Banks are always at least LARGE regardless of employees (DORA, BaFin oversight)
+  Healthcare:
+    min_tier: MEDIUM
+  Insurance:
+    min_tier: MEDIUM
+  Technology/Software:
+    min_tier: MICRO
+
+ai_act_overrides:
+  has_high_risk_ai_system:
+    min_tier: MEDIUM
+    note: AI providers/deployers never MICRO (AI Act Art. 6)

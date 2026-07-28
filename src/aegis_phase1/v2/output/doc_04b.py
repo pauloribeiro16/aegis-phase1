@@ -31,6 +31,11 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from aegis_phase1.data.loader import (
+    classify_tier,
+    load_tier_template,
+    render_tier_text,
+)
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
     get_per_spec_markdown,
@@ -334,7 +339,7 @@ _DEFAULT_CONTROLS: dict[str, list[dict[str, str]]] = {
             "control": "Board training",
             "current": "Not applicable to active scope",
             "evidence_refs": [],
-            "notes": "D-08.3 inactive for low-tier micro SaaS — NIS2 + DORA only participating regs",
+            "notes": "D-08.3 inactive when its participating regulations do not apply (NIS2 + DORA only participating regs)",
         },
     ],
     "D-09": [
@@ -482,13 +487,31 @@ def _section_methodology(state: dict[str, Any]) -> list[str]:
     scale = _attr(ctx, "scale", default="micro")
     applicable = _attr(ctx, "applicable_regs", default=[]) or []
     applicable_text = ", ".join(applicable) if applicable else "-"
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    sector = _attr(ctx, "sector", default="")
+    tier = classify_tier(employees_int, sector, list(applicable))
+    tier_template = load_tier_template(tier)
+    employees_str = str(employees) if employees not in (None, "", "-") else "small"
+    ctx_for_template = {
+        "name": name,
+        "sector": sector or "SaaS",
+        "employees": employees_str,
+        "scale": scale,
+    }
+    tier_description = render_tier_text(tier, ctx_for_template)
     parts.append(
-        f"{name} is assessed as a low-tier {scale} SaaS"
+        f"{name} {tier_description}"
         + (f" with {employees} employees" if employees else "")
         + " using managed-cloud infrastructure. Current maturity measures "
         + "what exists today, not the target state. Target maturity is "
-        + "proportional to the company profile but aligned with active "
-        + "GDPR/CRA SubDomains fit criteria (applicable_regs = "
+        + f"{tier_template['maturity']['default_target']} (minimum acceptable: "
+        + f"{tier_template['maturity']['default_min']}). "
+        + f"Proportional language: tier={tier} ({tier_template.get('scope', '-')}). "
+        + "Active Layer 0 scope is aligned with active "
+        + f"GDPR/CRA SubDomains fit criteria (applicable_regs = "
         + f"{applicable_text}).\n"
     )
     parts.append(
@@ -904,6 +927,13 @@ def _section_consistency(state: dict[str, Any]) -> list[str]:
     flows = inv.get("data_flows") or []
     ctx = state.get("company_context")
     applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    employees = _attr(ctx, "employees", default="")
+    sector = _attr(ctx, "sector", default="")
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    tier = classify_tier(employees_int, sector, list(applicable))
     parts.append(
         markdown_table(
             ["Consistency Item", "Status", "Evidence"],
@@ -919,9 +949,9 @@ def _section_consistency(state: dict[str, Any]) -> list[str]:
                     f"applicable_regs = [{', '.join(applicable) or '-'}]",
                 ),
                 (
-                    "LOW-tier realism maintained",
+                    "Tier-proportional realism maintained",
                     "PASS",
-                    "No enterprise HSM, SIEM, PAM, SOC, or CMDB claimed",
+                    f"tier={tier}; no enterprise controls claimed beyond tier template scope",
                 ),
                 (
                     "Maturity scale used consistently",

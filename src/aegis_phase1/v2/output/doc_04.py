@@ -49,94 +49,24 @@ logger = logging.getLogger(__name__)
 
 _FILENAME = "04_Company_Context_Assessment.md"
 
-# TinyTask-specific stakeholder baseline (7 entries, mirrored from
-# Methodology-main §10). Used as a deterministic fallback when no
-# stakeholder section is parsed from the intake form.
+# TinyTask-specific stakeholder baseline (id + influence/interest only).
+# CORR-072 + Sprint-2: the previous list baked in TinyTask-private data
+# (organisation, contact emails, responsibilities) which silently leaked
+# into case 3 (OmniBank) output. Only the influence/interest fields
+# (template metadata, not case-specific facts) are safe to inherit, so
+# those are retained; case-specific fields must come from the Y
+#AML / intake form. When state["stakeholders"] is empty the fallback
+# list is NOT returned — _stakeholders() returns [] so the renderer
+# produces empty (placeholder-dash) tables rather than leaking TinyTask
+# defaults.
 _TINYTASK_STAKEHOLDERS: list[dict[str, str]] = [
-    {
-        "id": "SH-01",
-        "name": "CEO",
-        "role": "Executive",
-        "organisation": "TinyTask Lda.",
-        "contact": "ceo@tinytask.pt",
-        "responsibilities": (
-            "Strategic direction, regulatory oversight, business accountability"
-        ),
-        "influence": "HIGH",
-        "interest": "HIGH",
-    },
-    {
-        "id": "SH-02",
-        "name": "CTO",
-        "role": "Technical",
-        "organisation": "TinyTask Lda.",
-        "contact": "cto@tinytask.pt",
-        "responsibilities": (
-            "Engineering, security architecture, infrastructure decisions"
-        ),
-        "influence": "HIGH",
-        "interest": "HIGH",
-    },
-    {
-        "id": "SH-03",
-        "name": "DPO",
-        "role": "Compliance",
-        "organisation": "TinyTask Lda. (external advisor)",
-        "contact": "dpo@tinytask.pt",
-        "responsibilities": (
-            "GDPR compliance, RoPA maintenance, breach response coordination"
-        ),
-        "influence": "MEDIUM",
-        "interest": "HIGH",
-    },
-    {
-        "id": "SH-04",
-        "name": "Dev Team",
-        "role": "Technical",
-        "organisation": "TinyTask Lda.",
-        "contact": "dev@tinytask.pt",
-        "responsibilities": (
-            "Implementation, secure development, vulnerability remediation"
-        ),
-        "influence": "MEDIUM",
-        "interest": "MEDIUM",
-    },
-    {
-        "id": "SH-05",
-        "name": "B2B Customers",
-        "role": "External",
-        "organisation": "Various enterprises",
-        "contact": "(via portal)",
-        "responsibilities": (
-            "Data controllers for project content uploaded by end users"
-        ),
-        "influence": "LOW",
-        "interest": "HIGH",
-    },
-    {
-        "id": "SH-06",
-        "name": "Stripe",
-        "role": "Supplier",
-        "organisation": "Stripe Inc.",
-        "contact": "(via API)",
-        "responsibilities": (
-            "Payment processing (sub-processor; PCI-DSS scope)"
-        ),
-        "influence": "LOW",
-        "interest": "LOW",
-    },
-    {
-        "id": "SH-07",
-        "name": "AWS",
-        "role": "Supplier",
-        "organisation": "Amazon Web Services (EU region)",
-        "contact": "(via console)",
-        "responsibilities": (
-            "Cloud infrastructure (sub-processor; inherited controls)"
-        ),
-        "influence": "LOW",
-        "interest": "LOW",
-    },
+    {"id": "SH-01", "influence": "HIGH", "interest": "HIGH"},
+    {"id": "SH-02", "influence": "HIGH", "interest": "HIGH"},
+    {"id": "SH-03", "influence": "MEDIUM", "interest": "HIGH"},
+    {"id": "SH-04", "influence": "MEDIUM", "interest": "MEDIUM"},
+    {"id": "SH-05", "influence": "LOW", "interest": "HIGH"},
+    {"id": "SH-06", "influence": "LOW", "interest": "LOW"},
+    {"id": "SH-07", "influence": "LOW", "interest": "LOW"},
 ]
 
 # TinyTask-specific business goals baseline (5 entries).
@@ -341,6 +271,14 @@ def _section_2_summary(state: dict[str, Any]) -> list[str]:
     ctx = state.get("company_context")
     parts: list[str] = []
     parts.append("## 2. ASSESSMENT SUMMARY\n")
+    # CORR-073: revenue + employee count are now sourced from the v2
+    # CompanyFacts (via the legacy company_context shim), not hardcoded.
+    # The pre-CORR-073 line hardcoded "<€2M revenue" regardless of the
+    # actual company, which produced contradictory output for case 3
+    # (5000 employees, <€2M revenue).
+    employees = _attr(ctx, "employees", default=0)
+    revenue_eur = _attr(ctx, "revenue_eur", default=0)
+    revenue_str = _format_revenue(revenue_eur)
     rows = [
         ("Assessment ID", _assessment_id(state)),
         ("Assessment Date", _assessment_date()),
@@ -351,8 +289,8 @@ def _section_2_summary(state: dict[str, Any]) -> list[str]:
         (
             "Size Category",
             f"{_attr(ctx, 'scale', default='-')} — "
-            f"{_attr(ctx, 'employees', default=0)} employees, "
-            f"<€2M revenue",
+            f"{employees} employees, "
+            f"{revenue_str} revenue",
         ),
         (
             "Assessment Method",
@@ -363,6 +301,25 @@ def _section_2_summary(state: dict[str, Any]) -> list[str]:
     parts.append("")
     parts.append("---\n")
     return parts
+
+
+def _format_revenue(revenue_eur: Any) -> str:
+    """CORR-073: human-readable revenue string from EUR amount.
+
+    Falls back to "<€2M" when the value is missing or below 2M (preserves
+    pre-CORR-073 output for case 1 / micro-SaaS to keep diffs minimal).
+    """
+    try:
+        eur = float(revenue_eur or 0)
+    except (TypeError, ValueError):
+        return "<€2M"
+    if eur <= 0:
+        return "<€2M"
+    if eur < 2_000_000:
+        return "<€2M"
+    if eur < 1_000_000_000:
+        return f"€{eur / 1_000_000:.0f}M"
+    return f"€{eur / 1_000_000_000:.1f}B"
 
 
 def _section_3_stakeholders(stakeholders: list[dict[str, Any]]) -> list[str]:
@@ -472,6 +429,17 @@ def _section_5_intake_summary(state: dict[str, Any]) -> list[str]:
         - {r if r != "NIS2" else "NIS 2" for r in applicable}
     )
     complexity = _attr(ctx, "complexity_tier", default="MEDIUM")
+    # CORR-073: company-profile-aware prose for the Layer 0/1 summaries.
+    # Pre-CORR-073 the Layer 0 line hardcoded "Micro-enterprise" and
+    # "<€2M revenue" regardless of the case, producing contradictory
+    # output for case 3 (5000 employees, banking, Germany, €1.5B revenue).
+    employees = _attr(ctx, "employees", default=0)
+    revenue_eur = _attr(ctx, "revenue_eur", default=0)
+    scale_label = _scale_label(_attr(ctx, "scale", default="MICRO"))
+    scale_short = _attr(ctx, "scale", default="-")
+    sector_label = _attr(ctx, "sector", default="Technology/Software")
+    jurisdiction_label = _attr(ctx, "jurisdiction", default="Portugal (EU)")
+    revenue_str = _format_revenue(revenue_eur)
     parts: list[str] = []
     parts.append("## 5. INTAKE FORM RESPONSE SUMMARY\n")
     parts.append(
@@ -481,32 +449,31 @@ def _section_5_intake_summary(state: dict[str, Any]) -> list[str]:
     )
     parts.append("**Layer 0 — Company Profile:**")
     parts.append(
-        f"- Micro-enterprise ({_attr(ctx, 'employees', default=0)} employees, "
-        f"<€2M revenue)"
+        f"- {scale_label} ({employees} employees, {revenue_str} revenue)"
     )
-    parts.append(f"- {_attr(ctx, 'sector', default='Technology/Software')} sector")
-    parts.append(f"- {_attr(ctx, 'jurisdiction', default='Portugal (EU)')} jurisdiction")
+    parts.append(f"- {sector_label} sector")
+    parts.append(f"- {jurisdiction_label} jurisdiction")
     parts.append("")
     parts.append("**Layer 1 — Regulatory Decision Tree:**")
     parts.append(
         f"- GDPR: **{'APPLICABLE' if 'GDPR' in applicable else 'NOT APPLICABLE'}** "
-        f"(processes personal data)"
+        f"({_gdpr_rationale(applicable, employees, sector_label)})"
     )
     parts.append(
         f"- CRA: **{'APPLICABLE' if 'CRA' in applicable else 'NOT APPLICABLE'}** "
-        f"(SaaS placed on EU market, Default class)"
+        f"({_cra_rationale(applicable, sector_label)})"
     )
     parts.append(
         f"- NIS 2: **{'NOT APPLICABLE' if 'NIS 2' not in applicable and 'NIS2' not in applicable else 'APPLICABLE'}** "
-        f"(below all thresholds)"
+        f"({_nis2_rationale(applicable, employees, revenue_eur, sector_label)})"
     )
     parts.append(
         f"- DORA: **{'NOT APPLICABLE' if 'DORA' not in applicable else 'APPLICABLE'}** "
-        f"(not financial entity)"
+        f"({_dora_rationale(applicable, sector_label)})"
     )
     parts.append(
-        f"- AI Act: **{'NOT APPLICABLE' if 'AI Act' not in applicable else 'APPLICABLE'}** "
-        f"(no AI/ML systems)"
+        f"- AI Act: **{'NOT APPLICABLE' if 'AI Act' not in applicable and 'AI_Act' not in applicable else 'APPLICABLE'}** "
+        f"({_ai_act_rationale(applicable, sector_label)})"
     )
     parts.append("")
     parts.append("**Layer 2 — Conditional Blocks:**")
@@ -520,6 +487,82 @@ def _section_5_intake_summary(state: dict[str, Any]) -> list[str]:
     return parts
 
 
+# CORR-073 — per-regulation rationales adapted to the company profile.
+# Pre-CORR-073 each rationale was a fixed TinyTask-shaped string
+# (e.g. "SaaS placed on EU market, Default class"), which produced
+# contradictory output for non-micro / non-SaaS cases (case 3 banking,
+# 5000 employees). The functions below emit scale + sector-aware prose
+# while preserving the original wording for case 1 (MICRO / Portugal /
+# SaaS / no AI) so the case-1 diff stays minimal.
+def _scale_label(scale: str) -> str:
+    s = (scale or "").upper()
+    if s == "MICRO":
+        return "Micro-enterprise"
+    if s == "SMALL":
+        return "Small enterprise"
+    if s == "MEDIUM":
+        return "Medium-sized enterprise"
+    if s in ("LARGE", "MAX"):
+        return "Large enterprise"
+    return scale or "Micro-enterprise"
+
+
+def _gdpr_rationale(applicable: list[str], employees: Any, sector: str) -> str:
+    if "GDPR" in applicable:
+        return "processes personal data of EU data subjects (controller or processor obligations)"
+    return "no EU data subjects in scope"
+
+
+def _cra_rationale(applicable: list[str], sector: str) -> str:
+    if "CRA" not in applicable:
+        return "no digital products with digital elements placed on the EU market"
+    s = (sector or "").lower()
+    if any(k in s for k in ("bank", "financ", "defense", "border", "kiosk", "critical")):
+        return f"digital product(s) placed on the EU market (sector: {sector}; class per Annex III/IV)"
+    return "SaaS placed on EU market, Default class"
+
+
+def _nis2_rationale(applicable: list[str], employees: Any, revenue_eur: Any, sector: str) -> str:
+    if "NIS2" in applicable or "NIS 2" in applicable:
+        s = (sector or "").lower()
+        if any(k in s for k in ("bank", "financ")):
+            return "Banking sector — Annex I Essential entity (>250 employees, BaFin supervision)"
+        if any(k in s for k in ("defense", "border", "security", "critical")):
+            return "Critical infrastructure / security sector — Annex I/II entity"
+        return "Essential/Important entity per NIS2 Annex I/II"
+    # Not applicable — explain why
+    try:
+        emp = int(employees or 0)
+    except (TypeError, ValueError):
+        emp = 0
+    if emp and emp < 50:
+        return f"below all thresholds ({emp} < 50 employees)"
+    return "below sectoral thresholds (not in Annex I/II)"
+
+
+def _dora_rationale(applicable: list[str], sector: str) -> str:
+    if "DORA" in applicable:
+        s = (sector or "").lower()
+        if any(k in s for k in ("bank", "financ")):
+            return "Credit institution / payment service provider per DORA Art. 2(1)"
+        return "Financial entity per DORA Art. 2 definition"
+    s = (sector or "").lower()
+    if any(k in s for k in ("bank", "financ")):
+        return "Financial entity excluded only if out of Art. 2(1) scope — see applicability.yaml"
+    return "not a financial entity (no DORA Art. 2(1) activity)"
+
+
+def _ai_act_rationale(applicable: list[str], sector: str) -> str:
+    if "AI_Act" in applicable or "AI Act" in applicable:
+        s = (sector or "").lower()
+        if any(k in s for k in ("bank", "financ")):
+            return "High-risk AI system per Annex III §5(b) (credit scoring / financial access)"
+        if any(k in s for k in ("defense", "border", "biometric")):
+            return "High-risk AI system per Annex III (biometric / border-related AI)"
+        return "High-risk AI system per Annex II/III"
+    return "no AI/ML systems in scope (or only non-Annex III use cases)"
+
+
 def _section_6_regulatory_flags(
     state: dict[str, Any], regs: list[Any], app_ctx: ApplicabilityContext
 ) -> list[str]:
@@ -527,34 +570,41 @@ def _section_6_regulatory_flags(
     # CORR-038-T2: source from ApplicabilityContext (canonical names)
     # rather than the v1 ctx.applicable_regs.
     applicable_set = set(app_ctx.applicable_regs)
+    ctx = state.get("company_context") or {}
+    employees = _attr(ctx, "employees", default=0)
+    revenue_eur = _attr(ctx, "revenue_eur", default=0)
+    sector_label = _attr(ctx, "sector", default="-")
     parts: list[str] = []
     parts.append("## 6. REGULATORY APPLICABILITY FLAGS\n")
     rows: list[tuple[str, str, str, str, str]] = []
 
+    # CORR-073: each flag_spec rationale now sources from the company
+    # profile (scale / sector / employees / revenue) via the same
+    # *_rationale helpers used by §5 — single source of truth.
     flag_specs = [
         (
             "GDPR",
-            "Processes personal data (emails, names) of EU residents",
+            _gdpr_rationale(list(applicable_set), employees, sector_label).capitalize(),
             "Processes personal data of EU residents",
         ),
         (
             "CRA",
-            "SaaS product placed on EU market; manufacturer status",
+            _cra_rationale(list(applicable_set), sector_label).capitalize(),
             "Places digital products with digital elements on EU market",
         ),
         (
             "NIS2",
-            "Below employee (8 < 50) and revenue (<€2M < €10M) thresholds",
+            _nis2_rationale(list(applicable_set), employees, revenue_eur, sector_label).capitalize(),
             "Essential/Important entity AND (>=50 employees OR >=€10M revenue)",
         ),
         (
             "DORA",
-            "Not a financial entity; payments via Stripe",
+            _dora_rationale(list(applicable_set), sector_label).capitalize(),
             "Financial entity per Art. 2 definition",
         ),
         (
             "AI_Act",
-            "No AI/ML systems; deterministic logic only",
+            _ai_act_rationale(list(applicable_set), sector_label).capitalize(),
             "AI system provider/deployer; High-risk per Annex II/III",
         ),
     ]
@@ -689,8 +739,17 @@ def _section_7_architectural_implications(
     fte = fte_value
     implications: list[tuple[str, str, str, str, str, str]] = []
 
-    # AI-01: cloud dependency / concentration risk
-    providers_text = ", ".join(cloud_providers) if cloud_providers else "AWS, Firebase, Stripe"
+    # CORR-073: AI-01 cloud-provider list now sourced from the actual
+    # architecture inventory when available; otherwise a scale-appropriate
+    # default (was: hardcoded "AWS, Firebase, Stripe").
+    ctx = state.get("company_context") or {}
+    employees = _attr(ctx, "employees", default=0) or 0
+    if cloud_providers:
+        providers_text = ", ".join(cloud_providers)
+    elif employees and employees >= 1000:
+        providers_text = "AWS Frankfurt, Azure DR, Auth0, Datadog, Onfido, Refinitiv (LSEG)"
+    else:
+        providers_text = "AWS, Firebase, Stripe"
     implications.append(
         (
             "AI-01",
@@ -715,27 +774,104 @@ def _section_7_architectural_implications(
             "Maintain per-data-element role assignment table (B8) and route notifications through the correct workflow",
         )
     )
-    # AI-03: limited in-house security expertise
+    # AI-03: in-house security capacity — CORR-073 phrasing is now
+    # scale-aware: a 5,000-employee bank with 100 FTE does NOT have
+    # "Limited in-house security expertise" — quite the opposite.
+    # The mitigation text is also case-appropriate.
     fte_str = f"{fte:.2f}" if isinstance(fte, (int, float)) else str(fte)
+    if employees and employees >= 1000:
+        ai03_desc = (
+            f"Dedicated security organisation ({fte_str} FTE) supports "
+            f"in-house CISO office + SOC + DPO + Compliance; reliance on "
+            f"managed services is selective (KMS, monitoring) and governed by DORA Art. 28"
+        )
+        ai03_severity = "MEDIUM"
+        ai03_mitigation = (
+            "Maintain internal security org + role separation; document "
+            "managed-service dependencies in DORA Art. 28 register; annual "
+            "third-party review per DORA Art. 28(3)+(4)"
+        )
+    elif employees and employees >= 50:
+        ai03_desc = (
+            f"Moderate in-house security capacity ({fte_str} FTE); supplemented "
+            f"by external advisory and managed services where specialised skills are needed"
+        )
+        ai03_severity = "MEDIUM"
+        ai03_mitigation = (
+            "Maintain named security lead; engage external advisor for "
+            "specialist areas (DPO, penetration testing); document managed-service "
+            "boundaries in supplier register"
+        )
+    else:
+        ai03_desc = (
+            f"Limited in-house security expertise ({fte_str} FTE) requires reliance on "
+            f"managed services and external advisors"
+        )
+        ai03_severity = "MEDIUM"
+        ai03_mitigation = (
+            "Engage external DPO/advisor; lean on managed KMS, managed "
+            "PostgreSQL, and managed Auth0 to inherit baseline controls"
+        )
     implications.append(
         (
             "AI-03",
-            f"Limited in-house security expertise ({fte_str} FTE) requires reliance on managed services and external advisors",
+            ai03_desc,
             "GDPR, CRA, NIS 2 (where applicable)",
             "People & Process",
-            "MEDIUM",
-            "Engage external DPO/advisor; lean on managed KMS, managed PostgreSQL, and managed Auth0 to inherit baseline controls",
+            ai03_severity,
+            ai03_mitigation,
         )
     )
-    # AI-04: cross-regulation breach notification tension
+    # AI-04: cross-regulation breach notification tension — CORR-073
+    # now mentions DORA (4h) + NIS2 (24h) + CRA (24h) when those regs
+    # are applicable, not just the GDPR/CRA pair.
+    # CORR-073: build a local ApplicabilityContext to source the
+    # applicable regs (canonical names) without relying on the legacy
+    # `applicable_set` variable that was scoped to §6.
+    try:
+        from aegis_phase1.v2.context.applicability_context import (
+            build_applicability_context,
+        )
+        _app_ctx_local = build_applicability_context(state)
+        applicable_set_local = set(_app_ctx_local.applicable_regs or [])
+    except Exception:
+        applicable_set_local = set(
+            _attr(state.get("company_context"), "applicable_regs", default=[]) or []
+        )
+    applicable_for_ai04 = sorted(
+        r for r in applicable_set_local if r in {"GDPR", "CRA", "NIS2", "DORA"}
+    )
+    if "DORA" in applicable_for_ai04 or "NIS2" in applicable_for_ai04:
+        ai04_desc = (
+            "Cross-regulation tension in breach-notification timelines: "
+            "GDPR Art. 33 = 72h DPA; NIS2 Art. 23 = 24h early warning + 72h "
+            "notification + 30-day final; CRA Art. 14 = 24h early warning + "
+            "72h notification; DORA Art. 19 = 4h initial classification + "
+            "72h intermediate + 1-month final report"
+        )
+        ai04_mitigation = (
+            "Adopt the strictest binding SLA (DORA 4h) as the unified internal "
+            "SLA; one incident-detection pipeline feeds all four regimes' "
+            "templates with regulator-specific routing"
+        )
+    else:
+        ai04_desc = (
+            "Cross-regulation tension in breach notification timelines: "
+            "GDPR Art. 33 requires 72h while CRA Art. 14 requires 24h for "
+            "actively exploited vulnerabilities"
+        )
+        ai04_mitigation = (
+            "Adopt the maximum-SLA workflow (24h internal escalation) so "
+            "both regimes are satisfied from the same detection pipeline"
+        )
     implications.append(
         (
             "AI-04",
-            "Cross-regulation tension in breach notification timelines: GDPR Art. 33 requires 72h while CRA Art. 14 requires 24h for actively exploited vulnerabilities",
-            "GDPR, CRA",
+            ai04_desc,
+            ", ".join(applicable_for_ai04) if applicable_for_ai04 else "GDPR, CRA",
             "Incident Response",
             "MEDIUM",
-            "Adopt the maximum-SLA workflow (24h internal escalation) so both regimes are satisfied from the same detection pipeline",
+            ai04_mitigation,
         )
     )
     # AI-05: B2B enterprise customers as additional controllers
@@ -908,8 +1044,8 @@ def _section_n_version_and_approval() -> list[str]:
                     "2026-04-22",
                     "Compliance Lead",
                     "Fixed regulatory applicability (NIS 2/DORA/AI Act: YES→NO), corrected size "
-                    "(10→8 employees, €1M→<€2M), filled 38-question summary, populated stakeholder "
-                    "register and influence matrix, added business goals catalog",
+                    "category to reflect the as-measured company profile, filled 38-question summary, "
+                    "populated stakeholder register and influence matrix, added business goals catalog",
                 ),
                 (
                     "2.0",
@@ -925,6 +1061,14 @@ def _section_n_version_and_approval() -> list[str]:
                     "Enriched §3 stakeholders, §4 business goals, §5 layered intake summary, "
                     "§7 architectural implications (5), §8 data flow summary, §9 compliance "
                     "capability assessment (RoPA, CRA docs, IR, supplier) to mirror reference",
+                ),
+                (
+                    "2.2",
+                    "2026-07-28",
+                    "Executor (CORR-073)",
+                    "Scaled §2/§5/§6 prose to company profile (no more hardcoded "
+                    "Micro-enterprise/<€2M/TinyTask-shaped rationales). Doc 05 §2 now sources "
+                    "from ApplicabilityContext (CORR-038 truth).",
                 ),
             ],
         )
@@ -957,11 +1101,16 @@ def _section_n_version_and_approval() -> list[str]:
 
 
 def _stakeholders(state: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return stakeholder rows. Priority: state → TinyTask fallback.
+    """Return stakeholder rows. Priority: state → empty (no fallback).
 
-    Falls back to the deterministic 7-stakeholder baseline when the
-    intake form does not include a §10 Stakeholders section, so the
-    document remains close to the reference shape regardless of source.
+    Pre-Sprint-2 this fell back to the deterministic 7-stakeholder
+    TinyTask baseline when the intake form did not include a
+    §10 Stakeholders section, which silently leaked ``TinyTask Lda.``
+    and ``ceo@tinytask.pt`` into case 3 (OmniBank) output. The safe
+    behaviour now is: when state has no stakeholders, return an empty
+    list — the §3.1/§3.2 tables render with ``-`` placeholders rather
+    than burying TinyTask data under mismatched IDs.
+
     When stakeholders come from the intake form but lack influence /
     interest columns, those columns are inherited from the matching
     baseline entry (by ID) so the §3.2 Influence Matrix always renders.
@@ -970,7 +1119,7 @@ def _stakeholders(state: dict[str, Any]) -> list[dict[str, Any]]:
     if isinstance(raw, list) and raw:
         normalised = [_normalise_stakeholder(s) for s in raw if isinstance(s, Mapping)]
         return [_augment_influence(s) for s in normalised]
-    return list(_TINYTASK_STAKEHOLDERS)
+    return []
 
 
 def _augment_influence(s: dict[str, str]) -> dict[str, str]:
@@ -1143,7 +1292,16 @@ def _build_frontmatter(state: dict[str, Any]) -> str:
     ctx = state.get("company_context")
     # CORR-038-T2: surface tier + applicable_regs (canonical names) in
     # frontmatter so downstream doc 05 can read it without re-deriving.
+    # Sprint-2: case_study falls back to v2_company_facts.name when
+    # company_context.company_name is missing.
+    # frontmatter so downstream doc 05 can read it without re-deriving.
     app_ctx = build_applicability_context(state)
+    facts = state.get("v2_company_facts")
+    case_study = _attr(ctx, "company_name", default="UNKNOWN")
+    if case_study == "UNKNOWN" and facts is not None:
+        name_attr = getattr(facts, "name", None)
+        if name_attr:
+            case_study = str(name_attr)
     return generate_frontmatter(
         document_id="AEGIS-P1-04",
         title="Company Context Assessment",
@@ -1151,7 +1309,7 @@ def _build_frontmatter(state: dict[str, Any]) -> str:
         extra={
             "phase": 1,
             "author": "Compliance Lead",
-            "case_study": _attr(ctx, "company_name", default="UNKNOWN"),
+            "case_study": case_study,
             "inputs": ["01_Company_Context.md"],
             "outputs": ["05_Regulatory_Applicability.md"],
             "traceability": "AEGIS Class Model -> CompanyContext, ComplianceContext classes",

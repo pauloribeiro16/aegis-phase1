@@ -1,0 +1,12 @@
+industry: Insurance
+jurisdiction_examples: [Germany, France, Italy, Spain]
+primary_supervisors:
+  - BaFin
+  - EIOPA
+retention_standards:
+  - {framework: VAG, retention_years: 10, scope: insurance records}
+  - {framework: Solvency II, retention_years: 10, scope: actuarial records}
+typical_systems:
+  policy_admin: Guidewire, Insurity, Duck Creek
+  claims: snappy, ClaimVantage
+default_concentration_risk_threshold_pct: 30

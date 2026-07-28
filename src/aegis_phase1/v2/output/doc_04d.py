@@ -31,6 +31,10 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from aegis_phase1.data.loader import (
+    classify_tier,
+    load_role_model,
+)
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
     get_per_spec_markdown,
@@ -251,15 +255,49 @@ def _section_purpose_scope(state: dict[str, Any]) -> list[str]:
             "requirement.\n"
         )
     employees = _attr(ctx, "employees", default="")
+    scale = str(_attr(ctx, "scale", default="MICRO")).upper()
+    # CORR-073: proportionality note is now scale-aware. Pre-CORR-073
+    # the note always said "many hats fall on the CEO/CTO/lead developer"
+    # regardless of company size, which was wrong for case 3 (5,000
+    # employees with a dedicated CISO office + DPO + CRO + COO).
+    try:
+        emp_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        emp_int = 0
+    if emp_int >= 1000 or scale in {"LARGE", "MAX"}:
+        proportionality_note = (
+            f"{name} has {emp_int or 'a large'} employee headcount and "
+            f"operates a dedicated organisational structure with separate "
+            f"**CISO office**, **DPO (Datenschutzbeauftragter)**, "
+            f"**Chief Risk Officer (CRO)**, **Head of AI/ML**, "
+            f"**Head of Compliance**, and **Internal Audit** function. "
+            f"Formal role separation is feasible and expected under "
+            f"GDPR Art. 37-39, DORA Art. 5-6, and BaFin ZAIT 5.6. RACI "
+            f"assignments concentrate **A** (Accountable) on the role "
+            f"with primary regulatory ownership per macro-domain.\n"
+        )
+    elif emp_int >= 50 or scale == "MEDIUM":
+        proportionality_note = (
+            f"{name} has {emp_int} employee headcount. Role separation "
+            f"is partially formal — at minimum separate **DPO**, **CISO / "
+            f"Security Lead**, and **Operations** are required; engineering "
+            f"may be combined. RACI assignments distribute **A** (Accountable) "
+            f"across the leadership team, with **R** (Responsible) assigned "
+            f"to the function with the right domain expertise.\n"
+        )
+    else:
+        proportionality_note = (
+            f"{name} has {emp_int or 'a small'} employee headcount. Formal "
+            f"role separation characteristic of larger firms (separate DPO, "
+            f"CISO, IT Manager, Legal, HR, IR Lead) is not feasible — many "
+            f"hats fall on the CEO/CTO/lead developer. RACI assignments "
+            f"concentrate **A** (Accountable) on the CEO or CTO, with one "
+            f"**R** (Responsible) per activity and the rest as **C** "
+            f"(Consulted) or **I** (Informed).\n"
+        )
     parts.append(
         "**Proportionality note (P2 — Company Reality First):** "
-        f"{name} has {employees or 'a small'} employee headcount. Formal "
-        "role separation characteristic of larger firms (separate DPO, "
-        "CISO, IT Manager, Legal, HR, IR Lead) is not feasible — many "
-        "hats fall on the CEO/CTO/lead developer. RACI assignments "
-        "concentrate **A** (Accountable) on the CEO or CTO, with one "
-        "**R** (Responsible) per activity and the rest as **C** "
-        "(Consulted) or **I** (Informed).\n"
+        + proportionality_note
     )
     return parts
 
@@ -274,13 +312,56 @@ def _section_company_level(state: dict[str, Any]) -> list[str]:
         "(Key Roles) and §5 (RACI Matrix).\n"
     )
     headers = ["Role", "Default Owner", "Regulations"]
-    rows = [
-        ("Compliance Lead", "Chief Compliance Officer / DPO (CEO)", "GDPR — controller + processor"),
-        ("Engineering Lead", "CTO / Head of Engineering", "CRA — secure development / vulnerability"),
-        ("Operations Lead", "COO / Head of Operations", "NIS 2, DORA (when applicable)"),
-        ("DPO (voluntary)", "CEO (voluntary designation per Art. 37)", "GDPR Art. 37-39"),
-        ("CISO / Security Lead", "CTO (CRA Annex I Part II (8)(f))", "CRA Annex I, NIS 2, DORA"),
-    ]
+    # CORR-073: Default Owner column is scale-aware. Pre-CORR-073 each
+    # row hardcoded "CEO" / "CTO" / "COO" — appropriate for a 5-person
+    # micro-SaaS but wrong for a 5,000-employee bank (where CISO, DPO,
+    # CRO, Head of AI/ML, Head of Compliance are distinct appointments
+    # with BaFin-supervised accountability).
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default=0)
+    scale = str(_attr(ctx, "scale", default="MICRO")).upper()
+    try:
+        emp_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        emp_int = 0
+    if emp_int >= 1000 or scale in {"LARGE", "MAX"}:
+        rows = [
+            ("Compliance Lead", "Head of Compliance + DPO (BaFin-registered)",
+             "GDPR (Art. 37-39), DORA Art. 5-6, BaFin compliance reporting"),
+            ("Engineering Lead", "CTO / Head of Engineering + CISO office",
+             "CRA — secure development / vulnerability / Annex VII"),
+            ("Operations Lead", "COO + Head of Operations",
+             "NIS 2 Art. 21, DORA Art. 8-12 (ICT resilience + 24/7 SOC)"),
+            ("DPO (mandatory)", "Dedicated DPO (Datenschutzbeauftragter)",
+             "GDPR Art. 37-39 (mandatory for credit institutions per BaFin guidance)"),
+            ("CISO / Security Lead", "Dedicated CISO + CISO office (12 FTE)",
+             "CRA Annex I, NIS 2 Art. 21, DORA Art. 5-6"),
+            ("Chief Risk Officer", "CRO (operational resilience + DORA ICT risk)",
+             "DORA Art. 6 (ICT risk framework) + Art. 28 (third-party risk)"),
+            ("Head of AI/ML", "Head of AI/ML (credit-scoring AI governance)",
+             "AI Act Annex III §5(b) — Art. 26 deployer + Art. 27 FRIA"),
+        ]
+    elif emp_int >= 50 or scale == "MEDIUM":
+        rows = [
+            ("Compliance Lead", "Chief Compliance Officer / DPO",
+             "GDPR — controller + processor"),
+            ("Engineering Lead", "CTO / Head of Engineering",
+             "CRA — secure development / vulnerability"),
+            ("Operations Lead", "COO / Head of Operations",
+             "NIS 2, DORA (when applicable)"),
+            ("DPO", "Dedicated DPO (or shared DPO service for SMEs)",
+             "GDPR Art. 37-39 (mandatory where core activity = monitoring)"),
+            ("CISO / Security Lead", "Dedicated CISO / Security Lead",
+             "CRA Annex I, NIS 2, DORA"),
+        ]
+    else:
+        rows = [
+            ("Compliance Lead", "Chief Compliance Officer / DPO (CEO)", "GDPR — controller + processor"),
+            ("Engineering Lead", "CTO / Head of Engineering", "CRA — secure development / vulnerability"),
+            ("Operations Lead", "COO / Head of Operations", "NIS 2, DORA (when applicable)"),
+            ("DPO (voluntary)", "CEO (voluntary designation per Art. 37)", "GDPR Art. 37-39"),
+            ("CISO / Security Lead", "CTO (CRA Annex I Part II (8)(f))", "CRA Annex I, NIS 2, DORA"),
+        ]
     parts.append(markdown_table(headers, rows))
     parts.append("")
     return parts
@@ -341,66 +422,57 @@ def _section_regulation_level(state: dict[str, Any]) -> list[str]:
 def _section_key_roles(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 4. Key Roles\n")
-    parts.append(
-        "Functional roles are listed below. In a low-tier organisation "
-        "many hats fall on a single individual; backup assignments are "
-        "documented for incident-trigger continuity.\n"
-    )
     headers = ["Role", "Person / Team", "Reports To", "FTE Allocation", "Backup"]
+    # CORR-073: key-roles table is scale-aware. Pre-CORR-073 every case
+    # rendered the 7-row TinyTask fallback (CEO+Founder, CTO+Founder,
+    # 5 developers, etc.), producing "CEO as DPO" / "CTO as CISO" /
+    # "2 founders" output for a 5,000-employee bank — strictly wrong.
+    # Sprint 2: roles are now sourced from data/role_models/{tier}.yaml
+    # via load_role_model(tier), keyed off classify_tier(). The lead-in
+    # narrative remains per-tier but the rows are no longer hardcoded.
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default=0)
+    sector = _attr(ctx, "sector", default="")
+    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    try:
+        emp_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        emp_int = 0
+    tier = classify_tier(emp_int, sector, list(applicable))
+    if tier in {"LARGE", "MAX"}:
+        parts.append(
+            "Functional roles below reflect a **banking-grade organisational "
+            "structure**: dedicated CISO office, DPO, CRO, COO, Head of AI/ML, "
+            "and Head of Compliance, with separation of duties required under "
+            "BaFin ZAIT 5.6, MaRisk AT 4.5, and DORA Art. 5-6. Backup "
+            "assignments are documented for incident-trigger continuity.\n"
+        )
+    elif tier == "MEDIUM":
+        parts.append(
+            "Functional roles below reflect a **medium-sized organisation**: "
+            "named CISO + DPO + COO, with backup assignments for incident "
+            "continuity. Engineering team combines developers under the CTO.\n"
+        )
+    else:
+        parts.append(
+            "Functional roles are listed below. In a low-tier organisation "
+            "many hats fall on a single individual; backup assignments are "
+            "documented for incident-trigger continuity.\n"
+        )
     rows = [
         (
-            "CEO (also DPO)",
-            "Founder #1",
-            "Board (2 founders)",
-            "0.2 DPO + 0.8 CEO (combined 1.0)",
-            "CTO (acting DPO)",
-        ),
-        (
-            "CTO (also CISO)",
-            "Founder #2",
-            "Board (2 founders)",
-            "0.3 CISO + 0.7 CTO (combined 1.0)",
-            "CEO (acting CISO)",
-        ),
-        (
-            "Lead Developer",
-            "Senior engineer — most-tenured non-founder",
-            "CTO",
-            "1.0 (full developer; ~0.1 on security tasks via CI/CD and patching)",
-            "CTO for code-related security tasks",
-        ),
-        (
-            "Developers × 5",
-            "5 full-stack developers",
-            "CTO",
-            "5 × 1.0 across product development, secure coding, CI/CD maintenance, on-call rotation",
-            "Peer developers",
-        ),
-        (
-            "External Legal Adviser",
-            "External law firm (retainer)",
-            "CEO",
-            "0 (retainer; ad-hoc consultation)",
-            "None — single retainer",
-        ),
-        (
-            "Management Board",
-            "2 founders (CEO + CTO)",
-            "—",
-            "—",
-            "n/a — board is the board",
-        ),
-        (
-            "IR Lead",
-            "CTO in CISO capacity",
-            "n/a (rotational developer on-call)",
-            "Same as CTO/CISO; on-call rotation across developers",
-            "CEO",
-        ),
+            r.get("role", "-"),
+            r.get("person", "-"),
+            r.get("reports_to", "-"),
+            r.get("fte", "-"),
+            r.get("backup", "-"),
+        )
+        for r in load_role_model(tier)
     ]
     parts.append(markdown_table(headers, rows))
     parts.append("")
     return parts
+
 
 
 def _section_reporting_lines(

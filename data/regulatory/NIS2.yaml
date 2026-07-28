@@ -1,0 +1,20 @@
+regulation: NIS2
+full_name: Directive on security of network and information systems
+articles:
+  - id: Art. 21
+    title: Cybersecurity risk-management measures
+    phase1_relevance: 14 control domains
+  - id: Art. 23
+    title: Reporting obligations
+    phase1_relevance: 24h early warning, 72h notification
+  - id: Art. 21(2)(f)
+    title: Supply chain security
+    phase1_relevance: Third-party ICT risk
+  - id: Art. 21(2)(g)
+    title: Business continuity
+    phase1_relevance: BCP and DR
+phase1_summary: |
+  NIS2 applies to essential and important entities. Phase 1 captures:
+  (a) entity classification (essential vs important), (b) 10 baseline
+  measures per Art. 21, (c) 24h early warning + 72h incident report
+  process, (d) supply chain security controls.

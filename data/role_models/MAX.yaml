@@ -1,0 +1,46 @@
+tier: MAX
+roles:
+  - role: CEO
+    person: Chief Executive Officer
+    reports_to: Board
+    fte: "1.0"
+    backup: Deputy CEO
+    regulations: [GDPR, AI_Act, NIS2, DORA]
+    notes: Executive sponsor
+  - role: DPO (with regional deputies)
+    person: Chief Compliance Officer
+    reports_to: CEO
+    fte: "1.0"
+    backup: Regional DPOs (per jurisdiction)
+    regulations: [GDPR, AI_Act, DORA, NIS2]
+    notes: Cross-jurisdictional DPO coordination
+  - role: CISO + SOC Lead
+    person: Chief Information Security Officer
+    reports_to: CTO
+    fte: "1.0"
+    backup: Deputy CISO
+    regulations: [NIS2, DORA, CRA]
+    notes: Dedicated 24/7 SOC team
+  - role: CRO + Risk Committee
+    person: Chief Risk Officer
+    reports_to: CEO
+    fte: "1.0"
+    backup: Head of Operational Risk
+    regulations: [DORA, NIS2, AI_Act]
+    notes: Risk committee with quarterly reviews
+  - role: Head of AI/ML + MLRO
+    person: VP AI
+    reports_to: CTO
+    fte: "1.0"
+    backup: Senior ML Engineer
+    regulations: [AI_Act]
+    notes: MLRO function for model risk
+  - role: Head of Outsourcing Committee
+    person: Chief Procurement Officer
+    reports_to: CFO
+    fte: "1.0"
+    backup: Deputy
+    regulations: [DORA]
+    notes: Third-party risk committee
+contact_patterns:
+  placeholder: "{role}@{company_slug}.example"

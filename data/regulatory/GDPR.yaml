@@ -1,0 +1,30 @@
+regulation: GDPR
+full_name: General Data Protection Regulation
+articles:
+  - id: Art. 5
+    title: Principles relating to processing of personal data
+    phase1_relevance: Lawfulness, fairness, purpose limitation
+  - id: Art. 30
+    title: Records of processing activities
+    phase1_relevance: "Mandatory for organizations with 250+ employees or risky processing"
+  - id: Art. 32
+    title: Security of processing
+    phase1_relevance: Technical and organizational measures
+  - id: Art. 33
+    title: Notification of personal data breach to the supervisory authority
+    phase1_relevance: Incident response within 72h
+  - id: Art. 35
+    title: Data protection impact assessment
+    phase1_relevance: High-risk processing
+  - id: Art. 37
+    title: Designation of the data protection officer
+    phase1_relevance: Mandatory DPO for sensitive processing or large-scale monitoring
+  - id: Art. 38
+    title: Position of the data protection officer
+  - id: Art. 39
+    title: Tasks of the data protection officer
+phase1_summary: |
+  GDPR applies to all processing of personal data of EU data subjects. Phase 1
+  captures: (a) Records of Processing Activities per Art. 30, (b) Security
+  measures per Art. 32, (c) DPO designation per Art. 37, (d) Breach notification
+  process per Art. 33, (e) Data subject categories and lawful bases.

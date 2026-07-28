@@ -1,0 +1,25 @@
+tier: MEDIUM
+identity:
+  description: "is assessed as a medium-scale {sector} entity"
+  employee_phrase: "{employees} employees"
+  scope: "established mid-market"
+role_separation:
+  dpo: "dedicated or external advisor"
+  ciso: "dedicated or combined with Head of Security"
+  cro: "designated (often combined)"
+maturity:
+  default_target: 3
+  default_min: 2
+clause_emphasis:
+  - "GDPR Art. 30 (Records of Processing)"
+  - "GDPR Art. 32 (security of processing)"
+  - "CRA Annex I Part I (essential requirements)"
+  - "CRA Annex I Part II (vulnerability handling)"
+  - "NIS2 important entity obligations (if applicable)"
+  - "AI Act Annex III (high-risk classification, if applicable)"
+incident_response:
+  workflow: "documented and tested annually"
+  sla: "GDPR 72h, NIS2 24h early warning"
+third_party:
+  register: "explicit (DPA + Art. 28 if DORA)"
+  criticality: "medium"

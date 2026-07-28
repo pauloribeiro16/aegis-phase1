@@ -1,0 +1,26 @@
+regulation: AI_Act
+full_name: AI Act
+articles:
+  - id: Art. 6
+    title: Classification rules for high-risk AI systems
+    phase1_relevance: Annex III high-risk categories
+  - id: Art. 9
+    title: Risk management system
+    phase1_relevance: Continuous risk management
+  - id: Art. 10
+    title: Data and data governance
+    phase1_relevance: Training data quality
+  - id: Art. 14
+    title: Human oversight
+    phase1_relevance: Oversight mechanisms
+  - id: Art. 17
+    title: Quality management system
+    phase1_relevance: QMS for high-risk AI
+  - id: Annex III
+    title: High-risk AI systems
+    phase1_relevance: Credit scoring, employment, etc.
+phase1_summary: |
+  AI Act applies to providers and deployers of AI systems. Phase 1 captures:
+  (a) AI system inventory, (b) Annex III high-risk classification,
+  (c) provider/deployer role allocation, (d) data governance evidence,
+  (e) human oversight design, (f) fundamental rights impact.

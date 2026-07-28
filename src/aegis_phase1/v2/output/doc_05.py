@@ -45,6 +45,7 @@ from aegis_phase1.v2.context.applicability_context import (
     build_applicability_context,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
+from aegis_phase1.data.loader import get_regulation_summary
 
 # CORR-061 S3b: spec IDs that this doc consumes from
 # ``state["per_spec_markdown"]``. Kept local to the doc so the
@@ -59,43 +60,13 @@ _FILENAME = "05_Regulatory_Applicability.md"
 _MAX_FRAGMENT_BYTES = 4000
 _MOCK_TRUTHS = {"1", "true", "yes", "on"}
 
-_REG_THRESHOLDS: dict[str, dict[str, str]] = {
-    "GDPR": {
-        "trigger": "processes personal data of EU data subjects",
-        "size_threshold": "any (no size exemption in Art. 2)",
-        "role_threshold": "controller or processor (Art. 4)",
-        "retention_min": "Art. 5(1)(e) — kept only as long as necessary",
-        "breach_clock": "Art. 33 — controller to SA within 72 h",
-    },
-    "CRA": {
-        "trigger": "places digital products on the EU market",
-        "size_threshold": "any (no size exemption in Art. 2)",
-        "role_threshold": "manufacturer (Art. 3)",
-        "retention_min": "Art. 13(8) support ≥ 5 y; Art. 13(9) updates ≥ 10 y",
-        "breach_clock": "Art. 14 — early warning within 24 h; final ≤ 72 h",
-    },
-    "NIS2": {
-        "trigger": "essential or important entity (Annex I/II)",
-        "size_threshold": "≥ 50 employees OR ≥ €10 M turnover",
-        "role_threshold": "essential entity / important entity",
-        "retention_min": "Art. 21 — record-keeping ≥ 6 months",
-        "breach_clock": "Art. 23 — early warning within 24 h",
-    },
-    "DORA": {
-        "trigger": "financial entity (Art. 2 scope)",
-        "size_threshold": "any financial entity in scope",
-        "role_threshold": "financial entity / ICT third-party provider",
-        "retention_min": "Art. 17 — register of contractual arrangements",
-        "breach_clock": "Art. 19 — initial notification within 4 h, intermediate ≤ 72 h",
-    },
-    "AI Act": {
-        "trigger": "provider / deployer / importer / distributor of AI systems",
-        "size_threshold": "any (provider obligations from Art. 16)",
-        "role_threshold": "provider or deployer",
-        "retention_min": "Art. 12 — logs ≥ 6 months for high-risk",
-        "breach_clock": "Art. 73 — serious incident reporting",
-    },
-}
+
+def _regulatory_summary(regulation: str) -> str:
+    """Return the Phase 1 scope summary for a regulation from data/regulatory/."""
+    try:
+        return get_regulation_summary(regulation)
+    except FileNotFoundError:
+        return ""
 
 
 def render_doc_05(
@@ -146,7 +117,7 @@ def render_doc_05(
     parts.extend(_section_0_applicability_summary(app_ctx))
 
     parts.extend(_section_1_purpose())
-    parts.extend(_section_2_summary(regs))
+    parts.extend(_section_2_summary(regs, app_ctx=app_ctx))
     parts.extend(
         _section_3_per_regulation(regs, assessment_by_reg, ontology)
     )
@@ -282,25 +253,58 @@ def _section_0_applicability_summary(app_ctx: ApplicabilityContext) -> list[str]
     return parts
 
 
-def _section_2_summary(regs: list[Any]) -> list[str]:
+def _section_2_summary(
+    regs: list[Any], app_ctx: ApplicabilityContext | None = None
+) -> list[str]:
+    """CORR-073: §2 APPLICABLE SUMMARY sources from app_ctx (CORR-038 truth).
+
+    Pre-CORR-073 this section read ``state["regulations"]`` (legacy v1 list)
+    which is empty in v2 — producing "(0) applicable regulations" output
+    despite 5 regs being listed in the frontmatter. The fix: prefer
+    ``app_ctx.applicable_regs`` + ``app_ctx.clause_count_per_reg`` when
+    available; fall back to legacy ``regs`` (with ``clause_count``) so
+    callers that don't pass ``app_ctx`` continue to work.
+
+    ``regs`` is kept in the signature for backwards compatibility with
+    tests + downstream consumers that pass the legacy list.
+    """
     parts: list[str] = []
-    applicable = [r for r in regs if isinstance(r, Mapping) and r.get("applicable")]
-    not_applicable = [r for r in regs if isinstance(r, Mapping) and not r.get("applicable")]
     parts.append("## 2. APPLICABLE SUMMARY\n")
-    parts.append(
-        f"- **Applicable regulations ({len(applicable)}):** "
-        + (", ".join(_abbr(r) for r in applicable) if applicable else "-")
-    )
-    parts.append(
-        f"- **Non-applicable regulations ({len(not_applicable)}):** "
-        + (", ".join(_abbr(r) for r in not_applicable) if not_applicable else "-")
-    )
-    total_clauses = sum(
-        int(r.get("clause_count", 0) or 0)
-        for r in regs
-        if isinstance(r, Mapping)
-    )
-    parts.append(f"- **Total applicable clauses across the case:** {total_clauses}")
+    if app_ctx is not None and (app_ctx.applicable_regs or app_ctx.declared_applicable_regs):
+        # CORR-073: source from canonical ApplicabilityContext.
+        applicable = list(app_ctx.applicable_regs)
+        declared = list(app_ctx.declared_applicable_regs)
+        applicable_set = set(applicable)
+        non_applicable = sorted(set(declared) - applicable_set)
+        total_clauses = sum(int(c or 0) for c in app_ctx.clause_count_per_reg.values())
+        parts.append(
+            f"- **Applicable regulations ({len(applicable)}):** "
+            + (", ".join(applicable) if applicable else "-")
+        )
+        parts.append(
+            f"- **Non-applicable regulations ({len(non_applicable)}):** "
+            + (", ".join(non_applicable) if non_applicable else "-")
+        )
+        parts.append(f"- **Total applicable clauses across the case:** {total_clauses}")
+    else:
+        # Legacy path — preserve behaviour for any caller that hasn't
+        # passed app_ctx (e.g. legacy unit tests).
+        applicable = [r for r in regs if isinstance(r, Mapping) and r.get("applicable")]
+        not_applicable = [r for r in regs if isinstance(r, Mapping) and not r.get("applicable")]
+        parts.append(
+            f"- **Applicable regulations ({len(applicable)}):** "
+            + (", ".join(_abbr(r) for r in applicable) if applicable else "-")
+        )
+        parts.append(
+            f"- **Non-applicable regulations ({len(not_applicable)}):** "
+            + (", ".join(_abbr(r) for r in not_applicable) if not_applicable else "-")
+        )
+        total_clauses = sum(
+            int(r.get("clause_count", 0) or 0)
+            for r in regs
+            if isinstance(r, Mapping)
+        )
+        parts.append(f"- **Total applicable clauses across the case:** {total_clauses}")
     parts.append("")
     return parts
 
@@ -1067,6 +1071,14 @@ def _build_frontmatter(state: dict[str, Any], regs: list[Any]) -> str:
     # so the frontmatter is consistent with §0.
     app_ctx = build_applicability_context(state)
     applicable = list(app_ctx.applicable_regs)
+    # Sprint-2: case_study falls back to v2_company_facts.name when
+    # company_context.company_name is missing.
+    case_study = getattr(ctx, "company_name", "UNKNOWN") if ctx else "UNKNOWN"
+    if case_study == "UNKNOWN":
+        facts = state.get("v2_company_facts")
+        name_attr = getattr(facts, "name", None) if facts is not None else None
+        if name_attr:
+            case_study = str(name_attr)
     payload: dict[str, Any] = {
         "document_id": "AEGIS-P1-05",
         "title": "Regulatory Applicability Assessment",
@@ -1076,7 +1088,7 @@ def _build_frontmatter(state: dict[str, Any], regs: list[Any]) -> str:
         "updated": now,
         "author": "Executor",
         "status": "DRAFT",
-        "case_study": getattr(ctx, "company_name", "UNKNOWN") if ctx else "UNKNOWN",
+        "case_study": case_study,
         "inputs": [
             "04_Company_Context_Assessment.md",
             "../00_COMMON/01_Company_Context.md",
