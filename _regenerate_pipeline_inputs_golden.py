@@ -68,21 +68,40 @@ print(f"Loaded {len(tipo2_all)} tipo2, {len(tipo3_all)} tipo3, {len(all_subdomai
 
 # ── Helpers (mirror orchestrator) ──────────────────────────────────────
 def build_layer0_refs(subdomain_ids):
+    """Mirror orchestrator._build_layer0_subdomain_refs exactly.
+
+    The previous implementation included the full ``hso_hl`` and
+    ``hso_per_reg`` Pydantic repr strings (~15K per ref). The
+    orchestrator only carries ``hso_hl_objective`` (extracted string),
+    which produces ~3K per ref and brings the post-filter payload
+    under the CORR-049 512KB cap.
+    """
     by_id = {s.id: s for s in all_subdomains}
     refs = []
     for sid in subdomain_ids:
         sd = by_id.get(sid)
         if sd is None:
             continue
+        anchors: list[str] = []
+        for sr in (getattr(sd, "security_requirements", None) or []):
+            anchors.extend(getattr(sr, "anchors", None) or [])
+        objective = sd.hso_hl.objective if getattr(sd, "hso_hl", None) else None
+        pairs = [
+            p.model_dump() if hasattr(p, "model_dump") else p
+            for p in (getattr(sd, "pairs", None) or [])
+        ]
         refs.append({
             "sub_domain_id": sd.id,
-            "domain_id": sd.id.split(".")[0] if "." in sd.id else sd.id,
-            "title": sd.title or sd.id,
-            "objective": getattr(sd, "objective", "") or "",
-            "hso_hl": getattr(sd, "hso_hl", "") or "",
-            "hso_per_reg": getattr(sd, "hso_per_reg", []) or [],
-            "participating_regulations": getattr(sd, "participating_regulations", []) or [],
-            "pairs": getattr(sd, "pairs", []) or [],
+            "title": getattr(sd, "title", None) or sd.id,
+            "domain_id": getattr(sd, "domain_id", None) or sd.id.split(".")[0],
+            "participating_regulations": list(
+                getattr(sd, "participating_regulations", None) or []
+            ),
+            "hso_hl_objective": objective,
+            "objective": objective,
+            "pairs": pairs,
+            "anchors": sorted(set(anchors)),
+            "csf": list(getattr(sd, "csf_hint", None) or []),
         })
     return refs
 
@@ -152,6 +171,16 @@ for case_name, applicable_regs in CASES.items():
             tipo3_enriched = tipo3_filtered
         layer0_catalog = {"tipo2": tipo2_filtered, "tipo3": tipo3_enriched}
 
+        # CORR-071: per-reg filter mirrors phase1_executor.run_phase_1b
+        # (same predicate: ``reg in ref.participating_regulations``).
+        # The executor applies this filter at runtime so the LLM
+        # receives only refs where the regulation participates.
+        # Goldens must reflect what the LLM actually sees.
+        lane_refs = [
+            r for r in layer0_subdomain_refs
+            if reg in (r.get("participating_regulations") or [])
+        ]
+
         inputs = {
             "case_id": case_name,
             "lane_id": reg,
@@ -160,7 +189,7 @@ for case_name, applicable_regs in CASES.items():
             "classification": classification,
             "coverage_matrix_row": make_coverage_row(reg),
             "aggregated_activations": [],
-            "layer0_subdomain_refs": layer0_subdomain_refs,
+            "layer0_subdomain_refs": lane_refs,
             "layer0_catalog": layer0_catalog,
         }
 

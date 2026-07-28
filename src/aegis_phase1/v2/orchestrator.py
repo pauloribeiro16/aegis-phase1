@@ -1702,14 +1702,11 @@ class Phase1Orchestrator:
         layer0_catalog = self._load_filtered_catalogs_for_reg(reg_id, cc)
 
         case_id = Path(self.state.get("case_path") or "case").name
-        # CORR-070 Bug A: layer0_catalog (small, ~25K) must come BEFORE
-        # layer0_subdomain_refs (large, ~544K) so the catalog survives
-        # the CORR-049 512KB cap. json.dumps preserves key order, so a
-        # dict that puts refs first puts the catalog at the tail and
-        # the cap truncates the catalog + # TASK. Reversed the order
-        # to put the catalog at the head. Refs may be partially
-        # truncated — the LLM tolerates partial refs better than a
-        # missing catalog (P1B-LLM-01 spec requires the catalog).
+        # CORR-071: the orchestrator passes the full set of refs and
+        # the executor (run_phase_1b) filters per-regulation before
+        # invoking the LLM. This makes the CORR-070 BUG-A kwarg-reorder
+        # workaround structurally unnecessary — filtered refs fit
+        # under the CORR-049 512KB cap without ordering tricks.
         result = executor.run_phase_1b(
             case_id=case_id,
             applicable_regs=[reg_id],

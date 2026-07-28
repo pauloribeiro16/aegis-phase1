@@ -36,108 +36,415 @@
     "layer0_subdomain_refs": [
       {
         "sub_domain_id": "D-01.1",
-        "domain_id": "D-01",
         "title": "D-01.1 Data at Rest Encryption",
-        "objective": "",
-        "hso_hl": "id='SO-D-01.1.HL' subdomain_id='D-01.1' is_high_level=True applies_to=['ALL'] derivation_source='../../CrossRegulation/DeepAnalysis/D-01_Data-Protection/D-01.1.md \u00a7D-01.1' verified_relationship_basis='CRDA-deep verified (6 pairs, all SAME \u2014 CRDA initial 5 COMPLEMENTARY + 1 EQUAL corrected to SAME after OJ-text analysis)' emergent_tensions=0 objective=\"Data held at rest in storage is protected against unauthorised\\naccess through appropriate technical measures \u2014 primarily encryption with\\nappropriate key custody \u2014 calibrated to the risks identified in the entity's\\nrisk assessment and commensurate with the state of the art.\" considerations=['The four participating regulations converge on the same substantive obligation'] anchors=[] csf=[] inherits_from=None source_SR=None activation='auto'",
-        "hso_per_reg": [
-          "id='SO-D-01.1.GDPR' yaml_id='SO-D-01.1.GDPR' regulation='GDPR' subdomain_id='D-01.1' applies_to='[GDPR]' inherits_from='SO-GDPR-001' source_SR='SR-GDPR-001' activation='if GDPR in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Personal data at rest is processed in a manner that ensures\\nappropriate security \u2014 including protection against unauthorised or\\nunlawful processing and against accidental loss, destruction or damage \u2014\\nusing appropriate technical or organisational measures, with the ability\\nto ensure the ongoing confidentiality, integrity, availability and\\nresilience of processing systems and services (Art. 5(1)(f) + Art.\\n32(1)(b); the `appropriate` threshold is anchored by the five Art. 32(1)\\npreamble factors \u2014 state of the art, costs of implementation, nature,\\nscope, context, purposes, risks).' considerations=[\"GDPR's anchor is the strictest for personal data on the at-rest dimension\"] anchors=['Art.\\n32(1)', 'Art. 32(1)', 'Art. 5(1)'] csf=[]",
-          "id='SO-D-01.1.NIS2' yaml_id='SO-D-01.1.NIS2' regulation='NIS2' subdomain_id='D-01.1' applies_to='[NIS2]' inherits_from='SO-NIS2-001' source_SR='SR-NIS2-001' activation='if NIS2 in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Essential and important entities establish policies and\\nprocedures regarding the use of cryptography and, where appropriate,\\nencryption, covering the confidentiality, integrity, and authenticity of\\ndata stored, transmitted, and processed by network and information\\nsystems (Art. 21(2)(h)).' considerations=['The `where appropriate` hedge on encryption admits a narrower scope than'] anchors=['Art. 21(2)'] csf=[]",
-          "id='SO-D-01.1.CRA' yaml_id='SO-D-01.1.CRA' regulation='CRA' subdomain_id='D-01.1' applies_to='[CRA]' inherits_from='SO-CRA-002' source_SR='SR-CRA-002' activation='if CRA in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Where a product with digital elements stores data \u2014\\npersonal or other \u2014 the confidentiality of that data is protected by\\nencrypting relevant data at rest using state-of-the-art mechanisms\\n(Annex I Part I (2)(e)).' considerations=['The CRA state-of-the-art baseline + harmonised-standards anchor (Art. 27)'] anchors=['Annex I Part I (2)', 'Art. 27'] csf=[]",
-          "id='SO-D-01.1.DORA' yaml_id='SO-D-01.1.DORA' regulation='DORA' subdomain_id='D-01.1' applies_to='[DORA]' inherits_from='SO-DORA-001' source_SR='SR-DORA-001' activation='if DORA in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Data confidentiality, integrity, authenticity and\\navailability are maintained at high standards across all data states,\\nincluding at rest, through ICT security policies, procedures, protocols\\nand tools designed to ensure ICT-system resilience, continuity and\\navailability (Art. 9(2)).' considerations=[\"DORA is OJ-explicit on the at-rest dimension (unlike GDPR's scope-imposed\"] anchors=['Art. 9(2)'] csf=[]"
-        ],
+        "domain_id": "D-01",
         "participating_regulations": [
           "GDPR",
           "NIS2",
           "CRA",
           "DORA"
         ],
+        "hso_hl_objective": "Data held at rest in storage is protected against unauthorised\naccess through appropriate technical measures \u2014 primarily encryption with\nappropriate key custody \u2014 calibrated to the risks identified in the entity's\nrisk assessment and commensurate with the state of the art.",
+        "objective": "Data held at rest in storage is protected against unauthorised\naccess through appropriate technical measures \u2014 primarily encryption with\nappropriate key custody \u2014 calibrated to the risks identified in the entity's\nrisk assessment and commensurate with the state of the art.",
         "pairs": [
-          "id='D-01.1_GDPR-NIS2' subdomain_id='D-01.1' pair='GDPR \u2194 NIS2' reg_a='GDPR' reg_b='NIS2' classification='SAME (CORRECTED \u2014 terminology only, not substance).' verified_relationship='SAME (CORRECTED \u2014 terminology only, not substance).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y \u2014 the GDPR controller that is also a NIS 2 essential entity bears both obligations on the same datastore.' downstream_implication='** For Phase 1C Doc 07, D-01.1 is a **stack-merge with documentation** sub-domain: a single at-rest encryption deployment (e.g. approved symmetric cipher with appropriate key custody under separate logical access) plus the joint Article 32 / Art. 21(2)(h) risk-assessment artefact discharges both obligations on a NIS 2 essential entity that is a GDPR controller.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.1_GDPR-CRA' subdomain_id='D-01.1' pair='GDPR \u2194 CRA' reg_a='GDPR' reg_b='CRA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test=\"** Conditional \u2014 disjoint in the baseline case (CRA manufacturer is not the GDPR controller; the SaaS deployer is the GDPR controller inheriting CRA's product-side baseline). Y when the same party is both manufacturer and controller (integrated vendors).\" downstream_implication='** For Phase 1C Doc 07, this is a **disjoint baseline / scope-conditional** pair: a non-integrated SaaS-uses-CRA-product company has separate compliance tracks (CRA SBOM intake from vendor + GDPR at-rest implementation by controller); an integrated manufacturer-controller has one combined documentation pack.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.1_GDPR-DORA' subdomain_id='D-01.1' pair='GDPR \u2194 DORA' reg_a='GDPR' reg_b='DORA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y \u2014 the DORA financial entity is the GDPR controller on the same data assets.' downstream_implication=\"** Stack-merge with overlay: DORA's classification-driven cipher-strength tiering (PR.DS-01 + GV.RM-04 per SR-DORA-003) sits on top of the joint at-rest encryption; for a DORA financial entity that is also a GDPR controller, a tiered key-management architecture addresses both.\" verbatim_articles={} source_subdomain=None",
-          "id='D-01.1_NIS2-CRA' subdomain_id='D-01.1' pair='NIS2 \u2194 CRA' reg_a='NIS2' reg_b='CRA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y \u2014 the NIS 2 essential entity bears both obligations on the same artefact.' downstream_implication='** Stack-merge. A CRA-compliant product used by a NIS 2 essential entity discharges the product-side encryption floor; the entity adds the policy/appropriate-and-proportionate layer per Art. 21(1).' verbatim_articles={} source_subdomain=None",
-          "id='D-01.1_NIS2-DORA' subdomain_id='D-01.1' pair='NIS2 \u2194 DORA' reg_a='NIS2' reg_b='DORA' classification='SAME (CORRECTED \u2014 no change).' verified_relationship='SAME (CORRECTED \u2014 no change).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y for the DORA financial entity that is also a NIS 2 essential entity; N (disjoint in baseline) for the NIS 2 essential entity in the financial sector (DORA is lex specialis).' downstream_implication='** Stack-merge for the cross-sector entity; lex specialis for the financial entity (DORA absorbs the NIS 2 obligation).' verbatim_articles={} source_subdomain=None",
-          "id='D-01.1_CRA-DORA' subdomain_id='D-01.1' pair='CRA \u2194 DORA' reg_a='CRA' reg_b='DORA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y when the DORA financial entity deploys a CRA product; disjoint in baseline (CRA manufacturer \u2260 DORA financial entity).' downstream_implication='** Stack-merge. The CRA product supplies the at-rest floor (Annex I (2)(e)); DORA financial entity adds in-use (PR.DS-10) + classification-driven cipher strength (SR-DORA-003, GV.RM-04) + key custody.' verbatim_articles={} source_subdomain=None"
+          {
+            "id": "D-01.1_GDPR-NIS2",
+            "subdomain_id": "D-01.1",
+            "pair": "GDPR \u2194 NIS2",
+            "reg_a": "GDPR",
+            "reg_b": "NIS2",
+            "classification": "SAME (CORRECTED \u2014 terminology only, not substance).",
+            "verified_relationship": "SAME (CORRECTED \u2014 terminology only, not substance).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y \u2014 the GDPR controller that is also a NIS 2 essential entity bears both obligations on the same datastore.",
+            "downstream_implication": "** For Phase 1C Doc 07, D-01.1 is a **stack-merge with documentation** sub-domain: a single at-rest encryption deployment (e.g. approved symmetric cipher with appropriate key custody under separate logical access) plus the joint Article 32 / Art. 21(2)(h) risk-assessment artefact discharges both obligations on a NIS 2 essential entity that is a GDPR controller.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.1_GDPR-CRA",
+            "subdomain_id": "D-01.1",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Conditional \u2014 disjoint in the baseline case (CRA manufacturer is not the GDPR controller; the SaaS deployer is the GDPR controller inheriting CRA's product-side baseline). Y when the same party is both manufacturer and controller (integrated vendors).",
+            "downstream_implication": "** For Phase 1C Doc 07, this is a **disjoint baseline / scope-conditional** pair: a non-integrated SaaS-uses-CRA-product company has separate compliance tracks (CRA SBOM intake from vendor + GDPR at-rest implementation by controller); an integrated manufacturer-controller has one combined documentation pack.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.1_GDPR-DORA",
+            "subdomain_id": "D-01.1",
+            "pair": "GDPR \u2194 DORA",
+            "reg_a": "GDPR",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y \u2014 the DORA financial entity is the GDPR controller on the same data assets.",
+            "downstream_implication": "** Stack-merge with overlay: DORA's classification-driven cipher-strength tiering (PR.DS-01 + GV.RM-04 per SR-DORA-003) sits on top of the joint at-rest encryption; for a DORA financial entity that is also a GDPR controller, a tiered key-management architecture addresses both.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.1_NIS2-CRA",
+            "subdomain_id": "D-01.1",
+            "pair": "NIS2 \u2194 CRA",
+            "reg_a": "NIS2",
+            "reg_b": "CRA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y \u2014 the NIS 2 essential entity bears both obligations on the same artefact.",
+            "downstream_implication": "** Stack-merge. A CRA-compliant product used by a NIS 2 essential entity discharges the product-side encryption floor; the entity adds the policy/appropriate-and-proportionate layer per Art. 21(1).",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.1_NIS2-DORA",
+            "subdomain_id": "D-01.1",
+            "pair": "NIS2 \u2194 DORA",
+            "reg_a": "NIS2",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 no change).",
+            "verified_relationship": "SAME (CORRECTED \u2014 no change).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the DORA financial entity that is also a NIS 2 essential entity; N (disjoint in baseline) for the NIS 2 essential entity in the financial sector (DORA is lex specialis).",
+            "downstream_implication": "** Stack-merge for the cross-sector entity; lex specialis for the financial entity (DORA absorbs the NIS 2 obligation).",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.1_CRA-DORA",
+            "subdomain_id": "D-01.1",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y when the DORA financial entity deploys a CRA product; disjoint in baseline (CRA manufacturer \u2260 DORA financial entity).",
+            "downstream_implication": "** Stack-merge. The CRA product supplies the at-rest floor (Annex I (2)(e)); DORA financial entity adds in-use (PR.DS-10) + classification-driven cipher strength (SR-DORA-003, GV.RM-04) + key custody.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I",
+          "Annex I (2)",
+          "Annex I Part I (2)",
+          "Annex II",
+          "Art. 15",
+          "Art. 21(2)",
+          "Art. 27",
+          "Art. 3(47)",
+          "Art. 32(1)",
+          "Art. 4(1)",
+          "Art. 5(1)",
+          "Art. 9(2)",
+          "Art. 9(4)"
+        ],
+        "csf": [
+          "PR.DS-01",
+          "PR.DS-10",
+          "PR.DS-11",
+          "PR.AA-01",
+          "PR.AA-05",
+          "ID.AM-08",
+          "GV.RM-04",
+          "DE.CM-09"
         ]
       },
       {
         "sub_domain_id": "D-01.2",
-        "domain_id": "D-01",
         "title": "D-01.2 Data in Transit Encryption",
-        "objective": "",
-        "hso_hl": "id='SO-D-01.2.HL' subdomain_id='D-01.2' is_high_level=True applies_to=['ALL'] derivation_source='../../CrossRegulation/DeepAnalysis/D-01_Data-Protection/D-01.2.md \u00a7D-01.2' verified_relationship_basis='CRDA-deep verified (3 pairs, all SAME \u2014 CRDA initial 3 COMPLEMENTARY corrected to SAME after OJ-text analysis)' emergent_tensions=0 objective='Data in transit \u2014 across network paths, inter-service\\ncalls, and third-party APIs \u2014 is protected against unauthorised disclosure\\nand alteration through cryptographic confidentiality and integrity controls\\n(mutual authentication, encryption, integrity verification).' considerations=['The three participating regulations converge on the same substantive'] anchors=[] csf=[] inherits_from=None source_SR=None activation='auto'",
-        "hso_per_reg": [
-          "id='SO-D-01.2.GDPR' yaml_id='SO-D-01.2.GDPR' regulation='GDPR' subdomain_id='D-01.2' applies_to='[GDPR]' inherits_from='SO-GDPR-001  # cross-ref \u2014 D-01.2 is covered by SO-GDPR-001 (D-01.1) per per-reg SO file' source_SR='SR-GDPR-002' activation='if GDPR in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Personal data transmitted across networks, inter-service\\nchannels, and third-party infrastructure remains confidential and\\nunaltered in transit, with the in-transit protection anchored to the\\nfive-event Art. 32(2) risk enumeration (accidental or unlawful\\ndestruction, loss, alteration, unauthorised disclosure of, or access\\nto, personal data transmitted) (Art. 32(1)(b) + Art. 32(2)).\\n\\n**CSF anchors (from `SR-GDPR-002` v0.3 security_rationale):**\\nPR.DS-02, PR.IR-01.' considerations=[] anchors=['Art. 32(1)', 'Art. 32(2)'] csf=['PR.DS-02', 'PR.IR-01']",
-          "id='SO-D-01.2.CRA' yaml_id='SO-D-01.2.CRA' regulation='CRA' subdomain_id='D-01.2' applies_to='[CRA]' inherits_from='SO-CRA-003' source_SR='SR-CRA-003' activation='if CRA in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Where data is transmitted by a product with digital\\nelements \u2014 personal or other \u2014 the confidentiality of the data in transit\\nis protected by encrypting relevant data using state-of-the-art mechanisms,\\nwith the Annex I (2)(j) attack-surface-limitation leg constraining the\\nexposed interfaces through which the data could otherwise leak (Annex I\\nPart I (2)(e) + (2)(j)).' considerations=['The CRA state-of-the-art + attack-surface-limitation substrate is stricter'] anchors=['Annex I\\nPart I (2)', 'Annex I (2)'] csf=[]",
-          "id='SO-D-01.2.DORA' yaml_id='SO-D-01.2.DORA' regulation='DORA' subdomain_id='D-01.2' applies_to='[DORA]' inherits_from='SO-DORA-001' source_SR='SR-DORA-001' activation='if DORA in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Data confidentiality, integrity, authenticity and\\navailability are maintained at high standards across all data states,\\nincluding in transit, through ICT security policies, procedures, protocols\\nand tools (Art. 9(2)).' considerations=['DORA is OJ-explicit on the `in transit` dimension; the entity-level'] anchors=['Art. 9(2)'] csf=[]",
-          "id='SO-D-01.2.NIS2' yaml_id='SO-D-01.2.NIS2' regulation='NIS2' subdomain_id='D-01.2' applies_to=['NIS2'] inherits_from='SO-NIS2-004' source_SR='CORR-030 propagation (cross-ref \u2014 partial coverage per master 01_SecurityObjectives.md)' activation='auto (propagated by CORR-030 from SO-NIS2-004 master SO, partial)' phase_1A_role='propagated' verified_relationship='PARTIAL (master 01_SecObj declares D-03.2 primary, D-01.2 partial)' objective='' considerations=[] anchors=[] csf=[]"
-        ],
+        "domain_id": "D-01",
         "participating_regulations": [
           "GDPR",
           "CRA",
           "DORA"
         ],
+        "hso_hl_objective": "Data in transit \u2014 across network paths, inter-service\ncalls, and third-party APIs \u2014 is protected against unauthorised disclosure\nand alteration through cryptographic confidentiality and integrity controls\n(mutual authentication, encryption, integrity verification).",
+        "objective": "Data in transit \u2014 across network paths, inter-service\ncalls, and third-party APIs \u2014 is protected against unauthorised disclosure\nand alteration through cryptographic confidentiality and integrity controls\n(mutual authentication, encryption, integrity verification).",
         "pairs": [
-          "id='D-01.2_GDPR-CRA' subdomain_id='D-01.2' pair='GDPR \u2194 CRA' reg_a='GDPR' reg_b='CRA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y when the same product transmits personal data; disjoint in baseline (CRA manufacturer \u2260 GDPR controller).' downstream_implication='** Stack-merge on the same channel; a CRA-compliant TLS configuration + network-segmentation profile discharges the GDPR Art. 32(1)(b)/(2) in-transit control.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.2_GDPR-DORA' subdomain_id='D-01.2' pair='GDPR \u2194 DORA' reg_a='GDPR' reg_b='DORA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y for the DORA financial entity processing personal data.' downstream_implication='** Single-control \u2014 a mutually-authenticated encrypted-channel architecture + documented network-segmentation policy satisfies both.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.2_CRA-DORA' subdomain_id='D-01.2' pair='CRA \u2194 DORA' reg_a='CRA' reg_b='DORA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y (DORA financial entity using CRA product); disjoint in baseline (manufacturer \u2260 financial entity).' downstream_implication='** Stack-merge \u2014 CRA product supplies the in-transit cipher-suite and surface-limitation baseline; DORA entity adds the deployment governance.' verbatim_articles={} source_subdomain=None"
+          {
+            "id": "D-01.2_GDPR-CRA",
+            "subdomain_id": "D-01.2",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y when the same product transmits personal data; disjoint in baseline (CRA manufacturer \u2260 GDPR controller).",
+            "downstream_implication": "** Stack-merge on the same channel; a CRA-compliant TLS configuration + network-segmentation profile discharges the GDPR Art. 32(1)(b)/(2) in-transit control.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.2_GDPR-DORA",
+            "subdomain_id": "D-01.2",
+            "pair": "GDPR \u2194 DORA",
+            "reg_a": "GDPR",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the DORA financial entity processing personal data.",
+            "downstream_implication": "** Single-control \u2014 a mutually-authenticated encrypted-channel architecture + documented network-segmentation policy satisfies both.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.2_CRA-DORA",
+            "subdomain_id": "D-01.2",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y (DORA financial entity using CRA product); disjoint in baseline (manufacturer \u2260 financial entity).",
+            "downstream_implication": "** Stack-merge \u2014 CRA product supplies the in-transit cipher-suite and surface-limitation baseline; DORA entity adds the deployment governance.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I",
+          "Annex I (2)",
+          "Annex I Part I (2)",
+          "Art. 15",
+          "Art. 27",
+          "Art. 32(1)",
+          "Art. 32(2)",
+          "Art. 9(2)"
+        ],
+        "csf": [
+          "PR.DS-02",
+          "PR.IR-01"
         ]
       },
       {
         "sub_domain_id": "D-01.3",
-        "domain_id": "D-01",
         "title": "D-01.3 Cryptographic Key Management",
-        "objective": "",
-        "hso_hl": "id='SO-D-01.3.HL' subdomain_id='D-01.3' is_high_level=True applies_to=['ALL'] derivation_source='../../CrossRegulation/DeepAnalysis/D-01_Data-Protection/D-01.3.md \u00a7D-01.3' verified_relationship_basis='CRDA-deep verified (3 pairs, all SAME \u2014 CRDA initial 3 COMPLEMENTARY corrected to SAME after OJ-text analysis)' emergent_tensions=0 objective='Cryptographic keys and related authentication material are\\nmanaged with separation of roles such that possession of the key material\\nis not bundled with possession of the operational environment that uses it;\\nthe key custodian and the data consumer are distinct roles under distinct\\ntechnical and organisational control, with the cryptographic key (not the\\nstorage medium) as the necessary condition for intelligibility of the\\nprotected data.' considerations=['The three participating regulations converge on the same substantive'] anchors=[] csf=[] inherits_from=None source_SR=None activation='auto'",
-        "hso_per_reg": [
-          "id='SO-D-01.3.GDPR' yaml_id='SO-D-01.3.GDPR' regulation='GDPR' subdomain_id='D-01.3' applies_to='[GDPR]' inherits_from='SO-GDPR-002' source_SR='SR-GDPR-003, SR-GDPR-004' activation='if GDPR in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Where pseudonymisation or encryption is applied to personal\\ndata, the additional information required to re-identify the data subject\\n(the cryptographic key, the mapping table, or the tokenisation seed) is\\nkept separately and is subject to appropriate technical and organisational\\nmeasures that prevent attribution (Art. 4(5) de-attribution test + Art.\\n34(3)(a) unintelligibility carve-out + Art. 32(1)(a) pseudonymisation/\\nencryption anchor).\\n\\n**CSF anchors (from `SR-GDPR-003` + `SR-GDPR-004` v0.3 security_rationale):**\\nPR.DS-01, PR.IR-03.\\n*(`SR-GDPR-003` covers the Art. 32(1)(a) + Art. 4(5) pseudonymisation-separation\\ntest anchored to PR.DS-01; `SR-GDPR-004` covers the Art. 34(3)(a)\\nunintelligibility carve-out anchored to PR.DS-01 + PR.IR-03 \u2014 the\\nresilience dimension of the carve-out presupposes that the key separation\\nremains effective on the day of the breach.)*' considerations=[] anchors=['Art.\\n34(3)', 'Art. 32(1)', 'Art. 34(3)', 'Art. 4(5)'] csf=['PR.DS-01', 'PR.IR-03']",
-          "id='SO-D-01.3.CRA' yaml_id='SO-D-01.3.CRA' regulation='CRA' subdomain_id='D-01.3' applies_to='[CRA]' inherits_from='SO-CRA-004' source_SR='SR-CRA-004' activation='if CRA in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Cryptographic keys and related authentication material used\\nto protect the confidentiality and integrity of stored, transmitted or\\notherwise processed data by a product with digital elements \u2014 personal or\\nother \u2014 are managed with separation of roles such that possession of the\\nkey material is not bundled with possession of the operational environment\\nthat uses it (Annex I Part I (2)(d) access-control + (2)(e) \"other technical\\nmeans\" reading per `SR-CRA-004` ambiguity_notes; the Annex I text does not\\nmention key management explicitly \u2014 the synthesis catalogue\\n`99_CRA_Synthesis.md` \u00a74 flags this as a T2-vs-text gap \u2014 so the\\nkey-separation reading rests on the combination of Annex I (2)(d)\\naccess-control duty with the Annex I (2)(e) \"other technical means\"\\nresidual).' considerations=['The reading chosen anchors separation in functional role-based access'] anchors=['Annex I', 'Annex I (2)', 'Annex I Part I (2)', '\u00a74'] csf=[]",
-          "id='SO-D-01.3.DORA' yaml_id='SO-D-01.3.DORA' regulation='DORA' subdomain_id='D-01.3' applies_to='[DORA]' inherits_from='SO-DORA-002' source_SR='SR-DORA-002, SR-DORA-003' activation='if DORA in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Strong authentication mechanisms, cryptographic-key protection\\nmeasures, and data encryption are implemented through coordinated policies\\nand protocols, with the cryptographic-key protection leg tied to approved\\ndata classification and ICT risk assessment processes (Art. 9(4)(d)\\n3-control AND of strong authentication + key protection + encryption).' considerations=['The DORA classification-driven entity-level architecture operationalises'] anchors=['Art. 9(4)'] csf=[]"
-        ],
+        "domain_id": "D-01",
         "participating_regulations": [
           "GDPR",
           "CRA",
           "DORA"
         ],
+        "hso_hl_objective": "Cryptographic keys and related authentication material are\nmanaged with separation of roles such that possession of the key material\nis not bundled with possession of the operational environment that uses it;\nthe key custodian and the data consumer are distinct roles under distinct\ntechnical and organisational control, with the cryptographic key (not the\nstorage medium) as the necessary condition for intelligibility of the\nprotected data.",
+        "objective": "Cryptographic keys and related authentication material are\nmanaged with separation of roles such that possession of the key material\nis not bundled with possession of the operational environment that uses it;\nthe key custodian and the data consumer are distinct roles under distinct\ntechnical and organisational control, with the cryptographic key (not the\nstorage medium) as the necessary condition for intelligibility of the\nprotected data.",
         "pairs": [
-          "id='D-01.3_GDPR-CRA' subdomain_id='D-01.3' pair='GDPR \u2194 CRA' reg_a='GDPR' reg_b='CRA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y on the same product; disjoint in baseline.' downstream_implication='** Stack-merge with documentation. A single key-custody architecture (HSM-anchored, RBAC-separated) plus the dual documentation pack (Art. 32 + Annex VII) discharges both.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.3_GDPR-DORA' subdomain_id='D-01.3' pair='GDPR \u2194 DORA' reg_a='GDPR' reg_b='DORA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y for the DORA financial entity.' downstream_implication=\"** Stack-merge with overlay. DORA's classification-driven tiering (PR.DS-01 + GV.RM-04) sits above GDPR's PR.DS-01 + PR.IR-03 de-attribution/resilience pair.\" verbatim_articles={} source_subdomain=None",
-          "id='D-01.3_CRA-DORA' subdomain_id='D-01.3' pair='CRA \u2194 DORA' reg_a='CRA' reg_b='DORA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y (DORA financial entity deploying CRA product).' downstream_implication=\"** Stack-merge with depth-layer overlay. CRDA's depth framing is correct; the proportional cost is materially higher for the DORA layer (small SaaS in CRA scope only meets the floor with HSM-anchored custodianship + rotation; DORA financial entity requires the full split-knowledge + quorum-recovery stack).\" verbatim_articles={} source_subdomain=None"
+          {
+            "id": "D-01.3_GDPR-CRA",
+            "subdomain_id": "D-01.3",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on the same product; disjoint in baseline.",
+            "downstream_implication": "** Stack-merge with documentation. A single key-custody architecture (HSM-anchored, RBAC-separated) plus the dual documentation pack (Art. 32 + Annex VII) discharges both.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.3_GDPR-DORA",
+            "subdomain_id": "D-01.3",
+            "pair": "GDPR \u2194 DORA",
+            "reg_a": "GDPR",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the DORA financial entity.",
+            "downstream_implication": "** Stack-merge with overlay. DORA's classification-driven tiering (PR.DS-01 + GV.RM-04) sits above GDPR's PR.DS-01 + PR.IR-03 de-attribution/resilience pair.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.3_CRA-DORA",
+            "subdomain_id": "D-01.3",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y (DORA financial entity deploying CRA product).",
+            "downstream_implication": "** Stack-merge with depth-layer overlay. CRDA's depth framing is correct; the proportional cost is materially higher for the DORA layer (small SaaS in CRA scope only meets the floor with HSM-anchored custodianship + rotation; DORA financial entity requires the full split-knowledge + quorum-recovery stack).",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I",
+          "Annex I (2)",
+          "Annex I Part I (2)",
+          "Annex VII",
+          "Art. 15",
+          "Art. 27",
+          "Art. 32",
+          "Art. 32(1)",
+          "Art. 34(3)",
+          "Art. 4(5)",
+          "Art. 5(2)",
+          "Art. 6",
+          "Art. 9(2)",
+          "Art. 9(4)",
+          "\u00a7149",
+          "\u00a74"
+        ],
+        "csf": [
+          "PR.DS-01"
         ]
       },
       {
         "sub_domain_id": "D-01.4",
-        "domain_id": "D-01",
         "title": "D-01.4 Data Integrity Mechanisms",
-        "objective": "",
-        "hso_hl": "id='SO-D-01.4.HL' subdomain_id='D-01.4' is_high_level=True applies_to=['ALL'] derivation_source='../../CrossRegulation/DeepAnalysis/D-01_Data-Protection/D-01.4.md \u00a7D-01.4' verified_relationship_basis='CRDA-deep verified (6 pairs, all SAME \u2014 CRDA initial 4 COMPLEMENTARY + 1 EQUAL + 2 DIFFERENT PERSPECTIVE corrected to SAME after OJ-text analysis)' emergent_tensions=0 objective='Data integrity is preserved against unauthorised modification\\nacross the data lifecycle \u2014 at rest, in transit, and in use \u2014 with\\ncorruption detected, logged, and reported, and with semantic accuracy\\nmaintained as the workflow leg of the personal-data principle.' considerations=['The four participating regulations converge on the same substantive'] anchors=[] csf=[] inherits_from=None source_SR=None activation='auto'",
-        "hso_per_reg": [
-          "id='SO-D-01.4.GDPR' yaml_id='SO-D-01.4.GDPR' regulation='GDPR' subdomain_id='D-01.4' applies_to='[GDPR]' inherits_from='SO-GDPR-003' source_SR='SR-GDPR-005, SR-GDPR-006' activation='if GDPR in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Personal data are accurate and, where necessary, kept up to\\ndate; every reasonable step is taken to ensure that personal data that are\\ninaccurate are erased or rectified without delay (Art. 5(1)(d) accuracy\\nprinciple), with the integrity property anchored to two further legs \u2014\\nstorage integrity (Art. 5(1)(f)) and the Art. 16 rectification cascade with\\nArt. 19 recipient-cascade duty.\\n\\n**CSF anchors (from `SR-GDPR-005` + `SR-GDPR-006` v0.3 security_rationale):**\\nPR.DS-01, PR.DS-12, PR.DS-10.\\n*(`SR-GDPR-005` covers the Art. 5(1)(d) accuracy + Art. 5(1)(f) integrity leg\\nanchored to PR.DS-01 (storage-layer immutability, write-audit logging,\\ntamper-evidence) + PR.DS-12 (policy-level data-management discipline\\ngoverning data-quality monitoring, periodic refresh cadence, and the\\nfeedback loop to the rectification workflow); `SR-GDPR-006` covers the Art.\\n16 + Art. 19 rectification workflow anchored to PR.DS-10 (controlled-write\\nintegrity check on data in process) + PR.DS-12 (recipient register +\\npropagation procedure).)*' considerations=[] anchors=['Art.\\n16', 'Art. 16', 'Art. 19', 'Art. 5(1)'] csf=['PR.DS-01', 'PR.DS-10', 'PR.DS-12']",
-          "id='SO-D-01.4.CRA' yaml_id='SO-D-01.4.CRA' regulation='CRA' subdomain_id='D-01.4' applies_to='[CRA]' inherits_from='SO-CRA-005' source_SR='SR-CRA-005' activation='if CRA in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='The integrity of stored, transmitted, or otherwise processed\\ndata \u2014 personal or other \u2014 as well as the integrity of commands, programs,\\nand configuration, is protected against any manipulation or modification not\\nauthorised by the user (Annex I Part I (2)(f) \u2014 the universal-quantifier\\n`any` makes the integrity protection unconditional); corruption is reported\\nto the user / administering party (Annex I Part I (2)(f) `report on\\ncorruptions` + (2)(l) logging + monitoring).' considerations=['The CRA technical-integrity universal quantifier is the storage/protection'] anchors=['Annex I Part I (2)'] csf=[]",
-          "id='SO-D-01.4.DORA' yaml_id='SO-D-01.4.DORA' regulation='DORA' subdomain_id='D-01.4' applies_to='[DORA]' inherits_from='SO-DORA-001' source_SR='SR-DORA-001' activation='if DORA in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='Data confidentiality, integrity, authenticity and availability\\nare maintained at high standards across all data states \u2014 at rest, in use,\\nor in transit \u2014 through ICT security policies, procedures, protocols and\\ntools designed to ensure ICT-system resilience, continuity and availability\\n(Art. 9(2)).' considerations=[\"DORA is OJ-explicit on the integrity dimension (unlike NIS 2's silence on\"] anchors=['Art. 9(2)'] csf=[]",
-          "id='SO-D-01.4.AI_Act' yaml_id='SO-D-01.4.AI_Act' regulation='AI_Act' subdomain_id='D-01.4' applies_to='[AI_Act]' inherits_from='SO-AI_Act-009' source_SR='SR-AI_Act-015' activation='if AI_Act in applicable_regs' phase_1A_role='1_of_N' verified_relationship=None objective='High-risk AI systems are as resilient as possible regarding\\nerrors, faults, or inconsistencies that may occur within the system or the\\nenvironment (Art. 15(3)); the robustness of high-risk AI systems may be\\nachieved through technical redundancy solutions, which may include backup or\\nfail-safe plans.' considerations=[\"The AI Act's resilience framing is different from data-integrity in the\"] anchors=['Art. 15(3)'] csf=[]",
-          "id='SO-D-01.4.CRA' yaml_id='SO-D-01.4.CRA' regulation='CRA' subdomain_id='D-01.4' applies_to=['CRA'] inherits_from='SO-CRA-001' source_SR='CORR-030 propagation' activation='auto (propagated by CORR-030 from SO-CRA-001 master SO)' phase_1A_role='propagated' verified_relationship='PHANTOM (mechanical propagation per CORR-030)' objective='' considerations=[] anchors=[] csf=[]"
-        ],
+        "domain_id": "D-01",
         "participating_regulations": [
           "GDPR",
           "CRA",
           "DORA",
           "AI_Act (partial)"
         ],
+        "hso_hl_objective": "Data integrity is preserved against unauthorised modification\nacross the data lifecycle \u2014 at rest, in transit, and in use \u2014 with\ncorruption detected, logged, and reported, and with semantic accuracy\nmaintained as the workflow leg of the personal-data principle.",
+        "objective": "Data integrity is preserved against unauthorised modification\nacross the data lifecycle \u2014 at rest, in transit, and in use \u2014 with\ncorruption detected, logged, and reported, and with semantic accuracy\nmaintained as the workflow leg of the personal-data principle.",
         "pairs": [
-          "id='D-01.4_GDPR-CRA' subdomain_id='D-01.4' pair='GDPR \u2194 CRA' reg_a='GDPR' reg_b='CRA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y on the same product handling personal data.' downstream_implication='** Stack-merge with two layers. A CRA-compliant integrity/logging stack (cryptographic hashes + write-audit logging + corruption reports) discharges the GDPR Art. 5(1)(f) integrity leg; the controller separately operates the Art. 5(1)(d) accuracy + Art. 16 rectification workflow + Art. 19 cascade.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.4_GDPR-DORA' subdomain_id='D-01.4' pair='GDPR \u2194 DORA' reg_a='GDPR' reg_b='DORA' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y for the DORA financial entity.' downstream_implication='** Stack-merge with workflow overlay. DORA covers the storage-integrity leg; GDPR adds the rectification workflow + cascade.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.4_GDPR-AI_Act' subdomain_id='D-01.4' pair='GDPR \u2194 AI_Act' reg_a='GDPR' reg_b='AI_Act' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y when a GDPR controller deploys a high-risk AI system processing personal data.' downstream_implication='** Layered-objects sub-domain: a controller-provider relationship must document both objects separately. Same-flag: CRDA classification stands under the 4-option framing; under the 5-option framing the pair is COMPLEMENTARY on the same asset.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.4_CRA-DORA' subdomain_id='D-01.4' pair='CRA \u2194 DORA' reg_a='CRA' reg_b='DORA' classification='SAME (CORRECTED \u2014 no change).' verified_relationship='SAME (CORRECTED \u2014 no change).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y for the DORA financial entity using a CRA product.' downstream_implication='** Stack-merge with conditional reporting cascades. The CRA product-side PR.DS-01 + PR.DS-10 + PR.PS-04 stack satisfies the integrity + monitoring layer; DORA adds the entity-level classification and Art. 19 incident-classification cascade.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.4_CRA-AI_Act' subdomain_id='D-01.4' pair='CRA \u2194 AI_Act' reg_a='CRA' reg_b='AI_Act' classification='SAME (CORRECTED \u2014 no change).' verified_relationship='SAME (CORRECTED \u2014 no change).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y for the integrated edge-AI product.' downstream_implication='** Stack-merge with CRA-AI Act deemed-compliance bridge. CRA-Compliant product + Art. 15(3) backup/fail-safe plans + Art. 15(1) accuracy/robustness/cybersecurity 3-way AND on the AI layer.' verbatim_articles={} source_subdomain=None",
-          "id='D-01.4_DORA-AI_Act' subdomain_id='D-01.4' pair='DORA \u2194 AI_Act' reg_a='DORA' reg_b='AI_Act' classification='SAME (CORRECTED \u2014 wording only).' verified_relationship='SAME (CORRECTED \u2014 wording only).' layer2_flag=False scope_overlap=None scope_disjoint_test='** Y for the DORA financial entity deploying high-risk AI.' downstream_implication='** Layered stack with DORA Art. 9(2) integrity + AI Act Art. 15(3) resilience + AI Act Art. 15(1) accuracy/robustness/cybersecurity.' verbatim_articles={} source_subdomain=None"
+          {
+            "id": "D-01.4_GDPR-CRA",
+            "subdomain_id": "D-01.4",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on the same product handling personal data.",
+            "downstream_implication": "** Stack-merge with two layers. A CRA-compliant integrity/logging stack (cryptographic hashes + write-audit logging + corruption reports) discharges the GDPR Art. 5(1)(f) integrity leg; the controller separately operates the Art. 5(1)(d) accuracy + Art. 16 rectification workflow + Art. 19 cascade.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.4_GDPR-DORA",
+            "subdomain_id": "D-01.4",
+            "pair": "GDPR \u2194 DORA",
+            "reg_a": "GDPR",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the DORA financial entity.",
+            "downstream_implication": "** Stack-merge with workflow overlay. DORA covers the storage-integrity leg; GDPR adds the rectification workflow + cascade.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.4_GDPR-AI_Act",
+            "subdomain_id": "D-01.4",
+            "pair": "GDPR \u2194 AI_Act",
+            "reg_a": "GDPR",
+            "reg_b": "AI_Act",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y when a GDPR controller deploys a high-risk AI system processing personal data.",
+            "downstream_implication": "** Layered-objects sub-domain: a controller-provider relationship must document both objects separately. Same-flag: CRDA classification stands under the 4-option framing; under the 5-option framing the pair is COMPLEMENTARY on the same asset.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.4_CRA-DORA",
+            "subdomain_id": "D-01.4",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 no change).",
+            "verified_relationship": "SAME (CORRECTED \u2014 no change).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the DORA financial entity using a CRA product.",
+            "downstream_implication": "** Stack-merge with conditional reporting cascades. The CRA product-side PR.DS-01 + PR.DS-10 + PR.PS-04 stack satisfies the integrity + monitoring layer; DORA adds the entity-level classification and Art. 19 incident-classification cascade.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.4_CRA-AI_Act",
+            "subdomain_id": "D-01.4",
+            "pair": "CRA \u2194 AI_Act",
+            "reg_a": "CRA",
+            "reg_b": "AI_Act",
+            "classification": "SAME (CORRECTED \u2014 no change).",
+            "verified_relationship": "SAME (CORRECTED \u2014 no change).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the integrated edge-AI product.",
+            "downstream_implication": "** Stack-merge with CRA-AI Act deemed-compliance bridge. CRA-Compliant product + Art. 15(3) backup/fail-safe plans + Art. 15(1) accuracy/robustness/cybersecurity 3-way AND on the AI layer.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-01.4_DORA-AI_Act",
+            "subdomain_id": "D-01.4",
+            "pair": "DORA \u2194 AI_Act",
+            "reg_a": "DORA",
+            "reg_b": "AI_Act",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the DORA financial entity deploying high-risk AI.",
+            "downstream_implication": "** Layered stack with DORA Art. 9(2) integrity + AI Act Art. 15(3) resilience + AI Act Art. 15(1) accuracy/robustness/cybersecurity.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I",
+          "Annex I (2)",
+          "Annex I Part I (2)",
+          "Art. 12",
+          "Art. 15",
+          "Art. 15(1)",
+          "Art. 15(3)",
+          "Art. 16",
+          "Art. 19",
+          "Art. 5(1)",
+          "Art. 6",
+          "Art. 9(2)",
+          "Art. 9(4)"
+        ],
+        "csf": [
+          "PR.DS-01",
+          "PR.DS-10"
         ]
       }
     ]
   },
   "rendered": {
     "system_len": 15980,
-    "user_len": 30127
+    "user_len": 20894
   }
 }

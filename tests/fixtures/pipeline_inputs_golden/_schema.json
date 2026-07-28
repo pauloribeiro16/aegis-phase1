@@ -41,7 +41,7 @@
         "tipo2",
         "tipo3"
       ],
-      "layer0_subdomain_refs_min_count": 38,
+      "layer0_subdomain_refs_min_count": 1,
       "catalog_min_count_per_reg": {
         "GDPR": 1,
         "CRA": 2,
@@ -89,7 +89,7 @@
         "tipo2",
         "tipo3"
       ],
-      "layer0_subdomain_refs_min_count": 38,
+      "layer0_subdomain_refs_min_count": 1,
       "catalog_min_count_per_reg": {
         "GDPR": 1,
         "CRA": 2,
@@ -178,10 +178,10 @@
       "fixed_in": "CORR-070"
     },
     "P1B-LLM-01_and_P1B-LLM-02": {
-      "bug_id": "BUG-A (CORR-070)",
-      "description": "CORR-049 512KB cap truncated the user prompt — layer0_catalog (tipo2 + tipo3) and # TASK instructions were at the tail and got cut. FIXED in CORR-070: layer0_catalog kwarg reordered BEFORE layer0_subdomain_refs in run_p1b_single (orchestrator.py:1704-1723) so json.dumps puts the catalog at the head and it survives the cap. Refs may now be partially truncated (acceptable — catalog is the material P1B-LLM-01 spec requires).",
+      "bug_id": "BUG-A (CORR-070) — superseded",
+      "description": "CORR-049 512KB cap truncated the user prompt — layer0_catalog and # TASK were at the tail. Originally mitigated by reordering kwargs (orchestrator.py:1704-1723) in CORR-070. ROOT-CAUSE FIX in CORR-071: per-reg filter in run_phase_1b reduces refs from 38 → 12-27 per lane, making BUG-A structurally impossible. The CORR-070 reorder workaround has been removed; refs and catalog now fit within the cap without ordering tricks. layer0_catalog is still passed first (natural order) for readability, not as a workaround.",
       "fix_out_of_scope_for_now": false,
-      "fixed_in": "CORR-070"
+      "fixed_in": "CORR-071"
     }
   }
 }
