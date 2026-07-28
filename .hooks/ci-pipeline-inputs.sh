@@ -18,7 +18,7 @@
 #   bash .hooks/ci-pipeline-inputs.sh
 #
 # When the orchestrator changes intentionally, regenerate golden files:
-#   python _regenerate_pipeline_inputs_golden.py
+#   python scripts/dev/regenerate-pipeline-inputs-golden.py
 #   git add tests/fixtures/pipeline_inputs_golden/
 #   git commit -m "chore: regenerate pipeline-inputs golden"
 
@@ -39,7 +39,7 @@ if [ ! -d "$GOLDEN_DIR/case1-tinytask" ] \
    || [ ! -d "$GOLDEN_DIR/case2-secureborder" ] \
    || [ ! -d "$GOLDEN_DIR/case3-omnibank" ]; then
     echo "FAIL: golden case directories missing" >&2
-    echo "  Run: python _regenerate_pipeline_inputs_golden.py" >&2
+    echo "  Run: python scripts/dev/regenerate-pipeline-inputs-golden.py" >&2
     exit 2
 fi
 
@@ -60,7 +60,7 @@ if [ $STRUCT_RC -ne 0 ]; then
     echo "  Required fields are missing from one or more spec inputs." >&2
     echo "  If the pipeline change is intentional:" >&2
     echo "    1. Update $SCHEMA" >&2
-    echo "    2. Run: python _regenerate_pipeline_inputs_golden.py" >&2
+    echo "    2. Run: python scripts/dev/regenerate-pipeline-inputs-golden.py" >&2
     echo "    3. Commit both" >&2
     exit 1
 fi

@@ -337,7 +337,7 @@ regenerated.
 ```bash
 # Phase 3+4: implement fixes (manually via edit tool)
 # Phase 5: regenerate golden + re-capture payloads
-python _regenerate_pipeline_inputs_golden.py
+python scripts/dev/regenerate-pipeline-inputs-golden.py
 git diff tests/fixtures/pipeline_inputs_golden/   # review
 python execution/CORR-070-payload-recapture.py    # capture
 # inspect output, verify catalog + # TASK survive

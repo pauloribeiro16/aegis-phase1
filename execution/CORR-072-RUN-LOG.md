@@ -25,7 +25,7 @@
 
 ## Validation
 
-### Isolated fix verification (`_verify_corr072.py`)
+### Isolated fix verification (`scripts/dev/verify-corr072-fixes.py`)
 
 ```
 === Fix #1 — _augment_influence ===
@@ -133,4 +133,4 @@ These are documented as follow-up work in `execution/CONTRACT-072.md`
 5. **Test in isolation when possible.** User feedback was clear: full
    pipeline runs are expensive (11 min + M3 API). Isolated function
    tests give faster, more reliable validation of specific fixes.
-   `_verify_corr072.py` pattern is reusable for future contracts.
+   `scripts/dev/verify-corr072-fixes.py` pattern is reusable for future contracts.

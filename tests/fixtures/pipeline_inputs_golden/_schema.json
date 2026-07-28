@@ -1,5 +1,5 @@
 {
-  "$comment": "Pipeline input contract — single source of truth for what fields MUST be present in each spec's inputs dict. Loaded by test_pipeline_inputs.py (structural assertions) and by _regenerate_pipeline_inputs_golden.py. Update here when adding new required fields; CI gate (.hooks/ci-pipeline-inputs.sh) will fail if any spec drops a field declared here.",
+  "$comment": "Pipeline input contract — single source of truth for what fields MUST be present in each spec's inputs dict. Loaded by test_pipeline_inputs.py (structural assertions) and by scripts/dev/regenerate-pipeline-inputs-golden.py. Update here when adding new required fields; CI gate (.hooks/ci-pipeline-inputs.sh) will fail if any spec drops a field declared here.",
 
   "version": "1.0.0",
   "created_for_correlation": "CORR-070",

@@ -59,7 +59,7 @@ PYTHONPATH=src python -m pytest tests/unit/v2/ --co -q 2>&1 | grep -E "ERROR|Mod
 bash .hooks/ci-pipeline-inputs.sh
 
 # Regenerate pipeline_inputs_golden (when contract changes intentionally)
-python _regenerate_pipeline_inputs_golden.py
+python scripts/dev/regenerate-pipeline-inputs-golden.py
 ```
 
 ## Common pitfalls
@@ -110,4 +110,4 @@ assert _augment_influence.__name__ == "_augment_influence"
 - `src/aegis_phase1/v2/AGENTS.md` — orchestrator + output renderers
 - `src/aegis_phase1/prompts_v2/AGENTS.md` — PROMPTS library tested here
 - `tests/fixtures/pipeline_inputs_golden/_schema.json` — input contract
-- `execution/CORR-072-RUN-LOG.md` — `_verify_corr072.py` (pattern for isolated testing)
+- `execution/CORR-072-RUN-LOG.md` — `scripts/dev/verify-corr072-fixes.py` (pattern for isolated testing)

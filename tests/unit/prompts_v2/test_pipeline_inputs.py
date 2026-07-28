@@ -32,7 +32,7 @@ pipeline changes (e.g. a new field appears, a count changes).
 
 **How to update the contract:**
 1. Update _schema.json with the new required fields
-2. Run `python _regenerate_pipeline_inputs_golden.py` to refresh golden files
+2. Run `python scripts/dev/regenerate-pipeline-inputs-golden.py` to refresh golden files
 3. Review the diff (it should be intentional)
 4. Commit both the schema and the golden files
 """
@@ -56,7 +56,7 @@ def schema() -> dict:
     if not SCHEMA_PATH.exists():
         pytest.fail(
             f"Schema not found at {SCHEMA_PATH}. "
-            f"Run: python _regenerate_pipeline_inputs_golden.py"
+            f"Run: python scripts/dev/regenerate-pipeline-inputs-golden.py"
         )
     return json.loads(SCHEMA_PATH.read_text())
 
@@ -144,7 +144,7 @@ class TestPipelineInputsStructural:
         """58 expected = 2+2+10+1+1 + 4+4+10+1+1 + 5+5+10+1+1 = 58."""
         assert len(golden_index) == 58, (
             f"Expected 58 golden files, found {len(golden_index)}. "
-            f"Run: python _regenerate_pipeline_inputs_golden.py"
+            f"Run: python scripts/dev/regenerate-pipeline-inputs-golden.py"
         )
 
     def test_golden_files_cover_all_5_specs(self, golden_index):

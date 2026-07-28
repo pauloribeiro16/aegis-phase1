@@ -71,7 +71,7 @@ print('LLM_SPECS:', list(LLM_SPECS.keys()))
 ruff check src/aegis_phase1/prompts_v2/
 
 # Regenerate pipeline-inputs golden (when contract changes intentionally)
-python _regenerate_pipeline_inputs_golden.py
+python scripts/dev/regenerate-pipeline-inputs-golden.py
 ```
 
 ## Common pitfalls
