@@ -796,3 +796,58 @@ def test_run_does_not_block_on_conflicts() -> None:
     # Reduce still ran (LLM-03 + LLM-02 = 2 calls past map)
     assert result["phase_1c_reduce"]["status"] == "OK"
     assert result["phase_1c_reduce"]["conflicts_count"] >= 1
+
+
+# ─── CORR-071: per-reg filter semantic guard ──────────────────────────
+
+
+class TestRunPhase1BPerRegFilter:
+    """Each P1B lane must only see refs where its regulation participates.
+
+    Hard semantic guard (CORR-071 S3). The filter is applied inside
+    ``run_phase_1b`` (phase1_executor.py:204-241). If anyone removes
+    or loosens the filter, this test fails loudly. There is no
+    max_count threshold (would risk false negatives); the invariant
+    is "every ref in the lane must match the lane's regulation".
+    """
+
+    def test_per_reg_filter_is_applied(self) -> None:
+        executor, _, _, _, _, _ = _make_executor()
+        executor.invoker = MagicMock()
+        executor.invoker.invoke.side_effect = [_ok_response() for _ in range(6)]
+
+        refs = [
+            {"sub_domain_id": "D-01.1", "participating_regulations": ["GDPR", "NIS2"]},
+            {"sub_domain_id": "D-02.1", "participating_regulations": ["CRA"]},
+            {"sub_domain_id": "D-03.1", "participating_regulations": ["GDPR", "AI_Act"]},
+            {"sub_domain_id": "D-04.1", "participating_regulations": ["GDPR"]},
+        ]
+        executor.run_phase_1b(
+            "Case_01",
+            ["GDPR", "CRA", "AI_Act"],
+            layer0_subdomain_refs=refs,
+        )
+
+        expected_by_lane = {
+            "GDPR": {"D-01.1", "D-03.1", "D-04.1"},
+            "CRA": {"D-02.1"},
+            "AI_Act": {"D-03.1"},
+        }
+        seen_by_lane: dict[str, set[str]] = {}
+        for call in executor.invoker.invoke.call_args_list:
+            if call.args[0] != SPEC_INTERPRETATION:
+                continue
+            lane_id = call.args[1]["lane_id"]
+            lane_refs = call.args[1]["layer0_subdomain_refs"]
+            assert isinstance(lane_refs, list), "lane_refs must be a list"
+            for ref in lane_refs:
+                # Hard invariant: every ref in this lane must name this reg.
+                assert lane_id in ref["participating_regulations"], (
+                    f"{lane_id} lane received {ref['sub_domain_id']} "
+                    f"without '{lane_id}' in participating_regulations"
+                )
+            seen_by_lane[lane_id] = {r["sub_domain_id"] for r in lane_refs}
+
+        assert seen_by_lane == expected_by_lane, (
+            f"Per-reg filter mismatch. expected={expected_by_lane}, got={seen_by_lane}"
+        )

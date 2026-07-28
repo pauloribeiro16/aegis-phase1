@@ -42,6 +42,7 @@
         "tipo3"
       ],
       "layer0_subdomain_refs_min_count": 1,
+      "per_reg_filter_required": true,
       "catalog_min_count_per_reg": {
         "GDPR": 1,
         "CRA": 2,
@@ -49,8 +50,9 @@
         "DORA": 1,
         "AI_Act": 1
       },
-      "user_prompt_max_bytes": 524288,
-      "truncation_marker_expected": "[CORR-049 truncated"
+      "user_prompt_max_bytes": 200000,
+      "user_prompt_max_bytes_note": "soft budget; runtime is enforced by per-reg filter (TestRunPhase1BPerRegFilter)",
+      "truncation_marker_expected": null
     },
 
     "P1B-LLM-02-RATIONALE": {
@@ -90,6 +92,7 @@
         "tipo3"
       ],
       "layer0_subdomain_refs_min_count": 1,
+      "per_reg_filter_required": true,
       "catalog_min_count_per_reg": {
         "GDPR": 1,
         "CRA": 2,
@@ -97,10 +100,11 @@
         "DORA": 1,
         "AI_Act": 1
       },
-      "user_prompt_max_bytes": 524288,
+      "user_prompt_max_bytes": 200000,
+      "user_prompt_max_bytes_note": "soft budget; runtime is enforced by per-reg filter (TestRunPhase1BPerRegFilter)",
       "p1b_llm_01_outputs_required": true,
       "p1b_llm_01_outputs_wired_from_p1b01": true,
-      "truncation_marker_expected": "[CORR-049 truncated"
+      "truncation_marker_expected": null
     },
 
     "P1C-LLM-01-OVERLAP-CLASSIFICATION": {
