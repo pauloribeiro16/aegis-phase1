@@ -168,6 +168,15 @@ class Phase1Executor:
 
         Sequential per-reg (v1.2 MVP). Parallelism per lane is a follow-up.
 
+        CORR-071: filter ``layer0_subdomain_refs`` per lane so each
+        regulation lane only sees the subdomains where ``reg in
+        ref.participating_regulations``. Same structural pattern as
+        the CORR-045 per-domain filter in ``run_phase_1c_map``,
+        rebased onto ``participating_regulations`` instead of
+        ``sub_domain_id.startswith``. Reduces P1B payload from
+        ~575KB to ~150-200KB by removing refs that are not
+        material to the current regulation.
+
         Args:
             case_id: Case identifier.
             applicable_regs: List of applicable regulation codes.
@@ -192,11 +201,25 @@ class Phase1Executor:
         all_synth: dict[str, dict[str, Any]] = {}
         statuses: list[str] = []
 
+        all_refs = inputs.get("layer0_subdomain_refs") or []
         for reg in applicable_regs:
+            # CORR-071: per-reg filter (same pattern as CORR-045
+            # per-domain in run_phase_1c_map). A ref is a dict
+            # post-_build_layer0_subdomain_refs with a
+            # ``participating_regulations`` list; keep only those
+            # where the current ``reg`` participates.
+            lane_refs: list[Any] = []
+            if isinstance(all_refs, list):
+                for ref in all_refs:
+                    if isinstance(ref, dict):
+                        pr = ref.get("participating_regulations") or []
+                        if reg in pr:
+                            lane_refs.append(ref)
+            lane_inputs = {**inputs, "layer0_subdomain_refs": lane_refs}
             out_01 = self.invoker.invoke(
                 SPEC_INTERPRETATION,
                 {
-                    **inputs,
+                    **lane_inputs,
                     "case_id": case_id,
                     "lane_id": reg,
                     "applicable_regs": [reg],
@@ -207,17 +230,10 @@ class Phase1Executor:
             out_02 = self.invoker.invoke(
                 SPEC_RATIONALE,
                 {
-                    **inputs,
+                    **lane_inputs,
                     "case_id": case_id,
                     "lane_id": reg,
                     "applicable_regs": [reg],
-                    # CORR-070 Bug B: P1B-LLM-02-RATIONALE spec
-                    # requires p1b_llm_01_outputs (the P1B-LLM-01
-                    # parsed output) to ground the rationale. Wire
-                    # it from the captured out_01 (the immediately
-                    # prior SPEC_INTERPRETATION call). Defensive
-                    # fallback `or {}` so a failed P1B-01 doesn't
-                    # crash the rationale call.
                     "p1b_llm_01_outputs": (out_01.get("parsed_output") or {}),
                 },
                 config=config,
