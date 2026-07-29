@@ -1,1 +1,36 @@
-auth_systems: []
+# Authentication & Identity Systems (Case 03 — OmniBank Financial Systems S.A.)
+# Banking IAM: Auth0 (CIAM + workforce), HSM-backed signing, internal AD,
+# customer MFA gateway. Schema mirrors doc_04a._auth_systems_table columns:
+#   system, purpose, mfa, sso, password_policy
+auth_systems:
+  - id: AUTH-CIAM
+    system: Auth0 Customer Identity (Okta)
+    purpose: Customer internet + mobile banking login (PSD2 SCA-compliant)
+    mfa: Yes — mandatory (TOTP / WebAuthn / push / device biometrics)
+    sso: Yes — OAuth2/OIDC federation for partner integrations
+    password_policy: Min 12 chars, NIST 800-63B composition + breach-list screening; rotate on compromise
+    notes: FAPI 2.0 profile; PSD2 Art. 97 SCA exemptions logged in audit
+
+  - id: AUTH-WORKFORCE
+    system: Auth0 Workforce Identity + on-prem Active Directory
+    purpose: Employee + contractor SSO to internal apps + admin consoles
+    mfa: Yes — mandatory (WebAuthn hardware token YubiKey 5 for privileged)
+    sso: Yes — SAML 2.0 + OIDC, 200+ apps
+    password_policy: Min 14 chars, NIST 800-63B, breach-list screening, 90-day max for privileged
+    notes: Privileged accounts require YubiKey; admin consoles behind VPN + Bastion
+
+  - id: AUTH-HSM-SIGN
+    system: Thales Luna HSM Cluster (FIPS 140-3 Level 3)
+    purpose: Cryptographic signing for payment orders + audit-log batch manifests
+    mfa: Quorum-based (3-of-5) split-knowledge
+    sso: N — direct HSM client only
+    password_policy: N/A — FIPS-bound operator cards + PIN (M-of-N activation)
+    notes: Used by SYS-PAYMENTS and SYS-AUDIT; primary DC1 + DR DC2 quorum
+
+  - id: AUTH-PSD2-SCA
+    system: Customer MFA Gateway (PSD2 SCA exemption engine)
+    purpose: Step-up authentication for PSD2 high-risk transactions
+    mfa: Yes — transaction-risk-analysis (TRA) + behavioural + risk-based
+    sso: N
+    password_policy: N/A (inherits from AUTH-CIAM)
+    notes: Article 18 RTS; SCA exemption thresholds per RTS (≤€30, ≤5 tx, €100 cumulative)

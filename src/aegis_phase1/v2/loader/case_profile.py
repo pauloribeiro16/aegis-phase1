@@ -133,6 +133,9 @@ class ArchitectureFacts(_TolerantModel):
     cloud_services: list[dict[str, Any]] = Field(default_factory=list)
     data_flows: list[dict[str, Any]] = Field(default_factory=list)
     data_stores: list[dict[str, Any]] = Field(default_factory=list)
+    # CORR-073: optional data_subjects.yaml inventory (GDPR data-subject
+    # categories). Tolerates missing file — empty list when absent.
+    data_subjects: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class RegulatoryFacts(_TolerantModel):
@@ -183,6 +186,10 @@ class CompanyProfile(_TolerantModel):
     regulatory_classification: Any | None = None
     role_matrix: Any | None = None
     regulatory_interactions: Any | None = None
+    # CORR-073: GDPR Art. 30 records of processing (personal-data
+    # categories). Optional; None if YAML missing. When present, drives
+    # doc_04a §2.3 Personal Data Categories table.
+    personal_data_categories: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -392,12 +399,29 @@ class CaseProfileLoader:
         # systems / auth_systems: case 1 uses 'systems' / 'auth_systems'
         # (no alias needed for now, but pass via _read_yaml_list for
         # consistency).
+        # CORR-073: data_subjects.yaml is optional. WARNING-tolerant —
+        # returns empty list when the file is missing (so case 1 / 2
+        # remain unaffected). Doc 04a §2.4 reads from this list.
+        ds_path = arch_dir / "data_subjects.yaml"
+        data_subjects: list[dict[str, Any]] = []
+        if ds_path.exists():
+            try:
+                ds_raw = self._read_yaml(ds_path)
+                ds_list = ds_raw.get("data_subjects", []) or []
+                if isinstance(ds_list, list):
+                    data_subjects = [d for d in ds_list if isinstance(d, dict)]
+            except Exception as e:
+                logger.warning(
+                    "_load_architecture: failed to parse %s: %s; data_subjects empty",
+                    ds_path, e,
+                )
         return ArchitectureFacts(
             systems=self._read_yaml_list(arch_dir / "systems.yaml", "systems"),
             auth_systems=self._read_yaml_list(arch_dir / "auth_systems.yaml", "auth_systems"),
             cloud_services=cloud_services,
             data_flows=data_flows,
             data_stores=data_stores,
+            data_subjects=data_subjects,
         )
 
     def _load_regulatory(self) -> tuple[RegulatoryFacts, list[str], list[str]]:
@@ -508,6 +532,42 @@ class CaseProfileLoader:
             )
             return None
 
+    # -- CORR-073: Personal Data Categories (GDPR Art. 30) -----------
+
+    def _load_personal_data_categories(self) -> list[dict[str, Any]]:
+        """CORR-073: load ``company/personal_data.yaml`` (GDPR Art. 30 inventory).
+
+        Tolerant of missing file (returns empty list) and parse errors
+        (returns empty list with WARNING) so other categories can still load.
+        The list shape is a list of dicts (not a Pydantic model) to keep
+        the schema flexible across cases (some fields are case-specific).
+        """
+        path = self.input_dir / "company" / "personal_data.yaml"
+        if not path.exists():
+            logger.debug(
+                "_load_personal_data_categories: missing %s; "
+                "personal_data_categories will be empty",
+                path,
+            )
+            return []
+        try:
+            raw = self._read_yaml(path)
+            categories = raw.get("personal_data_categories", []) or []
+            if not isinstance(categories, list):
+                logger.warning(
+                    "_load_personal_data_categories: %s#personal_data_categories "
+                    "is not a list (got %s); returning []",
+                    path, type(categories).__name__,
+                )
+                return []
+            return [c for c in categories if isinstance(c, dict)]
+        except Exception as e:
+            logger.warning(
+                "_load_personal_data_categories: failed to parse %s: %s; "
+                "returning []", path, e,
+            )
+            return []
+
     # -- main entrypoint --------------------------------------------------
 
     @functools_cache  # noqa: B019  (intentional: case_path is the cache key)
@@ -559,6 +619,8 @@ class CaseProfileLoader:
             regulatory_classification=self._load_regulatory_classification(),
             role_matrix=self._load_role_matrix(),
             regulatory_interactions=self._load_regulatory_interactions(),
+            # CORR-073: GDPR Art. 30 personal-data inventory
+            personal_data_categories=self._load_personal_data_categories(),
         )
 
 

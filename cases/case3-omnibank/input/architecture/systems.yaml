@@ -1,1 +1,94 @@
-systems: []
+# Systems (Case 03 — OmniBank Financial Systems S.A.)
+# Banking IT estate: mainframe + web + AI + AML + regulatory plumbing.
+# Schema mirrors doc_04a._systems_table columns:
+#   id, name, type, tech_stack, owner, criticality, hosts_personal_data
+systems:
+  - id: SYS-CBS
+    name: Core Banking System (Temenos T24)
+    type: core_banking_mainframe
+    tech_stack: "Temenos T24, IBM z/OS, COBOL, DB2 z/OS, JBASE"
+    owner: Head of Operations (COO)
+    criticality: critical
+    hosts_personal_data: true
+    notes: System of record for accounts, balances, ledger. Hosted on-premises at Frankfurt DC1; HA pair DC2 (Munich) for DORA RTO/RPO.
+
+  - id: SYS-WEB
+    name: Retail & SMB Web Banking Platform
+    type: web_application
+    tech_stack: "React, Next.js, Java 21 (Spring Boot), PostgreSQL 16, Redis"
+    owner: Head of Digital Channels (CTO)
+    criticality: critical
+    hosts_personal_data: true
+    notes: Customer-facing internet banking; OAuth2 + FAPI 2.0 baseline.
+
+  - id: SYS-MOBILE
+    name: OmniBank Mobile (iOS + Android)
+    type: mobile_application
+    tech_stack: "Kotlin (Android), Swift (iOS), gRPC, mTLS"
+    owner: Head of Digital Channels (CTO)
+    criticality: critical
+    hosts_personal_data: true
+    notes: Biometric MFA + device binding; CRA-Default class product per Annex VII.
+
+  - id: SYS-AML
+    name: AML Transaction Monitoring Engine (NICE Actimize)
+    type: regtech_engine
+    tech_stack: "NICE Actimize SAM, KYC/CDD, screening (Refinitiv World-Check)"
+    owner: Head of Compliance / MLRO
+    criticality: critical
+    hosts_personal_data: true
+    notes: BaFin §6h GwG, FATF Rec. 10/16/20; AML/CFT obligations.
+
+  - id: SYS-CREDITAI
+    name: Credit Scoring AI Platform (Annex III §5(b))
+    type: ai_ml_platform
+    tech_stack: "Python 3.12, MLflow, Airflow, on-prem GPU (NVIDIA A100), XGBoost + CatBoost"
+    owner: Head of AI/ML (CRO reports)
+    criticality: high
+    hosts_personal_data: true
+    notes: High-risk AI system per AI Act Annex III §5(b) (credit access). Art. 26 deployer obligations.
+
+  - id: SYS-KYC
+    name: KYC Onboarding Service
+    type: customer_onboarding
+    tech_stack: "Onfido (IDV), Persona (liveness), PostgreSQL, Kafka"
+    owner: Head of Compliance
+    criticality: high
+    hosts_personal_data: true
+    notes: Records KYC artefacts (passport, selfie, proof of address) for 5y retention per GwG §8.
+
+  - id: SYS-PAYMENTS
+    name: Payment Service Hub (SEPA + Instant)
+    type: payment_engine
+    tech_stack: "Java, IBM MQ, SCT Inst gateway (EPC)"
+    owner: Head of Payments
+    criticality: critical
+    hosts_personal_data: true
+    notes: PSD2 Art. 97 SCA; instant SEPA credit transfer routing.
+
+  - id: SYS-DWH
+    name: Customer Data Warehouse (Snowflake)
+    type: analytics_data_warehouse
+    tech_stack: "Snowflake (AWS Frankfurt eu-central-1), dbt, Fivetran"
+    owner: Head of Data & Analytics (CDO)
+    criticality: high
+    hosts_personal_data: true
+    notes: Reg-reporting data mart; PSD2/BaFin/ZAG line items.
+
+  - id: SYS-AUDIT
+    name: Immutable Audit Log Platform
+    type: audit_logging
+    tech_stack: "OpenSearch, AWS S3 Object-Lock, Vault signing"
+    owner: CISO
+    criticality: critical
+    hosts_personal_data: false
+    notes: 7y retention (GwG §8); append-only; signed manifest.
+
+  - id: SYS-OBSERVABILITY
+    name: Observability Stack (Datadog + PagerDuty)
+    type: monitoring_observability
+    tech_stack: "Datadog (APM, logs, RUM), PagerDuty, Slack ops channel"
+    owner: Head of SRE
+    criticality: high
+    hosts_personal_data: false
+    notes: 24/7 SOC (3-shift in-house); DORA Art. 12 ICT operations monitoring.

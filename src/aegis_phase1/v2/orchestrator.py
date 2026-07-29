@@ -174,6 +174,10 @@ class Phase1Orchestrator:
                 # without re-parsing the YAML.
                 self.state["v2_regulatory_rationale"] = dict(profile.regulatory.applicability_rationale)
                 self.state["v2_clause_count_per_reg"] = dict(profile.regulatory.clause_count_per_reg)
+                # CORR-073: GDPR Art. 30 personal-data inventory
+                self.state["v2_personal_data_categories"] = list(
+                    profile.personal_data_categories or []
+                )
                 logger.debug(
                     "T3a: case_profile loaded — %d stakeholders, %d goals, %d architecture sections",
                     len(profile.stakeholders),
@@ -353,23 +357,39 @@ class Phase1Orchestrator:
                         if hasattr(value, "model_dump")
                         else value
                     )
+            # CORR-073: surface personal_data_categories (GDPR Art. 30)
+            # on the v1 company_context shim so doc_04a + future
+            # consumers can read it.
+            pdc = getattr(profile, "personal_data_categories", None) or []
+            if pdc:
+                base["personal_data_categories"] = [dict(c) for c in pdc]
+                base["data_types"] = [dict(c) for c in pdc]
 
         return base
 
     def _build_architecture_inventory(self) -> dict[str, list[dict[str, Any]]]:
-        """Build v1-shape architecture_inventory (dict[str, list[dict]])."""
+        """Build v1-shape architecture_inventory (dict[str, list[dict]]).
+
+        CORR-073: also surfaces ``architecture/data_subjects.yaml`` (if
+        present) under the ``data_subjects`` key so doc_04a §2.4 has data.
+        Pre-CORR-073 the architecture loader only consumed systems /
+        auth_systems / cloud_services / data_flows / data_stores;
+        data_subjects was loaded but not threaded into the inventory.
+        """
         profile = self.state.get("v2_company_profile")
         if profile is None:
             return {}
         arch = profile.architecture
-        return {
+        inv: dict[str, list[dict[str, Any]]] = {
             "N.1_systems": list(arch.systems),
             "N.2_auth": list(arch.auth_systems),
             "N.3_cloud": list(arch.cloud_services),
             "N.4_data_flows": list(arch.data_flows),
             "N.5_data_stores": list(arch.data_stores),
             "N.6_other": [],
+            "data_subjects": list(getattr(arch, "data_subjects", []) or []),
         }
+        return inv
 
     def _build_ontology_shim(self) -> dict[str, Any]:
         """Build v1-shape ontology from v2 pairs.
@@ -377,12 +397,21 @@ class Phase1Orchestrator:
         v1 ontology had: overlaps, regulations, source_regulations, stacks.
         v2 sources give us: v2_pairs (cross-regulation pairs) and
         v2_applicable_regs.
+
+        CORR-073: also threads `company.data_types` from
+        ``v2_personal_data_categories`` so doc_04a §2.3 Personal Data
+        Categories has data to render.
         """
         return {
             "regulations": list(self.state.get("v2_applicable_regs", [])),
             "overlaps": [p.model_dump() for p in self.state.get("v2_pairs", [])],
             "source_regulations": {},
             "stacks": [],
+            "company": {
+                "data_types": list(
+                    self.state.get("v2_personal_data_categories") or []
+                ),
+            },
         }
 
     def _build_preprocessing_shim(self) -> dict[str, Any]:

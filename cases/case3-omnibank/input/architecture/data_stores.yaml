@@ -1,1 +1,85 @@
-stores: []
+# Data Stores (Case 03 — OmniBank Financial Systems S.A.)
+# Banking-grade: CBS ledger, AML store, customer DWH, key vault, etc.
+# Schema mirrors doc_04a._data_stores_table columns:
+#   id, type, location, system, encryption_at_rest, owner, retention_period, backup
+data_stores:
+  - id: STORE-CBS-LEDGER
+    type: relational_dbms
+    location: Frankfurt DC1 (on-prem) + DR DC2 Munich
+    system: SYS-CBS
+    encryption_at_rest: AES-256 (LUKS2 + DB2 native TDE)
+    owner: Head of Operations (COO)
+    retention_period: 10 years (HGB §257; GwG §8)
+    backup: Yes — nightly incremental, weekly full, offsite to DC2 (RPO 5 min, RTO 4 h)
+
+  - id: STORE-CUSTOMER-DWH
+    type: columnar_warehouse
+    location: AWS eu-central-1 (Frankfurt)
+    system: SYS-DWH
+    encryption_at_rest: AES-256 (Snowflake-managed, key rotated annually)
+    owner: Head of Data & Analytics (CDO)
+    retention_period: 5 years (GwG §8; MiFID II)
+    backup: Yes — Time Travel 90 days + Fail-safe 7 days (Snowflake native)
+
+  - id: STORE-CREDITSCORE-OUT
+    type: object_store
+    location: On-prem Frankfurt DC1 (GPU cluster NFS)
+    system: SYS-CREDITAI
+    encryption_at_rest: AES-256 (LUKS2, HSM-bound key per STORE-KMS)
+    owner: Head of AI/ML
+    retention_period: 7 years (BaFin circular 05/2023 model-risk)
+    backup: Yes — daily snapshot, immutable, 7y WORM
+
+  - id: STORE-AUDIT-LOG
+    type: append_only_object_store
+    location: AWS eu-central-1 (S3 Object-Lock, compliance mode)
+    system: SYS-AUDIT
+    encryption_at_rest: AES-256 (SSE-KMS, dedicated key per STORE-KMS)
+    owner: CISO
+    retention_period: 7 years (GwG §8; HGB §257)
+    backup: Yes — cross-region replication (eu-central-1 → eu-west-1), Object-Lock
+
+  - id: STORE-AML-TX
+    type: columnar_store
+    location: AWS eu-central-1 (NICE Actimize managed)
+    system: SYS-AML
+    encryption_at_rest: AES-256 (vendor-managed KMS)
+    owner: Head of Compliance / MLRO
+    retention_period: 5 years (GwG §8)
+    backup: Yes — vendor-managed daily, 35-day retention
+
+  - id: STORE-KYC-DOCS
+    type: document_object_store
+    location: AWS eu-central-1 (S3, IA tier)
+    system: SYS-KYC
+    encryption_at_rest: AES-256 (SSE-KMS; bucket key per region)
+    owner: Head of Compliance
+    retention_period: 5 years after account closure (GwG §8)
+    backup: Yes — cross-region replication, versioning enabled
+
+  - id: STORE-KEY-VAULT
+    type: hsm_kms
+    location: On-prem Frankfurt DC1 (Thales Luna HSM cluster, FIPS 140-3 Level 3)
+    system: SYS-CBS / SYS-AUDIT
+    encryption_at_rest: HSM-root keys (pay-no-DB-export-permit)
+    owner: CISO
+    retention_period: 10 years post-key-rotation (key history)
+    backup: Yes — HSM quorum (3-of-5) with M-of-N split-knowledge; DR HSM at DC2
+
+  - id: STORE-DOC-OCR
+    type: searchable_archive
+    location: AWS eu-central-1 (S3 + OpenSearch)
+    system: SYS-KYC
+    encryption_at_rest: AES-256 (SSE-KMS)
+    owner: Head of Operations
+    retention_period: 7 years (MiFID II record-keeping)
+    backup: Yes — daily snapshot, 35-day retention
+
+  - id: STORE-REG-REPORT-LAKE
+    type: data_lake_iceberg
+    location: AWS eu-central-1 (S3 + Iceberg tables)
+    system: SYS-DWH
+    encryption_at_rest: AES-256 (SSE-KMS; dedicated reg-report key)
+    owner: Head of Regulatory Reporting
+    retention_period: 10 years (BaFin ZAIT reporting retention)
+    backup: Yes — cross-region replication (eu-central-1 → eu-west-1), versioning

@@ -1,0 +1,60 @@
+# AEGIS Phase 1 — Regulatory Interactions (Case 03 — OmniBank Financial Systems S.A.)
+# Layer 3 scans for OmniBank: temporal / requirement / trigger / negative.
+# Banking-grade: documents real cross-regulatory tensions relevant to a
+# German credit institution supervised by BaFin + ECB.
+#
+# Temporal conflicts (breach-notification timeline differences).
+temporal_conflicts:
+  - id: TEMPORAL-01
+    type: TEMPORAL
+    regulations: [GDPR, CRA, DORA, NIS2]
+    sub_domains: [D-04.3, D-04.4]
+    description: "Personal data breach notification timelines differ across regimes — GDPR Art. 33 = 72h DPA notification; NIS2 Art. 23 = 24h early warning + 72h notification + 30-day final report; CRA Art. 14 = 24h early warning + 72h notification; DORA Art. 19 = 4h initial classification + 72h intermediate + 1-month final report."
+    resolution: "Adopt the strictest binding SLA (DORA 4h) as the unified internal SLA; one incident-detection pipeline feeds all four regimes' templates with regulator-specific routing. Documented in IR runbook §3.2."
+
+  - id: TEMPORAL-02
+    type: TEMPORAL
+    regulations: [NIS2, DORA]
+    sub_domains: [D-04.3]
+    description: "Major ICT-related incident reporting: NIS2 = early warning 24h; DORA = initial classification 4h. Both must be filed for an OmniBank-grade ICT incident."
+    resolution: "Single 4h DORA-aligned initial classification covers NIS2 24h early warning when augmented with the NIS2-specific fields."
+
+# Requirement conflicts (obligations that conflict across regs).
+requirement_conflicts:
+  - id: REQ-01
+    type: REQUIREMENT
+    regulations: [GDPR, NIS2]
+    sub_domains: [D-04.3]
+    description: "GDPR Art. 33(3) requires DPO/controller notification to include 'approximate number of data subjects and records'; NIS2 Art. 23 requires DORA-aligned anonymised dataset. The same incident feeds both with the same artefacts but different fields."
+    resolution: "Internal incident report template carries both GDPR + NIS2 + DORA field sets; single artefact, multiple regulator submissions."
+
+# Trigger mismatches (trigger-event definitions differ).
+trigger_mismatches:
+  - id: TRIGGER-01
+    type: TRIGGER
+    regulations: [NIS2, DORA]
+    sub_domains: [D-04.3]
+    description: "'Major incident' threshold definitions differ: NIS2 Art. 23 uses service-disruption criteria; DORA Annex III uses operational + financial + reputational criteria. The same event may exceed one threshold but not the other."
+    resolution: "Union-of-criteria classifier in SYS-OBSERVABILITY: an incident classified 'major' if ANY regime's threshold is met."
+
+# Negative analyses (what SHOULD apply but DOESN'T at this proportionality tier).
+negative_analyses:
+  - id: NEG-01
+    description: "AI Act Art. 27 Fundamental Rights Impact Assessment (FRIA) is required for deployers of high-risk Annex III §5(b) systems. OmniBank's FRIA is in draft; not yet published."
+    expected_regulations: [AI_Act]
+    severity: HIGH
+
+  - id: NEG-02
+    description: "DORA Art. 28(3) requires an exit strategy document for each ICT third-party service provider classified critical/important. Document exists for AWS but not yet for Auth0 / Datadog / Onfido."
+    expected_regulations: [DORA]
+    severity: MEDIUM
+
+  - id: NEG-03
+    description: "NIS2 Art. 21(2)(j) requires a crisis-management plan with annual board-level review. Crisis-management plan exists; annual board-level review not yet completed."
+    expected_regulations: [NIS2]
+    severity: MEDIUM
+
+  - id: NEG-04
+    description: "AI Act Art. 26(7) requires deployers of high-risk AI to cooperate with the provider and competent authorities. Cooperation clause exists in credit-scoring vendor contract but the cooperation playbook (which authority, which data, which cadence) is not documented."
+    expected_regulations: [AI_Act]
+    severity: MEDIUM

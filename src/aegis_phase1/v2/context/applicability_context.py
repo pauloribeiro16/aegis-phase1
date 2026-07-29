@@ -286,6 +286,16 @@ def build_applicability_context(state: dict[str, Any]) -> ApplicabilityContext:
     obligated: dict[str, str] = {}
     if regulatory_obj is not None and hasattr(regulatory_obj, "obligated_party_per_reg"):
         obligated = dict(regulatory_obj.obligated_party_per_reg or {})
+    # CORR-073: also read v2_obligated_party (populated by orchestrator
+    # from CaseProfileLoader.profile.regulatory.obligated_party_per_reg)
+    # — the legacy `state["regulatory"]` is NOT populated by the v2
+    # orchestrator so the previous code path yielded empty obligated
+    # parties for NIS2/DORA/AI_Act even though classification.yaml
+    # has the values.
+    v2_obligated = state.get("v2_obligated_party") or {}
+    for reg, party in v2_obligated.items():
+        if party and (reg not in obligated or not obligated.get(reg)):
+            obligated[reg] = party
     # Sensible defaults
     obligated.setdefault("GDPR", "controller")
     obligated.setdefault("CRA", "manufacturer")
@@ -305,6 +315,15 @@ def build_applicability_context(state: dict[str, Any]) -> ApplicabilityContext:
     if regulatory_obj is not None and hasattr(regulatory_obj, "clause_count_per_reg"):
         clause_count = {str(k): int(v) for k, v in (regulatory_obj.clause_count_per_reg or {}).items() if isinstance(v, (int, float))}
     elif v2_clause_count:
+        clause_count = {str(k): int(v) for k, v in v2_clause_count.items() if isinstance(v, (int, float))}
+    # CORR-073: also read v2_regulatory_rationale / v2_clause_count_per_reg
+    # as fallbacks — the legacy `state["regulatory"]` is not populated by
+    # the v2 orchestrator, so the previous code path produced empty
+    # rationale/clause_count for all 5 regs in case 3 (despite the
+    # applicability.yaml having 4 entries + 28-38 clause counts).
+    if not rationale and v2_rationale:
+        rationale = {str(k): str(v) for k, v in v2_rationale.items()}
+    if not clause_count and v2_clause_count:
         clause_count = {str(k): int(v) for k, v in v2_clause_count.items() if isinstance(v, (int, float))}
 
     # Tier

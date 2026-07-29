@@ -1,0 +1,33 @@
+# Data Subjects (Case 03 — OmniBank Financial Systems S.A.)
+# Banking data subject categories. Schema mirrors doc_04a._data_subjects_table
+# columns: subject_type, data_categories, access_mechanism, erasure_mechanism.
+#
+# NOTE: the v2 loader currently does not consume this YAML (data_subjects is
+# keyed under architecture_inventory but the architecture_inventory shim only
+# populates N.1..N.6). This file is provided for future-proofing so a small
+# loader extension can wire it through without a schema break.
+data_subjects:
+  - subject_type: Retail customers (current)
+    data_categories: name, email, phone, postal address, IBAN, account history, KYC artefacts
+    access_mechanism: Internet + mobile banking (SYS-WEB, SYS-MOBILE) + Auth0 CIAM
+    erasure_mechanism: DSAR portal + manual workflow; KYC artefacts retained 5y per GwG §8
+
+  - subject_type: Loan applicants
+    data_categories: name, contact, financial history, credit-bureau pull, scoring input, decision rationale
+    access_mechanism: Branch portal + REST API (B2B partners via mTLS)
+    erasure_mechanism: Model inputs anonymised after decision + 7y retention; full erasure on DSAR
+
+  - subject_type: Employees + contractors
+    data_categories: name, payroll data, role, badges, training records, performance
+    access_mechanism: HR system + internal AD (Workforce Identity)
+    erasure_mechanism: 10y retention (German payroll law); then erasure
+
+  - subject_type: Corporate / SMB clients
+    data_categories: legal-entity data, UBO (beneficial owner) data, mandate holders, tx history
+    access_mechanism: Corporate banking portal + dedicated relationship manager
+    erasure_mechanism: 10y retention post-relationship-end; GwG §8 override on UBO data
+
+  - subject_type: Prospective customers (marketing)
+    data_categories: name, email, marketing-consent record, lead source
+    access_mechanism: Web form + CRM (Salesforce) + consent management platform
+    erasure_mechanism: Opt-out within 30 days; full erasure on DSAR; consent record kept for 3y (GDPR accountability)
