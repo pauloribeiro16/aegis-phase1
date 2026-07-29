@@ -198,7 +198,7 @@ def test_rationale_section_handles_flat_synthesis_dict():
 
 
 def test_run_all_wires_run_phase_1b(monkeypatch):
-    """Verify run_all() invokes run_phase_1b() between MAP and REDUCE."""
+    """Verify run_all() invokes run_phase_1b() before MAP and REDUCE."""
     from aegis_phase1.v2.orchestrator import Phase1Orchestrator
 
     calls: list[str] = []
@@ -244,7 +244,7 @@ def test_run_all_wires_run_phase_1b(monkeypatch):
     orch = Phase1Orchestrator(work_dir=_work_dir(), llm_invoker=None)
     orch.run_all(case_path="/tmp/case")
 
-    assert calls == ["load", "map", "phase_1b", "reduce", "outputs"], (
+    assert calls == ["load", "phase_1b", "map", "reduce", "outputs"], (
         f"Unexpected call order: {calls}"
     )
 

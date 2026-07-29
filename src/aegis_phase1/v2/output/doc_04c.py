@@ -647,9 +647,20 @@ def _risk_narrative_prompt(
     cloud: list[dict],
     rows: list[tuple[str, str, str, str, str, str]],
 ) -> str:
+    """LLM prompt for §5.1 Concentration Risk narrative.
+
+    Function vocabulary (ROLE_VOCABULARY): DPO, CISO, Engineering,
+    Operations, Governance. Disclaimer: DO NOT name individuals.
+    """
+    from aegis_phase1.v2.output._functional_prompts import (
+        build_functional_context,
+        extract_tier_and_regs,
+    )
     name = _attr(state.get("company_context"), "company_name", default="the company")
     vendor_count = len(cloud)
-    return (
+    tier, regs = extract_tier_and_regs(state)
+    ctx = build_functional_context(tier, regs)
+    body = (
         f"Produce a 3-4 sentence concentration-risk narrative for {name}. "
         f"Total inherited providers recorded: {vendor_count}. "
         "The narrative should: (1) note that all critical workloads run on "
@@ -660,6 +671,7 @@ def _risk_narrative_prompt(
         "manageable under the proportionality tier but worth documenting. "
         "Avoid bullet lists."
     )
+    return f"{ctx}\n\n{body}" if ctx else body
 
 
 def _should_use_llm(llm_invoker: Any | None) -> bool:

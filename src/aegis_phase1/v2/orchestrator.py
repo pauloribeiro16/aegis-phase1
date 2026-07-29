@@ -392,19 +392,50 @@ class Phase1Orchestrator:
         return inv
 
     def _build_ontology_shim(self) -> dict[str, Any]:
-        """Build v1-shape ontology from v2 pairs.
+        """Build v1-shape ontology from v2 pairs and security requirements.
 
         v1 ontology had: overlaps, regulations, source_regulations, stacks.
-        v2 sources give us: v2_pairs (cross-regulation pairs) and
-        v2_applicable_regs.
+        v2 sources give us: v2_pairs (cross-regulation pairs),
+        v2_applicable_regs, and preprocessed security requirements.
 
         CORR-073: also threads `company.data_types` from
         ``v2_personal_data_categories`` so doc_04a §2.3 Personal Data
         Categories has data to render.
         """
+        clause_mappings: list[dict[str, Any]] = []
+        if self.preproc_catalog is not None:
+            try:
+                srs = self.preproc_catalog.load_srs()
+                for sr in srs:
+                    sub_domain_ids = list(getattr(sr, "sub_domain", []) or [])
+                    source_clauses = list(getattr(sr, "source_clauses", []) or [])
+                    for source_clause in source_clauses:
+                        clause_id = (
+                            source_clause.get("clause_id")
+                            if isinstance(source_clause, dict)
+                            else getattr(source_clause, "clause_id", None)
+                        )
+                        if not clause_id:
+                            continue
+                        sub_domain_id = sorted(sub_domain_ids)[0] if sub_domain_ids else ""
+                        clause_mappings.append(
+                            {
+                                "clause_id": str(clause_id),
+                                "regulation_id": str(getattr(sr, "regulation", "") or ""),
+                                "maps_to_subdomain": str(sub_domain_id),
+                                "source_sr_ids": [str(getattr(sr, "id", "") or "")],
+                                "normative_strength": 2,
+                            }
+                        )
+            except Exception as exc:
+                logger.warning(
+                    "CORR-060 T3: clause_mappings backfill failed: %s", exc
+                )
+
         return {
             "regulations": list(self.state.get("v2_applicable_regs", [])),
             "overlaps": [p.model_dump() for p in self.state.get("v2_pairs", [])],
+            "clause_mappings": clause_mappings,
             "source_regulations": {},
             "stacks": [],
             "company": {
@@ -689,6 +720,9 @@ class Phase1Orchestrator:
             applicable_regs=applicable_regs,
             state=self.state,
             company_facts=cc,
+            p1b_outputs_by_reg=(
+                self.state.get("aggregated_data", {}).get("rationale_by_reg", {})
+            ),
             layer0_subdomain_refs=self._build_layer0_subdomain_refs(
                 list((self.state.get("subdomains") or {}).keys())
             ),
@@ -1523,7 +1557,7 @@ class Phase1Orchestrator:
         *,
         preprocessing_path: str | None = None,
     ) -> V2State:
-        """Run all 4 stages in sequence: LOAD → MAP → REDUCE → OUTPUT.
+        """Run all stages: LOAD → Phase 1B → MAP → REDUCE → OUTPUT.
 
         Both ``regulatory_baseline_path`` (canonical) and the deprecated
         ``preprocessing_path`` alias are accepted. If only the alias is
@@ -1549,8 +1583,8 @@ class Phase1Orchestrator:
             regulatory_baseline_path,
             preprocessing_path=preprocessing_path,
         )
-        self.map_domains()
         self.run_phase_1b()
+        self.map_domains()
         self.reduce()
         self.generate_outputs(output_dir)
         logger.info("=== PIPELINE COMPLETE ===")

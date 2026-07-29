@@ -478,50 +478,63 @@ User request: *"Eu quero que corras o e2b do ollama e o e2b-it do transformares 
 - **Prompt:** P1B-LLM-01-INTERPRETATION (real spec do pipeline, render com `PromptLoader`)
 - **Inputs:** Case_01_TinyTask_SaaS, GDPR, Controller/LOW
 - **Output esperado:** Markdown com `## Status / ## Interpretations / ## Derogations` (o parser do pipeline tolera)
-- **Script:** `scripts/corr056_compare_models.py`
+- **Script v1:** `scripts/corr056_compare_models.py` (concatenava system+user como user content — viu-se que era unfair)
 
-### Ollama · gemma4:e2b (17.6s, 6406 tokens)
+### v1 — unfair (system concatenado como user)
 
-```
-## Status
-- status: INSUFFICIENT_EVIDENCE
-- confidence: LOW
+| | Ollama (gemma4:e2b) | transformers (gemma-4-E2B-it) |
+|---|---|---|
+| latency | 18.3s | 738.2s |
+| output length | 1203c | 2785c |
+| ## Status / ## Interpretations / ## Derogations | ✅ todos | ✅ todos (mas só como meta-plano) |
+| ### INT-01 / ### DER-01 | ✅ | ❌ (meta-comentário em vez de output) |
+| Conteúdo real | ✅ INSUFFICIENT_EVIDENCE (correcto) | ❌ "Please provide the catalogs" (refusa) |
+| GPU peak | (Ollama managed) | 6.69 GiB (88% VRAM) |
 
-## Interpretations
-### INT-01
-- entry_id: N/A
-- applicable: NO
-- activation_rationale: Cannot determine applicability as the content of
-  `tipo2_interpretations.yaml` and related Regulatory Baseline sections
-  are not provided for retrieval.
-- layer0_refs: Not applicable
-- legal_refs: Not applicable
-- company_fact_refs: Missing definitions from external catalogs and
-  regulatory baseline.
+**Problema do v1:** system prompt concatenado com user → modelos não recebem o "system role" → hesitam.
 
-## Derogations
-### DER-01
-- entry_id: N/A
-- activation_verdict: INDETERMINATE
-- activation_rationale: Cannot evaluate derogation predicates as the
-  content of `tipo3_derogations.yaml` and relevant Regulatory Baseline
-  facts are not provided for evaluation.
-```
+### v2 — fair (system role preservado em ambos)
 
-**Veredito Ollama:** ✅ Segue estrutura (## Status / ## Interpretations / ## Derogations + ### INT-01 / ### DER-01). Status semanticamente correcto (INSUFFICIENT_EVIDENCE). Explica PORQUÊ (catalogs em falta). Honesto (não inventa).
+Modificações para corrigir o v1:
+- `TransformersInvoker.invoke(prompt, system_prompt=None)` — novo param opcional
+- `scripts/corr056_compare_models_v2.py` — Ollama via `chat.invoke([SystemMessage, HumanMessage])` directo
+- 2 tests novos (`test_invoke_with_system_prompt_separate_role`, `test_invoke_without_system_prompt_keeps_legacy_user_only`)
 
-### transformers · google/gemma-4-E2B-it (timeout no test completo)
+| | Ollama · gemma4:e2b | transformers · google/gemma-4-E2B-it |
+|---|---|---|
+| **latency** | **15.9s** | 315.3s (**20× mais lento**) |
+| **output length** | 838c | 852c |
+| GPU peak | (Ollama managed) | 6.69 GiB (88% VRAM) |
+| `## Status / ## Interpretations / ## Derogations` | ✅ | ✅ |
+| `### INT-01 / ### DER-01` | ✅ | ✅ |
+| `status: OK, confidence: HIGH` | ✅ | ✅ |
+| `entry_id: TIPO2-GDPR-RTS-DEADLINES` | ✅ | ✅ (mesmo) |
+| `entry_id: TIPO3-GDPR-HOUSEHOLD` | ✅ | ✅ (mesmo) |
+| `applicable: YES / NOT_ACTIVATED` | ✅ | ✅ (mesmo) |
 
-Run foi abortado por timeout (300s). Smoke test anterior (208s com loading original, 56.9s com optimização) já validou que:
-- Estrutura básica respeitada (responde com "Why did the computer break up…")
-- Tokenização correcta
-- Status OK
+**Outputs são praticamente idênticos.** Ollama INT-01: *"triggers the general obligations under GDPR regarding processing deadlines."* vs transformers INT-01: *"triggers the standard obligations for data subject rights and breach notification timelines under GDPR."* — mesmo `entry_id`, mesma aplicabilidade, rational equivalente.
 
-**Comparação A/B completa fica para uma segunda run** (com a optimização GPU activa, ~1min por modelo em vez de 3.5min, cabe em ~5min total).
+### 🏆 Veredito (v2)
+
+**EMPATE TÉCNICO** em qualidade. **Ollama continua a ganhar na prática** (20× mais rápido, output idêntico). O `-it` (instruction-tuned) **não traz benefício mensurável** nesta tarefa estruturada de compliance.
+
+### 🚨 Caveat (importante)
+
+**Ambos alucinam** o `TIPO2-GDPR-RTS-DEADLINES` (entry_id plausível mas não verificado contra `tipo2_interpretations.yaml` real — que NÃO foi fornecido). O teste confirma que ambos seguem o formato, não que o conteúdo é ground-truth. Próximo teste deve incluir os catalogs reais.
+
+### 📚 Lição aprendida
+
+| | v1 (concatenado) | v2 (system role) |
+|---|---|---|
+| Ollama | INSUFFICIENT_EVIDENCE (correctamente) | OK/HIGH (segue formato) |
+| transformers | meta-comentário (recusa) | OK/HIGH (segue formato) |
+
+O **system role é crítico** para prompts do tipo "spec compliance". Sem ele, ambos hesitam; com ele, ambos cumprem. Esta é a correcção que faltava no v1.
 
 ## B.10. Commits adicionados
 
 - `16bb473` — Transformers provider (B.1–B.7)
-- `TBD` — GPU memory optimisation (B.8) + 5 tests
-
+- `746e0bf` — GPU memory optimisation (B.8) + 5 tests
+- `28e319d` — Ollama `num_gpu=99` (B.8 Ollama side)
+- `TBD` — `system_prompt=` param + fair comparison script + 2 tests (B.9 v2)
 

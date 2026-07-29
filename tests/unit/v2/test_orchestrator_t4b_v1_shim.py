@@ -58,6 +58,14 @@ def test_shim_populates_ontology(tmp_work_dir: Path) -> None:
     assert ont["regulations"] == ["CRA", "GDPR"]
     assert isinstance(ont["overlaps"], list)
     assert len(ont["overlaps"]) == 196  # all pairs
+    assert len(ont["clause_mappings"]) > 200
+    assert {
+        "clause_id",
+        "regulation_id",
+        "maps_to_subdomain",
+        "source_sr_ids",
+        "normative_strength",
+    } <= ont["clause_mappings"][0].keys()
 
 
 def test_shim_populates_preprocessing(tmp_work_dir: Path) -> None:

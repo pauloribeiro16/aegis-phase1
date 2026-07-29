@@ -1,18 +1,25 @@
-"""doc_04d — render AEGIS-P1-04d Organisation, Roles & RACI Matrix.
+"""doc_04d — render AEGIS-P1-04d Organisation, Roles & Capability Summary.
 
 Sections produced (mirrors the reference ``04d_Org_Roles_RACI.md`` in
-Case_01_TinyTask_SaaS):
+Case_01_TinyTask_SaaS, with §6 replaced per CORR-075):
 
 1.  Purpose & Scope
 2.  Company-Level Responsible (table)
 3.  Regulation-Level Owner (table)
 4.  Key Roles (table)
 5.  Reporting Lines (narrative + ASCII tree)
-6.  RACI Matrix (per macro-domain)
+6.  Capability Summary (per macro-domain, sourced from data/capabilities/)
 7.  Training Status (table)
 8.  Compliance Mapping (D-08 / D-09)
-9.  Gaps & Known Limitations
-10. Gate
+9.  Escalation Paths
+10. Gaps & Known Limitations
+11. Gate
+
+CORR-075 (2026-07-29): §6 was renamed from "RACI Matrix" to
+"Capability Summary" and now reads capability IDs sourced from
+``data/capabilities/{D-XX}.yaml`` via ``load_capabilities()``. The
+per-individual RACI mapping (``_RACI_BY_DOMAIN``, ``_STAKEHOLDER_COLUMNS``)
+was removed because user explicitly required functions-not-people output.
 
 The optional §5 Reporting Lines narrative and §9 Escalation Paths are
 LLM-generated when an invoker is supplied (and ``MOCK_LLM`` is unset).
@@ -20,6 +27,8 @@ All other sections are deterministic.
 
 References:
     - Methodology-main/02_CASES/Case_01_TinyTask_SaaS/01_PHASE1_CONTEXT/04d_Org_Roles_RACI.md
+    - execution/SPEC.md (SP-2026-18) — capabilities wired into Doc 04d
+    - execution/CONTRACT-074.md — capabilities catalog (data layer)
 """
 
 from __future__ import annotations
@@ -33,7 +42,9 @@ from pathlib import Path
 from typing import Any
 
 from aegis_phase1.data.loader import (
+    ROLE_VOCABULARY,
     classify_tier,
+    load_capabilities,
     load_role_model,
     load_tier_template,
 )
@@ -60,86 +71,11 @@ _FILENAME = "04d_Org_Roles_RACI.md"
 _MAX_FRAGMENT_BYTES = 2000
 _SAFE_KEY = re.compile(r"[^A-Za-z0-9_.-]")
 
-# Hardcoded stakeholder list — mirrors the reference convention.
-# Column abbreviations are kept short for readability.
-_STAKEHOLDER_COLUMNS = [
-    ("DPO", "CEO acting as voluntary Data Protection Officer"),
-    ("CISO", "CTO acting as Security Lead / CISO"),
-    ("Dev", "Lead Developer + developer team"),
-    ("Legal", "External Legal Adviser (retainer)"),
-    ("HR", "CEO in HR-coordination role"),
-    ("Board", "2 founders (CEO + CTO)"),
-]
-
-# Per-domain activity → R/A/C/I mapping per stakeholder column.
-# The mapping encodes the deterministic algorithm:
-#   - Data-protection-specific activities => A = DPO
-#   - Security/engineering activities => A = CISO
-#   - Implementation work => R = Dev
-#   - Governance approvals => A = Board
-_RACI_BY_DOMAIN: dict[str, list[tuple[str, dict[str, str]]]] = {
-    "D-01": [
-        ("Encrypt personal data at rest", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-        ("Manage encryption keys", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-        ("Notify DPA within 72h (Art. 33 GDPR)", {"DPO": "R", "CISO": "A", "Dev": "C", "Legal": "C", "HR": "—", "Board": "I"}),
-        ("Conduct DPIA (Art. 35 GDPR)", {"DPO": "R", "CISO": "C", "Dev": "C", "Legal": "A", "HR": "—", "Board": "I"}),
-    ],
-    "D-02": [
-        ("Run vulnerability scans (Snyk, dependency review)", {"DPO": "I", "CISO": "A", "Dev": "R", "Legal": "—", "HR": "—", "Board": "I"}),
-        ("Apply critical patches (CRA Annex I Part I (2)(f))", {"DPO": "I", "CISO": "A", "Dev": "R", "Legal": "—", "HR": "—", "Board": "I"}),
-        ("Annual penetration testing", {"DPO": "I", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-        ("Operate CVD / security.txt (CRA Art. 14)", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-    ],
-    "D-03": [
-        ("Manage IAM (Auth0 + cloud IAM)", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-        ("Enforce MFA (admins; future customer MFA)", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "—", "HR": "—", "Board": "I"}),
-        ("Quarterly access review", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-        ("Offboarding (revoke access within 24h)", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "C", "Board": "I"}),
-    ],
-    "D-04": [
-        ("Detect incident", {"DPO": "I", "CISO": "A", "Dev": "R", "Legal": "—", "HR": "—", "Board": "I"}),
-        ("Contain incident", {"DPO": "I", "CISO": "A", "Dev": "R", "Legal": "C", "HR": "—", "Board": "I"}),
-        ("Notify authorities (72h GDPR / 24h CRA)", {"DPO": "R", "CISO": "A", "Dev": "C", "Legal": "C", "HR": "—", "Board": "I"}),
-        ("Notify controllers (Art. 33(2) processor→controller)", {"DPO": "R", "CISO": "A", "Dev": "C", "Legal": "C", "HR": "—", "Board": "I"}),
-        ("Recover systems (RPO / RTO targets)", {"DPO": "I", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-        ("Post-incident review", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-    ],
-    "D-05": [
-        ("Enforce data minimisation", {"DPO": "R", "CISO": "A", "Dev": "C", "Legal": "C", "HR": "—", "Board": "I"}),
-        ("Manage retention policies", {"DPO": "R", "CISO": "A", "Dev": "C", "Legal": "C", "HR": "—", "Board": "I"}),
-        ("Process erasure requests (Art. 17 GDPR)", {"DPO": "R", "CISO": "C", "Dev": "A", "Legal": "C", "HR": "—", "Board": "I"}),
-        ("Process portability requests (Art. 20 GDPR)", {"DPO": "R", "CISO": "C", "Dev": "A", "Legal": "C", "HR": "—", "Board": "I"}),
-    ],
-    "D-06": [
-        ("Assess vendor security (annual review)", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "C", "HR": "—", "Board": "I"}),
-        ("Maintain SBOM (CRA Annex I Part II (1))", {"DPO": "I", "CISO": "A", "Dev": "R", "Legal": "—", "HR": "—", "Board": "I"}),
-        ("Manage DPA contracts with B2B controllers", {"DPO": "R", "CISO": "C", "Dev": "I", "Legal": "A", "HR": "—", "Board": "I"}),
-        ("Manage DPA acceptance from subprocessor vendors", {"DPO": "R", "CISO": "A", "Dev": "I", "Legal": "C", "HR": "—", "Board": "I"}),
-    ],
-    "D-07": [
-        ("Threat model per feature", {"DPO": "C", "CISO": "C", "Dev": "R/A", "Legal": "I", "HR": "—", "Board": "I"}),
-        ("Code review", {"DPO": "I", "CISO": "C", "Dev": "R/A", "Legal": "—", "HR": "—", "Board": "I"}),
-        ("Security testing in CI/CD (SAST/DAST/SCA)", {"DPO": "I", "CISO": "A", "Dev": "R", "Legal": "—", "HR": "—", "Board": "I"}),
-        ("Change approval (CAB) for production releases", {"DPO": "I", "CISO": "C", "Dev": "R", "Legal": "I", "HR": "—", "Board": "A"}),
-    ],
-    "D-08": [
-        ("Annual security awareness training (D-08.1)", {"DPO": "C", "CISO": "A", "Dev": "I", "Legal": "I", "HR": "R", "Board": "I"}),
-        ("Role-specific training — secure coding (D-08.2)", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "—", "HR": "I", "Board": "I"}),
-        ("Role-specific training — DPO competence refresh (D-08.2)", {"DPO": "R/A", "CISO": "C", "Dev": "—", "Legal": "C", "HR": "I", "Board": "I"}),
-    ],
-    "D-09": [
-        ("Approve security policies", {"DPO": "C", "CISO": "C", "Dev": "C", "Legal": "C", "HR": "C", "Board": "A"}),
-        ("Conduct risk assessments (annual + per-feature)", {"DPO": "R", "CISO": "A", "Dev": "C", "Legal": "C", "HR": "I", "Board": "I"}),
-        ("Maintain asset inventory", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-        ("Maintain RoPA (Art. 30 GDPR)", {"DPO": "R", "CISO": "A", "Dev": "C", "Legal": "C", "HR": "—", "Board": "I"}),
-        ("Maintain CRA Annex VII technical documentation", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "C", "HR": "—", "Board": "I"}),
-    ],
-    "D-10": [
-        ("Continuous security monitoring (Datadog; SIEM-light)", {"DPO": "I", "CISO": "A", "Dev": "R", "Legal": "—", "HR": "—", "Board": "I"}),
-        ("Audit-log retention", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-        ("Annual compliance testing", {"DPO": "C", "CISO": "A", "Dev": "R", "Legal": "I", "HR": "—", "Board": "I"}),
-    ],
-}
+# CORR-075 (2026-07-29): per-individual RACI columns were removed in
+# favour of a Capability Summary sourced from data/capabilities/.
+# The previous _STAKEHOLDER_COLUMNS / _RACI_BY_DOMAIN dicts are gone —
+# functions (DPO / CISO / Engineering / Operations / Governance) are
+# named in §6 Capability Summary, never individuals.
 
 _DOMAIN_NAME: dict[str, str] = {
     "D-01": "Data Protection",
@@ -202,13 +138,13 @@ def _build_body(
     config: dict[str, Any] | None = None,
 ) -> str:
     parts: list[str] = []
-    parts.append("# Organisation, Roles & RACI Matrix\n")
+    parts.append("# Organisation, Roles & Capability Summary\n")
     parts.extend(_section_purpose_scope(state))
     parts.extend(_section_company_level(state))
     parts.extend(_section_regulation_level(state))
     parts.extend(_section_key_roles(state))
     parts.extend(_section_reporting_lines(state, llm_invoker, config=config))
-    parts.extend(_section_raci_matrix(state))
+    parts.extend(_section_capabilities_summary(state))
     parts.extend(_section_training_status(state))
     parts.extend(_section_compliance_mapping(state))
     parts.extend(_section_escalation_paths(state, llm_invoker, config=config))
@@ -229,14 +165,14 @@ def _section_purpose_scope(state: dict[str, Any]) -> list[str]:
     name = _attr(ctx, "company_name", default="the company")
     parts.append(
         f"This document describes {name}'s organisational structure and "
-        "the per-activity RACI matrix that allocates information-security "
-        "and data-protection responsibilities. It maps to Layer 0 "
-        "sub-domains **D-08 (Human Factors)** and **D-09 (Governance "
-        "Documentation)**, and supports compliance with **GDPR Art. 37-39** "
-        "(DPO designation), **GDPR Art. 32** (security of processing), "
-        "**CRA Annex I Part II (8)(f)** (vulnerability handling competence), "
-        "and **CRA Annex VII §5** (technical documentation — organisational "
-        "measures).\n"
+        "the **Capability Summary** (see §6) that maps information-security "
+        "and data-protection responsibilities to functional roles. It maps "
+        "to Layer 0 sub-domains **D-08 (Human Factors)** and **D-09 "
+        "(Governance Documentation)**, and supports compliance with **GDPR "
+        "Art. 37-39** (DPO designation), **GDPR Art. 32** (security of "
+        "processing), **CRA Annex I Part II (8)(f)** (vulnerability "
+        "handling competence), and **CRA Annex VII §5** (technical "
+        "documentation — organisational measures).\n"
     )
     parts.append(
         "**Scope:** D-08 and D-09 only. Architecture context is in "
@@ -252,7 +188,7 @@ def _section_purpose_scope(state: dict[str, Any]) -> list[str]:
             "**DORA**; neither regulation applies at the current "
             "proportionality tier. Consequently, there is **no OJ-level "
             "regulatory mandate** for formal board cybersecurity training. "
-            "The board-training row in the RACI matrix is retained as a "
+            "The board-training row in §7 Training Status is retained as a "
             "**best-practice placeholder**, not as a derived compliance "
             "requirement.\n"
         )
@@ -568,46 +504,90 @@ def _read_doc_04d_template(tier: str, start_marker: str, end_marker: str) -> str
     return slice_md
 
 
-def _section_raci_matrix(state: dict[str, Any]) -> list[str]:
+def _section_capabilities_summary(state: dict[str, Any]) -> list[str]:
+    """§6 Capability Summary — prose + compact capability list per D-XX.
+
+    CORR-075 (2026-07-29): replaces the legacy per-individual RACI
+    matrix. Reads ``load_capabilities(domain_id)`` for each
+    D-01..D-10 and renders a compact 3-column table per domain with
+    capability ID, accountable function, and regulation anchor. Missing
+    catalogs render an info-only note (no ``PENDING REVIEW`` marker).
+
+    Functions (DPO / CISO / Engineering / Operations / Governance) are
+    the only entities named. Assignment of capabilities to individuals
+    is the company's responsibility (Phase 2B).
+    """
     parts: list[str] = []
-    parts.append("## 6. RACI Matrix\n")
+    parts.append("## 6. Capability Summary\n")
     parts.append(
-        "**Legend:** **R** = Responsible, **A** = Accountable (single "
-        "sign-off; one A per row), **C** = Consulted, **I** = Informed, "
-        "**—** = Not involved.\n"
-    )
-    tier = _tier_for_state(state)
-    board_label = _board_label_for_tier(tier)
-    parts.append(
-        "**Column abbreviations** (people are listed once each; in a "
-        "small team, multiple hats are worn):\n"
-        "- **DPO** = CEO acting as voluntary Data Protection Officer\n"
-        "- **CISO** = CTO acting as Security Lead / CISO\n"
-        "- **Dev** = Lead Developer + developer team\n"
-        "- **Legal** = External Legal Adviser (retainer)\n"
-        "- **HR** = CEO in HR-coordination role\n"
-        f"- **Board** = {board_label}\n"
+        "These capabilities are required by the applicable regulatory "
+        "perimeter. RACI per individual is intentionally out of scope; "
+        "capability-to-person allocation is the company's responsibility "
+        "(see Phase 2B). Functions listed below are drawn from the "
+        f"canonical vocabulary ``{sorted(ROLE_VOCABULARY)}``.\n"
     )
 
-    inactive = _inactive_subdomain_ids(state)
-    for domain_id in sorted(_RACI_BY_DOMAIN.keys()):
-        sub_label = _domain_sub_label(domain_id, inactive)
-        parts.append(f"### 6.{int(domain_id.split('-')[1])} {_DOMAIN_NAME[domain_id]} ({sub_label})\n")
-        rows = _RACI_BY_DOMAIN[domain_id]
-        parts.append(_raci_table(rows))
+    for domain_id in sorted(_DOMAIN_NAME.keys()):
+        catalog = load_capabilities(domain_id)
+        title = _DOMAIN_NAME.get(domain_id, domain_id)
+        caps = (
+            list(catalog.get("capabilities", []))
+            if isinstance(catalog, Mapping) and catalog
+            else []
+        )
+        parts.append(f"\n### {domain_id} Capability Summary — {title}\n")
+        if not caps:
+            parts.append(
+                f"_(Capability catalog for {domain_id} not yet authored; "
+                f"see data/capabilities/{domain_id}.yaml.)_\n"
+            )
+            parts.append("")
+            continue
+        rows: list[tuple[str, str, str]] = []
+        for cap in sorted(caps, key=lambda c: str(c.get("id", ""))):
+            if not isinstance(cap, Mapping):
+                continue
+            cap_id = str(cap.get("id", "-"))
+            a_function = str(cap.get("a_function", "-"))
+            anchor = _regulation_anchor(cap)
+            rows.append((cap_id, a_function, anchor))
+        if rows:
+            parts.append(
+                markdown_table(
+                    ["ID", "Accountable Function", "Regulation Anchor"],
+                    rows,
+                )
+            )
+        parts.append(f"Full detail: `data/capabilities/{domain_id}.yaml`\n")
         parts.append("")
 
-    parts.append(
-        "**Reading note:** Rows that place both **CISO = A** and **Dev = R** "
-        "mirror the standard \"RACI for small teams\" pattern — the "
-        "CTO/CISO owns the outcome; the lead developer (with the rotating "
-        "developer team) does the work. Where the activity is "
-        "data-protection-specific (e.g., Art. 17 erasure), **DPO = A** "
-        "holds the legal accountability per Art. 28(3); implementation "
-        "**R** swaps to Dev. Board rows are predominantly **I** "
-        "operationally and **A** for governance-level approvals.\n"
-    )
     return parts
+
+
+def _regulation_anchor(capability: Mapping[str, Any]) -> str:
+    """Return a compact regulation anchor string for one capability.
+
+    Joins the capability's ``obligations`` mapping as ``REG Art.X, Art.Y``
+    or returns the cadence when no obligations are mapped. Falls back
+    to ``—`` when neither field is present.
+    """
+    obligations = capability.get("obligations") if isinstance(capability, Mapping) else None
+    if isinstance(obligations, Mapping) and obligations:
+        pieces: list[str] = []
+        for reg, articles in obligations.items():
+            if isinstance(articles, list) and articles:
+                art_text = ", ".join(str(a) for a in articles)
+                pieces.append(f"{reg} {art_text}")
+            elif isinstance(articles, str) and articles:
+                pieces.append(f"{reg} {articles}")
+            else:
+                pieces.append(str(reg))
+        if pieces:
+            return "; ".join(pieces)
+    cadence = capability.get("cadence") if isinstance(capability, Mapping) else None
+    if cadence:
+        return f"cadence: {cadence}"
+    return "—"
 
 
 def _section_training_status(state: dict[str, Any]) -> list[str]:
@@ -835,7 +815,19 @@ def _section_version_history(state: dict[str, Any]) -> list[str]:
         markdown_table(
             ["Version", "Date", "Author", "Changes"],
             [
-                (1.0, today, "Executor", "Generated RACI from state.regulations and a deterministic per-domain mapping"),
+                ("1.0", today, "Executor", "Generated RACI from state.regulations and a deterministic per-domain mapping"),
+                (
+                    "2.0",
+                    "2026-07-29",
+                    "Executor (CORR-073)",
+                    "Scaled §2/§3 to company profile; tier-aware role model + reporting-lines template.",
+                ),
+                (
+                    "2.3",
+                    "2026-07-29",
+                    "Executor (CORR-075)",
+                    "Remove RACI per individual; replace §6 with Capability Summary sourced from data/capabilities/. No person names referencing roles.",
+                ),
             ],
         )
     )
@@ -851,9 +843,9 @@ def _section_approval(state: dict[str, Any]) -> list[str]:
         markdown_table(
             ["Role", "Name", "Signature", "Date"],
             [
-                ("Document Author", "Executor", "", today),
-                ("Technical Review", "CTO", "", ""),
-                ("Business Review", "CEO", "", ""),
+                ("Document Author", "Executor (CORR-075)", "", today),
+                ("Technical Review", "CISO", "", ""),
+                ("Business Review", "DPO", "", ""),
                 ("AEGIS Methodology Review", "Validator", "", ""),
             ],
         )
@@ -875,29 +867,6 @@ def _section_see_also(state: dict[str, Any]) -> list[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Tables
-# ─────────────────────────────────────────────────────────────────────
-
-
-def _raci_table(rows: list[tuple[str, dict[str, str]]]) -> str:
-    headers = ["Activity", "DPO (CEO)", "CISO (CTO)", "Dev", "Legal", "HR", "Board"]
-    table_rows: list[tuple[str, str, str, str, str, str, str]] = []
-    for activity, mapping in rows:
-        table_rows.append(
-            (
-                activity,
-                mapping.get("DPO", "—"),
-                mapping.get("CISO", "—"),
-                mapping.get("Dev", "—"),
-                mapping.get("Legal", "—"),
-                mapping.get("HR", "—"),
-                mapping.get("Board", "—"),
-            )
-        )
-    return markdown_table(headers, table_rows)
-
-
-# ─────────────────────────────────────────────────────────────────────
 # Sub-domain activation helpers
 # ─────────────────────────────────────────────────────────────────────
 
@@ -911,23 +880,6 @@ def _inactive_subdomain_ids(state: dict[str, Any]) -> list[str]:
     if not isinstance(not_covered, list):
         return []
     return [str(item.get("id")) for item in not_covered if isinstance(item, Mapping) and item.get("id")]
-
-
-def _domain_sub_label(domain_id: str, inactive: list[str]) -> str:
-    """Return a sub-domain label like ``D-XX.Y - Z sub-domains``."""
-    mapping = {
-        "D-01": "D-01.1, D-01.2, D-01.3, D-01.4",
-        "D-02": "D-02.1, D-02.2, D-02.3, D-02.4",
-        "D-03": "D-03.1, D-03.2, D-03.3, D-03.4",
-        "D-04": "D-04.1, D-04.2, D-04.3, D-04.4",
-        "D-05": "D-05.1, D-05.2, D-05.3, D-05.4",
-        "D-06": "D-06.1, D-06.2, D-06.3, D-06.4",
-        "D-07": "D-07.1, D-07.2, D-07.3, D-07.4",
-        "D-08": "D-08.1, D-08.2; D-08.3 inactive" if "D-08.3" in inactive else "D-08.1, D-08.2, D-08.3",
-        "D-09": "D-09.1, D-09.2, D-09.3, D-09.4",
-        "D-10": "D-10.1, D-10.2, D-10.3",
-    }
-    return f"sub-domain {mapping.get(domain_id, domain_id)}"
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -958,25 +910,48 @@ def _regulation_owner(abbrev: str, reg: Mapping[str, Any]) -> str:
 
 
 def _reporting_lines_prompt(state: dict[str, Any]) -> str:
+    """LLM prompt for §5 Reporting Lines narrative.
+
+    Function vocabulary (ROLE_VOCABULARY): DPO, CISO, Engineering,
+    Operations, Governance. Disclaimer: DO NOT name individuals.
+    """
+    from aegis_phase1.v2.output._functional_prompts import (
+        build_functional_context,
+        extract_tier_and_regs,
+    )
     ctx = state.get("company_context")
     name = _attr(ctx, "company_name", default="the company")
     employees = _attr(ctx, "employees", default="")
     tier = _tier_for_state(state)
     board_label = _board_label_for_tier(tier)
     emphasis = ", ".join(load_tier_template(tier).get("clause_emphasis", []))
-    return (
+    fc_tier, fc_regs = extract_tier_and_regs(state)
+    fc_ctx = build_functional_context(fc_tier, fc_regs)
+    body = (
         f"Produce a 4-5 sentence plain-text description of the reporting "
         f"lines at {name} (with {employees or 'a small'} employees), "
         f"tier={tier}. Cover: {board_label}; emphasis on clauses "
         f"({emphasis}). Roles per data/role_models/{tier}.yaml. "
         "Avoid bullet lists."
     )
+    return f"{fc_ctx}\n\n{body}" if fc_ctx else body
 
 
 def _escalation_prompt(state: dict[str, Any]) -> str:
+    """LLM prompt for §9 Escalation Paths narrative.
+
+    Function vocabulary (ROLE_VOCABULARY): DPO, CISO, Engineering,
+    Operations, Governance. Disclaimer: DO NOT name individuals.
+    """
+    from aegis_phase1.v2.output._functional_prompts import (
+        build_functional_context,
+        extract_tier_and_regs,
+    )
     ctx = state.get("company_context")
     name = _attr(ctx, "company_name", default="the company")
-    return (
+    fc_tier, fc_regs = extract_tier_and_regs(state)
+    fc_ctx = build_functional_context(fc_tier, fc_regs)
+    body = (
         f"Produce a 3-4 sentence escalation paths narrative for {name}. "
         "Cover: (1) routine security event escalation (Dev → CTO/CISO); "
         "(2) personal-data incident escalation (Dev → CTO/CISO → "
@@ -986,6 +961,7 @@ def _escalation_prompt(state: dict[str, Any]) -> str:
         "loss of customer trust). Reference GDPR Art. 33 and CRA Annex "
         "I Part II (8)(f). Avoid bullet lists."
     )
+    return f"{fc_ctx}\n\n{body}" if fc_ctx else body
 
 
 def _should_use_llm(llm_invoker: Any | None) -> bool:
