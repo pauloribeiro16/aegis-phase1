@@ -60,13 +60,19 @@ _FILENAME = "04_Company_Context_Assessment.md"
 # produces empty (placeholder-dash) tables rather than leaking TinyTask
 # defaults.
 _TINYTASK_STAKEHOLDERS: list[dict[str, str]] = [
-    {"id": "SH-01", "influence": "HIGH", "interest": "HIGH"},
-    {"id": "SH-02", "influence": "HIGH", "interest": "HIGH"},
-    {"id": "SH-03", "influence": "MEDIUM", "interest": "HIGH"},
-    {"id": "SH-04", "influence": "MEDIUM", "interest": "MEDIUM"},
-    {"id": "SH-05", "influence": "LOW", "interest": "HIGH"},
-    {"id": "SH-06", "influence": "LOW", "interest": "LOW"},
-    {"id": "SH-07", "influence": "LOW", "interest": "LOW"},
+    # CORR-073 Sprint 2: reduced to bare id + template metadata (role,
+    # influence, interest). _augment_influence fills in
+    # influence/interest from this baseline when the case input leaves
+    # them blank. No contact, organisation, or responsibilities here —
+    # those are case-specific facts that must come from the YAML intake
+    # (or stay as "-" placeholders).
+    {"id": "SH-01", "role": "CEO", "influence": "HIGH", "interest": "HIGH"},
+    {"id": "SH-02", "role": "CTO", "influence": "HIGH", "interest": "HIGH"},
+    {"id": "SH-03", "role": "DPO", "influence": "MEDIUM", "interest": "HIGH"},
+    {"id": "SH-04", "role": "Compliance Lead", "influence": "MEDIUM", "interest": "MEDIUM"},
+    {"id": "SH-05", "role": "Engineering Team", "influence": "LOW", "interest": "HIGH"},
+    {"id": "SH-06", "role": "Customer Support", "influence": "LOW", "interest": "LOW"},
+    {"id": "SH-07", "role": "External Auditor", "influence": "LOW", "interest": "LOW"},
 ]
 
 # TinyTask-specific business goals baseline (5 entries).

@@ -1,0 +1,43 @@
+# Control evidence — D-01 Data Protection
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D01
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   STORES → data_stores.yaml
+#   FLOWS  → data_flows.yaml
+#   SYSTEMS → systems.yaml
+
+domain_id: D-01
+title: Data Protection
+controls:
+  - control: Encryption at rest
+    current_by_tier:
+      MICRO: "Not implemented; plaintext on disk"
+      SMALL: "Cloud-managed AES-256 on primary DB"
+      MEDIUM: "AES-256 on primary DB and backups; manual key rotation"
+      LARGE: "AES-256 + customer-managed HSM root keys; automated rotation"
+      MAX: "Customer-managed HSM cluster + multi-region key escrow + FIPS 140-3 L3"
+    evidence_refs: ["STORES"]
+  - control: Encryption in transit
+    current_by_tier:
+      MICRO: "HTTPS only on public routes"
+      SMALL: "TLS 1.2+ on all documented flows"
+      MEDIUM: "TLS 1.3 on main app; mTLS on internal services"
+      LARGE: "TLS 1.3 + mTLS + FAPI 2.0 on financial APIs"
+      MAX: "TLS 1.3 + mTLS + post-quantum ready; HSM-backed session keys"
+    evidence_refs: ["FLOWS"]
+  - control: Key management
+    current_by_tier:
+      MICRO: "No formal KMS; secrets in env vars"
+      SMALL: "Cloud-managed KMS; manual rotation"
+      MEDIUM: "Cloud KMS with documented rotation; alias-per-env"
+      LARGE: "Dedicated HSM cluster; separation of duties; PCI-DSS compliant"
+      MAX: "Multi-region HSM cluster with quorum; HSM-backed key rotation; certified FIPS 140-3 L3"
+    evidence_refs: ["STORES"]
+  - control: Data integrity
+    current_by_tier:
+      MICRO: "Application-level constraints only"
+      SMALL: "DB constraints + daily backup checks"
+      MEDIUM: "Hashed audit logs; integrity checksums on backups"
+      LARGE: "Cryptographic integrity verification; signed audit trail"
+      MAX: "Tamper-evident audit chain; cryptographic notarization"
+    evidence_refs: ["STORES"]

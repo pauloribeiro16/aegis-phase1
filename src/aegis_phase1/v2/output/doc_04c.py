@@ -30,6 +30,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from aegis_phase1.data.loader import classify_tier
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
     get_per_spec_markdown,
@@ -300,7 +301,7 @@ def _section_contractual_controls(state: dict[str, Any]) -> list[str]:
     parts.append(
         "**Common pattern:** Providers substitute third-party certifications "
         "(SOC 2 / ISO 27001) for direct audit access. This is industry-standard "
-        "for low-tier SaaS and requires annual freshness review.\n"
+        "for managed-cloud consumers and requires annual freshness review.\n"
     )
     return parts
 
@@ -346,8 +347,8 @@ def _section_risk_classification(
     parts.append("")
     parts.append(
         f"**Vendor count:** {len(cloud)} (deduplicated by provider+service). "
-        "No Critical+High combinations expected for a low-tier SaaS that "
-        "uses managed cloud services exclusively.\n"
+        "Critical+High combinations depend on the assessed tier; managed-cloud "
+        "providers dominate the LOW/MICRO tier profile.\n"
     )
 
     # CORR-061 S3b: §5.1 Concentration Risk Narrative now reads
@@ -499,7 +500,9 @@ def _section_gate(state: dict[str, Any]) -> list[str]:
         )
     )
     parts.append("")
-    parts.append("**Gate Status:** PASS (proportionate for LOW-tier micro SaaS under P2).\n")
+    parts.append(
+        f"**Gate Status:** PASS (proportionate for {_tier_for_state(state)} tier under P2).\n"
+    )
     return parts
 
 
@@ -713,6 +716,19 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, Mapping):
         return obj.get(name, default)
     return default
+
+
+def _tier_for_state(state: dict[str, Any]) -> str:
+    """Resolve company tier from state via :func:`classify_tier`."""
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default="")
+    sector = _attr(ctx, "sector", default="")
+    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    return classify_tier(employees_int, sector, list(applicable))
 
 
 __all__ = ["render_doc_04c"]

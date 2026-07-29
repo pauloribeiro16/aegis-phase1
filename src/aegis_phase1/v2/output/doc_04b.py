@@ -29,10 +29,13 @@ import os
 import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Any
 
 from aegis_phase1.data.loader import (
     classify_tier,
+    load_control_evidence,
+    load_control_maturity,
     load_tier_template,
     render_tier_text,
 )
@@ -63,43 +66,37 @@ _MAX_FRAGMENT_BYTES = 2000
 _SAFE_KEY = re.compile(r"[^A-Za-z0-9_.-]")
 
 # ─────────────────────────────────────────────────────────────────────
-# Default maturity profile (deterministic)
+# Default maturity profile — tier-aware (CORR-073 Sprint 2)
 # ─────────────────────────────────────────────────────────────────────
 #
-# Per-domain current maturity. Deterministic defaults aligned with the
-# reference (TinyTask) but applicable to any micro/low-tier SaaS:
-#   - D-01, D-03, D-07: level 2 (defined; documented or repeatable)
-#   - D-02, D-04, D-05, D-06, D-08, D-09, D-10: level 1 (ad-hoc)
+# Per-domain current/target maturity is now derived from
+# ``data/control_maturity/{tier}.yaml``. Each tier (MICRO..MAX) declares
+# its own current_by_domain / target_by_domain mapping. Pre-Sprint 2
+# values were static (treated the whole industry as a low-tier SaaS).
+# Tier resolution comes from the company context via :func:`_tier_for_state`.
 #
-# These values can be overridden per-case in future sprints by injecting
-# them into state["security_posture_overrides"] (a dict keyed by domain
-# id).
+# State-level overrides remain supported via
+# ``state["security_posture_overrides"]`` (a dict keyed by domain id)
+# to support per-case adjustments on top of the tier profile.
 
-_DOMAIN_CURRENT: dict[str, int] = {
-    "D-01": 2,
-    "D-02": 1,
-    "D-03": 2,
-    "D-04": 1,
-    "D-05": 1,
-    "D-06": 1,
-    "D-07": 2,
-    "D-08": 1,
-    "D-09": 1,
-    "D-10": 1,
-}
 
-_DOMAIN_TARGET: dict[str, int] = {
-    "D-01": 3,
-    "D-02": 3,
-    "D-03": 3,
-    "D-04": 3,
-    "D-05": 2,
-    "D-06": 2,
-    "D-07": 2,
-    "D-08": 2,
-    "D-09": 3,
-    "D-10": 3,
-}
+@lru_cache(maxsize=1)
+def _control_maturity_for_tier(tier: str) -> tuple[dict, dict]:
+    """Load current/target maturity scores per macro-domain for tier."""
+    data = load_control_maturity(tier)
+    return data.get("current_by_domain", {}), data.get("target_by_domain", {})
+
+
+@lru_cache(maxsize=1)
+def _control_evidence_for_domain(domain_id: str) -> list[dict]:
+    """Load control evidence list for a single macro-domain.
+
+    Source: ``data/control_evidence/{domain_id}.yaml``.
+    Each entry exposes ``control``, ``current_by_tier`` (MICRO..MAX),
+    ``evidence_refs``, ``notes``.
+    """
+    data = load_control_evidence(domain_id)
+    return data.get("controls", [])
 
 _DOMAIN_NAME: dict[str, str] = {
     "D-01": "Data Protection",
@@ -544,11 +541,14 @@ def _section_per_domain(
     overrides = _overrides(state)
     review = _load_review_for_state(state)
     domain_results = state.get("domain_results") or {}
-    for domain_id in sorted(_DOMAIN_CURRENT.keys()):
-        current = overrides.get(domain_id, _DOMAIN_CURRENT[domain_id])
-        target = _DOMAIN_TARGET[domain_id]
+    tier = _tier_for_state(state)
+    current_by_dom, target_by_dom = _control_maturity_for_tier(tier)
+    domain_ids = sorted(current_by_dom.keys())
+    for domain_id in domain_ids:
+        current = overrides.get(domain_id, current_by_dom.get(domain_id, 1))
+        target = target_by_dom.get(domain_id, 1)
         gap = max(0, target - current)
-        controls = _controls_for(domain_id, state)
+        controls = _controls_for(domain_id, tier)
         parts.append(f"### {domain_id} {_DOMAIN_NAME[domain_id]} — Maturity: {current}\n")
         parts.append(_controls_table(controls))
         parts.append("")
@@ -861,12 +861,14 @@ def _section_summary(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 4. Summary Dashboard\n")
     overrides = _overrides(state)
+    tier = _tier_for_state(state)
+    current_by_dom, target_by_dom = _control_maturity_for_tier(tier)
     rows: list[tuple[str, int, int, int]] = []
     total_current = 0
     total_target = 0
-    for domain_id in sorted(_DOMAIN_CURRENT.keys()):
-        current = overrides.get(domain_id, _DOMAIN_CURRENT[domain_id])
-        target = _DOMAIN_TARGET[domain_id]
+    for domain_id in sorted(current_by_dom.keys()):
+        current = overrides.get(domain_id, current_by_dom.get(domain_id, 1))
+        target = target_by_dom.get(domain_id, 1)
         gap = max(0, target - current)
         rows.append((f"{domain_id} {_DOMAIN_NAME[domain_id]}", current, target, gap))
         total_current += current
@@ -884,7 +886,7 @@ def _section_summary(state: dict[str, Any]) -> list[str]:
     parts.append("")
 
     # Maturity count by level
-    counts = _maturity_counts(overrides)
+    counts = _maturity_counts(overrides, tier)
     parts.append("**Maturity distribution:** " + ", ".join(
         f"Level {lvl} = {counts.get(lvl, 0)}" for lvl in (0, 1, 2, 3, 4)
     ) + "\n")
@@ -895,10 +897,16 @@ def _section_top_gaps(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. Top Gaps (feeds Doc 07)\n")
     overrides = _overrides(state)
+    tier = _tier_for_state(state)
+    current_by_dom, target_by_dom = _control_maturity_for_tier(tier)
     ranked = sorted(
         (
-            (domain_id, _DOMAIN_TARGET[domain_id] - overrides.get(domain_id, _DOMAIN_CURRENT[domain_id]))
-            for domain_id in _DOMAIN_CURRENT
+            (
+                domain_id,
+                target_by_dom.get(domain_id, 1)
+                - overrides.get(domain_id, current_by_dom.get(domain_id, 1)),
+            )
+            for domain_id in current_by_dom
         ),
         key=lambda kv: (-kv[1], kv[0]),
     )
@@ -1207,10 +1215,11 @@ _GAP_SUMMARY: dict[str, tuple[str, str]] = {
 }
 
 
-def _maturity_counts(overrides: Mapping[str, int]) -> dict[int, int]:
+def _maturity_counts(overrides: Mapping[str, int], tier: str) -> dict[int, int]:
     counts = {lvl: 0 for lvl in (0, 1, 2, 3, 4)}
-    for domain_id in _DOMAIN_CURRENT:
-        lvl = overrides.get(domain_id, _DOMAIN_CURRENT[domain_id])
+    current_by_dom, _ = _control_maturity_for_tier(tier)
+    for domain_id in current_by_dom:
+        lvl = overrides.get(domain_id, current_by_dom.get(domain_id, 1))
         if lvl in counts:
             counts[lvl] += 1
     return counts
@@ -1230,34 +1239,34 @@ def _overrides(state: dict[str, Any]) -> dict[str, int]:
     return result
 
 
-def _controls_for(domain_id: str, state: dict[str, Any]) -> list[dict[str, str]]:
+def _controls_for(
+    domain_id: str, tier_or_state: str | dict[str, Any]
+) -> list[dict[str, str]]:
     """Return the control rows for ``domain_id``.
 
-    Substitutes evidence refs using architecture_inventory where possible
-    (so the table matches the actual inventory rather than the static
-    default).
+    Source: :func:`load_control_evidence` per-domain YAML. The ``current``
+    column is selected from ``current_by_tier[tier]`` so each tier sees a
+    proportional narrative. Falls back to ``"Unknown"`` when the tier is
+    not in the per-control mapping.
+
+    ``tier_or_state`` may be either a tier string (preferred; passed
+    directly by the per-domain loop after :func:`_tier_for_state`) or a
+    full ``state`` dict (legacy fallback; resolves the tier then).
     """
-    defaults = [dict(ctl) for ctl in _DEFAULT_CONTROLS.get(domain_id, [])]
-    inv = state.get("architecture_inventory") or {}
-    sys_ids = [s.get("id", "") for s in (inv.get("systems") or []) if s.get("id")]
-    store_ids = [s.get("id", "") for s in (inv.get("data_stores") or []) if s.get("id")]
-    flow_ids = [f.get("id", "") for f in (inv.get("data_flows") or []) if f.get("id")]
-
-    if not sys_ids and not store_ids and not flow_ids:
-        return defaults
-
-    # Replace default refs with the actual inventory ids where known.
-    for ctl in defaults:
-        refs = ctl.get("evidence_refs") or []
-        if not refs:
-            continue
-        new_refs: list[str] = []
-        for ref in refs:
-            if (ref.startswith("SYS-") and ref in sys_ids) or (ref.startswith("STORE-") and ref in store_ids) or (ref.startswith("FLOW-") and ref in flow_ids):
-                new_refs.append(ref)
-            else:
-                new_refs.append(ref)
-        ctl["evidence_refs"] = new_refs
+    if isinstance(tier_or_state, Mapping):
+        tier = _tier_for_state(tier_or_state)  # type: ignore[arg-type]
+    else:
+        tier = str(tier_or_state)
+    raw_controls = _control_evidence_for_domain(domain_id)
+    defaults = [
+        {
+            "control": c.get("control", ""),
+            "current": c.get("current_by_tier", {}).get(tier, "Unknown"),
+            "evidence_refs": list(c.get("evidence_refs") or []),
+            "notes": c.get("notes", ""),
+        }
+        for c in raw_controls
+    ]
     return defaults
 
 
@@ -1354,6 +1363,25 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, Mapping):
         return obj.get(name, default)
     return default
+
+
+def _tier_for_state(state: dict[str, Any]) -> str:
+    """Resolve company tier from state via :func:`classify_tier`.
+
+    Centralised helper so per-domain maturity and control-evidence
+    lookups stay consistent. Falls back to ``MICRO`` when context is
+    missing (defensive default — never silently lower the tier in real
+    case runs because the orchestrator always populates company_context).
+    """
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default="")
+    sector = _attr(ctx, "sector", default="")
+    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    return classify_tier(employees_int, sector, list(applicable))
 
 
 __all__ = ["render_doc_04b"]

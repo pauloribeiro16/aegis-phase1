@@ -34,6 +34,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from aegis_phase1.data.loader import classify_tier
 from aegis_phase1.v2.output._common import (
     get_per_spec_markdown,
     markdown_table,
@@ -448,36 +449,75 @@ def _data_subjects_table(rows: list[dict]) -> str:
 
 
 def _personal_data_categories_table(state: dict[str, Any]) -> str:
-    """Deterministic personal-data categories from the ontology ``company`` block."""
+    """Deterministic personal-data categories from the ontology ``company`` block.
+
+    CORR-073: accepts two shapes per entry:
+      1. ``str`` (legacy TinyTask-style "task_content", "email", "name")
+         — renders with hardcoded defaults (backwards compat).
+      2. ``dict`` (new GDPR Art. 30 inventory from
+         ``cases/<case>/input/company/personal_data.yaml``) — renders
+         with the rich fields the case author supplied:
+         ``category`` / ``description`` / ``lawful_basis`` /
+         ``special_category`` / ``biometric`` / ``systems_processing``
+         / ``recipients`` / ``transfers`` / ``retention`` / ``dsar_route``
+         / ``purpose``.
+    """
     ontology = state.get("ontology") or {}
     company = ontology.get("company") if isinstance(ontology, Mapping) else {}
-    data_types = list((company or {}).get("data_types") or []) if isinstance(company, Mapping) else []
+    data_types: list[Any] = (
+        list((company or {}).get("data_types") or [])
+        if isinstance(company, Mapping)
+        else []
+    )
     if not data_types:
         return "_No personal data categories recorded in the ontology._"
 
     systems_summary = _system_ids(state)
     rows: list[tuple[str, str, str, str, str]] = []
-    for category in data_types:
-        legal_basis = "Contract" if category.lower() != "task_content" else "Contract"
-        systems_processing = ", ".join(systems_summary) or "SYS-01, SYS-02, SYS-03"
-        retention = (
-            "Account lifetime plus 30 days after deletion request where legally permissible"
-            if category.lower() != "task_content"
-            else "Workspace lifetime; backups retained up to 12 months"
-        )
-        erasure = (
-            "Manual admin deletion through support workflow; Auth0 deletion required separately"
-            if category.lower() in {"email", "name"}
-            else "Workspace deletion removes active records; backups expire by retention schedule"
-        )
-        rows.append((category, legal_basis, systems_processing, retention, erasure))
+    for entry in data_types:
+        if isinstance(entry, Mapping):
+            cat = str(entry.get("category") or entry.get("id") or "-")
+            lawful_basis = str(entry.get("lawful_basis") or "Contract (Art. 6 GDPR)")
+            sys_in = entry.get("systems_processing") or []
+            if isinstance(sys_in, list) and sys_in:
+                systems_processing = ", ".join(str(s) for s in sys_in)
+            else:
+                systems_processing = ", ".join(systems_summary) or "SYS-01, SYS-02, SYS-03"
+            retention = str(entry.get("retention") or "Per applicable retention schedule")
+            dsar = entry.get("dsar_route") or "DSAR portal + manual review by DPO"
+            # Include special-category / biometric flag inline so the
+            # banker reading this can see Art. 9 implications without
+            # a separate column.
+            flags: list[str] = []
+            if entry.get("special_category"):
+                flags.append("Art. 9 special category")
+            if entry.get("biometric"):
+                flags.append("biometric")
+            if flags:
+                dsar = f"{dsar} [{', '.join(flags)}]"
+            rows.append((cat, lawful_basis, systems_processing, retention, dsar))
+        else:
+            category = str(entry)
+            legal_basis = "Contract" if category.lower() != "task_content" else "Contract"
+            systems_processing = ", ".join(systems_summary) or "SYS-01, SYS-02, SYS-03"
+            retention = (
+                "Account lifetime plus 30 days after deletion request where legally permissible"
+                if category.lower() != "task_content"
+                else "Workspace lifetime; backups retained up to 12 months"
+            )
+            erasure = (
+                "Manual admin deletion through support workflow; Auth0 deletion required separately"
+                if category.lower() in {"email", "name"}
+                else "Workspace deletion removes active records; backups expire by retention schedule"
+            )
+            rows.append((category, legal_basis, systems_processing, retention, erasure))
     return markdown_table(
         [
             "Category",
             "Legal Basis (Art. 6 GDPR)",
             "Systems Processing",
             "Retention",
-            "Erasure Mechanism",
+            "DSAR / Erasure Route",
         ],
         rows,
     )
@@ -655,11 +695,12 @@ def _gate_rows(
             f"{len(active)} active sub-domains in Section 3; expected {expected_active}",
         ),
         (
-            "Proportionality maintained for low-tier micro/small SaaS",
+            "Proportionality maintained for the assessed company tier",
             "PASS" if proportional or not applicable else "PARTIAL",
             (
-                f"Scale: {_attr(ctx, 'scale', default='-')}; managed services used; "
-                "no enterprise HSM, SOC, SIEM, or formal CMDB claimed"
+                f"tier={_tier_for_state(state)}; scale: "
+                f"{_attr(ctx, 'scale', default='-')}; managed services used; "
+                "no enterprise-only controls claimed beyond tier scope"
             ),
         ),
     ]
@@ -934,6 +975,19 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, Mapping):
         return obj.get(name, default)
     return default
+
+
+def _tier_for_state(state: dict[str, Any]) -> str:
+    """Resolve company tier from state via :func:`classify_tier`."""
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default="")
+    sector = _attr(ctx, "sector", default="")
+    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    return classify_tier(employees_int, sector, list(applicable))
 
 
 # ─────────────────────────────────────────────────────────────────────

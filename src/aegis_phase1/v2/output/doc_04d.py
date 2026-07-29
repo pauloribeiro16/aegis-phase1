@@ -29,11 +29,13 @@ import os
 import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from aegis_phase1.data.loader import (
     classify_tier,
     load_role_model,
+    load_tier_template,
 )
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
@@ -454,11 +456,19 @@ def _section_key_roles(state: dict[str, Any]) -> list[str]:
             "continuity. Engineering team combines developers under the CTO.\n"
         )
     else:
-        parts.append(
-            "Functional roles are listed below. In a low-tier organisation "
-            "many hats fall on a single individual; backup assignments are "
-            "documented for incident-trigger continuity.\n"
-        )
+        tier_narrative = load_tier_template(tier).get("role_separation", {})
+        if tier_narrative:
+            parts.append(
+                "Functional roles are listed below. "
+                f"{tier_narrative}. Backup assignments are documented for "
+                "incident-trigger continuity.\n"
+            )
+        else:
+            parts.append(
+                "Functional roles are listed below. In a proportional organisation "
+                "many hats fall on a single individual; backup assignments are "
+                "documented for incident-trigger continuity.\n"
+            )
     rows = [
         (
             r.get("role", "-"),
@@ -481,46 +491,26 @@ def _section_reporting_lines(
     *,
     config: dict[str, Any] | None = None,
 ) -> list[str]:
+    """§5 Reporting Lines — tier-aware (CORR-073 Sprint 2).
+
+    The ASCII tree and Tier-appropriate narrative are loaded from
+    ``data/templates/doc_04d/{tier}.md`` (the section between
+    ``## 5. Reporting Lines`` and the next ``## 7`` heading). Falls back
+    to a stub when the template file is missing for the resolved tier.
+
+    The optional narrative block after the template keeps the
+    P1C-LLM-03 strategic-synthesis call (S3b) with a fallback to the
+    legacy narrative invoker when no LLM is configured.
+    """
     parts: list[str] = []
+    tier = _tier_for_state(state)
+    template_md = _read_doc_04d_template(tier, "## 5. Reporting Lines", "## 7")
     parts.append("## 5. Reporting Lines\n")
-    parts.append(
-        "The following ASCII tree and narrative describe the reporting "
-        "structure.\n"
-    )
-    parts.append("```\n")
-    parts.append(
-        "                            ┌─────────────────────────────┐\n"
-        "                            │       Management Board       │\n"
-        "                            │   (2 founders — CEO + CTO)    │\n"
-        "                            └──────────────┬────────────────┘\n"
-        "                                           │\n"
-        "               ┌───────────────────────────┼────────────────────────┐\n"
-        "               │                                                         │\n"
-        "        ┌──────▼─────────┐                                       ┌──────▼─────────┐\n"
-        "        │      CEO       │                                       │      CTO       │\n"
-        "        │ 0.2 FTE DPO    │                                       │ 0.3 FTE CISO   │\n"
-        "        │ + founder ops  │                                       │ + founder tech │\n"
-        "        └──┬─────────────┘                                       └──┬─────────────┘\n"
-        "           │                       ┌─────────────────┐              │\n"
-        "           │                       │ External Legal  │              │\n"
-        "           │                       │   (DPO Support) │              │\n"
-        "           │                       └─────────────────┘              │\n"
-        "           │                                                        │\n"
-        "           └────────────────────┬───────────────────────────────────┘\n"
-        "                                │\n"
-        "                   ┌────────────▼────────────┐\n"
-        "                   │     Lead Developer       │\n"
-        "                   │    (senior engineer)     │\n"
-        "                   └────────────┬─────────────┘\n"
-        "                                │\n"
-        "             ┌──────────────────┴──────────────────┐\n"
-        "             │                                      │\n"
-        "    ┌────────▼────────┐                  ┌─────────▼───────┐\n"
-        "    │ Developers × 5  │                  │  (Developers on │\n"
-        "    │  (full-time)    │                  │   security rota)│\n"
-        "    └────────────────┘                  └────────────────┘\n"
-    )
-    parts.append("```\n")
+    if template_md:
+        parts.append(template_md)
+        parts.append("")
+    else:
+        parts.append(f"_(Template for tier {tier} not yet authored; see data/templates/doc_04d/.)_\n")
 
     # CORR-061 S3b: §5 Reporting Lines narrative now reads
     # P1C-LLM-03 raw markdown from ``state["per_spec_markdown"]``
@@ -546,6 +536,38 @@ def _section_reporting_lines(
     return parts
 
 
+def _read_doc_04d_template(tier: str, start_marker: str, end_marker: str) -> str:
+    """Return the slice of ``data/templates/doc_04d/{tier}.md`` between markers.
+
+    The leading start-marker line is stripped from the returned slice
+    so the caller can use its own header (avoids duplicate ``## 5``
+    lines). Returns an empty string when the template file is absent
+    or the markers are not found. Callers degrade gracefully.
+
+    Path resolution: ``doc_04d.py`` lives at
+    ``src/aegis_phase1/v2/output/``, so walking up 5 levels reaches
+    the repo root where ``data/templates/`` lives.
+    """
+    template_path = (
+        Path(__file__).resolve().parent.parent.parent.parent.parent
+        / "data"
+        / "templates"
+        / "doc_04d"
+        / f"{tier}.md"
+    )
+    if not template_path.exists():
+        return ""
+    text = template_path.read_text()
+    start = text.find(start_marker)
+    if start < 0:
+        return ""
+    end = text.find(end_marker, start + len(start_marker))
+    if end < 0:
+        end = len(text)
+    slice_md = text[start + len(start_marker):end].rstrip() + "\n"
+    return slice_md
+
+
 def _section_raci_matrix(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 6. RACI Matrix\n")
@@ -554,6 +576,8 @@ def _section_raci_matrix(state: dict[str, Any]) -> list[str]:
         "sign-off; one A per row), **C** = Consulted, **I** = Informed, "
         "**—** = Not involved.\n"
     )
+    tier = _tier_for_state(state)
+    board_label = _board_label_for_tier(tier)
     parts.append(
         "**Column abbreviations** (people are listed once each; in a "
         "small team, multiple hats are worn):\n"
@@ -562,7 +586,7 @@ def _section_raci_matrix(state: dict[str, Any]) -> list[str]:
         "- **Dev** = Lead Developer + developer team\n"
         "- **Legal** = External Legal Adviser (retainer)\n"
         "- **HR** = CEO in HR-coordination role\n"
-        "- **Board** = 2 founders (CEO + CTO)\n"
+        f"- **Board** = {board_label}\n"
     )
 
     inactive = _inactive_subdomain_ids(state)
@@ -591,6 +615,8 @@ def _section_training_status(state: dict[str, Any]) -> list[str]:
     parts.append("## 7. Training Status\n")
     inactive = _inactive_subdomain_ids(state)
     d08_3_status = "INACTIVE — placeholder row only" if "D-08.3" in inactive else "ACTIVE"
+    tier = _tier_for_state(state)
+    board_label = _board_label_for_tier(tier)
     headers = ["Role", "Training Required", "Last Completed", "Next Refresh", "Source (D-08.x)"]
     rows = [
         (
@@ -632,7 +658,7 @@ def _section_training_status(state: dict[str, Any]) -> list[str]:
             "D-08.2 (informal)",
         ),
         (
-            "Management Board (2 founders)",
+            board_label,
             f"D-08.3 — {d08_3_status}",
             "NOT STARTED" if "D-08.3" not in inactive else "n/a (D-08.3 INACTIVE)",
             "n/a" if "D-08.3" in inactive else "2026-12-31 (target)",
@@ -795,7 +821,9 @@ def _section_gate(state: dict[str, Any]) -> list[str]:
         )
     )
     parts.append("")
-    parts.append("**Gate Status:** PASS (proportionate for LOW-tier micro SaaS under P2).\n")
+    parts.append(
+        f"**Gate Status:** PASS (proportionate for {_tier_for_state(state)} tier under P2).\n"
+    )
     return parts
 
 
@@ -933,13 +961,15 @@ def _reporting_lines_prompt(state: dict[str, Any]) -> str:
     ctx = state.get("company_context")
     name = _attr(ctx, "company_name", default="the company")
     employees = _attr(ctx, "employees", default="")
+    tier = _tier_for_state(state)
+    board_label = _board_label_for_tier(tier)
+    emphasis = ", ".join(load_tier_template(tier).get("clause_emphasis", []))
     return (
         f"Produce a 4-5 sentence plain-text description of the reporting "
-        f"lines at {name} (with {employees or 'a small'} employees). "
-        "Cover: Management Board (2 founders); CEO holding the DPO hat; "
-        "CTO holding the CISO hat; Lead Developer under CTO; Developers "
-        "rotating on-call; External Legal Adviser reporting to CEO; "
-        "absence of separate HR / IT Manager functions. Avoid bullet lists."
+        f"lines at {name} (with {employees or 'a small'} employees), "
+        f"tier={tier}. Cover: {board_label}; emphasis on clauses "
+        f"({emphasis}). Roles per data/role_models/{tier}.yaml. "
+        "Avoid bullet lists."
     )
 
 
@@ -1045,6 +1075,30 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, Mapping):
         return obj.get(name, default)
     return default
+
+
+def _tier_for_state(state: dict[str, Any]) -> str:
+    """Resolve company tier from state via :func:`classify_tier`."""
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default="")
+    sector = _attr(ctx, "sector", default="")
+    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    return classify_tier(employees_int, sector, list(applicable))
+
+
+def _board_label_for_tier(tier: str) -> str:
+    """Return a tier-appropriate board/governance body label."""
+    if tier == "MICRO":
+        return "Board (2 founders)"
+    if tier == "SMALL":
+        return "Board (3-5 founders)"
+    if tier == "MEDIUM":
+        return "Board + Audit Committee"
+    return "Board + Audit Committee + Risk Committee"
 
 
 __all__ = ["render_doc_04d"]

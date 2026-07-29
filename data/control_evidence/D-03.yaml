@@ -1,0 +1,51 @@
+# Control evidence — D-03 Access Control
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D03
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   STORES → data_stores.yaml
+#   SYSTEMS → systems.yaml
+#   FLOWS  → data_flows.yaml
+
+domain_id: D-03
+title: Access Control
+controls:
+  - control: Identity & authentication
+    current_by_tier:
+      MICRO: "Local accounts, shared passwords"
+      SMALL: "Central IdP with MFA on critical apps"
+      MEDIUM: "SSO + MFA on all apps; password manager rollout"
+      LARGE: "Workforce SSO + phishing-resistant MFA (FIDO2 / passkeys); conditional access"
+      MAX: "Passwordless (FIDO2) across all workforce; step-up auth for privileged; just-in-time access"
+    evidence_refs: ["SYSTEMS"]
+  - control: Privileged Access Management (PAM)
+    current_by_tier:
+      MICRO: "No PAM; admins share root password"
+      SMALL: "Named admin accounts; manual session log"
+      MEDIUM: "PAM vault for database and infra admins; session recording"
+      LARGE: "PAM with just-in-time elevation; session capture; quarterly access recertification"
+      MAX: "PAM + JIT + session capture + breach analytics; HSM-backed root; quarterly recert + audit"
+    evidence_refs: ["SYSTEMS"]
+  - control: Segregation of duties
+    current_by_tier:
+      MICRO: "Implicit; everyone does everything"
+      SMALL: "Documented role matrix; conflicting roles identified"
+      MEDIUM: "RBAC enforced in core systems; quarterly review"
+      LARGE: "RBAC + risk-based SoD rules; preventive + detective controls; DORA Art. 13(5) traceability"
+      MAX: "Full SoD rule library across core banking; preventive enforcement; continuous detection"
+    evidence_refs: ["SYSTEMS"]
+  - control: Account lifecycle
+    current_by_tier:
+      MICRO: "Manual, slow offboarding"
+      SMALL: "HR-driven joiners/leavers process; quarterly review"
+      MEDIUM: "Automated joiner/leaver workflow tied to HRIS; 24h revocation"
+      LARGE: "Automated lifecycle; 8h privileged revocation; dormant account sweep weekly"
+      MAX: "Automated lifecycle <4h for privileged; dormant sweep daily; certification quarterly"
+    evidence_refs: ["SYSTEMS"]
+  - control: Session management
+    current_by_tier:
+      MICRO: "No timeouts"
+      SMALL: "Idle timeout 60 min on critical apps"
+      MEDIUM: "Adaptive timeout; concurrent session limits on banking apps"
+      LARGE: "Risk-based session controls; PSD2 SCA exemptions handled; PSD3-ready step-up"
+      MAX: "Continuous authentication signals; per-transaction risk scoring; FAPI 2.0 profile"
+    evidence_refs: ["FLOWS"]

@@ -1,0 +1,33 @@
+# Control maturity profile — MICRO tier
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_maturity_evaluation
+# Used to populate §6 maturity-by-domain matrix for SaaS MICRO entities.
+#
+# Maturity scale (NIST CSF 2.0 mapping):
+#   1 = Performed informally / ad-hoc
+#   2 = Planned and tracked
+#   3 = Well-defined and consistently applied
+#   4 = Quantitatively managed / continuously improving
+
+tier: MICRO
+current_by_domain:
+  D-01: 1   # data protection
+  D-02: 1   # vulnerability management
+  D-03: 1   # access control
+  D-04: 1   # incident response
+  D-05: 1   # data lifecycle
+  D-06: 1   # third-party
+  D-07: 1   # secure development
+  D-08: 1   # human factors
+  D-09: 1   # governance
+  D-10: 1   # monitoring
+target_by_domain:
+  D-01: 2
+  D-02: 2
+  D-03: 2
+  D-04: 2
+  D-05: 1
+  D-06: 1
+  D-07: 2
+  D-08: 1
+  D-09: 2
+  D-10: 1

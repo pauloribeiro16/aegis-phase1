@@ -1,0 +1,51 @@
+# Control evidence — D-10 Monitoring
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D10
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   STORES → data_stores.yaml (log stores)
+#   SYSTEMS → systems.yaml (monitoring tools)
+#   FLOWS  → data_flows.yaml (network flows)
+
+domain_id: D-10
+title: Monitoring
+controls:
+  - control: Log collection (SIEM)
+    current_by_tier:
+      MICRO: "Application logs on disk only"
+      SMALL: "Centralised log collection on critical apps; 30-day retention"
+      MEDIUM: "SIEM with auth + perimeter + critical app logs; 90-day retention"
+      LARGE: "Enterprise SIEM; auth + endpoint + network + cloud + app; 1-year hot retention"
+      MAX: "Enterprise SIEM with full coverage + cloud-native detection; 1y hot + 7y cold per GwG / MiFID II"
+    evidence_refs: ["SYSTEMS"]
+  - control: Detection use cases
+    current_by_tier:
+      MICRO: "None"
+      SMALL: "Default SIEM rules only"
+      MEDIUM: "Curated use-case library covering top MITRE ATT&CK techniques"
+      LARGE: "Risk-based use-case library mapped to MITRE ATT&CK + FS-ISAC FIN tag library; quarterly tuning"
+      MAX: "Risk-based + threat-led use-case library; purple-team validated; AI-assisted tuning with human review"
+    evidence_refs: ["SYSTEMS"]
+  - control: Threat intelligence
+    current_by_tier:
+      MICRO: "Reads vendor advisories ad hoc"
+      SMALL: "Subscribes to one free TI feed"
+      MEDIUM: "Multiple commercial + open-source TI feeds; weekly review"
+      LARGE: "Commercial + open-source + FS-ISAC + national CERT feeds; daily triage; integrated into SIEM"
+      MAX: "TI + FS-ISAC + ECB / national CERT + sector ISACs + dark-web monitoring; strategic + operational + tactical"
+    evidence_refs: ["SYSTEMS"]
+  - control: Anomaly and behavioural detection
+    current_by_tier:
+      MICRO: "None"
+      SMALL: "Threshold-based alerts only"
+      MEDIUM: "UEBA on authentication events; weekly model retraining"
+      LARGE: "UEBA + network anomaly + cloud workload anomaly; daily tuning; financial-crime models"
+      MAX: "UEBA + UEBA + ML anomaly + AML + fraud + insider; explainable outputs; per-entity risk scoring"
+    evidence_refs: ["FLOWS"]
+  - control: Metrics and KPIs
+    current_by_tier:
+      MICRO: "None reported"
+      SMALL: "MTTR + number of incidents per quarter"
+      MEDIUM: "KPI dashboard with MTTD / MTTR / patch SLA / training completion"
+      LARGE: "KRI dashboard aligned to DORA Art. 13 + NIS2; CISO reports quarterly to Board Risk Committee"
+      MAX: "KRI dashboard + ORX loss-event mapping; real-time risk view; CISO + CRO joint reporting"
+    evidence_refs: ["SYSTEMS"]

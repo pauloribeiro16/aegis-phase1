@@ -1071,14 +1071,33 @@ def _build_frontmatter(state: dict[str, Any], regs: list[Any]) -> str:
     # so the frontmatter is consistent with §0.
     app_ctx = build_applicability_context(state)
     applicable = list(app_ctx.applicable_regs)
-    # Sprint-2: case_study falls back to v2_company_facts.name when
-    # company_context.company_name is missing.
-    case_study = getattr(ctx, "company_name", "UNKNOWN") if ctx else "UNKNOWN"
-    if case_study == "UNKNOWN":
+    # Sprint-2 (CORR-073): case_study falls back to v2_company_facts.name,
+    # then company_facts.name, then case_name, only becoming "UNKNOWN" when
+    # all of those are absent. The prior `getattr(..., "UNKNOWN")` default
+    # hid missing data; this version is explicit about every fallback.
+    case_study: str | None = None
+    if ctx is not None:
+        candidate = getattr(ctx, "company_name", None)
+        if isinstance(candidate, str) and candidate.strip():
+            case_study = candidate
+    if case_study is None:
         facts = state.get("v2_company_facts")
-        name_attr = getattr(facts, "name", None) if facts is not None else None
-        if name_attr:
-            case_study = str(name_attr)
+        if facts is not None:
+            name_attr = getattr(facts, "name", None)
+            if isinstance(name_attr, str) and name_attr.strip():
+                case_study = name_attr
+    if case_study is None:
+        company_facts = state.get("company_facts")
+        if isinstance(company_facts, Mapping):
+            candidate = company_facts.get("name")
+            if isinstance(candidate, str) and candidate.strip():
+                case_study = candidate
+    if case_study is None:
+        case_name = state.get("case_name")
+        if isinstance(case_name, str) and case_name.strip():
+            case_study = case_name
+    if not case_study:
+        case_study = "UNKNOWN"
     payload: dict[str, Any] = {
         "document_id": "AEGIS-P1-05",
         "title": "Regulatory Applicability Assessment",

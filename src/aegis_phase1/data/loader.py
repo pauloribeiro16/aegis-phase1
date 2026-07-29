@@ -54,6 +54,23 @@ def load_industry_defaults(industry: str) -> dict:
     return _load_yaml(str(DATA_ROOT / "industry_defaults" / f"{industry}.yaml"))
 
 
+def load_control_maturity(tier: str) -> dict:
+    """Load data/control_maturity/{tier}.yaml.
+
+    Returns a dict with keys ``current_by_domain`` (dict[str, int]),
+    ``target_by_domain`` (dict[str, int]), and ``tier`` (str).
+    """
+    return _load_yaml(str(DATA_ROOT / "control_maturity" / f"{tier}.yaml"))
+
+
+def load_control_evidence(domain_id: str) -> dict:
+    """Load data/control_evidence/{domain_id}.yaml.
+
+    Returns a dict with keys ``domain_id``, ``title``, ``controls``.
+    """
+    return _load_yaml(str(DATA_ROOT / "control_evidence" / f"{domain_id}.yaml"))
+
+
 def classify_tier(employees: int, sector: str = "", applicable_regs: list[str] | None = None) -> str:
     """Pure function: classify company into MICRO/SMALL/MEDIUM/LARGE/MAX.
 

@@ -1,0 +1,44 @@
+# Control evidence — D-02 Vulnerability Management
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D02
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   STORES → data_stores.yaml
+#   FLOWS  → data_flows.yaml
+#   SYSTEMS → systems.yaml
+#   APPS   → systems.yaml (applications slice)
+
+domain_id: D-02
+title: Vulnerability Management
+controls:
+  - control: Patch management cadence
+    current_by_tier:
+      MICRO: "Ad-hoc; patches applied when something breaks"
+      SMALL: "Monthly OS patches; critical CVEs within 14 days"
+      MEDIUM: "Monthly + automated OS patching; critical CVEs within 7 days"
+      LARGE: "Risk-based SLA: critical 24h, high 7d, medium 30d; documented exceptions register"
+      MAX: "Risk-based SLA: critical 24h with on-call; high 7d; zero unpatched criticals >72h enforced"
+    evidence_refs: ["SYSTEMS"]
+  - control: Vulnerability scanning
+    current_by_tier:
+      MICRO: "None; relies on vendor defaults"
+      SMALL: "Quarterly authenticated scans on production"
+      MEDIUM: "Monthly authenticated scans + weekly unauthenticated on perimeter"
+      LARGE: "Continuous authenticated scanning; weekly perimeter + monthly internal PCI scope"
+      MAX: "Continuous scanning + red-team emulation; integration with SIEM for prioritisation"
+    evidence_refs: ["SYSTEMS"]
+  - control: Penetration testing
+    current_by_tier:
+      MICRO: "None"
+      SMALL: "Annual external pentest (CREST-equivalent)"
+      MEDIUM: "Annual external + biennial internal pentest"
+      LARGE: "Annual external + internal; scenario-led red team; PCI-DSS ASV scans quarterly"
+      MAX: "Continuous red team; TIBER-EU style threat-led pentest; purple-team exercises quarterly"
+    evidence_refs: ["SYSTEMS"]
+  - control: SBOM and dependency tracking
+    current_by_tier:
+      MICRO: "Not maintained"
+      SMALL: "Manual dependency list for primary product"
+      MEDIUM: "Automated SBOM (CycloneDX) generated at build for main product"
+      LARGE: "SBOM per build across all products; CVE-feed monitoring; CRA Annex II readiness"
+      MAX: "SBOM per artefact with provenance (SLSA L3); VEX feeds; CRA Annex I §2 enforced"
+    evidence_refs: ["APPS"]

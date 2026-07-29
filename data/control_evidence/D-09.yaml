@@ -1,0 +1,49 @@
+# Control evidence — D-09 Governance
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D09
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   SYSTEMS → systems.yaml (GRC tooling)
+
+domain_id: D-09
+title: Governance
+controls:
+  - control: Policy framework
+    current_by_tier:
+      MICRO: "Few informal rules"
+      SMALL: "Top-5 policies documented; reviewed annually"
+      MEDIUM: "Policy library covering security, privacy, incident, vendor; version-controlled"
+      LARGE: "Policy library aligned to ISO 27001 + DORA + NIS2; annual board approval; exceptions register"
+      MAX: "Policy library aligned to ISO 27001 + DORA + NIS2 + MaRisk + GwG; board-approved; exceptions enforced"
+    evidence_refs: ["SYSTEMS"]
+  - control: Risk management
+    current_by_tier:
+      MICRO: "No formal risk register"
+      SMALL: "Annual risk review at founder level"
+      MEDIUM: "Risk register reviewed quarterly; risk appetite statement"
+      LARGE: "Risk register per DORA Art. 13; ICT risk integrated into operational risk; CRO-owned"
+      MAX: "ICT risk integrated into ICAAP; ORX-aligned scenario library; CRO with direct board reporting line"
+    evidence_refs: ["SYSTEMS"]
+  - control: Compliance program
+    current_by_tier:
+      MICRO: "Reactive; addresses issues when raised"
+      SMALL: "GDPR + sector basics covered by external advisor"
+      MEDIUM: "Internal compliance lead; obligation register; annual compliance review"
+      LARGE: "Compliance function; obligation register per regulation; quarterly attestations; DORA / NIS2 / GDPR covered"
+      MAX: "Compliance function with regulatory liaisons; continuous horizon-scanning; pre-engagement with BaFin / ECB"
+    evidence_refs: ["SYSTEMS"]
+  - control: Internal audit
+    current_by_tier:
+      MICRO: "None"
+      SMALL: "Annual external audit only"
+      MEDIUM: "Outsourced internal audit; annual ICT audit"
+      LARGE: "In-house internal audit; annual ICT audit plan; reports to Audit Committee"
+      MAX: "In-house IA + co-sourced specialists; continuous auditing on critical controls; Audit Committee independence"
+    evidence_refs: ["SYSTEMS"]
+  - control: Board and management oversight
+    current_by_tier:
+      MICRO: "Founder decides everything"
+      SMALL: "Quarterly review by founders; no formal board"
+      MEDIUM: "Management review board; quarterly security update"
+      LARGE: "Board Risk Committee; quarterly CISO report; annual external assurance"
+      MAX: "Board + Risk + Audit + Technology Committees; quarterly CISO + CRO report; annual external + regulatory assurance"
+    evidence_refs: ["SYSTEMS"]
