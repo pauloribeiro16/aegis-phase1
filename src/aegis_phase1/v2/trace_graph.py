@@ -39,7 +39,11 @@ defeat that introspection and silently drop ``config`` to its default
 ``None`` inside every node, breaking the orchestrator handoff.
 """
 
+import logging
+
 import warnings
+
+logger = logging.getLogger(__name__)
 
 warnings.warn(
     "aegis_phase1.v2.trace_graph is deprecated; use aegis_phase1.v2.graph "
@@ -58,7 +62,7 @@ from langgraph.graph import END, START, StateGraph  # noqa: E402
 
 from aegis_phase1.v2.domain.processor import (  # noqa: E402
     MapPartialFailure,
-    OllamaUnreachable,
+    LLMUnreachable,
 )
 from aegis_phase1.v2.graph import (  # noqa: E402,F401 — re-export new names
     Phase1GraphState,
@@ -222,7 +226,7 @@ def run_orchestrator_graph(
         The final :class:`OrchestratorRunState` produced by LangGraph.
 
     Raises:
-        OllamaUnreachable: When the LLM is unreachable during MAP.
+        LLMUnreachable: When the LLM is unreachable during MAP.
         MapPartialFailure: When ≥1 domain ends with status FAILED after
             retries (same semantics as :meth:`Phase1Orchestrator.run_all`).
     """
@@ -249,7 +253,25 @@ def run_orchestrator_graph(
     }
 
     graph = compile_orchestrator_graph()
-    result_state = graph.invoke(initial, config=run_config)
+    logger.info("STAGE: graph.invoke starting (18-node LangGraph)")
+    import time as _time
+    _t0 = _time.monotonic()
+    try:
+        result_state = graph.invoke(initial, config=run_config)
+    except Exception:
+        # CORR-063 S2: previously the S1 (PID 3033454) died silently
+        # after the 21st LLM call. The runner had no try/except here
+        # so any unhandled exception aborted the process with no
+        # traceback in the log. Re-raise after logging the full
+        # exception chain so the operator can see exactly which node
+        # crashed and why.
+        logger.exception(
+            "graph.invoke raised after %.1fs — pipeline aborted", _time.monotonic() - _t0
+        )
+        raise
+    logger.info(
+        "STAGE: graph.invoke complete in %.1fs", _time.monotonic() - _t0
+    )
 
     client, _handler = get_langfuse_callback()
     if client is not None:

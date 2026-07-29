@@ -21,6 +21,7 @@ from aegis_phase1.v2.context.clause_mapping_context import (
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
     markdown_table,
+    render_per_spec_markdown_appendix,
     write_output,
 )
 
@@ -41,16 +42,21 @@ def render_doc_06(state: dict[str, Any], output_dir: str) -> dict[str, str]:
         Mapping ``AEGIS-P1-06`` -> absolute file path.
     """
     ctx = build_clause_mapping_context(state)
-    return _render_from_context(ctx, output_dir)
+    return _render_from_context(ctx, output_dir, state)
 
 
 def _render_from_context(
     ctx: ClauseMappingContext,
     output_dir: str,
+    state: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """Render Doc 06 from a pre-built ClauseMappingContext.
 
     Exposed for direct invocation (--run-clauses CLI flag, T5).
+    Accepts an optional ``state`` (CORR-061 S3b) so the per-spec
+    markdown appendix can be appended; when called without state
+    (e.g. the CLI's bare clause-mapping path) the appendix is
+    omitted.
     """
     parts: list[str] = []
     parts.append("# AEGIS-P1-06 Clause Mapping Matrix\n")
@@ -108,6 +114,16 @@ def _render_from_context(
             "excluded from the mapping table. These orphans are listed "
             "in the next contract (CORR-040) for review.\n"
         )
+
+    # CORR-061 S3b: append the per-spec markdown appendix. Doc 06
+    # is fully deterministic (reads only the catalog / clause
+    # context) so all 5 spec sections will show the
+    # ``(no LLM response for this spec)`` placeholder — the
+    # appendix is still emitted for grep consistency with the other
+    # 8 docs and so reviewers can confirm "no LLM content was
+    # expected in this doc" at a glance.
+    if state is not None:
+        parts.extend(render_per_spec_markdown_appendix(state))
 
     body = "\n".join(parts)
     frontmatter = generate_frontmatter(

@@ -1,0 +1,53 @@
+# Cloud Services (Case 03 — OmniBank Financial Systems S.A.)
+# Banking-grade cloud footprint: AWS primary (Frankfurt), Azure DR (Germany),
+# Auth0 identity, Datadog observability, payment rails, KYC vendors.
+# Schema mirrors doc_04a._cloud_services_table columns:
+#   provider, service, data_stored, region, dpa_in_place
+cloud_services:
+  - id: CLOUD-01
+    provider: AWS
+    service: EC2 / RDS / S3 / KMS (eu-central-1)
+    data_stored: Customer data warehouse, audit logs, document archive, KMS keys
+    region: Frankfurt (eu-central-1) — primary
+    dpa_in_place: Yes (AWS DPA addendum signed 2024-Q4; GDPR Art. 28 compliant)
+    notes: Primary cloud; AWS Frankfurt eu-central-1 only (data residency commitment per BaFin ZAIT 5.5)
+
+  - id: CLOUD-02
+    provider: Microsoft Azure
+    service: Azure Backup Vault + Azure Blob (germany-westcentral)
+    data_stored: Encrypted DR snapshots (RPO/RTO target), backup of CBS disaster-recovery copy
+    region: Frankfurt (germany-westcentral) — DR pair
+    dpa_in_place: Yes (Microsoft Products and Services DPA + Germany Cloud Addendum)
+    notes: DR-only; cross-cloud replication via S3-compatible API; data residency Germany
+
+  - id: CLOUD-03
+    provider: Auth0 by Okta
+    service: Customer Identity (CIAM) + Workforce Identity (WorkOS)
+    data_stored: Customer + employee identity (email, hashed password, MFA factors, OAuth tokens)
+    region: EU (Frankfurt) — tenant configured EU-only
+    dpa_in_place: Yes (Okta DPA + subprocessor list); ISO 27001 + SOC 2 Type II
+    notes: FAPI 2.0 baseline; DORA Art. 28 ICT third-party service provider register entry
+
+  - id: CLOUD-04
+    provider: Datadog
+    service: APM / Logs / RUM (EU1 region)
+    data_stored: Operational logs, traces, RUM (no PII; pseudonymised IP)
+    region: EU (Frankfurt eu-central-1) — tenant EU1 region
+    dpa_in_place: Yes (Datadog DPA + EU SCC 2021/914)
+    notes: Pseudonymisation before ingest; PII stripped via log pipeline
+
+  - id: CLOUD-05
+    provider: Onfido
+    service: Identity Verification (IDV) — passport / liveness / selfie
+    data_stored: Customer passport + biometric template (5y retention)
+    region: EU (Ireland eu-west-1) — vendor default
+    dpa_in_place: Yes (Onfido DPA + EU SCC + ISO 27001)
+    notes: KYC vendor; DORA Art. 28 subprocessor register entry
+
+  - id: CLOUD-06
+    provider: Refinitiv (LSEG)
+    service: World-Check One — sanctions / PEP / adverse media screening
+    data_stored: Screening results (name match, hit/no-hit, list source) — no raw customer PII transmitted beyond search criteria
+    region: EU (Amsterdam) — tenant EU
+    dpa_in_place: Yes (LSEG DPA + EU SCC + ISO 27001 + SOC 2)
+    notes: AML/CFT screening vendor; GwG §6 mandatory

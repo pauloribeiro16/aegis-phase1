@@ -1,0 +1,21 @@
+tier: SMALL
+identity:
+  description: "is assessed as a small-scale {sector} entity"
+  employee_phrase: "{employees} employees"
+  scope: "multi-team startup"
+role_separation:
+  dpo: "part-time or shared DPO"
+  ciso: "shared with IT manager"
+  cro: "informal"
+maturity:
+  default_target: 2
+  default_min: 1
+clause_emphasis:
+  - "GDPR Art. 32 (security of processing)"
+  - "CRA Annex I Part I §1(2) (essential requirements)"
+incident_response:
+  workflow: "documented but not tested"
+  sla: "best-effort"
+third_party:
+  register: "informal list"
+  criticality: "low"

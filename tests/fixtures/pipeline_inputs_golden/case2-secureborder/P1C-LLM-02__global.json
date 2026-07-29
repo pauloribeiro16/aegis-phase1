@@ -1,0 +1,627 @@
+{
+  "case": "case2-secureborder",
+  "spec": "P1C-LLM-02-COMPOUND-EVENT",
+  "lane": "global",
+  "inputs": {
+    "case_id": "case2-secureborder",
+    "lane_id": "global",
+    "applicable_regs": [
+      "GDPR",
+      "CRA",
+      "NIS2",
+      "AI_Act"
+    ],
+    "aggregated_activations": [
+      {
+        "sub_domain_id": "D-01.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-01.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-01.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-01.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-02.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-02.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-02.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-02.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-03.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-03.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-03.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-03.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-04.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-04.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-04.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-04.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-05.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-05.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-05.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-05.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-06.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-06.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-06.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-06.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-07.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-07.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-07.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-07.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-08.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-08.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-08.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-08.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-09.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-09.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-09.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-09.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-10.1",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-10.2",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-10.3",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      },
+      {
+        "sub_domain_id": "D-10.4",
+        "reg_pair": [
+          "GDPR",
+          "CRA"
+        ],
+        "company_scope_verdict": "IN_SCOPE",
+        "regulatory_baseline_relationship": "EXTENDS",
+        "layer0_refs": []
+      }
+    ],
+    "doc07b_profile": {
+      "D-01.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-01.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-01.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-01.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-02.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-02.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-02.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-02.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-03.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-03.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-03.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-03.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-04.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-04.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-04.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-04.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-05.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-05.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-05.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-05.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-06.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-06.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-06.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-06.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-07.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-07.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-07.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-07.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-08.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-08.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-08.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-08.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-09.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-09.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-09.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-09.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-10.1": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-10.2": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-10.3": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      },
+      "D-10.4": {
+        "tier": "STANDARD",
+        "ownership": "CTO",
+        "satisfaction_pattern": "BUILD_REQUIRED"
+      }
+    },
+    "sync_conflicts": [],
+    "c03_strategic_synthesis": {
+      "placeholder": "real synthesis"
+    }
+  },
+  "rendered": {
+    "system_len": 15543,
+    "user_len": 14371
+  }
+}

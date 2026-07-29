@@ -35,7 +35,12 @@ import aegis_phase1.env  # noqa: F401 — load .env via env.py module-import sid
 
 logger = logging.getLogger(__name__)
 
-from aegis_phase1.llm.unified import OllamaUnreachableError  # noqa: E402 — placed after logger
+# CORR-067 S2: threshold (out of 10 domains) at which MAP partial
+# failure becomes a hard abort. Below this, the runner continues to
+# OUTPUT and renders docs with the successful domain results.
+MAP_ABORT_THRESHOLD = 5
+
+from aegis_phase1.llm.unified import LLMUnreachableError  # noqa: E402 — placed after logger
 
 _DEFAULT_PROJECTS = Path(__file__).resolve().parents[4]
 DEFAULT_CASE = str(_DEFAULT_PROJECTS / "Methodology-main" / "02_CASES" / "Case_01_TinyTask_SaaS")
@@ -43,42 +48,41 @@ DEFAULT_PREPROC = str(_DEFAULT_PROJECTS / "Methodology-main" / "00_METHODOLOGY" 
 DEFAULT_OUTPUT = "output/phase1"
 
 
-def setup_logging(level: str = "INFO") -> None:
-    """Configure logging for the v2 pipeline."""
-    log_dir = Path("logs") / "phase1" / "v2"
-    log_dir.mkdir(parents=True, exist_ok=True)
+def _sanitize_model_tag(model: str) -> str:
+    """Map a model name to a filesystem-safe tag (CORR-060).
 
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[
-            logging.FileHandler(str(log_dir / "pipeline.log"), encoding="utf-8"),
-            logging.StreamHandler(sys.stdout),
-        ],
-    )
-
-    logging.getLogger("aegis_phase1.v2.output").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_04a").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_04b").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_04c").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_04d").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_05").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_07").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.doc_07b").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output.xlsx_generator").setLevel(logging.WARNING)
-    logging.getLogger("aegis_phase1.v2.output._common").setLevel(logging.WARNING)
+    Examples:
+        ``gemma4:e2b``     -> ``gemma4_e2b``
+        ``hf:org/repo``    -> ``hf_org_repo``
+        ``org/repo``       -> ``org_repo``
+        ``llama3.1:8b``    -> ``llama3.1_8b``
+    """
+    import re as _re
+    return _re.sub(r"[^A-Za-z0-9._-]+", "_", model).strip("_") or "default"
 
 
 def main() -> None:
     from aegis_phase1.v2.domain.processor import MapPartialFailure
     from aegis_phase1.v2.llm import build_llm_invoker
     from aegis_phase1.v2.orchestrator import Phase1Orchestrator
+    from aegis_phase1.utils.logging import setup_logging
 
     parser = argparse.ArgumentParser(description="AEGIS Phase 1 v2 Pipeline")
     parser.add_argument(
         "--case",
         default=DEFAULT_CASE,
         help="Case directory path",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging verbosity. DEBUG = verbose (HTTP req/res, raw LLM I/O). Default: INFO.",
+    )
+    parser.add_argument(
+        "--log-file",
+        default=None,
+        help="Optional path to also write logs to a file. Default: stderr only.",
     )
     parser.add_argument(
         "--regulatory-baseline-path",
@@ -239,10 +243,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--provider",
-        choices=["ollama", "transformers", "auto"],
+        choices=["ollama", "transformers", "minimax", "auto"],
         default="auto",  # CORR-056: auto-detect from model name
         help="LLM provider (default: auto-detect from --model). "
-             "'transformers' uses HuggingFace transformers (no Ollama needed).",
+             "'transformers' uses HuggingFace transformers (no Ollama needed). "
+             "'minimax' uses the MiniMax M-series (M2.7/M3) via the Mavis "
+             "gateway (CORR-062 S2). Auth: MAVIS_ACCESS_TOKEN env var.",
     )
     parser.add_argument(
         "--retry-failed",
@@ -258,11 +264,31 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    setup_logging("DEBUG" if args.verbose else "INFO")
+    # CORR-060 (multi-model eval): set per-model log dir BEFORE
+    # setup_logging() and the factory/orchestrator imports so all
+    # jsonl log files (llm-calls, format-errors, MAP per-domain, v2
+    # pipeline.log) land under logs/phase1/<model_tag>/.
+    import os as _os
+    _model_tag = _sanitize_model_tag(args.model)
+    _log_base = _os.environ.get("AEGIS_LOG_BASE", "logs/phase1")
+    _os.environ["AEGIS_LOG_DIR"] = str(Path(_log_base) / _model_tag)
+    logger.info("Per-model log dir: %s", _os.environ["AEGIS_LOG_DIR"])
+
+    # CORR-063 S1: --log-level flag takes priority; --verbose is a
+    # backward-compat shortcut for --log-level DEBUG. The file path
+    # is the per-model pipeline log (CORR-060 compat) unless the user
+    # explicitly passes --log-file.
+    effective_level = args.log_level
+    if args.verbose and args.log_level == "INFO":
+        effective_level = "DEBUG"
+    setup_logging(
+        level=effective_level,
+        model_tag=_model_tag,
+        log_file=args.log_file,
+    )
     logger.info("AEGIS Phase 1 v2 Pipeline starting")
 
     if args.mock_llm:
-        import os as _os
         _os.environ["MOCK_LLM"] = "true"
 
     # Resolve effective Regulatory Baseline path with deprecation handling.
@@ -296,7 +322,7 @@ def main() -> None:
     logger.info("Regulatory Baseline path: %s", prep_path)
     logger.info("Output path: %s", output_path)
 
-    llm_invoker = build_llm_invoker(model=args.model)
+    llm_invoker = build_llm_invoker(model=args.model, provider=args.provider)
     # CORR-039-T1: inject typed loaders so _load_v2_catalog actually
     # populates v2_subdomains / v2_srs / v2_sos / v2_pairs / v2_catalog_*.
     # Pre-CORR-039 the runner passed only llm_invoker — every v2_* key
@@ -309,12 +335,20 @@ def main() -> None:
     preproc_catalog = PreprocCatalogLoader(preproc_root="preproc_out")
     case_profile_loader = CaseProfileLoader(Path(args.case))
     catalog_loader = CatalogLoader(root=get_prompts_root() / "catalogs")
+    # CORR-063 S4: a single run_id is shared between the orchestrator's
+    # Langfuse session_id (set in Phase1Orchestrator.__init__) and
+    # the run_phase1_graph metadata. Generating it here keeps both
+    # usages pointing at the same UUID.
+    import uuid as _uuid_top
+    _run_id = str(_uuid_top.uuid4())
     orch = Phase1Orchestrator(
         llm_invoker=llm_invoker,
         preproc_catalog=preproc_catalog,
         case_profile_loader=case_profile_loader,
         catalog_loader=catalog_loader,
+        run_id=_run_id,
     )
+    logger.info("Run ID: %s (used as Langfuse session_id)", _run_id)
     if args.skip_reduce_llms:
         orch.set_skip_reduce_llms(True)
     if getattr(args, "skip_phase_1b", False):
@@ -325,8 +359,22 @@ def main() -> None:
         try:
             orch.run_all(case_path, prep_path, output_path)
         except MapPartialFailure as exc:
-            logger.error("Pipeline aborted — MAP partial failure: %s", exc)
-            sys.exit(2)
+            # CORR-067 S2: see threshold handling in run_all_traced
+            # branch above.
+            failed = list(exc.failed_domains or [])
+            n_failed = len(failed)
+            n_total = 10
+            if n_failed >= MAP_ABORT_THRESHOLD:
+                logger.error(
+                    "Pipeline aborted — MAP mostly failed (%d/%d domains): %s",
+                    n_failed, n_total, failed,
+                )
+                sys.exit(2)
+            if n_failed:
+                logger.warning(
+                    "MAP partial failure (%d/%d domains failed: %s) — continuing",
+                    n_failed, n_total, failed,
+                )
         if args.retry_failed:
             domains = [d.strip() for d in args.retry_failed.split(",") if d.strip()]
             if domains:
@@ -349,8 +397,32 @@ def main() -> None:
                 output_path=output_path,
             )
         except MapPartialFailure as exc:
-            logger.error("Pipeline aborted — MAP partial failure: %s", exc)
-            sys.exit(2)
+            # CORR-067 S2: threshold-based partial-failure handling.
+            # 1-2 domain failures (out of 10) are tolerable — the
+            # OUTPUT stage can still render useful docs with the 8-9
+            # successful domain results. ≥5 failures means MAP is
+            # essentially broken (LLM unreachable, schema drift, etc.)
+            # and we should hard-abort. The threshold is exported as
+            # a constant below for testability.
+            failed = list(exc.failed_domains or [])
+            n_failed = len(failed)
+            n_total = 10
+            if n_failed >= MAP_ABORT_THRESHOLD:
+                logger.error(
+                    "Pipeline aborted — MAP mostly failed (%d/%d domains): %s",
+                    n_failed, n_total, failed,
+                )
+                sys.exit(2)
+            if n_failed:
+                logger.warning(
+                    "MAP partial failure (%d/%d domains failed: %s) — "
+                    "continuing with %d results",
+                    n_failed, n_total, failed, n_total - n_failed,
+                )
+                # Force rc=0 so we don't sys.exit below; the OUTPUT
+                # stage already handles missing domain_results
+                # gracefully (it falls back to deterministic docs).
+                rc = 0
         if rc != 0:
             sys.exit(rc)
         if args.retry_failed:
@@ -369,8 +441,25 @@ def main() -> None:
         try:
             orch.map_domains()
         except MapPartialFailure as exc:
-            logger.error("MAP partial failure: %s", exc)
-            sys.exit(2)
+            # CORR-067 S2: same threshold handling. map_only always
+            # exits with the appropriate code based on failure count.
+            failed = list(exc.failed_domains or [])
+            n_failed = len(failed)
+            n_total = 10
+            if n_failed >= MAP_ABORT_THRESHOLD:
+                logger.error(
+                    "MAP mostly failed (%d/%d domains): %s",
+                    n_failed, n_total, failed,
+                )
+                sys.exit(2)
+            if n_failed:
+                logger.warning(
+                    "MAP partial failure (%d/%d domains failed: %s) — done",
+                    n_failed, n_total, failed,
+                )
+                # Partial failure is reported but not fatal in map_only
+                # mode — return 0 so callers can inspect the persisted
+                # state. They can grep for MAP_FAILED markers.
         if args.retry_failed:
             domains = [d.strip() for d in args.retry_failed.split(",") if d.strip()]
             if domains:
@@ -452,10 +541,16 @@ def main() -> None:
 
         try:
             run_wizard(orch, case_path, prep_path, output_path)
-        except OllamaUnreachableError as exc:
-            print(f"⚠ Ollama not reachable at {exc.base_url}.")
-            print("  Start it with: ollama serve")
-            print("  Or run with --mock-llm for offline mode.")
+        except LLMUnreachableError as exc:
+            # CORR-064: logger.exception emits the full Python traceback
+            # so the operator can see which call raised and why — the
+            # original S1 crash (PID 3033454, 3149128) showed the bare
+            # "LLM backend not reachable" message with no stack.
+            logger.exception(
+                "LLM backend not reachable at %s. Start with `ollama serve` "
+                "or pass --mock-llm for offline mode.",
+                exc.base_url,
+            )
             sys.exit(2)
 
 
@@ -732,7 +827,7 @@ def cmd_run_all_traced(
 
     Returns:
         Process-style exit code: ``0`` on success, ``2`` on
-        ``OllamaUnreachableError`` (re-raised so the CLI can also map it).
+        ``LLMUnreachableError`` (re-raised so the CLI can also map it).
     """
     from aegis_phase1.v2.graph import run_phase1_graph
 
@@ -771,10 +866,15 @@ def cmd_run_all_traced(
                 "subphases_run": ["map", "1b", "reduce", "output"],
             },
         )
-    except OllamaUnreachableError as exc:
-        print(f"⚠ Ollama not reachable at {exc.base_url}.")
-        print("  Start it with: ollama serve")
-        print("  Or run with --mock-llm for offline mode.")
+    except LLMUnreachableError as exc:
+        # CORR-064: logger.exception emits the full Python traceback
+        # (caller chain, file/line, exception class) — the bare
+        # logger.error was hiding the actual failure mode.
+        logger.exception(
+            "LLM backend not reachable at %s. Start with `ollama serve` "
+            "or pass --mock-llm for offline mode.",
+            exc.base_url,
+        )
         return 2
     return 0
 

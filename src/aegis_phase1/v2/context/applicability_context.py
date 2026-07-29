@@ -244,14 +244,19 @@ def build_applicability_context(state: dict[str, Any]) -> ApplicabilityContext:
     # Prefer v2's pre-computed list if present
     v2_applicable_pre: list[str] = list(state.get("v2_applicable_regs", []))
 
-    # Authoritative computation (re-derive from predicates)
+    # Authoritative computation:
+    # CORR-068 S2: user-declared applicability (v2_applicable_regs, populated
+    # from classification.yaml by CaseProfileLoader) takes priority over
+    # the sector-heuristic. The heuristic is a FALLBACK for cases where
+    # the loader didn't run (e.g., persisted state.json from a pre-CORR-061
+    # era without v2_company_facts).
     applicable_computed = _compute_applicable_regs(predicates)
-    if not applicable_computed and (v1_applicable_from_cc or v2_applicable_pre):
-        # Fallback: use the pre-computed list (e.g., from a
-        # persisted state.json without v2_company_facts)
-        applicable_computed = sorted(
-            set(v1_applicable_from_cc) | set(v2_applicable_pre)
-        )
+    if v2_applicable_pre:
+        # User has declared applicability — trust it.
+        applicable_computed = list(v2_applicable_pre)
+    elif not applicable_computed and v1_applicable_from_cc:
+        # Fallback: pre-CORR-061 v1 state with applicable_regs in company_context
+        applicable_computed = sorted(v1_applicable_from_cc)
 
     # Declared: from regulatory.applicable (preferred) or v2_declared_regs
     # (added in T2) or v2_applicable_pre
@@ -281,6 +286,16 @@ def build_applicability_context(state: dict[str, Any]) -> ApplicabilityContext:
     obligated: dict[str, str] = {}
     if regulatory_obj is not None and hasattr(regulatory_obj, "obligated_party_per_reg"):
         obligated = dict(regulatory_obj.obligated_party_per_reg or {})
+    # CORR-073: also read v2_obligated_party (populated by orchestrator
+    # from CaseProfileLoader.profile.regulatory.obligated_party_per_reg)
+    # — the legacy `state["regulatory"]` is NOT populated by the v2
+    # orchestrator so the previous code path yielded empty obligated
+    # parties for NIS2/DORA/AI_Act even though classification.yaml
+    # has the values.
+    v2_obligated = state.get("v2_obligated_party") or {}
+    for reg, party in v2_obligated.items():
+        if party and (reg not in obligated or not obligated.get(reg)):
+            obligated[reg] = party
     # Sensible defaults
     obligated.setdefault("GDPR", "controller")
     obligated.setdefault("CRA", "manufacturer")
@@ -300,6 +315,15 @@ def build_applicability_context(state: dict[str, Any]) -> ApplicabilityContext:
     if regulatory_obj is not None and hasattr(regulatory_obj, "clause_count_per_reg"):
         clause_count = {str(k): int(v) for k, v in (regulatory_obj.clause_count_per_reg or {}).items() if isinstance(v, (int, float))}
     elif v2_clause_count:
+        clause_count = {str(k): int(v) for k, v in v2_clause_count.items() if isinstance(v, (int, float))}
+    # CORR-073: also read v2_regulatory_rationale / v2_clause_count_per_reg
+    # as fallbacks — the legacy `state["regulatory"]` is not populated by
+    # the v2 orchestrator, so the previous code path produced empty
+    # rationale/clause_count for all 5 regs in case 3 (despite the
+    # applicability.yaml having 4 entries + 28-38 clause counts).
+    if not rationale and v2_rationale:
+        rationale = {str(k): str(v) for k, v in v2_rationale.items()}
+    if not clause_count and v2_clause_count:
         clause_count = {str(k): int(v) for k, v in v2_clause_count.items() if isinstance(v, (int, float))}
 
     # Tier

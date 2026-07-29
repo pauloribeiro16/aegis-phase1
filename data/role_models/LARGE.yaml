@@ -1,0 +1,60 @@
+tier: LARGE
+roles:
+  - role: CEO
+    person: Chief Executive Officer
+    reports_to: Board
+    fte: "1.0"
+    backup: COO
+    regulations: [GDPR, AI_Act]
+    notes: Executive sponsor
+  - role: DPO (dedicated)
+    person: Chief Compliance Officer
+    reports_to: CEO
+    fte: "1.0"
+    backup: External DPO advisor
+    regulations: [GDPR, AI_Act, DORA]
+    notes: Mandatory under GDPR Art. 37(1)(b) for sensitive processing
+  - role: CTO
+    person: Chief Technology Officer
+    reports_to: CEO
+    fte: "1.0"
+    backup: VP Engineering
+    regulations: [CRA, NIS2]
+    notes: Engineering lead
+  - role: CISO
+    person: Chief Information Security Officer
+    reports_to: CTO
+    fte: "1.0"
+    backup: Head of Security Operations
+    regulations: [NIS2, DORA, CRA]
+    notes: Independent from CIO per DORA Art. 13
+  - role: CRO
+    person: Chief Risk Officer
+    reports_to: CEO
+    fte: "1.0"
+    backup: Head of Operational Risk
+    regulations: [DORA, NIS2]
+    notes: ICT risk ownership per DORA Art. 5
+  - role: Head of AI/ML
+    person: VP AI
+    reports_to: CTO
+    fte: "1.0"
+    backup: Senior ML Engineer
+    regulations: [AI_Act]
+    notes: |
+  - role: Head of Compliance
+    person: Compliance Director
+    reports_to: CEO
+    fte: "1.0"
+    backup: Senior Compliance Officer
+    regulations: [GDPR, DORA, NIS2, AI_Act]
+    notes: |
+  - role: Head of Internal Audit
+    person: Internal Audit Director
+    reports_to: Audit Committee
+    fte: "1.0"
+    backup: External auditor
+    regulations: [DORA, NIS2]
+    notes: Three lines of defense
+contact_patterns:
+  placeholder: "{role}@{company_slug}.example"

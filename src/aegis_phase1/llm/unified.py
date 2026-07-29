@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 _PROBE_TTL_SECONDS = 30.0
 
 
-class OllamaUnreachableError(RuntimeError):
+class LLMUnreachableError(RuntimeError):
     """Raised when Ollama is not reachable at the configured base_url.
 
     Distinct from connection-during-invocation: this is detected BEFORE any
@@ -215,17 +215,39 @@ class UnifiedInvoker:
         timeout: int | None = None,
         num_ctx: int | None = None,
         langfuse_handler: Any | None = None,
-        prompt_loader: Any | None = None,
-        catalog_loader: Any | None = None,
-        validator: Any | None = None,
-        llm_logger: Any | None = None,
-        format_logger: Any | None = None,
+        prompt_loader: Any = None,
+        catalog_loader: Any = None,
+        validator: Any = None,
+        llm_logger: Any = None,
+        format_logger: Any = None,
         prompts_root: Any = None,
+        provider: str = "ollama",
+        api_key: str | None = None,
+        max_tokens: int | None = None,
     ) -> None:
-        from langchain_ollama import ChatOllama
+        # CORR-062 S2: ``provider`` selects the chat backend. The default
+        # stays "ollama" for backward compat (existing tests + recovery
+        # modes all use the local Ollama daemon). Pass "minimax" to use
+        # the M-series models (M2.7 / M3) via the Mavis gateway.
+        self.provider = provider
+        self.api_key = api_key or ""
+        self.max_tokens = max_tokens or 4096
 
         self.model = model or self.DEFAULT_MODEL
-        self.base_url = base_url or self.DEFAULT_BASE_URL
+
+        # CORR-062 S2: when provider=minimax and no explicit base_url is
+        # given, fall back to the Mavis gateway (the Anthropic-Messages
+        # endpoint) instead of the Ollama default. ``ChatMinimax`` has
+        # its own DEFAULT_BASE_URL, but we resolve here so the rest of
+        # the pipeline (e.g. log paths) sees the right URL too.
+        if base_url:
+            self.base_url = base_url
+        elif provider == "minimax":
+            from aegis_phase1.llm.chat_minimax import DEFAULT_BASE_URL
+            self.base_url = DEFAULT_BASE_URL
+        else:
+            self.base_url = self.DEFAULT_BASE_URL
+
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self.num_ctx = num_ctx or self.DEFAULT_NUM_CTX
         self._langfuse_handler = langfuse_handler
@@ -237,16 +259,37 @@ class UnifiedInvoker:
         self.format_logger = format_logger
         self._prompts_root = prompts_root
 
-        self.chat = ChatOllama(
-            model=self.model,
-            base_url=self.base_url,
-            timeout=self.timeout,
-            num_ctx=self.num_ctx,
-            # CORR-056: force all model layers onto GPU (gemma4:e2b fits
-            # in 7.6GB VRAM; default `num_gpu=None` lets Ollama decide,
-            # which under-uses VRAM on small models).
-            num_gpu=99,
-        )
+        if provider == "minimax":
+            from aegis_phase1.llm.chat_minimax import ChatMinimax
+
+            self.chat = ChatMinimax(
+                model=self.model,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                timeout=self.timeout,
+                max_tokens=self.max_tokens,
+            )
+            logger.info(
+                "UnifiedInvoker.__init__: provider=minimax, chat=%s model=%s base_url=%s",
+                type(self.chat).__name__, self.chat.model, self.chat.base_url,
+            )
+        else:
+            from langchain_ollama import ChatOllama
+
+            self.chat = ChatOllama(
+                model=self.model,
+                base_url=self.base_url,
+                timeout=self.timeout,
+                num_ctx=self.num_ctx,
+                # CORR-056: force all model layers onto GPU (gemma4:e2b fits
+                # in 7.6GB VRAM; default `num_gpu=None` lets Ollama decide,
+                # which under-uses VRAM on small models).
+                num_gpu=99,
+            )
+            logger.info(
+                "UnifiedInvoker.__init__: provider=ollama, chat=%s model=%s base_url=%s",
+                type(self.chat).__name__, self.model, self.base_url,
+            )
         self._heavy: Any | None = None
         self._ollama_reachable: bool | None = None
         self._ollama_probe_ts: float = 0.0
@@ -270,7 +313,7 @@ class UnifiedInvoker:
 
         Probes Ollama before invocation (cached for
         ``_PROBE_TTL_SECONDS``) and raises
-        :class:`OllamaUnreachableError` immediately when down — no retry,
+        :class:`LLMUnreachableError` immediately when down — no retry,
         no log spam (CORR-015).
         """
         self._ensure_ollama("invoke_raw")
@@ -283,10 +326,27 @@ class UnifiedInvoker:
                 )
             )
 
+        # CORR-063 S3: DEBUG-level entry log. Visible only with
+        # --log-level DEBUG. Does NOT log prompt content (privacy +
+        # size — can be 10+ KB for AEGIS prompts).
+        logger.debug(
+            "invoke_raw called: prompt_len=%d feedback=%s chat=%s",
+            len(prompt), bool(feedback), type(self.chat).__name__,
+        )
+
         cfg = _merge_handler_into_config(self._langfuse_handler, config)
         try:
+            import time as _time
+            _t0 = _time.monotonic()
             resp = self.chat.invoke(msgs, config=cfg)
+            elapsed = _time.monotonic() - _t0
             usage = _extract_usage(resp)
+            logger.debug(
+                "invoke_raw result: status=OK in %.2fs, raw_len=%d, "
+                "input=%d output=%d",
+                elapsed, len(resp.content),
+                usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0),
+            )
             return {
                 "raw": str(resp.content),
                 "status": "OK",
@@ -294,6 +354,7 @@ class UnifiedInvoker:
             }
         except Exception as exc:
             logger.warning("UnifiedInvoker.invoke_raw failed: %s", exc)
+            logger.debug("invoke_raw traceback:", exc_info=True)
             return {
                 "raw": "",
                 "status": "FAILED_AFTER_RETRIES",
@@ -306,6 +367,7 @@ class UnifiedInvoker:
         inputs: dict[str, Any],
         *,
         config: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Heavy path — load prompt, render, invoke, parse, validate, log, retry.
 
@@ -315,14 +377,23 @@ class UnifiedInvoker:
         the Langfuse handler baked into its constructor, matching CORR-011
         semantics.
 
+        Args:
+            spec_id: Canonical Phase 1 LLM ID.
+            inputs: Forwarded to the heavy invoker as prompt inputs.
+            config: Optional LangChain RunnableConfig.
+            state: Optional pipeline state (CORR-061 S3b). When provided,
+                the raw markdown response is captured into
+                ``state["per_spec_markdown"][spec_id]``. Pass ``None`` to
+                disable capture (test paths).
+
         Probes Ollama before delegating (cached for
-        ``_PROBE_TTL_SECONDS``); raises :class:`OllamaUnreachableError`
+        ``_PROBE_TTL_SECONDS``); raises :class:`LLMUnreachableError`
         when down — no retry, no log spam (CORR-015). The heavy child also
         re-probes as defense-in-depth.
         """
         self._ensure_ollama("invoke_spec")
         heavy = self._get_heavy()
-        return heavy.invoke(spec_id, inputs)
+        return heavy.invoke(spec_id, inputs, config=config, state=state)
 
     def invoke(
         self,
@@ -331,23 +402,30 @@ class UnifiedInvoker:
         *,
         feedback: str = "",
         config: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Polymorphic dispatcher.
 
         Distinguishes the two call-site shapes by the type of ``inputs``:
 
-        - ``invoke(spec_id, inputs_dict)`` → :meth:`invoke_spec` (heavy)
-        - ``invoke(prompt)`` /
-          ``invoke(prompt, feedback="...", config={...})`` →
+        - ``invoke(spec_id, inputs_dict, state=state)` → :meth:`invoke_spec` (heavy)
+        - ``invoke(prompt, feedback="...", config={...})` →
           :meth:`invoke_raw` (light)
 
         This preserves backward compatibility with both
-        ``Phase1LLMInvoker.invoke(spec_id, inputs)`` (heavy) and
+        ``Phase1LLMInvoker.invoke(spec_id, inputs, state=state)`` (heavy) and
         ``UnifiedInvoker.invoke_raw(prompt)`` (light) without changing any
         caller in the tree.
+
+        CORR-062 S1 fix: ``state`` kwarg was added to the 9 call sites in
+        ``phase1_executor.py`` during CORR-061 S3b but the dispatcher
+        signature and forward were not updated; this is the 2-line
+        forwarder that closes the gap.
         """
         if isinstance(inputs, dict):
-            return self.invoke_spec(prompt_or_spec_id, inputs, config=config)
+            return self.invoke_spec(
+                prompt_or_spec_id, inputs, config=config, state=state
+            )
         return self.invoke_raw(
             prompt_or_spec_id,
             feedback=feedback,
@@ -387,33 +465,47 @@ class UnifiedInvoker:
             format_logger=self.format_logger,
             model=self.model,
             langfuse_handler=self._langfuse_handler,
+            provider=self.provider,  # CORR-062 S2: pass through to heavy
         )
         return self._heavy
 
     def _ensure_ollama(self, source: str) -> None:
-        """Probe Ollama; raise ``OllamaUnreachableError`` if down.
+        """Probe the chat backend; raise ``LLMUnreachableError`` if down.
 
         Caches the probe result for ``_PROBE_TTL_SECONDS`` to avoid probing
         on every invocation when many calls happen in sequence.
+
+        CORR-062 S2: the probe is provider-aware. For the Ollama path we
+        GET ``/api/version``; for the MiniMax path we skip the probe
+        entirely (the Mavis gateway has no equivalent version endpoint,
+        and the LLM call itself will fail-fast with an HTTP error if
+        the API is down).
         """
+        # CORR-062 S2: MiniMax / Mavis gateway has no ``/api/version``
+        # equivalent — skip the probe. The first real call will surface
+        # any network / auth / model errors as HTTPStatusError, which
+        # invoke_raw / invoke_spec already handle.
+        if self.provider == "minimax":
+            return
+
         now = time.time()
         if (
             self._ollama_reachable is not None
             and (now - self._ollama_probe_ts) < _PROBE_TTL_SECONDS
         ):
             if not self._ollama_reachable:
-                raise OllamaUnreachableError(self.base_url, source)
+                raise LLMUnreachableError(self.base_url, source)
             return
         reachable = probe_ollama(self.base_url)
         self._ollama_reachable = reachable
         self._ollama_probe_ts = now
         if not reachable:
-            raise OllamaUnreachableError(self.base_url, source)
+            raise LLMUnreachableError(self.base_url, source)
 
 
 __all__ = [
     "UnifiedInvoker",
-    "OllamaUnreachableError",
+    "LLMUnreachableError",
     "probe_ollama",
     "_extract_usage",
     "_merge_handler_into_config",

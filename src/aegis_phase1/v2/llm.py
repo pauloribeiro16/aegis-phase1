@@ -14,7 +14,7 @@ Public API:
     MockInvoker           Scriptable mock for tests / MOCK_LLM mode.
     build_llm_invoker     Factory selecting MockInvoker vs UnifiedInvoker
                           vs TransformersInvoker (CORR-056).
-    OllamaUnreachableError  Raised when Ollama is unreachable.
+    LLMUnreachableError  Raised when Ollama is unreachable.
 
 Provider selection (CORR-056):
     - ``MOCK_LLM=true`` → MockInvoker (overrides everything)
@@ -54,7 +54,7 @@ _DEFAULT_OK_RESPONSE = (
 )
 
 
-class OllamaUnreachableError(Exception):
+class LLMUnreachableError(Exception):
     """Raised when Ollama is unreachable at startup health-check."""
 
 
@@ -106,32 +106,36 @@ def build_llm_invoker(
     langfuse_handler: Any = None,
     provider: str | None = None,
 ) -> MockInvoker | UnifiedInvoker | TransformersInvoker:
-    """Build the LLM invoker for the current run (CORR-013 + CORR-056).
+    """Build the LLM invoker for the current run (CORR-013 + CORR-056 + CORR-062 S2).
 
     Selection rule (in order):
         1. If ``MOCK_LLM`` env var is truthy, returns a :class:`MockInvoker`.
         2. If ``provider`` is given, use it (CORR-056: ``"ollama"`` or
-           ``"transformers"``). Unknown providers fall back to auto-detect.
+           ``"transformers"``; CORR-062 S2: ``"minimax"``).
+           Unknown providers fall back to auto-detect.
         3. Otherwise auto-detect from ``model``:
+           - ``minimax/`` prefix (CORR-062 S2) → ``minimax``
            - ``hf:`` prefix or contains ``/`` (HF Hub) → ``transformers``
            - otherwise → ``ollama``
 
     Args:
         model: Optional model name override. Default ``"gemma4:e4b"``
             (Ollama). For HF: e.g. ``"google/gemma-4-E2B-it"`` or
-            ``"hf:google/gemma-4-E2B-it"``.
-        langfuse_handler: Optional Langfuse handler (Ollama only — transformers
-            ignores it; no LangChain callbacks in the HF path).
-        provider: Optional explicit provider (``"ollama"`` | ``"transformers"``).
-            If ``None`` (default), auto-detects from model name.
+            ``"hf:google/gemma-4-E2B-it"``. For MiniMax:
+            e.g. ``"minimax/MiniMax-M3"`` (prefix stripped before passing
+            to ``ChatMinimax``).
+        langfuse_handler: Optional Langfuse handler (Ollama and MiniMax only —
+            transformers ignores it; no LangChain callbacks in the HF path).
+        provider: Optional explicit provider (``"ollama"`` | ``"transformers"``
+            | ``"minimax"``). If ``None`` (default), auto-detects from model name.
 
     Returns:
         A configured invoker instance. Type depends on selection:
         :class:`MockInvoker` / :class:`UnifiedInvoker` / :class:`TransformersInvoker`.
 
     Raises:
-        OllamaUnreachableError: When provider resolves to ollama and Ollama
-            cannot be reached. NOT raised for transformers provider.
+        LLMUnreachableError: When provider resolves to ollama and Ollama
+        cannot be reached. NOT raised for transformers or minimax providers.
     """
     if os.environ.get("MOCK_LLM", "").strip().lower() in _MOCK_TRUTHS:
         logger.info("MOCK_LLM=true → MockInvoker")
@@ -146,6 +150,28 @@ def build_llm_invoker(
             resolved_model,
         )
         return TransformersInvoker(model_id=resolved_model)
+
+    if resolved_provider == "minimax":
+        # CORR-062 S2: strip the "minimax/" prefix that the auto-detect
+        # rule used; UnifiedInvoker wants the bare model name
+        # (e.g. "MiniMax-M3") so the ChatMinimax class can pass it to
+        # the Mavis gateway unchanged.
+        bare_model = resolved_model
+        if bare_model.startswith("minimax/"):
+            bare_model = bare_model[len("minimax/"):]
+        logger.info(
+            "provider=minimax → UnifiedInvoker(model=%s, chat=ChatMinimax)",
+            bare_model,
+        )
+        invoker = UnifiedInvoker(
+            model=bare_model,
+            langfuse_handler=langfuse_handler,
+            provider="minimax",  # CORR-062 S2: critical — without this the
+                                 # UnifiedInvoker falls back to ChatOllama at
+                                 # localhost:11434, sending M3 model names to
+                                 # the local Ollama → 404.
+        )
+        return invoker
 
     # Default: Ollama
     invoker = UnifiedInvoker(
@@ -163,7 +189,7 @@ def _health_check(invoker: UnifiedInvoker) -> None:
     heavy LLM call so a missing Ollama fails immediately.
 
     Raises:
-        OllamaUnreachableError: When the probe fails.
+        LLMUnreachableError: When the probe fails.
     """
     import urllib.request
     from urllib.error import URLError
@@ -176,13 +202,13 @@ def _health_check(invoker: UnifiedInvoker) -> None:
         )
         with urllib.request.urlopen(req, timeout=3) as resp:
             if resp.status != 200:
-                raise OllamaUnreachableError(
+                raise LLMUnreachableError(
                     f"Ollama returned HTTP {resp.status} at {invoker.base_url}"
                 )
-    except OllamaUnreachableError:
+    except LLMUnreachableError:
         raise
     except (URLError, TimeoutError, ConnectionError, OSError) as exc:
-        raise OllamaUnreachableError(
+        raise LLMUnreachableError(
             f"Cannot reach Ollama at {invoker.base_url}: {exc}. "
             f"Set MOCK_LLM=true to use mock mode, or run "
             f"`ollama serve` + `ollama pull gemma4:e4b`."
@@ -191,7 +217,7 @@ def _health_check(invoker: UnifiedInvoker) -> None:
 
 __all__ = [
     "MockInvoker",
-    "OllamaUnreachableError",
+    "LLMUnreachableError",
     "UnifiedInvoker",
     "TransformersInvoker",
     "build_llm_invoker",

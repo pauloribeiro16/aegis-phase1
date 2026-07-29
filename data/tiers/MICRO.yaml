@@ -1,0 +1,21 @@
+tier: MICRO
+identity:
+  description: "is assessed as a low-tier {sector} entity"
+  employee_phrase: "{employees} employees"
+  scope: "single-team SaaS"
+role_separation:
+  dpo: "voluntary (GDPR Art. 37(4))"
+  ciso: "combined with CIO"
+  cro: "informal (CEO + CTO)"
+maturity:
+  default_target: 2
+  default_min: 1
+clause_emphasis:
+  - "GDPR Art. 32 (security of processing)"
+  - "CRA Annex I Part I §1(2) (essential requirements)"
+incident_response:
+  workflow: "informal escalation to CTO/CEO"
+  sla: "best-effort, no formal timeline"
+third_party:
+  register: "implicit (vendor contracts only)"
+  criticality: "low"

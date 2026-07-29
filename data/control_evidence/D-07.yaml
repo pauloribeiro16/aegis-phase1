@@ -1,0 +1,50 @@
+# Control evidence — D-07 Secure Development
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D07
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   SYSTEMS → systems.yaml
+#   APPS    → systems.yaml (applications slice)
+
+domain_id: D-07
+title: Secure Development
+controls:
+  - control: SDLC and secure coding
+    current_by_tier:
+      MICRO: "No formal SDLC; developer judgement"
+      SMALL: "Basic SDLC; coding guidelines shared"
+      MEDIUM: "Documented SDLC; secure coding guidelines based on OWASP ASVS L1"
+      LARGE: "Secure SDLC aligned to OWASP SAMM L3 + CRA Annex I; threat modelling per feature"
+      MAX: "Secure SDLC aligned to OWASP SAMM L4 + CRA Annex I; threat modelling + abuse cases per change"
+    evidence_refs: ["APPS"]
+  - control: SAST and code review
+    current_by_tier:
+      MICRO: "None"
+      SMALL: "Manual code review for primary product"
+      MEDIUM: "Automated SAST on PR; mandatory peer review before merge"
+      LARGE: "SAST + secret scanning + IaC scanning on every PR; security review for medium+ changes"
+      MAX: "SAST + secrets + IaC + container + policy-as-code on every PR; security review for any change touching money"
+    evidence_refs: ["APPS"]
+  - control: SCA and dependency scanning
+    current_by_tier:
+      MICRO: "Not done"
+      SMALL: "Manual `pip audit` / `npm audit` quarterly"
+      MEDIUM: "Automated SCA on every build; CVE blocking in CI for high+"
+      LARGE: "SCA + license compliance + SBOM per build; CVE-block at high+; CRA Annex II vulnerability handling"
+      MAX: "SCA + SBOM + VEX + reachability analysis; signed provenance; CRA Annex II 24h disclosure window"
+    evidence_refs: ["APPS"]
+  - control: Secrets management
+    current_by_tier:
+      MICRO: "Secrets in env files committed to repo"
+      SMALL: "Secrets in vault; rotation manual"
+      MEDIUM: "Secrets in central vault with rotation policy; no secrets in repo enforced by pre-commit"
+      LARGE: "Vault + workload identity + dynamic secrets; pre-commit + CI enforcement; HSM for root secrets"
+      MAX: "Vault + workload identity + dynamic + HSM; break-glass auditable; quarterly secret-rotation attestations"
+    evidence_refs: ["APPS"]
+  - control: Change and release management
+    current_by_tier:
+      MICRO: "Push to production whenever"
+      SMALL: "Manual approval gate; no rollback automation"
+      MEDIUM: "PR-based deploy with rollback; change advisory board for major changes"
+      LARGE: "GitOps + progressive delivery; change advisory board; automated rollback; CAB minutes retained"
+      MAX: "GitOps + progressive + automated rollback + DR drill; dual-control on prod access; full audit trail"
+    evidence_refs: ["APPS"]

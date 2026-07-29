@@ -161,11 +161,32 @@ class Phase1Executor:
         applicable_regs: list[str],
         *,
         config: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
         **inputs: Any,
     ) -> dict[str, Any]:
         """For each applicable regulation, call P1B-LLM-01 then P1B-LLM-02.
 
         Sequential per-reg (v1.2 MVP). Parallelism per lane is a follow-up.
+
+        CORR-071: filter ``layer0_subdomain_refs`` per lane so each
+        regulation lane only sees the subdomains where ``reg in
+        ref.participating_regulations``. Same structural pattern as
+        the CORR-045 per-domain filter in ``run_phase_1c_map``,
+        rebased onto ``participating_regulations`` instead of
+        ``sub_domain_id.startswith``. Reduces P1B payload from
+        ~575KB to ~150-200KB by removing refs that are not
+        material to the current regulation.
+
+        Args:
+            case_id: Case identifier.
+            applicable_regs: List of applicable regulation codes.
+            config: Optional LangChain RunnableConfig (callbacks, run_name).
+            state: Optional pipeline state. When provided, the raw
+                markdown response of each successful P1B-LLM-01/02 call
+                is captured into ``state["per_spec_markdown"]``
+                (CORR-061 S3b). Pass ``None`` for callers that don't
+                have an orchestrator state (e.g. standalone unit tests).
+            **inputs: Forwarded to the invoker as prompt inputs.
 
         Returns dict with:
             per_reg: {reg: {"P1B-LLM-01": out, "P1B-LLM-02": out}}
@@ -180,26 +201,43 @@ class Phase1Executor:
         all_synth: dict[str, dict[str, Any]] = {}
         statuses: list[str] = []
 
+        all_refs = inputs.get("layer0_subdomain_refs") or []
         for reg in applicable_regs:
+            # CORR-071: per-reg filter (same pattern as CORR-045
+            # per-domain in run_phase_1c_map). A ref is a dict
+            # post-_build_layer0_subdomain_refs with a
+            # ``participating_regulations`` list; keep only those
+            # where the current ``reg`` participates.
+            lane_refs: list[Any] = []
+            if isinstance(all_refs, list):
+                for ref in all_refs:
+                    if isinstance(ref, dict):
+                        pr = ref.get("participating_regulations") or []
+                        if reg in pr:
+                            lane_refs.append(ref)
+            lane_inputs = {**inputs, "layer0_subdomain_refs": lane_refs}
             out_01 = self.invoker.invoke(
                 SPEC_INTERPRETATION,
                 {
-                    **inputs,
+                    **lane_inputs,
                     "case_id": case_id,
                     "lane_id": reg,
                     "applicable_regs": [reg],
                 },
                 config=config,
+                state=state,
             )
             out_02 = self.invoker.invoke(
                 SPEC_RATIONALE,
                 {
-                    **inputs,
+                    **lane_inputs,
                     "case_id": case_id,
                     "lane_id": reg,
                     "applicable_regs": [reg],
+                    "p1b_llm_01_outputs": (out_01.get("parsed_output") or {}),
                 },
                 config=config,
+                state=state,
             )
 
             per_reg[reg] = {SPEC_INTERPRETATION: out_01, SPEC_RATIONALE: out_02}
@@ -235,12 +273,23 @@ class Phase1Executor:
         self,
         case_id: str,
         applicable_regs: list[str],
+        *,
+        state: dict[str, Any] | None = None,
         **inputs: Any,
     ) -> list[dict[str, Any]]:
         """For each domain D-01..D-10, call P1C-LLM-01-OVERLAP-CLASSIFICATION.
 
         Sequential (v1.2 MVP). True parallelism requires switching to
         asyncio.gather() or multiprocessing.Pool — see roadmap.
+
+        Args:
+            case_id: Case identifier.
+            applicable_regs: List of applicable regulation codes.
+            state: Optional pipeline state (CORR-061 S3b). When provided,
+                the raw markdown response of each per-domain P1C-LLM-01
+                call is captured into ``state["per_spec_markdown"]``
+                (one entry per spec, all 10 domains concatenated).
+            **inputs: Forwarded to the invoker as prompt inputs.
 
         CORR-045: filter ``layer0_subdomain_refs`` per lane so each
         D-XX lane only sees the subdomains whose ``sub_domain_id``
@@ -278,6 +327,7 @@ class Phase1Executor:
                     "lane_id": domain_id,
                     "applicable_regs": list(applicable_regs),
                 },
+                state=state,
             )
             parsed = out.get("parsed_output") or {}
             sd_activations = (
@@ -367,6 +417,7 @@ class Phase1Executor:
         track_b_profile: dict[str, Any] | None = None,
         *,
         config: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
         **inputs: Any,
     ) -> dict[str, Any]:
         """Reduce stage: P1C-LLM-03 first, then P1C-LLM-02 (per contract).
@@ -374,6 +425,18 @@ class Phase1Executor:
         LLM-03 (strategic synthesis) consumes Doc 07b (deterministic Track B
         constraint). LLM-02 (compound event) consumes the strategic synthesis
         produced by LLM-03.
+
+        Args:
+            case_id: Case identifier.
+            lane_outputs: Per-domain outputs from :meth:`run_phase_1c_map`.
+            sync_result: Cross-lane conflict matrix from :meth:`run_sync`.
+            track_b_profile: Optional Track B proportionality profile
+                (consumed by P1C-LLM-03).
+            config: Optional LangChain RunnableConfig.
+            state: Optional pipeline state (CORR-061 S3b). When provided,
+                the raw markdown responses from P1C-LLM-03 and P1C-LLM-02
+                are captured into ``state["per_spec_markdown"]``.
+            **inputs: Forwarded to the invoker as prompt inputs.
 
         Returns dict with:
             "P1C-LLM-03": out_03
@@ -402,6 +465,7 @@ class Phase1Executor:
                 "sync_conflicts": (sync_result or {}).get("conflicts", []),
             },
             config=config,
+            state=state,
         )
 
         # LLM-02 (COMPOUND EVENT) runs SECOND, consuming LLM-03 output.
@@ -417,6 +481,7 @@ class Phase1Executor:
                 "sync_conflicts": (sync_result or {}).get("conflicts", []),
             },
             config=config,
+            state=state,
         )
 
         statuses = [out_03.get("status"), out_02.get("status")]
@@ -438,9 +503,25 @@ class Phase1Executor:
         track_b_scale: str | None = None,
         track_b_fte: float | None = None,
         track_b_per_subdomain: dict[str, dict[str, str]] | None = None,
+        *,
+        config: dict[str, Any] | None = None,
+        state: dict[str, Any] | None = None,
         **inputs: Any,
     ) -> dict[str, Any]:
         """End-to-end Map/Reduce. Returns the full Phase 1 result dict.
+
+        Args:
+            case_id: Case identifier.
+            applicable_regs: List of applicable regulation codes.
+            track_b_profile: Optional precomputed Track B profile.
+            track_b_scale / track_b_fte / track_b_per_subdomain: Optional
+                inputs to compute track_b deterministically.
+            config: Optional LangChain RunnableConfig threaded into all
+                5 LLM calls.
+            state: Optional pipeline state (CORR-061 S3b). When provided,
+                the raw markdown response of each successful LLM call
+                is captured into ``state["per_spec_markdown"]``.
+            **inputs: Forwarded to the invoker as prompt inputs.
 
         Returns dict with keys:
             case_id, phase_1b, phase_1c_map, sync, phase_1c_reduce
@@ -461,14 +542,20 @@ class Phase1Executor:
             )
             track_b_profile = track_b_result["profile"]
 
-        phase_1b = self.run_phase_1b(case_id, applicable_regs, **inputs)
-        phase_1c_map = self.run_phase_1c_map(case_id, applicable_regs, **inputs)
+        phase_1b = self.run_phase_1b(
+            case_id, applicable_regs, config=config, state=state, **inputs,
+        )
+        phase_1c_map = self.run_phase_1c_map(
+            case_id, applicable_regs, state=state, **inputs,
+        )
         sync = self.run_sync(phase_1c_map)
         phase_1c_reduce = self.run_phase_1c_reduce(
             case_id,
             phase_1c_map,
             sync,
             track_b_profile=track_b_profile,
+            config=config,
+            state=state,
             **inputs,
         )
         result: dict[str, Any] = {

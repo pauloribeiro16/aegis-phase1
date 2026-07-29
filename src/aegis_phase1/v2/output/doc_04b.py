@@ -29,11 +29,35 @@ import os
 import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Any
 
-from aegis_phase1.v2.output._common import generate_frontmatter, markdown_table, write_output
+from aegis_phase1.data.loader import (
+    classify_tier,
+    load_control_evidence,
+    load_control_maturity,
+    load_tier_template,
+    render_tier_text,
+)
+from aegis_phase1.v2.output._common import (
+    generate_frontmatter,
+    get_per_spec_markdown,
+    markdown_table,
+    render_per_spec_markdown_appendix,
+    write_output,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
 from aegis_phase1.v2.review.loader import load_review
+
+# CORR-061 S3b: this doc consumes P1C-LLM-01-OVERLAP-CLASSIFICATION
+# (the per-domain overlap data that was previously read as typed
+# state from ``state["domain_results"][domain_id]``). The §3
+# per-domain Notes narrative continues to use the legacy
+# render_mandatory_narrative() invoker (no canonical 5-spec source
+# for a free-form "Notes" prompt); the per-domain adapted objective
+# is now a single hoisted section showing the raw spec markdown
+# instead of being rendered 10 times in the per-domain loop.
+_SPEC_OVERLAP = "P1C-LLM-01-OVERLAP-CLASSIFICATION"
 
 logger = logging.getLogger(__name__)
 
@@ -42,43 +66,37 @@ _MAX_FRAGMENT_BYTES = 2000
 _SAFE_KEY = re.compile(r"[^A-Za-z0-9_.-]")
 
 # ─────────────────────────────────────────────────────────────────────
-# Default maturity profile (deterministic)
+# Default maturity profile — tier-aware (CORR-073 Sprint 2)
 # ─────────────────────────────────────────────────────────────────────
 #
-# Per-domain current maturity. Deterministic defaults aligned with the
-# reference (TinyTask) but applicable to any micro/low-tier SaaS:
-#   - D-01, D-03, D-07: level 2 (defined; documented or repeatable)
-#   - D-02, D-04, D-05, D-06, D-08, D-09, D-10: level 1 (ad-hoc)
+# Per-domain current/target maturity is now derived from
+# ``data/control_maturity/{tier}.yaml``. Each tier (MICRO..MAX) declares
+# its own current_by_domain / target_by_domain mapping. Pre-Sprint 2
+# values were static (treated the whole industry as a low-tier SaaS).
+# Tier resolution comes from the company context via :func:`_tier_for_state`.
 #
-# These values can be overridden per-case in future sprints by injecting
-# them into state["security_posture_overrides"] (a dict keyed by domain
-# id).
+# State-level overrides remain supported via
+# ``state["security_posture_overrides"]`` (a dict keyed by domain id)
+# to support per-case adjustments on top of the tier profile.
 
-_DOMAIN_CURRENT: dict[str, int] = {
-    "D-01": 2,
-    "D-02": 1,
-    "D-03": 2,
-    "D-04": 1,
-    "D-05": 1,
-    "D-06": 1,
-    "D-07": 2,
-    "D-08": 1,
-    "D-09": 1,
-    "D-10": 1,
-}
 
-_DOMAIN_TARGET: dict[str, int] = {
-    "D-01": 3,
-    "D-02": 3,
-    "D-03": 3,
-    "D-04": 3,
-    "D-05": 2,
-    "D-06": 2,
-    "D-07": 2,
-    "D-08": 2,
-    "D-09": 3,
-    "D-10": 3,
-}
+@lru_cache(maxsize=1)
+def _control_maturity_for_tier(tier: str) -> tuple[dict, dict]:
+    """Load current/target maturity scores per macro-domain for tier."""
+    data = load_control_maturity(tier)
+    return data.get("current_by_domain", {}), data.get("target_by_domain", {})
+
+
+@lru_cache(maxsize=1)
+def _control_evidence_for_domain(domain_id: str) -> list[dict]:
+    """Load control evidence list for a single macro-domain.
+
+    Source: ``data/control_evidence/{domain_id}.yaml``.
+    Each entry exposes ``control``, ``current_by_tier`` (MICRO..MAX),
+    ``evidence_refs``, ``notes``.
+    """
+    data = load_control_evidence(domain_id)
+    return data.get("controls", [])
 
 _DOMAIN_NAME: dict[str, str] = {
     "D-01": "Data Protection",
@@ -318,7 +336,7 @@ _DEFAULT_CONTROLS: dict[str, list[dict[str, str]]] = {
             "control": "Board training",
             "current": "Not applicable to active scope",
             "evidence_refs": [],
-            "notes": "D-08.3 inactive for low-tier micro SaaS — NIS2 + DORA only participating regs",
+            "notes": "D-08.3 inactive when its participating regulations do not apply (NIS2 + DORA only participating regs)",
         },
     ],
     "D-09": [
@@ -422,6 +440,15 @@ def _build_body(
     parts.extend(_section_purpose(state))
     parts.extend(_section_methodology(state))
     parts.extend(_section_per_domain(state, llm_invoker, config=config))
+    # CORR-061 S3b: hoist the P1C-LLM-01 raw markdown out of the
+    # per-domain loop. Pre-S3b, the per-domain Adapted Objective
+    # subsection was rendered 10 times (once per D-XX) by reading
+    # ``state["domain_results"][domain_id]`` — duplicating the same
+    # spec output. S3b dumps the spec markdown once in a hoisted
+    # section after the per-domain loop. The per-domain deterministic
+    # content (maturity, controls, target, gap, Notes narrative)
+    # is unchanged.
+    parts.extend(_section_3b_overlap_classification(state))
     parts.extend(_section_summary(state))
     parts.extend(_section_top_gaps(state))
     parts.extend(_section_consistency(state))
@@ -429,6 +456,8 @@ def _build_body(
     parts.extend(_section_version_history(state))
     parts.extend(_section_approval(state))
     parts.extend(_section_see_also(state))
+    # CORR-061 S3b: append the per-spec markdown appendix.
+    parts.extend(render_per_spec_markdown_appendix(state))
     return "\n".join(parts)
 
 
@@ -455,13 +484,31 @@ def _section_methodology(state: dict[str, Any]) -> list[str]:
     scale = _attr(ctx, "scale", default="micro")
     applicable = _attr(ctx, "applicable_regs", default=[]) or []
     applicable_text = ", ".join(applicable) if applicable else "-"
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    sector = _attr(ctx, "sector", default="")
+    tier = classify_tier(employees_int, sector, list(applicable))
+    tier_template = load_tier_template(tier)
+    employees_str = str(employees) if employees not in (None, "", "-") else "small"
+    ctx_for_template = {
+        "name": name,
+        "sector": sector or "SaaS",
+        "employees": employees_str,
+        "scale": scale,
+    }
+    tier_description = render_tier_text(tier, ctx_for_template)
     parts.append(
-        f"{name} is assessed as a low-tier {scale} SaaS"
+        f"{name} {tier_description}"
         + (f" with {employees} employees" if employees else "")
         + " using managed-cloud infrastructure. Current maturity measures "
         + "what exists today, not the target state. Target maturity is "
-        + "proportional to the company profile but aligned with active "
-        + "GDPR/CRA SubDomains fit criteria (applicable_regs = "
+        + f"{tier_template['maturity']['default_target']} (minimum acceptable: "
+        + f"{tier_template['maturity']['default_min']}). "
+        + f"Proportional language: tier={tier} ({tier_template.get('scope', '-')}). "
+        + "Active Layer 0 scope is aligned with active "
+        + f"GDPR/CRA SubDomains fit criteria (applicable_regs = "
         + f"{applicable_text}).\n"
     )
     parts.append(
@@ -494,11 +541,14 @@ def _section_per_domain(
     overrides = _overrides(state)
     review = _load_review_for_state(state)
     domain_results = state.get("domain_results") or {}
-    for domain_id in sorted(_DOMAIN_CURRENT.keys()):
-        current = overrides.get(domain_id, _DOMAIN_CURRENT[domain_id])
-        target = _DOMAIN_TARGET[domain_id]
+    tier = _tier_for_state(state)
+    current_by_dom, target_by_dom = _control_maturity_for_tier(tier)
+    domain_ids = sorted(current_by_dom.keys())
+    for domain_id in domain_ids:
+        current = overrides.get(domain_id, current_by_dom.get(domain_id, 1))
+        target = target_by_dom.get(domain_id, 1)
         gap = max(0, target - current)
-        controls = _controls_for(domain_id, state)
+        controls = _controls_for(domain_id, tier)
         parts.append(f"### {domain_id} {_DOMAIN_NAME[domain_id]} — Maturity: {current}\n")
         parts.append(_controls_table(controls))
         parts.append("")
@@ -509,11 +559,59 @@ def _section_per_domain(
             config=config,
         )
         parts.append(f"**Notes**: {notes}\n")
+        # CORR-061 S3b: the per-domain Adapted Objective subsection
+        # previously read ``state["domain_results"][domain_id]`` (the
+        # structured P1C-LLM-01 output for that lane). That data
+        # source is now hoisted to §3b as raw markdown. The
+        # subsection header is preserved (per the S3b "do NOT change
+        # template structure" invariant) but the body is replaced
+        # with a per-domain placeholder pointing reviewers to §3b
+        # where the raw spec markdown lives. The human-review
+        # workflow that uses the adapted_objective + edited_text
+        # fields is unaffected — the data is still in
+        # ``state["domain_results"]`` and the helper
+        # :func:`_section_adapted_objective` is still exported.
         domain_result = domain_results.get(domain_id) or {}
         if domain_result:
             review_entry = review.get(domain_id) if isinstance(review, Mapping) else None
-            parts.append(_section_adapted_objective(domain_id, domain_result, review_entry))
+            parts.append(_section_adapted_objective_placeholder(domain_id, review_entry))
     return parts
+
+
+def _section_adapted_objective_placeholder(
+    domain_id: str,
+    review_entry: Mapping[str, Any] | None = None,
+) -> str:
+    """Render a per-domain placeholder for the Adapted Objective subsection.
+
+    Replaces the S3a behaviour (which read
+    ``state["domain_results"][domain_id]`` and rendered the
+    structured ``adapted_subdomains`` / ``adapted_objective`` text
+    here) with a deterministic placeholder pointing reviewers at
+    the hoisted §3b section. The full human-review workflow
+    (REJECTED/EDITED/APPROVED markers, PENDING RE-GENERATION
+    hints) is preserved for backwards compat — the review YAML
+    is still authoritative for sign-off.
+    """
+    parts: list[str] = []
+    parts.append(f"\n#### {domain_id} — Adapted Objective")
+    parts.append("")
+    status = "PENDING"
+    if isinstance(review_entry, Mapping):
+        status = str(review_entry.get("status", "PENDING") or "PENDING")
+    parts.append(
+        f"*Source: P1C-LLM-01 OVERLAP-CLASSIFICATION (per-domain slice) "
+        f"| review status: {status}*"
+    )
+    parts.append("")
+    parts.append(
+        f"_(per-domain LLM response not rendered here in S3b — see "
+        f"**§3b LLM Source — P1C-LLM-01 Overlap Classification** for "
+        f"the raw concatenated spec markdown, or the **Appendix** "
+        f"for the full per-spec dump)_"
+    )
+    parts.append("")
+    return "\n".join(parts)
 
 
 def _section_adapted_objective(
@@ -714,16 +812,63 @@ def _load_review_for_state(state: Mapping[str, Any]) -> dict[str, dict]:
     return review if isinstance(review, dict) else {}
 
 
+def _section_3b_overlap_classification(state: dict[str, Any]) -> list[str]:
+    """§3b 'LLM Source — P1C-LLM-01 Overlap Classification' (CORR-061 S3b).
+
+    Renders the raw markdown response of P1C-LLM-01 (per-domain
+    overlap classification, concatenated across the 10 D-XX lanes)
+    into a single section. Replaces the pre-S3b pattern of reading
+    ``state["domain_results"][domain_id]`` 10 times in the per-domain
+    loop and rendering a structured Adapted Objective per domain.
+
+    When P1C-LLM-01 has not been captured (deterministic-only / mock /
+    executor failure), the section shows a PENDING marker so reviewers
+    can identify the gap. The per-domain deterministic loop (§3) is
+    unchanged; the per-domain Notes narrative continues to use
+    :func:`render_mandatory_narrative` and falls back to its own
+    PENDING marker on missing LLM.
+    """
+    parts: list[str] = []
+    parts.append("## 3b. LLM Source — P1C-LLM-01 Overlap Classification\n")
+    parts.append(
+        "Raw markdown response of P1C-LLM-01 OVERLAP-CLASSIFICATION, "
+        "concatenated across the 10 D-XX lanes (separated by ``---``). "
+        "Pre-S3b this data was rendered 10 times in the §3 per-domain "
+        "loop as a structured Adapted Objective subsection. S3b hoists "
+        "the raw spec output to this single section so the markdown-only "
+        "contract is the source of truth; the §3 per-domain loop is now "
+        "deterministic + narrative-only.\n"
+    )
+    spec_md = get_per_spec_markdown(state, _SPEC_OVERLAP)
+    if spec_md:
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        parts.append(
+            "> **[PENDING REVIEW — P1C-LLM-01 OVERLAP-CLASSIFICATION "
+            "not yet captured]**\n"
+            "> Section ID: `doc_04b.section_3_b.overlap_classification`\n"
+            "> \n"
+            "> This section requires P1C-LLM-01 (per-domain overlap "
+            "classification, called once per D-XX lane). Re-run the "
+            "pipeline with a real LLM configured (`MOCK_LLM=false` and "
+            "Ollama running) to populate this section. Reviewers can "
+            "also consult the Appendix for the raw LLM output.\n"
+        )
+    return parts
+
+
 def _section_summary(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 4. Summary Dashboard\n")
     overrides = _overrides(state)
+    tier = _tier_for_state(state)
+    current_by_dom, target_by_dom = _control_maturity_for_tier(tier)
     rows: list[tuple[str, int, int, int]] = []
     total_current = 0
     total_target = 0
-    for domain_id in sorted(_DOMAIN_CURRENT.keys()):
-        current = overrides.get(domain_id, _DOMAIN_CURRENT[domain_id])
-        target = _DOMAIN_TARGET[domain_id]
+    for domain_id in sorted(current_by_dom.keys()):
+        current = overrides.get(domain_id, current_by_dom.get(domain_id, 1))
+        target = target_by_dom.get(domain_id, 1)
         gap = max(0, target - current)
         rows.append((f"{domain_id} {_DOMAIN_NAME[domain_id]}", current, target, gap))
         total_current += current
@@ -741,7 +886,7 @@ def _section_summary(state: dict[str, Any]) -> list[str]:
     parts.append("")
 
     # Maturity count by level
-    counts = _maturity_counts(overrides)
+    counts = _maturity_counts(overrides, tier)
     parts.append("**Maturity distribution:** " + ", ".join(
         f"Level {lvl} = {counts.get(lvl, 0)}" for lvl in (0, 1, 2, 3, 4)
     ) + "\n")
@@ -752,10 +897,16 @@ def _section_top_gaps(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. Top Gaps (feeds Doc 07)\n")
     overrides = _overrides(state)
+    tier = _tier_for_state(state)
+    current_by_dom, target_by_dom = _control_maturity_for_tier(tier)
     ranked = sorted(
         (
-            (domain_id, _DOMAIN_TARGET[domain_id] - overrides.get(domain_id, _DOMAIN_CURRENT[domain_id]))
-            for domain_id in _DOMAIN_CURRENT
+            (
+                domain_id,
+                target_by_dom.get(domain_id, 1)
+                - overrides.get(domain_id, current_by_dom.get(domain_id, 1)),
+            )
+            for domain_id in current_by_dom
         ),
         key=lambda kv: (-kv[1], kv[0]),
     )
@@ -784,6 +935,13 @@ def _section_consistency(state: dict[str, Any]) -> list[str]:
     flows = inv.get("data_flows") or []
     ctx = state.get("company_context")
     applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    employees = _attr(ctx, "employees", default="")
+    sector = _attr(ctx, "sector", default="")
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    tier = classify_tier(employees_int, sector, list(applicable))
     parts.append(
         markdown_table(
             ["Consistency Item", "Status", "Evidence"],
@@ -799,9 +957,9 @@ def _section_consistency(state: dict[str, Any]) -> list[str]:
                     f"applicable_regs = [{', '.join(applicable) or '-'}]",
                 ),
                 (
-                    "LOW-tier realism maintained",
+                    "Tier-proportional realism maintained",
                     "PASS",
-                    "No enterprise HSM, SIEM, PAM, SOC, or CMDB claimed",
+                    f"tier={tier}; no enterprise controls claimed beyond tier template scope",
                 ),
                 (
                     "Maturity scale used consistently",
@@ -1057,10 +1215,11 @@ _GAP_SUMMARY: dict[str, tuple[str, str]] = {
 }
 
 
-def _maturity_counts(overrides: Mapping[str, int]) -> dict[int, int]:
+def _maturity_counts(overrides: Mapping[str, int], tier: str) -> dict[int, int]:
     counts = {lvl: 0 for lvl in (0, 1, 2, 3, 4)}
-    for domain_id in _DOMAIN_CURRENT:
-        lvl = overrides.get(domain_id, _DOMAIN_CURRENT[domain_id])
+    current_by_dom, _ = _control_maturity_for_tier(tier)
+    for domain_id in current_by_dom:
+        lvl = overrides.get(domain_id, current_by_dom.get(domain_id, 1))
         if lvl in counts:
             counts[lvl] += 1
     return counts
@@ -1080,45 +1239,54 @@ def _overrides(state: dict[str, Any]) -> dict[str, int]:
     return result
 
 
-def _controls_for(domain_id: str, state: dict[str, Any]) -> list[dict[str, str]]:
+def _controls_for(
+    domain_id: str, tier_or_state: str | dict[str, Any]
+) -> list[dict[str, str]]:
     """Return the control rows for ``domain_id``.
 
-    Substitutes evidence refs using architecture_inventory where possible
-    (so the table matches the actual inventory rather than the static
-    default).
+    Source: :func:`load_control_evidence` per-domain YAML. The ``current``
+    column is selected from ``current_by_tier[tier]`` so each tier sees a
+    proportional narrative. Falls back to ``"Unknown"`` when the tier is
+    not in the per-control mapping.
+
+    ``tier_or_state`` may be either a tier string (preferred; passed
+    directly by the per-domain loop after :func:`_tier_for_state`) or a
+    full ``state`` dict (legacy fallback; resolves the tier then).
     """
-    defaults = [dict(ctl) for ctl in _DEFAULT_CONTROLS.get(domain_id, [])]
-    inv = state.get("architecture_inventory") or {}
-    sys_ids = [s.get("id", "") for s in (inv.get("systems") or []) if s.get("id")]
-    store_ids = [s.get("id", "") for s in (inv.get("data_stores") or []) if s.get("id")]
-    flow_ids = [f.get("id", "") for f in (inv.get("data_flows") or []) if f.get("id")]
-
-    if not sys_ids and not store_ids and not flow_ids:
-        return defaults
-
-    # Replace default refs with the actual inventory ids where known.
-    for ctl in defaults:
-        refs = ctl.get("evidence_refs") or []
-        if not refs:
-            continue
-        new_refs: list[str] = []
-        for ref in refs:
-            if (ref.startswith("SYS-") and ref in sys_ids) or (ref.startswith("STORE-") and ref in store_ids) or (ref.startswith("FLOW-") and ref in flow_ids):
-                new_refs.append(ref)
-            else:
-                new_refs.append(ref)
-        ctl["evidence_refs"] = new_refs
+    if isinstance(tier_or_state, Mapping):
+        tier = _tier_for_state(tier_or_state)  # type: ignore[arg-type]
+    else:
+        tier = str(tier_or_state)
+    raw_controls = _control_evidence_for_domain(domain_id)
+    defaults = [
+        {
+            "control": c.get("control", ""),
+            "current": c.get("current_by_tier", {}).get(tier, "Unknown"),
+            "evidence_refs": list(c.get("evidence_refs") or []),
+            "notes": c.get("notes", ""),
+        }
+        for c in raw_controls
+    ]
     return defaults
 
 
 def _active_count(state: dict[str, Any]) -> int:
-    """Number of active sub-domains from ontology."""
+    """Number of active sub-domains.
+
+    CORR-072: prefer the ontology ``subdomains.covered`` list (canonical
+    source-of-truth), but fall back to ``state['subdomains']`` when the
+    ontology is empty or absent. This matches Doc 04a's
+    ``_active_subdomains`` logic and prevents the ``active_subdomains: 0``
+    bug seen in case 3 (OmniBank) where the ontology was not populated
+    but the sub-domain dict was.
+    """
     ont = state.get("ontology") or {}
     subdomains = ont.get("subdomains") if isinstance(ont, Mapping) else None
-    if not isinstance(subdomains, Mapping):
-        return 0
-    covered = subdomains.get("covered") or []
-    return len(covered) if isinstance(covered, list) else 0
+    if isinstance(subdomains, Mapping):
+        covered = subdomains.get("covered") or []
+        if isinstance(covered, list) and covered:
+            return len(covered)
+    return len(state.get("subdomains") or {})
 
 
 def _total_count(state: dict[str, Any]) -> int:
@@ -1195,6 +1363,25 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, Mapping):
         return obj.get(name, default)
     return default
+
+
+def _tier_for_state(state: dict[str, Any]) -> str:
+    """Resolve company tier from state via :func:`classify_tier`.
+
+    Centralised helper so per-domain maturity and control-evidence
+    lookups stay consistent. Falls back to ``MICRO`` when context is
+    missing (defensive default — never silently lower the tier in real
+    case runs because the orchestrator always populates company_context).
+    """
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default="")
+    sector = _attr(ctx, "sector", default="")
+    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    return classify_tier(employees_int, sector, list(applicable))
 
 
 __all__ = ["render_doc_04b"]

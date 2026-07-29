@@ -1,0 +1,39 @@
+tier: MEDIUM
+roles:
+  - role: CEO
+    person: CEO
+    reports_to: Board
+    fte: "1.0"
+    backup: COO
+    regulations: [GDPR, AI_Act]
+    notes: Executive sponsor
+  - role: CTO
+    person: CTO
+    reports_to: CEO
+    fte: "1.0"
+    backup: VP Engineering
+    regulations: [CRA, NIS2, DORA]
+    notes: Engineering lead
+  - role: DPO (dedicated or part-time)
+    person: Head of Compliance
+    reports_to: CEO
+    fte: "0.5-1.0"
+    backup: External DPO firm
+    regulations: [GDPR, AI_Act, DORA]
+    notes: Art. 37 designation
+  - role: Head of Security
+    person: Head of Security
+    reports_to: CTO
+    fte: "1.0"
+    backup: CTO
+    regulations: [NIS2, DORA, CRA]
+    notes: Combined CISO function
+  - role: Head of Operations
+    person: COO
+    reports_to: CEO
+    fte: "1.0"
+    backup: CEO
+    regulations: [NIS2, DORA]
+    notes: Operational risk owner
+contact_patterns:
+  placeholder: "{role}@{company_slug}.example"

@@ -7,13 +7,13 @@ appended to the next prompt. The invoker's contract is::
     invoker.invoke(prompt: str, feedback: str = "") -> dict
         # returns {"raw": str, "status": "OK" | "FAILED_AFTER_RETRIES"}
 
-Network or Ollama failures propagate as :class:`OllamaUnreachable`
+Network or Ollama failures propagate as :class:`LLMUnreachable`
 so the orchestrator can abort the whole MAP stage — there is no
 silent fallback.
 
 Public API:
     DomainProcessor.process(domain_id, state) -> DomainResult
-    OllamaUnreachable    fatal LLM failure
+    LLMUnreachable    fatal LLM failure
     MapPartialFailure    raised by the orchestrator when ≥1 domain fails
     DOMAIN_NAMES         D-XX → human-readable name
 """
@@ -53,12 +53,23 @@ DOMAIN_NAMES: dict[str, str] = {
 # ─── Exceptions ────────────────────────────────────────────────────────
 
 
-class OllamaUnreachable(Exception):
+class LLMUnreachable(Exception):
     """Fatal: the LLM is unreachable. Propagates to abort MAP."""
 
 
 class MapPartialFailure(Exception):
-    """One or more domains failed. Blocks advance to REDUCE."""
+    """One or more domains failed. Blocks advance to REDUCE.
+
+    CORR-067 S2: now carries the list of failed domain IDs so the
+    runner can decide between graceful partial-doc generation
+    (1-2 failures out of 10) and hard abort (≥5 failures). The
+    ``failed_domains`` attribute is always a list (possibly empty for
+    backwards compat, but new code paths always populate it).
+    """
+
+    def __init__(self, message: str, failed_domains: list[str] | None = None) -> None:
+        super().__init__(message)
+        self.failed_domains: list[str] = list(failed_domains or [])
 
 
 # ─── Processor ─────────────────────────────────────────────────────────
@@ -119,7 +130,7 @@ class DomainProcessor:
             success or ``"FAILED"`` when all retries are exhausted.
 
         Raises:
-            OllamaUnreachable: When the invoker raises (network/Ollama
+            LLMUnreachable: When the invoker raises (network/Ollama
                 down). The orchestrator catches this to abort MAP.
         """
         domain_id = domain_id.upper()
@@ -133,19 +144,63 @@ class DomainProcessor:
         feedback = ""
         last_raw: str | None = None
 
+        # CORR-064 S6: wrap each LLM call in a Langfuse CHAIN context
+        # so the GENERATION (created by the langchain callback) becomes
+        # a CHILD of this CHAIN rather than a sibling. Without this
+        # wrapper, the CHAIN and GENERATION appeared at the same
+        # level in the Langfuse UI (both children of the langgraph
+        # node span), making the structure hard to navigate.
+        from aegis_phase1.llm.tracing import _lf_get_client
+        _lf_client = _lf_get_client() if _lf_get_client is not None else None
+
         for attempt in range(self.max_retries):
             prompt = render_prompt(inputs, feedback=feedback)
 
-            try:
-                response = self.llm_invoker.invoke(
-                    prompt, feedback=feedback, config=self.config
+            # Open a CHAIN context so the LLM call's GENERATION nests
+            # underneath. Falls back to a no-op context manager if
+            # Langfuse is disabled or not installed.
+            from contextlib import nullcontext
+            if _lf_client is not None:
+                _ctx = _lf_client.start_as_current_observation(
+                    as_type="chain",
+                    name=f"MAP {domain_id}",
+                    input={"domain_id": domain_id, "attempt": attempt + 1, "feedback": bool(feedback)},
                 )
-            except Exception as exc:
-                logger.error("LLM invoke raised for %s: %s", domain_id, exc)
-                raise OllamaUnreachable(str(exc)) from exc
+            else:
+                _ctx = nullcontext()
 
-            last_raw = response.get("raw") or ""
-            status = response.get("status", "FAILED")
+            try:
+                with _ctx as chain_span:
+                    try:
+                        response = self.llm_invoker.invoke(
+                            prompt, feedback=feedback, config=self.config
+                        )
+                    except Exception as exc:
+                        logger.error("LLM invoke raised for %s: %s", domain_id, exc)
+                        raise LLMUnreachable(str(exc)) from exc
+
+                    last_raw = response.get("raw") or ""
+                    status = response.get("status", "FAILED")
+                    # Annotate the chain with the result so the
+                    # Langfuse UI shows the outcome (status, raw_len)
+                    # even on failure paths.
+                    if chain_span is not None and hasattr(chain_span, "update"):
+                        try:
+                            chain_span.update(
+                                output={
+                                    "status": status,
+                                    "raw_len": len(last_raw),
+                                    "attempt": attempt + 1,
+                                }
+                            )
+                        except Exception:
+                            pass  # never let annotation break the run
+            except LLMUnreachable:
+                # Re-raise without closing the chain context (it's
+                # already closed by the `with` block — but the inner
+                # raise happens inside the `with`, so the context
+                # manager has cleaned up).
+                raise
 
             if status != "OK":
                 feedback = f"LLM returned status={status}. Try again."
@@ -378,5 +433,5 @@ __all__ = [
     "DOMAIN_NAMES",
     "DomainProcessor",
     "MapPartialFailure",
-    "OllamaUnreachable",
+    "LLMUnreachable",
 ]

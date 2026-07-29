@@ -1,0 +1,11 @@
+# AEGIS Phase 1 — Regulatory Classification (Case 03 — OmniBank Financial Systems S.A.)
+# Per-regulation classification (5 enums). Banking-grade:
+#  - NIS2 ESSENTIAL (Annex I Banking sector)
+#  - DORA FINANCIAL_ENTITY (credit institution + payment service provider)
+#  - AI Act HIGH_RISK (Annex III §5(b) credit scoring)
+# Values come from the regulations themselves, not company input.
+nis2_entity_class: ESSENTIAL            # Banking = Annex I Sector; >250 employees = ESSENTIAL
+dora_article_2_entity: FINANCIAL_ENTITY # Art. 2(1): credit institution under CRR Art. 4(1)(1)
+cra_product_class: CLASS_I              # Mobile app + web platform; "important" product handling financial data
+ai_system_classification: HIGH_RISK     # Credit scoring per AI Act Annex III §5(b) (access to credit)
+critical_or_important_ict: "YES"        # CBS / AML / Payments / CreditAI = DORA Art. 6 critical ICT (quoted to avoid YAML bool parsing)

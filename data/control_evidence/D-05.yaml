@@ -1,0 +1,43 @@
+# Control evidence — D-05 Data Lifecycle
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D05
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   STORES → data_stores.yaml
+#   FLOWS  → data_flows.yaml
+#   SYSTEMS → systems.yaml
+
+domain_id: D-05
+title: Data Lifecycle
+controls:
+  - control: Data classification
+    current_by_tier:
+      MICRO: "Implicit; no documented scheme"
+      SMALL: "Three tiers (Public / Internal / Confidential) documented"
+      MEDIUM: "Four tiers including Restricted; tag-driven enforcement on primary stores"
+      LARGE: "Five-tier scheme aligned to GDPR special categories + payment data; automated tagging"
+      MAX: "Five-tier scheme + payment card data + AML scopes; data catalogue with lineage; DLP-enforced"
+    evidence_refs: ["STORES"]
+  - control: Retention and deletion
+    current_by_tier:
+      MICRO: "Data kept indefinitely; no deletion policy"
+      SMALL: "Retention schedule documented; manual deletion annually"
+      MEDIUM: "Retention schedule + automated purge for non-regulated data"
+      LARGE: "Retention per HGB §257 (10y), GwG §8 (5y), MiFID II (5y); automated archival + deletion"
+      MAX: "Multi-jurisdiction retention matrix; automated archival + deletion with audit trail"
+    evidence_refs: ["STORES"]
+  - control: Backup and recovery
+    current_by_tier:
+      MICRO: "No backups beyond cloud-provider default"
+      SMALL: "Daily backups; monthly restore test on a sample"
+      MEDIUM: "Daily backups + offsite copy; quarterly full restore test; RTO 24h RPO 4h"
+      LARGE: "Continuous replication + immutable backups; quarterly DR exercise; RTO 4h RPO 15min"
+      MAX: "Multi-region active/active; immutable backups in air-gapped vault; DR exercised semi-annually"
+    evidence_refs: ["STORES"]
+  - control: Data lineage
+    current_by_tier:
+      MICRO: "Unknown; data flows undocumented"
+      SMALL: "Documented data flow diagram for primary product"
+      MEDIUM: "Lineage tracked for regulated data sets; GDPR Art. 30 record of processing"
+      LARGE: "Automated lineage for core banking + customer data; GDPR Art. 30 + DORA Art. 28 register"
+      MAX: "Full data lineage from ingestion to archival; AI Act Art. 10 traceability for high-risk AI data"
+    evidence_refs: ["FLOWS"]

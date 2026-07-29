@@ -1,0 +1,41 @@
+# Control evidence — D-08 Human Factors
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D08
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   SYSTEMS → systems.yaml (HRIS / training tooling)
+
+domain_id: D-08
+title: Human Factors
+controls:
+  - control: Security awareness training
+    current_by_tier:
+      MICRO: "None"
+      SMALL: "Annual security briefing for all staff"
+      MEDIUM: "Annual e-learning + monthly micro-learning; completion tracked"
+      LARGE: "Quarterly awareness + monthly phishing simulation; role-based paths; NIS2 Art. 21(2)(g)"
+      MAX: "Continuous awareness programme with adaptive content; mandatory annual certification per role"
+    evidence_refs: ["SYSTEMS"]
+  - control: Phishing and social-engineering simulation
+    current_by_tier:
+      MICRO: "Not run"
+      SMALL: "Annual phishing test"
+      MEDIUM: "Quarterly phishing + monthly targeted campaigns for finance / HR"
+      LARGE: "Continuous programme; adversary-emulation phishing; reporting rate KPI tracked monthly"
+      MAX: "Continuous + adversary-emulation + voice phishing (vishing) + SMS (smishing); per-team KPI dashboards"
+    evidence_refs: ["SYSTEMS"]
+  - control: Background checks and offboarding
+    current_by_tier:
+      MICRO: "References only"
+      SMALL: "Basic background check at hire; offboarding checklist"
+      MEDIUM: "Background check at hire + 5y rechecks for privileged roles; automated offboarding checklist"
+      LARGE: "Background check + 3y rechecks; automated offboarding <24h; GwG §6 fit-and-proper checks"
+      MAX: "Continuous vetting for privileged roles; automated offboarding <4h; fit-and-proper per GwG / MaRisk"
+    evidence_refs: ["SYSTEMS"]
+  - control: Role-based training
+    current_by_tier:
+      MICRO: "None"
+      SMALL: "On-the-job training; no formal curriculum"
+      MEDIUM: "Role-based paths for engineers, support, finance"
+      LARGE: "Role-based paths + annual certification; CRA Annex I §2 for engineers; DPO training per GDPR Art. 39"
+      MAX: "Annual recertification; DPO + CISO + CRO certification tracks; regulator-facing readiness drills"
+    evidence_refs: ["SYSTEMS"]

@@ -1,0 +1,435 @@
+{
+  "case": "case1-tinytask",
+  "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+  "lane": "D-02",
+  "inputs": {
+    "case_id": "case1-tinytask",
+    "domain_id": "D-02",
+    "lane_id": "D-02",
+    "applicable_regs": [
+      "GDPR",
+      "CRA"
+    ],
+    "company_facts": {
+      "name": "TinyTask Lda.",
+      "sector": "Technology/Software",
+      "jurisdiction": "Portugal (EU)",
+      "scale": "MICRO",
+      "employees": 8,
+      "role": "controller",
+      "obligated_party": "controller",
+      "complexity_tier": "LOW",
+      "data_categories": [
+        "personal_data"
+      ],
+      "products": [
+        "SaaS application"
+      ],
+      "role_obligations": [
+        "controller"
+      ],
+      "applicable_regs": [
+        "GDPR",
+        "CRA"
+      ]
+    },
+    "layer0_subdomain_refs": [
+      {
+        "sub_domain_id": "D-02.1",
+        "title": "D-02.1 Vulnerability Identification",
+        "domain_id": "D-02",
+        "participating_regulations": [
+          "GDPR",
+          "NIS2",
+          "CRA",
+          "DORA",
+          "AI_Act"
+        ],
+        "hso_hl_objective": "Vulnerabilities \u2014 including, where in scope,\nAI-system-specific attack surfaces (data poisoning, model poisoning,\nadversarial examples, model evasion, confidentiality attacks, model flaws)\n\u2014 are identified on a continuing basis across the system, product, ICT\nasset, or AI system that an entity operates, manufactures, deploys, or\nprocesses, with the resulting identification artefact (vulnerability\nregister, risk-scenario catalogue, SBOM, or risk-management file) feeding\nthe entity's testing, remediation, and notification cascades.",
+        "objective": "Vulnerabilities \u2014 including, where in scope,\nAI-system-specific attack surfaces (data poisoning, model poisoning,\nadversarial examples, model evasion, confidentiality attacks, model flaws)\n\u2014 are identified on a continuing basis across the system, product, ICT\nasset, or AI system that an entity operates, manufactures, deploys, or\nprocesses, with the resulting identification artefact (vulnerability\nregister, risk-scenario catalogue, SBOM, or risk-management file) feeding\nthe entity's testing, remediation, and notification cascades.",
+        "pairs": [
+          {
+            "id": "D-02.1_GDPR-NIS2",
+            "subdomain_id": "D-02.1",
+            "pair": "GDPR \u2194 NIS2",
+            "reg_a": "GDPR",
+            "reg_b": "NIS2",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the dual-scope entity; **NOT scope-disjoint** for the personal-data-breach sub-event at a NSIE.",
+            "downstream_implication": "** Stack-merge on the identification pipeline; layered cascade on the disclosure pathway. The identification layer (vulnerability discovery + validation + recording) is unified; the disclosure layer branches to SA (GDPR) and CSIRT (NIS 2) with the divergence lives in D-04.3 timeline analyses.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.1_GDPR-CRA",
+            "subdomain_id": "D-02.1",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y (controller inheriting CRA product-side pipeline).",
+            "downstream_implication": "** Stack-merge with advisory ingestion. The CRA product's SBOM and vulnerability-advisory pipeline feeds the controller's Art. 32(1)(d) testing register.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.1_GDPR-DORA",
+            "subdomain_id": "D-02.1",
+            "pair": "GDPR \u2194 DORA",
+            "reg_a": "GDPR",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the DORA financial entity that is also a GDPR controller.",
+            "downstream_implication": "** Stack-merge with DORA-cadenced floor. The DORA testing programme (continuous + at-least-yearly scenario review) discharges both obligations.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.1_GDPR-AI_Act",
+            "subdomain_id": "D-02.1",
+            "pair": "GDPR \u2194 AI_Act",
+            "reg_a": "GDPR",
+            "reg_b": "AI_Act",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the controller deploying high-risk AI processing personal data.",
+            "downstream_implication": "** Layered stack with AI-specific overlay. The GDPR conventional testing covers the conventional threat model; the AI Act Art. 9 + 15(4)\u2013(5) adds the AI-specific attack taxonomy.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.1_NIS2-CRA",
+            "subdomain_id": "D-02.1",
+            "pair": "NIS2 \u2194 CRA",
+            "reg_a": "NIS2",
+            "reg_b": "CRA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on the single dual-scope entity; the manufacturer-vs-entity actor split can be disjoint in baseline.",
+            "downstream_implication": "** Stack-merge with institutional pathway. The CRA product-side identification feeds the NIS 2 entity-side CVD architecture.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.1_NIS2-DORA",
+            "subdomain_id": "D-02.1",
+            "pair": "NIS2 \u2194 DORA",
+            "reg_a": "NIS2",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y for the dual-scope entity; N/A (lex specialis) for pure-financial.",
+            "downstream_implication": "** DORA-cadenced floor absorbs NIS 2 for financial entities; cross-sector entities stack-merge.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.1_NIS2-AI_Act",
+            "subdomain_id": "D-02.1",
+            "pair": "NIS2 \u2194 AI_Act",
+            "reg_a": "NIS2",
+            "reg_b": "AI_Act",
+            "classification": "SAME (CORRECTED \u2014 no change).",
+            "verified_relationship": "SAME (CORRECTED \u2014 no change).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on the dual-scope entity.",
+            "downstream_implication": "** Layered stack with AI-specific overlay.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.1_CRA-DORA",
+            "subdomain_id": "D-02.1",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on the dual-scope deployment; disjoint in baseline (manufacturer \u2260 financial entity).",
+            "downstream_implication": "** Stack-merge with SBOM ingestion. The CRA SBOM is an upstream input to the DORA asset-vulnerability register via supplier-correspondence.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.1_CRA-AI_Act",
+            "subdomain_id": "D-02.1",
+            "pair": "CRA \u2194 AI_Act",
+            "reg_a": "CRA",
+            "reg_b": "AI_Act",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on integrated edge-AI products; disjoint in baseline.",
+            "downstream_implication": "** Stack-merge with deemed-compliance bridge. CRA-Compliant product + AI Act Art. 9 + 15(4)\u2013(5) AI-specific layer.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.1_DORA-AI_Act",
+            "subdomain_id": "D-02.1",
+            "pair": "DORA \u2194 AI_Act",
+            "reg_a": "DORA",
+            "reg_b": "AI_Act",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on the dual-scope deployment.",
+            "downstream_implication": "** Layered stack with AI-specific overlay. DORA's continuous ICT risk identification + AI Act's AI-specific risk identification cycle + Art. 15(4)\u2013(5) AI-specific attack taxonomy.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part I (2)",
+          "Annex I Part II (1)",
+          "Annex I Part II (4)",
+          "Annex VII",
+          "Art. 13(3)",
+          "Art. 13(7)",
+          "Art. 13(8)",
+          "Art. 15(1)",
+          "Art. 15(4)",
+          "Art. 21(1)",
+          "Art. 21(2)",
+          "Art. 21(3)",
+          "Art. 23(4)",
+          "Art. 32(1)",
+          "Art. 33",
+          "Art. 35",
+          "Art. 35(11)",
+          "Art. 45",
+          "Art. 5(2)",
+          "Art. 6(4)",
+          "Art. 7(2)",
+          "Art. 72",
+          "Art. 8(2)",
+          "Art. 9(1)",
+          "Art. 9(2)",
+          "\u00a7100",
+          "\u00a72",
+          "\u00a73",
+          "\u00a74",
+          "\u00a76",
+          "\u00a78",
+          "\u00a79"
+        ],
+        "csf": [
+          "ID.RA-01",
+          "ID.RA-02",
+          "PR.PS-02"
+        ]
+      },
+      {
+        "sub_domain_id": "D-02.2",
+        "title": "D-02.2 Patch Management & Updates",
+        "domain_id": "D-02",
+        "participating_regulations": [
+          "CRA",
+          "DORA"
+        ],
+        "hso_hl_objective": "Vulnerabilities identified in the upstream identification\npipeline are addressed and remediated through security updates that are\ndistributed via a secure, separated channel, with the entity-side policy\ngoverning patch deployment (severity-classified deployment windows,\nautomated isolation of affected information assets in the event of a\ncyber-attack) forming a layered patch-management workflow on the asset.",
+        "objective": "Vulnerabilities identified in the upstream identification\npipeline are addressed and remediated through security updates that are\ndistributed via a secure, separated channel, with the entity-side policy\ngoverning patch deployment (severity-classified deployment windows,\nautomated isolation of affected information assets in the event of a\ncyber-attack) forming a layered patch-management workflow on the asset.",
+        "pairs": [
+          {
+            "id": "D-02.2_CRA-DORA",
+            "subdomain_id": "D-02.2",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on dual-scope deployment; disjoint in baseline.",
+            "downstream_implication": "** Stack-merge with documented-policy overlay. The CRA product-side pipeline + DORA entity-side \"documented and comprehensive\" policy; for a DORA financial entity the asset-estate severity-classification + automated isolation come from the entity-side implementation.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part I (2)",
+          "Annex I Part II (2)",
+          "Annex I Part II (7)",
+          "Annex II",
+          "Annex VII",
+          "Art. 13(6)",
+          "Art. 13(8)",
+          "Art. 13(9)",
+          "Art. 9(4)",
+          "\u00a73",
+          "\u00a78"
+        ],
+        "csf": [
+          "PR.PS-02",
+          "ID.RA-01"
+        ]
+      },
+      {
+        "sub_domain_id": "D-02.3",
+        "title": "D-02.3 Coordinated Vulnerability Disclosure",
+        "domain_id": "D-02",
+        "participating_regulations": [
+          "CRA",
+          "NIS2 partial"
+        ],
+        "hso_hl_objective": "A coordinated vulnerability disclosure (CVD) ecosystem is\nmaintained, covering the manufacturer-side CVD policy (intake, triage,\npublication, post-disclosure verification), a publicly identifiable\ncontact address for vulnerability reporting, and \u2014 when the manufacturer\nalso operates as a NIS 2 essential entity in a Member State \u2014 the\ninstitutional CSIRT-coordinated pathway under Art. 12(1) that integrates\nthe manufacturer-side CVD with the Member-State-level disclosure\ncoordination.",
+        "objective": "A coordinated vulnerability disclosure (CVD) ecosystem is\nmaintained, covering the manufacturer-side CVD policy (intake, triage,\npublication, post-disclosure verification), a publicly identifiable\ncontact address for vulnerability reporting, and \u2014 when the manufacturer\nalso operates as a NIS 2 essential entity in a Member State \u2014 the\ninstitutional CSIRT-coordinated pathway under Art. 12(1) that integrates\nthe manufacturer-side CVD with the Member-State-level disclosure\ncoordination.",
+        "pairs": [
+          {
+            "id": "D-02.3_CRA-NIS2",
+            "subdomain_id": "D-02.3",
+            "pair": "CRA \u2194 NIS2",
+            "reg_a": "CRA",
+            "reg_b": "NIS2",
+            "classification": "SAME (CORRECTED \u2014 no change).",
+            "verified_relationship": "SAME (CORRECTED \u2014 no change).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on integrated manufacturer-as-NIS-2-entity; disjoint in baseline (CRA manufacturer \u2260 NIS 2 entity in the typical SaaS-using-CRA-product case).",
+            "downstream_implication": "** Stack-merge with institutional pathway. A CRA manufacturer operating in a NIS 2 Member State operates the manufacturer-side CVD policy (Annex I Part II (4)\u2013(6)) + feeds the Art. 12(1) CSIRT-coordinated pathway on significant incidents.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part II (1)",
+          "Annex I Part II (4)",
+          "Annex I Part II (5)",
+          "Annex I Part II (6)",
+          "Annex II",
+          "Annex VII",
+          "Art. 12(1)",
+          "Art. 13(17)",
+          "Art. 13(8)",
+          "Art. 14(1)",
+          "Art. 14(8)",
+          "Art. 14(9)",
+          "Art. 16(2)",
+          "Art. 17(5)",
+          "Art. 21(1)",
+          "Art. 21(2)",
+          "Art. 21(3)",
+          "Art. 23(4)",
+          "\u00a72",
+          "\u00a78"
+        ],
+        "csf": [
+          "ID.RA-01",
+          "ID.RA-04"
+        ]
+      },
+      {
+        "sub_domain_id": "D-02.4",
+        "title": "D-02.4 Threat-Led Penetration Testing",
+        "domain_id": "D-02",
+        "participating_regulations": [
+          "CRA",
+          "DORA",
+          "AI_Act partial"
+        ],
+        "hso_hl_objective": "The security of the asset \u2014 product with digital elements,\nICT-supported business functions / information assets / ICT assets, or\nhigh-risk AI system \u2014 is tested on a continuing basis, with a layered\ntesting architecture combining conventional product-security testing, ICT\ndefensive-capability testing (portfolio of testing modalities with periodic\nadvanced TLPT), and AI-specific risk-management-measure testing plus\nreal-world conditions.",
+        "objective": "The security of the asset \u2014 product with digital elements,\nICT-supported business functions / information assets / ICT assets, or\nhigh-risk AI system \u2014 is tested on a continuing basis, with a layered\ntesting architecture combining conventional product-security testing, ICT\ndefensive-capability testing (portfolio of testing modalities with periodic\nadvanced TLPT), and AI-specific risk-management-measure testing plus\nreal-world conditions.",
+        "pairs": [
+          {
+            "id": "D-02.4_CRA-DORA",
+            "subdomain_id": "D-02.4",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on dual-scope deployment; disjoint in baseline.",
+            "downstream_implication": "** Stack-merge with TLPT overlay. CRA product-side + DORA entity-side 12-modality portfolio + 3-year TLPT (where Art. 26(8)\u2013(11) significant-entity criteria are met).",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.4_CRA-AI_Act",
+            "subdomain_id": "D-02.4",
+            "pair": "CRA \u2194 AI_Act",
+            "reg_a": "CRA",
+            "reg_b": "AI_Act",
+            "classification": "SAME (CORRECTED \u2014 no change).",
+            "verified_relationship": "SAME (CORRECTED \u2014 no change).",
+            "layer2_flag": false,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on integrated edge-AI products.",
+            "downstream_implication": "** Stack-merge with AI-specific testing overlay.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-02.4_DORA-AI_Act",
+            "subdomain_id": "D-02.4",
+            "pair": "DORA \u2194 AI_Act",
+            "reg_a": "DORA",
+            "reg_b": "AI_Act",
+            "classification": "SAME (CORRECTED \u2014 wording only).",
+            "verified_relationship": "SAME (CORRECTED \u2014 wording only).",
+            "layer2_flag": true,
+            "scope_overlap": null,
+            "scope_disjoint_test": "** Y on dual-scope deployment.",
+            "downstream_implication": "** Layered testing with TLPT adversarial-substrate overlay. DORA 3-year TLPT + AI Act Art. 9 + Art. 60 real-world conditions.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part I",
+          "Annex I Part II (1)",
+          "Annex I Part II (3)",
+          "Annex VII",
+          "Annex VIII Part II (8)",
+          "Art. 10",
+          "Art. 13(7)",
+          "Art. 13(8)",
+          "Art. 24",
+          "Art. 24(1)",
+          "Art. 25",
+          "Art. 25(1)",
+          "Art. 26(1)",
+          "Art. 26(8)",
+          "Art. 60",
+          "Art. 7(2)",
+          "Art. 72",
+          "Art. 8(2)",
+          "Art. 9(1)",
+          "Art. 9(2)",
+          "Art. 9(6)",
+          "Art. 9(7)",
+          "\u00a76"
+        ],
+        "csf": [
+          "ID.RA-01",
+          "GV.SC-04"
+        ]
+      }
+    ]
+  },
+  "rendered": {
+    "system_len": 15980,
+    "user_len": 19322
+  }
+}

@@ -194,7 +194,7 @@ def test_extract_corr047_fields_dict_direct_keys() -> None:
 # ──────────────────────────────────────────────────────────────────
 
 
-def test_invoker_truncates_large_prompts(caplog) -> None:
+def test_invoker_truncates_large_prompts() -> None:
     """When prompt.system + prompt.user > 10KB, _attempt() truncates
     the user message head and logs a WARNING.
 
@@ -241,16 +241,17 @@ def test_invoker_truncates_large_prompts(caplog) -> None:
             llm_inst.invoke = fake_invoke
             mock_chat.return_value = llm_inst
 
-            with caplog.at_level(logging.WARNING):
-                invoker._attempt(
-                    spec_id="P1C-LLM-01-OVERLAP-CLASSIFICATION",
-                    inputs=huge_inputs,
-                    invocation_pattern=get_invocation_pattern(
-                        "P1C-LLM-01-OVERLAP-CLASSIFICATION"
-                    ),
-                    stage=get_stage("P1C-LLM-01-OVERLAP-CLASSIFICATION"),
-                    attempt=1,
-                )
+            # CORR-059: caplog fixture removed — has stash KeyError bug in
+            # pytest 8.x/9.x. This test doesn't assert on logs anyway.
+            invoker._attempt(
+                spec_id="P1C-LLM-01-OVERLAP-CLASSIFICATION",
+                inputs=huge_inputs,
+                invocation_pattern=get_invocation_pattern(
+                    "P1C-LLM-01-OVERLAP-CLASSIFICATION"
+                ),
+                stage=get_stage("P1C-LLM-01-OVERLAP-CLASSIFICATION"),
+                attempt=1,
+            )
 
     user_len = captured.get("user_len", 0)
     # CORR-049-T7.1: cap raised from 10KB (CORR-048) to 512KB. A

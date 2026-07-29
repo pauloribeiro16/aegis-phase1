@@ -30,8 +30,23 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from aegis_phase1.v2.output._common import generate_frontmatter, markdown_table, write_output
+from aegis_phase1.data.loader import classify_tier
+from aegis_phase1.v2.output._common import (
+    generate_frontmatter,
+    get_per_spec_markdown,
+    markdown_table,
+    render_per_spec_markdown_appendix,
+    write_output,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
+
+# CORR-061 S3b: this doc consumes P1C-LLM-03-STRATEGIC-SYNTHESIS for
+# the §5.1 Concentration Risk Narrative. Pre-S3b the section went
+# through the legacy narrative invoker (no canonical 5-spec source);
+# S3b switches it to read from
+# ``state["per_spec_markdown"]["P1C-LLM-03-STRATEGIC-SYNTHESIS"]``
+# with a fallback to the legacy path when the spec has not run.
+_SPEC_STRATEGIC = "P1C-LLM-03-STRATEGIC-SYNTHESIS"
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +143,8 @@ def _build_body(
     parts.extend(_section_version_history(state))
     parts.extend(_section_approval(state))
     parts.extend(_section_see_also(state))
+    # CORR-061 S3b: append the per-spec markdown appendix.
+    parts.extend(render_per_spec_markdown_appendix(state))
     return "\n".join(parts)
 
 
@@ -284,7 +301,7 @@ def _section_contractual_controls(state: dict[str, Any]) -> list[str]:
     parts.append(
         "**Common pattern:** Providers substitute third-party certifications "
         "(SOC 2 / ISO 27001) for direct audit access. This is industry-standard "
-        "for low-tier SaaS and requires annual freshness review.\n"
+        "for managed-cloud consumers and requires annual freshness review.\n"
     )
     return parts
 
@@ -330,20 +347,28 @@ def _section_risk_classification(
     parts.append("")
     parts.append(
         f"**Vendor count:** {len(cloud)} (deduplicated by provider+service). "
-        "No Critical+High combinations expected for a low-tier SaaS that "
-        "uses managed cloud services exclusively.\n"
+        "Critical+High combinations depend on the assessed tier; managed-cloud "
+        "providers dominate the LOW/MICRO tier profile.\n"
     )
 
-    # Optional narrative
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_risk_narrative_prompt(state, cloud, rows),
-        section_id="doc_04c.section_5.concentration_risk_narrative",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
+    # CORR-061 S3b: §5.1 Concentration Risk Narrative now reads
+    # P1C-LLM-03 raw markdown from ``state["per_spec_markdown"]``
+    # (the legacy narrative invoker is retained as a fallback so
+    # the deterministic-only / mock / pre-LLM path still renders
+    # a PENDING REVIEW marker via the narrative helper).
     parts.append("### 5.1 Concentration Risk Narrative\n")
-    parts.append(narrative.rstrip() + "\n")
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_risk_narrative_prompt(state, cloud, rows),
+            section_id="doc_04c.section_5.concentration_risk_narrative",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append(narrative.rstrip() + "\n")
     return parts
 
 
@@ -475,7 +500,9 @@ def _section_gate(state: dict[str, Any]) -> list[str]:
         )
     )
     parts.append("")
-    parts.append("**Gate Status:** PASS (proportionate for LOW-tier micro SaaS under P2).\n")
+    parts.append(
+        f"**Gate Status:** PASS (proportionate for {_tier_for_state(state)} tier under P2).\n"
+    )
     return parts
 
 
@@ -591,12 +618,19 @@ def _next_review_date() -> str:
 
 
 def _active_subdomain_count(state: dict[str, Any]) -> int:
+    """Number of active sub-domains.
+
+    CORR-072: prefer the ontology ``subdomains.covered`` list, but fall
+    back to ``state['subdomains']`` when the ontology is empty/absent.
+    Mirrors the fix in doc_04b and doc_04d so the three docs agree.
+    """
     ont = state.get("ontology") or {}
     subdomains = ont.get("subdomains") if isinstance(ont, Mapping) else None
-    if not isinstance(subdomains, Mapping):
-        return 0
-    covered = subdomains.get("covered") or []
-    return len(covered) if isinstance(covered, list) else 0
+    if isinstance(subdomains, Mapping):
+        covered = subdomains.get("covered") or []
+        if isinstance(covered, list) and covered:
+            return len(covered)
+    return len(state.get("subdomains") or {})
 
 
 def _total_subdomain_count(state: dict[str, Any]) -> int:
@@ -682,6 +716,19 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, Mapping):
         return obj.get(name, default)
     return default
+
+
+def _tier_for_state(state: dict[str, Any]) -> str:
+    """Resolve company tier from state via :func:`classify_tier`."""
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default="")
+    sector = _attr(ctx, "sector", default="")
+    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    return classify_tier(employees_int, sector, list(applicable))
 
 
 __all__ = ["render_doc_04c"]

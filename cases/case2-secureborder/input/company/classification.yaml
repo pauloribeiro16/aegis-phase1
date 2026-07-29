@@ -1,0 +1,43 @@
+# AEGIS Phase 1 — Company Classification (Case 02 — SecureBorder Solutions)
+# Sourced from Methodology-main/02_CASES/Case_02_SecureBorder_Solutions/00_COMMON/01_Company_Context.md
+# (PROJECT_STATE.md, Layer 0 + Layer 1 + Layer 2)
+company:
+  name: SecureBorder Solutions B.V.
+  legal_structure: Private Limited Company (B.V.)
+  sector: Defense, Security & Critical Infrastructure
+  jurisdiction: Netherlands (EU)
+  employees: 450
+  revenue_eur: 120000000
+  scale: LARGE
+  security_fte: 25.0
+  criticality_level: critical
+tech_stack:
+  - Edge AI (kiosk)
+  - AWS
+  - PostgreSQL
+  - Custom biometric matching
+applicable_regulations:
+  - id: REG-GDPR
+    abbreviation: GDPR
+    applicable: true
+    obligated_party: controller
+    reason: processes_personal_data = true (biometric templates, passport data, audit logs)
+  - id: REG-CRA
+    abbreviation: CRA
+    applicable: true
+    obligated_party: manufacturer
+    reason: places_digital_products_eu = true (eGate kiosks, Critical class hardware+software)
+  - id: REG-NIS2
+    abbreviation: NIS2
+    applicable: true
+    obligated_party: essential_entity_supplier
+    reason: security_sector = true + employees >= 50
+  - id: REG-DORA
+    abbreviation: DORA
+    applicable: false
+    reason: not_financial_entity (border control systems, not financial services)
+  - id: REG-AI_Act
+    abbreviation: AI_Act
+    applicable: true
+    obligated_party: deployer
+    reason: high_risk_ai_annex_iii = true (border control AI, biometric verification)

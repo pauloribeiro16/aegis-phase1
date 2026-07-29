@@ -29,10 +29,30 @@ import os
 import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
-from aegis_phase1.v2.output._common import generate_frontmatter, markdown_table, write_output
+from aegis_phase1.data.loader import (
+    classify_tier,
+    load_role_model,
+    load_tier_template,
+)
+from aegis_phase1.v2.output._common import (
+    generate_frontmatter,
+    get_per_spec_markdown,
+    markdown_table,
+    render_per_spec_markdown_appendix,
+    write_output,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
+
+# CORR-061 S3b: this doc consumes P1C-LLM-03-STRATEGIC-SYNTHESIS for
+# the §5 Reporting Lines and §9 Escalation Paths narratives. Pre-S3b
+# both sections went through the legacy narrative invoker; S3b
+# switches them to read from
+# ``state["per_spec_markdown"]["P1C-LLM-03-STRATEGIC-SYNTHESIS"]``
+# with a fallback to the legacy path.
+_SPEC_STRATEGIC = "P1C-LLM-03-STRATEGIC-SYNTHESIS"
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +217,8 @@ def _build_body(
     parts.extend(_section_version_history(state))
     parts.extend(_section_approval(state))
     parts.extend(_section_see_also(state))
+    # CORR-061 S3b: append the per-spec markdown appendix.
+    parts.extend(render_per_spec_markdown_appendix(state))
     return "\n".join(parts)
 
 
@@ -235,15 +257,49 @@ def _section_purpose_scope(state: dict[str, Any]) -> list[str]:
             "requirement.\n"
         )
     employees = _attr(ctx, "employees", default="")
+    scale = str(_attr(ctx, "scale", default="MICRO")).upper()
+    # CORR-073: proportionality note is now scale-aware. Pre-CORR-073
+    # the note always said "many hats fall on the CEO/CTO/lead developer"
+    # regardless of company size, which was wrong for case 3 (5,000
+    # employees with a dedicated CISO office + DPO + CRO + COO).
+    try:
+        emp_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        emp_int = 0
+    if emp_int >= 1000 or scale in {"LARGE", "MAX"}:
+        proportionality_note = (
+            f"{name} has {emp_int or 'a large'} employee headcount and "
+            f"operates a dedicated organisational structure with separate "
+            f"**CISO office**, **DPO (Datenschutzbeauftragter)**, "
+            f"**Chief Risk Officer (CRO)**, **Head of AI/ML**, "
+            f"**Head of Compliance**, and **Internal Audit** function. "
+            f"Formal role separation is feasible and expected under "
+            f"GDPR Art. 37-39, DORA Art. 5-6, and BaFin ZAIT 5.6. RACI "
+            f"assignments concentrate **A** (Accountable) on the role "
+            f"with primary regulatory ownership per macro-domain.\n"
+        )
+    elif emp_int >= 50 or scale == "MEDIUM":
+        proportionality_note = (
+            f"{name} has {emp_int} employee headcount. Role separation "
+            f"is partially formal — at minimum separate **DPO**, **CISO / "
+            f"Security Lead**, and **Operations** are required; engineering "
+            f"may be combined. RACI assignments distribute **A** (Accountable) "
+            f"across the leadership team, with **R** (Responsible) assigned "
+            f"to the function with the right domain expertise.\n"
+        )
+    else:
+        proportionality_note = (
+            f"{name} has {emp_int or 'a small'} employee headcount. Formal "
+            f"role separation characteristic of larger firms (separate DPO, "
+            f"CISO, IT Manager, Legal, HR, IR Lead) is not feasible — many "
+            f"hats fall on the CEO/CTO/lead developer. RACI assignments "
+            f"concentrate **A** (Accountable) on the CEO or CTO, with one "
+            f"**R** (Responsible) per activity and the rest as **C** "
+            f"(Consulted) or **I** (Informed).\n"
+        )
     parts.append(
         "**Proportionality note (P2 — Company Reality First):** "
-        f"{name} has {employees or 'a small'} employee headcount. Formal "
-        "role separation characteristic of larger firms (separate DPO, "
-        "CISO, IT Manager, Legal, HR, IR Lead) is not feasible — many "
-        "hats fall on the CEO/CTO/lead developer. RACI assignments "
-        "concentrate **A** (Accountable) on the CEO or CTO, with one "
-        "**R** (Responsible) per activity and the rest as **C** "
-        "(Consulted) or **I** (Informed).\n"
+        + proportionality_note
     )
     return parts
 
@@ -258,13 +314,56 @@ def _section_company_level(state: dict[str, Any]) -> list[str]:
         "(Key Roles) and §5 (RACI Matrix).\n"
     )
     headers = ["Role", "Default Owner", "Regulations"]
-    rows = [
-        ("Compliance Lead", "Chief Compliance Officer / DPO (CEO)", "GDPR — controller + processor"),
-        ("Engineering Lead", "CTO / Head of Engineering", "CRA — secure development / vulnerability"),
-        ("Operations Lead", "COO / Head of Operations", "NIS 2, DORA (when applicable)"),
-        ("DPO (voluntary)", "CEO (voluntary designation per Art. 37)", "GDPR Art. 37-39"),
-        ("CISO / Security Lead", "CTO (CRA Annex I Part II (8)(f))", "CRA Annex I, NIS 2, DORA"),
-    ]
+    # CORR-073: Default Owner column is scale-aware. Pre-CORR-073 each
+    # row hardcoded "CEO" / "CTO" / "COO" — appropriate for a 5-person
+    # micro-SaaS but wrong for a 5,000-employee bank (where CISO, DPO,
+    # CRO, Head of AI/ML, Head of Compliance are distinct appointments
+    # with BaFin-supervised accountability).
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default=0)
+    scale = str(_attr(ctx, "scale", default="MICRO")).upper()
+    try:
+        emp_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        emp_int = 0
+    if emp_int >= 1000 or scale in {"LARGE", "MAX"}:
+        rows = [
+            ("Compliance Lead", "Head of Compliance + DPO (BaFin-registered)",
+             "GDPR (Art. 37-39), DORA Art. 5-6, BaFin compliance reporting"),
+            ("Engineering Lead", "CTO / Head of Engineering + CISO office",
+             "CRA — secure development / vulnerability / Annex VII"),
+            ("Operations Lead", "COO + Head of Operations",
+             "NIS 2 Art. 21, DORA Art. 8-12 (ICT resilience + 24/7 SOC)"),
+            ("DPO (mandatory)", "Dedicated DPO (Datenschutzbeauftragter)",
+             "GDPR Art. 37-39 (mandatory for credit institutions per BaFin guidance)"),
+            ("CISO / Security Lead", "Dedicated CISO + CISO office (12 FTE)",
+             "CRA Annex I, NIS 2 Art. 21, DORA Art. 5-6"),
+            ("Chief Risk Officer", "CRO (operational resilience + DORA ICT risk)",
+             "DORA Art. 6 (ICT risk framework) + Art. 28 (third-party risk)"),
+            ("Head of AI/ML", "Head of AI/ML (credit-scoring AI governance)",
+             "AI Act Annex III §5(b) — Art. 26 deployer + Art. 27 FRIA"),
+        ]
+    elif emp_int >= 50 or scale == "MEDIUM":
+        rows = [
+            ("Compliance Lead", "Chief Compliance Officer / DPO",
+             "GDPR — controller + processor"),
+            ("Engineering Lead", "CTO / Head of Engineering",
+             "CRA — secure development / vulnerability"),
+            ("Operations Lead", "COO / Head of Operations",
+             "NIS 2, DORA (when applicable)"),
+            ("DPO", "Dedicated DPO (or shared DPO service for SMEs)",
+             "GDPR Art. 37-39 (mandatory where core activity = monitoring)"),
+            ("CISO / Security Lead", "Dedicated CISO / Security Lead",
+             "CRA Annex I, NIS 2, DORA"),
+        ]
+    else:
+        rows = [
+            ("Compliance Lead", "Chief Compliance Officer / DPO (CEO)", "GDPR — controller + processor"),
+            ("Engineering Lead", "CTO / Head of Engineering", "CRA — secure development / vulnerability"),
+            ("Operations Lead", "COO / Head of Operations", "NIS 2, DORA (when applicable)"),
+            ("DPO (voluntary)", "CEO (voluntary designation per Art. 37)", "GDPR Art. 37-39"),
+            ("CISO / Security Lead", "CTO (CRA Annex I Part II (8)(f))", "CRA Annex I, NIS 2, DORA"),
+        ]
     parts.append(markdown_table(headers, rows))
     parts.append("")
     return parts
@@ -292,12 +391,30 @@ def _section_regulation_level(state: dict[str, Any]) -> list[str]:
             owner = _regulation_owner(abbrev, reg)
         rows.append((abbrev, applicable, owner))
     if not rows:
+        # CORR-072: source applicable_regs from applicability_context
+        # (CORR-038 source-of-truth) instead of using the stale
+        # TinyTask fallback that hardcoded NIS2/DORA/AI Act as NO.
+        try:
+            from aegis_phase1.v2.context.applicability_context import (
+                build_applicability_context,
+            )
+            app_ctx = build_applicability_context(state)
+            applicable_set = set(app_ctx.applicable_regs)
+        except Exception:
+            applicable_set = set(
+                _attr(state.get("company_context"), "applicable_regs", default=[]) or []
+            )
         rows = [
-            ("GDPR", "YES", "Compliance Lead (CEO/DPO)"),
-            ("CRA", "YES", "Engineering Lead (CTO/CISO)"),
-            ("NIS2", "NO", "n/a (not applicable)"),
-            ("DORA", "NO", "n/a (not applicable)"),
-            ("AI Act", "NO", "n/a (not applicable)"),
+            ("GDPR", "YES" if "GDPR" in applicable_set else "NO",
+             "Compliance Lead (CEO/DPO)" if "GDPR" in applicable_set else "n/a (not applicable)"),
+            ("CRA", "YES" if "CRA" in applicable_set else "NO",
+             "Engineering Lead (CTO/CISO)" if "CRA" in applicable_set else "n/a (not applicable)"),
+            ("NIS2", "YES" if "NIS2" in applicable_set else "NO",
+             "Operations Lead (COO)" if "NIS2" in applicable_set else "n/a (not applicable)"),
+            ("DORA", "YES" if "DORA" in applicable_set else "NO",
+             "Operations Lead (COO/CRO)" if "DORA" in applicable_set else "n/a (not applicable)"),
+            ("AI Act", "YES" if "AI_Act" in applicable_set else "NO",
+             "Head of AI/ML + DPO" if "AI_Act" in applicable_set else "n/a (not applicable)"),
         ]
     parts.append(markdown_table(headers, rows))
     parts.append("")
@@ -307,66 +424,65 @@ def _section_regulation_level(state: dict[str, Any]) -> list[str]:
 def _section_key_roles(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 4. Key Roles\n")
-    parts.append(
-        "Functional roles are listed below. In a low-tier organisation "
-        "many hats fall on a single individual; backup assignments are "
-        "documented for incident-trigger continuity.\n"
-    )
     headers = ["Role", "Person / Team", "Reports To", "FTE Allocation", "Backup"]
+    # CORR-073: key-roles table is scale-aware. Pre-CORR-073 every case
+    # rendered the 7-row TinyTask fallback (CEO+Founder, CTO+Founder,
+    # 5 developers, etc.), producing "CEO as DPO" / "CTO as CISO" /
+    # "2 founders" output for a 5,000-employee bank — strictly wrong.
+    # Sprint 2: roles are now sourced from data/role_models/{tier}.yaml
+    # via load_role_model(tier), keyed off classify_tier(). The lead-in
+    # narrative remains per-tier but the rows are no longer hardcoded.
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default=0)
+    sector = _attr(ctx, "sector", default="")
+    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    try:
+        emp_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        emp_int = 0
+    tier = classify_tier(emp_int, sector, list(applicable))
+    if tier in {"LARGE", "MAX"}:
+        parts.append(
+            "Functional roles below reflect a **banking-grade organisational "
+            "structure**: dedicated CISO office, DPO, CRO, COO, Head of AI/ML, "
+            "and Head of Compliance, with separation of duties required under "
+            "BaFin ZAIT 5.6, MaRisk AT 4.5, and DORA Art. 5-6. Backup "
+            "assignments are documented for incident-trigger continuity.\n"
+        )
+    elif tier == "MEDIUM":
+        parts.append(
+            "Functional roles below reflect a **medium-sized organisation**: "
+            "named CISO + DPO + COO, with backup assignments for incident "
+            "continuity. Engineering team combines developers under the CTO.\n"
+        )
+    else:
+        tier_narrative = load_tier_template(tier).get("role_separation", {})
+        if tier_narrative:
+            parts.append(
+                "Functional roles are listed below. "
+                f"{tier_narrative}. Backup assignments are documented for "
+                "incident-trigger continuity.\n"
+            )
+        else:
+            parts.append(
+                "Functional roles are listed below. In a proportional organisation "
+                "many hats fall on a single individual; backup assignments are "
+                "documented for incident-trigger continuity.\n"
+            )
     rows = [
         (
-            "CEO (also DPO)",
-            "Founder #1",
-            "Board (2 founders)",
-            "0.2 DPO + 0.8 CEO (combined 1.0)",
-            "CTO (acting DPO)",
-        ),
-        (
-            "CTO (also CISO)",
-            "Founder #2",
-            "Board (2 founders)",
-            "0.3 CISO + 0.7 CTO (combined 1.0)",
-            "CEO (acting CISO)",
-        ),
-        (
-            "Lead Developer",
-            "Senior engineer — most-tenured non-founder",
-            "CTO",
-            "1.0 (full developer; ~0.1 on security tasks via CI/CD and patching)",
-            "CTO for code-related security tasks",
-        ),
-        (
-            "Developers × 5",
-            "5 full-stack developers",
-            "CTO",
-            "5 × 1.0 across product development, secure coding, CI/CD maintenance, on-call rotation",
-            "Peer developers",
-        ),
-        (
-            "External Legal Adviser",
-            "External law firm (retainer)",
-            "CEO",
-            "0 (retainer; ad-hoc consultation)",
-            "None — single retainer",
-        ),
-        (
-            "Management Board",
-            "2 founders (CEO + CTO)",
-            "—",
-            "—",
-            "n/a — board is the board",
-        ),
-        (
-            "IR Lead",
-            "CTO in CISO capacity",
-            "n/a (rotational developer on-call)",
-            "Same as CTO/CISO; on-call rotation across developers",
-            "CEO",
-        ),
+            r.get("role", "-"),
+            r.get("person", "-"),
+            r.get("reports_to", "-"),
+            r.get("fte", "-"),
+            r.get("backup", "-"),
+        )
+        for r in load_role_model(tier)
     ]
     parts.append(markdown_table(headers, rows))
     parts.append("")
     return parts
+
 
 
 def _section_reporting_lines(
@@ -375,57 +491,81 @@ def _section_reporting_lines(
     *,
     config: dict[str, Any] | None = None,
 ) -> list[str]:
-    parts: list[str] = []
-    parts.append("## 5. Reporting Lines\n")
-    parts.append(
-        "The following ASCII tree and narrative describe the reporting "
-        "structure.\n"
-    )
-    parts.append("```\n")
-    parts.append(
-        "                            ┌─────────────────────────────┐\n"
-        "                            │       Management Board       │\n"
-        "                            │   (2 founders — CEO + CTO)    │\n"
-        "                            └──────────────┬────────────────┘\n"
-        "                                           │\n"
-        "               ┌───────────────────────────┼────────────────────────┐\n"
-        "               │                                                         │\n"
-        "        ┌──────▼─────────┐                                       ┌──────▼─────────┐\n"
-        "        │      CEO       │                                       │      CTO       │\n"
-        "        │ 0.2 FTE DPO    │                                       │ 0.3 FTE CISO   │\n"
-        "        │ + founder ops  │                                       │ + founder tech │\n"
-        "        └──┬─────────────┘                                       └──┬─────────────┘\n"
-        "           │                       ┌─────────────────┐              │\n"
-        "           │                       │ External Legal  │              │\n"
-        "           │                       │   (DPO Support) │              │\n"
-        "           │                       └─────────────────┘              │\n"
-        "           │                                                        │\n"
-        "           └────────────────────┬───────────────────────────────────┘\n"
-        "                                │\n"
-        "                   ┌────────────▼────────────┐\n"
-        "                   │     Lead Developer       │\n"
-        "                   │    (senior engineer)     │\n"
-        "                   └────────────┬─────────────┘\n"
-        "                                │\n"
-        "             ┌──────────────────┴──────────────────┐\n"
-        "             │                                      │\n"
-        "    ┌────────▼────────┐                  ┌─────────▼───────┐\n"
-        "    │ Developers × 5  │                  │  (Developers on │\n"
-        "    │  (full-time)    │                  │   security rota)│\n"
-        "    └────────────────┘                  └────────────────┘\n"
-    )
-    parts.append("```\n")
+    """§5 Reporting Lines — tier-aware (CORR-073 Sprint 2).
 
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_reporting_lines_prompt(state),
-        section_id="doc_04d.section_5.reporting_lines",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
-    parts.append("**Plain-text description:**\n")
-    parts.append(narrative.rstrip() + "\n")
+    The ASCII tree and Tier-appropriate narrative are loaded from
+    ``data/templates/doc_04d/{tier}.md`` (the section between
+    ``## 5. Reporting Lines`` and the next ``## 7`` heading). Falls back
+    to a stub when the template file is missing for the resolved tier.
+
+    The optional narrative block after the template keeps the
+    P1C-LLM-03 strategic-synthesis call (S3b) with a fallback to the
+    legacy narrative invoker when no LLM is configured.
+    """
+    parts: list[str] = []
+    tier = _tier_for_state(state)
+    template_md = _read_doc_04d_template(tier, "## 5. Reporting Lines", "## 7")
+    parts.append("## 5. Reporting Lines\n")
+    if template_md:
+        parts.append(template_md)
+        parts.append("")
+    else:
+        parts.append(f"_(Template for tier {tier} not yet authored; see data/templates/doc_04d/.)_\n")
+
+    # CORR-061 S3b: §5 Reporting Lines narrative now reads
+    # P1C-LLM-03 raw markdown from ``state["per_spec_markdown"]``
+    # with a fallback to the legacy narrative invoker. The
+    # markdown is shared with the §9 Escalation Paths narrative
+    # — both sections consume the same spec output. The narrative
+    # invoker fallback renders a PENDING REVIEW marker when no
+    # LLM is configured so reviewers can identify the gap.
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append("**Plain-text description (P1C-LLM-03):**\n")
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_reporting_lines_prompt(state),
+            section_id="doc_04d.section_5.reporting_lines",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append("**Plain-text description:**\n")
+        parts.append(narrative.rstrip() + "\n")
     return parts
+
+
+def _read_doc_04d_template(tier: str, start_marker: str, end_marker: str) -> str:
+    """Return the slice of ``data/templates/doc_04d/{tier}.md`` between markers.
+
+    The leading start-marker line is stripped from the returned slice
+    so the caller can use its own header (avoids duplicate ``## 5``
+    lines). Returns an empty string when the template file is absent
+    or the markers are not found. Callers degrade gracefully.
+
+    Path resolution: ``doc_04d.py`` lives at
+    ``src/aegis_phase1/v2/output/``, so walking up 5 levels reaches
+    the repo root where ``data/templates/`` lives.
+    """
+    template_path = (
+        Path(__file__).resolve().parent.parent.parent.parent.parent
+        / "data"
+        / "templates"
+        / "doc_04d"
+        / f"{tier}.md"
+    )
+    if not template_path.exists():
+        return ""
+    text = template_path.read_text()
+    start = text.find(start_marker)
+    if start < 0:
+        return ""
+    end = text.find(end_marker, start + len(start_marker))
+    if end < 0:
+        end = len(text)
+    slice_md = text[start + len(start_marker):end].rstrip() + "\n"
+    return slice_md
 
 
 def _section_raci_matrix(state: dict[str, Any]) -> list[str]:
@@ -436,6 +576,8 @@ def _section_raci_matrix(state: dict[str, Any]) -> list[str]:
         "sign-off; one A per row), **C** = Consulted, **I** = Informed, "
         "**—** = Not involved.\n"
     )
+    tier = _tier_for_state(state)
+    board_label = _board_label_for_tier(tier)
     parts.append(
         "**Column abbreviations** (people are listed once each; in a "
         "small team, multiple hats are worn):\n"
@@ -444,7 +586,7 @@ def _section_raci_matrix(state: dict[str, Any]) -> list[str]:
         "- **Dev** = Lead Developer + developer team\n"
         "- **Legal** = External Legal Adviser (retainer)\n"
         "- **HR** = CEO in HR-coordination role\n"
-        "- **Board** = 2 founders (CEO + CTO)\n"
+        f"- **Board** = {board_label}\n"
     )
 
     inactive = _inactive_subdomain_ids(state)
@@ -473,6 +615,8 @@ def _section_training_status(state: dict[str, Any]) -> list[str]:
     parts.append("## 7. Training Status\n")
     inactive = _inactive_subdomain_ids(state)
     d08_3_status = "INACTIVE — placeholder row only" if "D-08.3" in inactive else "ACTIVE"
+    tier = _tier_for_state(state)
+    board_label = _board_label_for_tier(tier)
     headers = ["Role", "Training Required", "Last Completed", "Next Refresh", "Source (D-08.x)"]
     rows = [
         (
@@ -514,7 +658,7 @@ def _section_training_status(state: dict[str, Any]) -> list[str]:
             "D-08.2 (informal)",
         ),
         (
-            "Management Board (2 founders)",
+            board_label,
             f"D-08.3 — {d08_3_status}",
             "NOT STARTED" if "D-08.3" not in inactive else "n/a (D-08.3 INACTIVE)",
             "n/a" if "D-08.3" in inactive else "2026-12-31 (target)",
@@ -587,16 +731,28 @@ def _section_escalation_paths(
     *,
     config: dict[str, Any] | None = None,
 ) -> list[str]:
+    """§9 Escalation Paths — CORR-061 S3b: consumes P1C-LLM-03 markdown.
+
+    The same raw markdown as §5 is used here (both sections draw on
+    the strategic synthesis). If P1C-LLM-03 has not been captured,
+    the legacy narrative invoker is used as a fallback (it returns
+    PENDING REVIEW when no LLM is configured).
+    """
     parts: list[str] = []
     parts.append("## 9. Escalation Paths\n")
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_escalation_prompt(state),
-        section_id="doc_04d.section_9.escalation_paths",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
-    parts.append(narrative.rstrip() + "\n")
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append("*(P1C-LLM-03 STRATEGIC-SYNTHESIS — same source as §5 Reporting Lines)*\n\n")
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_escalation_prompt(state),
+            section_id="doc_04d.section_9.escalation_paths",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append(narrative.rstrip() + "\n")
     return parts
 
 
@@ -665,7 +821,9 @@ def _section_gate(state: dict[str, Any]) -> list[str]:
         )
     )
     parts.append("")
-    parts.append("**Gate Status:** PASS (proportionate for LOW-tier micro SaaS under P2).\n")
+    parts.append(
+        f"**Gate Status:** PASS (proportionate for {_tier_for_state(state)} tier under P2).\n"
+    )
     return parts
 
 
@@ -803,13 +961,15 @@ def _reporting_lines_prompt(state: dict[str, Any]) -> str:
     ctx = state.get("company_context")
     name = _attr(ctx, "company_name", default="the company")
     employees = _attr(ctx, "employees", default="")
+    tier = _tier_for_state(state)
+    board_label = _board_label_for_tier(tier)
+    emphasis = ", ".join(load_tier_template(tier).get("clause_emphasis", []))
     return (
         f"Produce a 4-5 sentence plain-text description of the reporting "
-        f"lines at {name} (with {employees or 'a small'} employees). "
-        "Cover: Management Board (2 founders); CEO holding the DPO hat; "
-        "CTO holding the CISO hat; Lead Developer under CTO; Developers "
-        "rotating on-call; External Legal Adviser reporting to CEO; "
-        "absence of separate HR / IT Manager functions. Avoid bullet lists."
+        f"lines at {name} (with {employees or 'a small'} employees), "
+        f"tier={tier}. Cover: {board_label}; emphasis on clauses "
+        f"({emphasis}). Roles per data/role_models/{tier}.yaml. "
+        "Avoid bullet lists."
     )
 
 
@@ -841,7 +1001,17 @@ def _should_use_llm(llm_invoker: Any | None) -> bool:
 
 def _build_frontmatter(state: dict[str, Any]) -> str:
     ctx = state.get("company_context")
-    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    # CORR-072: prefer the canonical applicability context (CORR-038
+    # source-of-truth) over the legacy company_context.applicable_regs
+    # which can be stale in case 3 (OmniBank) and similar complex cases.
+    try:
+        from aegis_phase1.v2.context.applicability_context import (
+            build_applicability_context,
+        )
+        app_ctx = build_applicability_context(state)
+        applicable = list(app_ctx.applicable_regs)
+    except Exception:
+        applicable = _attr(ctx, "applicable_regs", default=[]) or []
     inactive = _inactive_subdomain_ids(state)
     active = _active_subdomain_count(state)
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -881,12 +1051,20 @@ def _build_frontmatter(state: dict[str, Any]) -> str:
 
 
 def _active_subdomain_count(state: dict[str, Any]) -> int:
+    """Number of active sub-domains.
+
+    CORR-072: prefer the ontology ``subdomains.covered`` list (canonical
+    source-of-truth), but fall back to ``state['subdomains']`` when the
+    ontology is empty or absent. Same fallback logic as Doc 04b's
+    ``_active_count``.
+    """
     ont = state.get("ontology") or {}
     subdomains = ont.get("subdomains") if isinstance(ont, Mapping) else None
-    if not isinstance(subdomains, Mapping):
-        return 0
-    covered = subdomains.get("covered") or []
-    return len(covered) if isinstance(covered, list) else 0
+    if isinstance(subdomains, Mapping):
+        covered = subdomains.get("covered") or []
+        if isinstance(covered, list) and covered:
+            return len(covered)
+    return len(state.get("subdomains") or {})
 
 
 def _attr(obj: Any, name: str, default: Any = None) -> Any:
@@ -897,6 +1075,30 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
     if isinstance(obj, Mapping):
         return obj.get(name, default)
     return default
+
+
+def _tier_for_state(state: dict[str, Any]) -> str:
+    """Resolve company tier from state via :func:`classify_tier`."""
+    ctx = state.get("company_context")
+    employees = _attr(ctx, "employees", default="")
+    sector = _attr(ctx, "sector", default="")
+    applicable = _attr(ctx, "applicable_regs", default=[]) or []
+    try:
+        employees_int = int(employees) if employees not in (None, "", "-") else 0
+    except (TypeError, ValueError):
+        employees_int = 0
+    return classify_tier(employees_int, sector, list(applicable))
+
+
+def _board_label_for_tier(tier: str) -> str:
+    """Return a tier-appropriate board/governance body label."""
+    if tier == "MICRO":
+        return "Board (2 founders)"
+    if tier == "SMALL":
+        return "Board (3-5 founders)"
+    if tier == "MEDIUM":
+        return "Board + Audit Committee"
+    return "Board + Audit Committee + Risk Committee"
 
 
 __all__ = ["render_doc_04d"]

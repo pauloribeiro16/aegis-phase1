@@ -1,0 +1,39 @@
+tier: SMALL
+roles:
+  - role: CEO
+    person: Founder #1
+    reports_to: Board
+    fte: "1.0"
+    backup: VP Operations
+    regulations: [GDPR, AI_Act]
+    notes: Executive sponsor
+  - role: CTO + Acting CISO
+    person: Founder #2
+    reports_to: CEO
+    fte: "1.0"
+    backup: External security advisor
+    regulations: [CRA, NIS2, DORA]
+    notes: Combined role; security champion
+  - role: DPO (external advisor)
+    person: External DPO
+    reports_to: CEO
+    fte: "0.2"
+    backup: External DPO firm
+    regulations: [GDPR]
+    notes: Art. 37(4) voluntary designation
+  - role: Engineering Lead
+    person: Senior Engineer
+    reports_to: CTO
+    fte: "1.0"
+    backup: CTO
+    regulations: [CRA]
+    notes: Secure development
+  - role: Operations
+    person: Operations Lead
+    reports_to: CEO
+    fte: "1.0"
+    backup: CEO
+    regulations: [NIS2]
+    notes: Operational compliance
+contact_patterns:
+  placeholder: "{role}@{company_slug}.example"

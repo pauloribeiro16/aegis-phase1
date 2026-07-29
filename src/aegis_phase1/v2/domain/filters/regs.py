@@ -60,11 +60,26 @@ def filter_regs(state: V2State, domain_id: str) -> list[str]:
     """
     ontology = state.get("ontology") or {}
     domain_regs = _domain_source_regs(ontology, domain_id)
+    # CORR-067 S4: also pull from state["subdomains"] when the ontology
+    # shim is empty (see _build_ontology_shim — it doesn't populate
+    # subdomains.covered today). state["subdomains"] is a dict[id, Subdomain]
+    # populated by the preproc_catalog loader. We synthesise the
+    # covered list on the fly.
+    if not domain_regs:
+        domain_regs = _domain_source_regs_from_state_subdomains(state, domain_id)
 
     ctx = state.get("company_context")
     applicable_regs: list[str] = []
     if ctx is not None:
-        applicable_regs = list(getattr(ctx, "applicable_regs", []) or [])
+        # CORR-067 S4: ctx can be a dict (from Pydantic .model_dump())
+        # OR an object (legacy Pydantic state). Handle both — getattr
+        # on a dict misses dict keys, so the previous code always saw
+        # an empty list when ctx was a dict, which collapsed the
+        # intersection to []. Use isinstance guard.
+        if isinstance(ctx, dict):
+            applicable_regs = list(ctx.get("applicable_regs", []) or [])
+        else:
+            applicable_regs = list(getattr(ctx, "applicable_regs", []) or [])
 
     if not domain_regs and applicable_regs:
         # Fallback: ontology lacks source_regulations — use company applicability.
@@ -115,6 +130,49 @@ def _domain_source_regs(ontology: dict, domain_id: str) -> list[str]:
             if r:
                 regs.append(str(r))
 
+    return regs
+
+
+def _domain_source_regs_from_state_subdomains(state: V2State, domain_id: str) -> list[str]:
+    """CORR-067 S4: fallback when the ontology shim lacks subdomains.
+
+    state['subdomains'] is a dict[subdomain_id, Subdomain] populated
+    by the preproc_catalog loader. We extract source_regulations
+    from each subdomain in the requested domain and return the
+    deduped list.
+
+    Subdomain objects (Pydantic) have an ``applies_to`` or
+    ``source_regulations`` attribute depending on the loader version;
+    we try both.
+    """
+    subdomains = state.get("subdomains") or {}
+    if not isinstance(subdomains, dict):
+        return []
+
+    prefix = domain_id + "."
+    regs: list[str] = []
+    for sid, sub in subdomains.items():
+        if not isinstance(sid, str) or not sid.startswith(prefix):
+            continue
+        # Pydantic Subdomain object
+        if hasattr(sub, "participating_regulations"):
+            sr = sub.participating_regulations or []
+        elif hasattr(sub, "source_regulations"):
+            sr = sub.source_regulations or []
+        elif hasattr(sub, "applies_to"):
+            sr = sub.applies_to or []
+        elif isinstance(sub, dict):
+            sr = (
+                sub.get("participating_regulations")
+                or sub.get("source_regulations")
+                or sub.get("applies_to")
+                or []
+            )
+        else:
+            sr = []
+        for r in sr:
+            if r:
+                regs.append(str(r))
     return regs
 
 

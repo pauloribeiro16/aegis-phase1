@@ -1,0 +1,139 @@
+# AEGIS Phase 1 — Personal Data Categories (Case 03 — OmniBank Financial Systems S.A.)
+# GDPR Art. 30 records of processing — categories of personal data processed.
+# Banking-grade inventory for a 5,000-employee German credit institution with
+# retail/SMB banking, credit scoring (Annex III §5(b) high-risk AI), AML, and
+# SEPA instant payments.
+#
+# Schema (one row per category):
+#   id              : PD-XX    (sequential, deterministic)
+#   category        : category name (PII / financial / behavioural / special-category)
+#   description     : what data subjects + what is captured
+#   lawful_basis    : GDPR Art. 6 ground(s)
+#   special_category: True if Art. 9 (race, health, biometric, etc.)
+#   biometric       : True if biometric data
+#   systems_processing: list of SYS-XXX IDs that process this category
+#   recipients      : list of recipient categories (BaFin, ECB, payment networks, etc.)
+#   transfers       : list of cross-border transfer mechanisms (if any)
+#   retention       : how long the data is retained + basis
+#   dsar_route      : how a data subject access / erasure request reaches the data
+#   purpose         : primary processing purpose
+#
+# This YAML is OPTIONAL (Pydantic loader is WARNING-tolerant). When present,
+# doc_04a §2.3 Personal Data Categories table renders from it.
+personal_data_categories:
+  - id: PD-01
+    category: Customer identification data (KYC)
+    description: Name, postal address, email, phone, DOB, nationality, ID-document number (passport / national ID), PEP / sanctions screening result
+    lawful_basis: Art. 6(1)(b) Contract; Art. 6(1)(c) Legal obligation (GwG §3, §6); Art. 6(1)(f) Legitimate interest (fraud prevention)
+    special_category: false
+    biometric: false
+    systems_processing: [SYS-KYC, SYS-CBS, SYS-AML]
+    recipients: [Internal compliance + relationship managers, Onfido (IDV processor), Refinitiv World-Check (PEP/sanctions screening), BaFin on request (GwG §6)]
+    transfers: []
+    retention: "5 years post-relationship-end (GwG §8) — beyond Art. 17 erasure where legal obligation overrides"
+    dsar_route: "DSAR portal + manual review by DPO; KYC artefacts retained per GwG §8 override"
+    purpose: "Customer onboarding + AML/CFT obligations (GwG §3 identification)"
+
+  - id: PD-02
+    category: Customer financial transactions
+    description: Account number, IBAN, balances, transaction history (incl. payee, amount, timestamp, channel), SEPA direct debits, card transactions
+    lawful_basis: Art. 6(1)(b) Contract
+    special_category: false
+    biometric: false
+    systems_processing: [SYS-CBS, SYS-PAYMENTS, SYS-DWH]
+    recipients: [Internal payments + ops, BaFin / ECB on regulatory reporting, payment schemes (SEPA, card networks)]
+    transfers: []
+    retention: "10 years (HGB §257, AO §147 — German commercial / tax law)"
+    dsar_route: "Account-level access request via DSAR portal; transaction-level access provided as extract; erasure restricted by HGB §257 retention obligation"
+    purpose: "Execution of payment services + contractual account management"
+
+  - id: PD-03
+    category: Credit history + scoring input
+    description: Loan-application data, income, employment, existing liabilities, credit-bureau pull (SCHUFA), scoring-input features
+    lawful_basis: Art. 6(1)(b) Contract (pre-contractual); Art. 22 profiling right applies (automated decision — credit decision)
+    special_category: false
+    biometric: false
+    systems_processing: [SYS-KYC, SYS-CREDITAI, SYS-CBS]
+    recipients: [SCHUFA (credit bureau), Internal credit committee, applicant (decision rationale)]
+    transfers: []
+    retention: "Application data: 7 years post-decision (BDSG §35); model inputs anonymised after decision + 7y retention; full erasure on DSAR where no override"
+    dsar_route: "DSAR portal + branch request; DPO coordinates with credit-risk team; Art. 22 right to human review provided"
+    purpose: "Credit decision (Art. 22 automated decision) + Annex III §5(b) high-risk AI conformity"
+
+  - id: PD-04
+    category: Authentication + device binding
+    description: Username, hashed password (Argon2id), MFA factors (TOTP, FIDO2 / WebAuthn), device fingerprint, OAuth tokens, session metadata
+    lawful_basis: Art. 6(1)(b) Contract; Art. 6(1)(f) Legitimate interest (security)
+    special_category: false
+    biometric: false
+    systems_processing: [SYS-WEB, SYS-MOBILE, Auth0 CIAM, SYS-AUDIT]
+    recipients: [Internal IAM team (privileged), Auth0 (processor), Datadog (logs)]
+    transfers: []
+    retention: "Account lifetime + 30 days post-closure (Auth0 logs); audit log 7 years (GwG §8 + GoBD)"
+    dsar_route: "Account-level access; password reset / MFA reset via Auth0; Auth0 deletion via support workflow"
+    purpose: "Customer authentication + PSD2 SCA (Art. 97 strong customer authentication)"
+
+  - id: PD-05
+    category: Biometric authentication (mobile)
+    description: Face ID / Touch ID template (stored in device secure enclave, not on OmniBank servers); liveness check selfie (KYC, Onfido processor)
+    lawful_basis: Art. 6(1)(a) Explicit consent (mobile biometric) + Art. 9(2)(a) explicit consent for biometric data
+    special_category: true
+    biometric: true
+    systems_processing: [SYS-MOBILE, Onfido (processor), SYS-KYC]
+    recipients: [Onfido (IDV processor — KYC selfie + liveness), Apple/Google (device-side biometrics)]
+    transfers: [Onfido processes in EU (Frankfurt); SCC fallback if cross-border]
+    retention: "Mobile biometric templates stored on device only — never on OmniBank servers; Onfido KYC selfie 5y per GwG §8"
+    dsar_route: "Mobile biometric templates: deletion = disable Face/Touch ID on device (user-controlled); Onfido KYC selfie: DSAR via portal; GwG §8 override applies"
+    purpose: "PSD2 SCA exemption + KYC identity verification"
+
+  - id: PD-06
+    category: AML transaction monitoring + alerts
+    description: Transaction patterns, alert flags, STR / SAR narrative, goAML submission metadata (no underlying PII beyond name + IBAN)
+    lawful_basis: Art. 6(1)(c) Legal obligation (GwG §6h, FATF Rec. 20); Art. 6(1)(f) Legitimate interest (crime prevention)
+    special_category: false
+    biometric: false
+    systems_processing: [SYS-AML, NICE Actimize vendor]
+    recipients: [BaFin FIU (goAML gateway — STR / SAR submissions), Internal MLRO + Compliance]
+    transfers: []
+    retention: "5 years post-alert closure (GwG §8)"
+    dsar_route: "DSAR portal — DPO coordinates with MLRO; Art. 23 derogation may apply for crime prevention; subject informed of restricted access"
+    purpose: "AML / CFT obligations (GwG §6h transaction monitoring)"
+
+  - id: PD-07
+    category: Employee + contractor HR data
+    description: Name, payroll, role, badges, training records, performance reviews, sickness absence
+    lawful_basis: Art. 6(1)(b) Contract (employment); Art. 6(1)(c) Legal obligation (tax, social security)
+    special_category: false
+    biometric: false
+    systems_processing: [HR system, Internal AD (Workforce Identity), Payroll provider]
+    recipients: [Tax authorities, Social security, internal management (limited to need-to-know)]
+    transfers: []
+    retention: "10 years post-employment-end (German payroll law + tax)"
+    dsar_route: "HR portal + HR-direct request; payroll-provider coordination for cross-system erasure"
+    purpose: "Employment contract execution + payroll + statutory reporting"
+
+  - id: PD-08
+    category: Marketing consent + lead data
+    description: Name, email, marketing-consent record, lead source, marketing-preference flags
+    lawful_basis: Art. 6(1)(a) Consent (Art. 7 GDPR — explicit, granular, withdrawable)
+    special_category: false
+    biometric: false
+    systems_processing: [Web form, Salesforce CRM, Consent management platform]
+    recipients: [Sales / marketing teams (need-to-know), Salesforce (processor)]
+    transfers: []
+    retention: "Opt-out within 30 days; full erasure on DSAR / consent withdrawal; consent record kept 3y (GDPR accountability — Art. 5(2))"
+    dsar_route: "Marketing preference centre + DSAR portal; consent-management platform handles cross-system propagation"
+    purpose: "Marketing + lead nurturing (consent-based)"
+
+  - id: PD-09
+    category: Customer service interactions
+    description: Call recordings (BDSG-compliant opt-in), chat transcripts, complaint correspondence, branch CCTV
+    lawful_basis: Art. 6(1)(b) Contract; Art. 6(1)(f) Legitimate interest (service quality); Art. 6(1)(a) Consent (CCTV, call recording)
+    special_category: false
+    biometric: false
+    systems_processing: [Contact-centre platform, complaint-management system, branch CCTV]
+    recipients: [Internal customer service + quality team, BaFin on complaint escalation]
+    transfers: []
+    retention: "Call recordings: 30 days (BDSG-compliant); complaints: 5 years (BaFin complaints register)"
+    dsar_route: "Customer service line + DSAR portal; CCTV erasure = branch-level deletion + 30-day rolling buffer"
+    purpose: "Customer service + complaints handling + crime prevention"

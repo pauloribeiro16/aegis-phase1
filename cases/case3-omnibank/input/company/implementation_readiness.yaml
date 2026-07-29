@@ -1,0 +1,21 @@
+# AEGIS Phase 1 — Implementation Readiness (Case 03 — OmniBank Financial Systems S.A.)
+# Banking-grade security posture for a 5,000-employee German bank.
+# 12 readiness areas (IR-01..IR-12). Values are bank-realistic: a significant
+# institution with active BaFin supervision — most controls are implemented
+# or partially implemented; the residual gaps feed Doc 04b §5 Top Gaps.
+#
+# IMPORTANT: NO / YES / PARTIAL are YAML-reserved as booleans, so they MUST
+# be quoted (otherwise PyYAML parses them as bool, which then fails Pydantic
+# Enum coercion in state.ImplementationReadiness).
+ciso: "YES"                            # IR-01 — dedicated CISO + CISO office (12 FTE)
+dpo: "YES"                             # IR-02 — dedicated DPO (Datenschutzbeauftragter), BaFin-registered
+information_security_policy: "YES"     # IR-03 — full ISP set (BaFin ZAIT 5.6 / ISO 27001 Annex A.5)
+risk_assessment: "PARTIAL"             # IR-04 — annual + per-feature risk register; ICT risk per DORA Art. 6 partially automated
+incident_response: "YES"               # IR-05 — tested playbook (GDPR 72h + CRA 24h + DORA Art. 19 major-incident)
+business_continuity: "YES"             # IR-06 — DR runbooks tested semi-annually; DORA Art. 12
+backup: "YES"                          # IR-07 — daily + weekly + immutable WORM (GwG §8 / HGB §257)
+access_control: "YES"                  # IR-08 — RBAC + ABAC; quarterly access review; privileged YubiKey
+vulnerability_management: "PARTIAL"    # IR-09 — Snyk + Tenable Nessus; SBOM CycloneDX in CI/CD; pen-test annual
+third_party_risk: "PARTIAL"            # IR-10 — DORA Art. 28 register complete; ICT concentration-risk assessment ongoing
+security_awareness: "PARTIAL"          # IR-11 — annual + role-based; phishing simulation quarterly; board training NOT STARTED
+audit_logging: "YES"                   # IR-12 — SIEM (Datadog + Splunk), 7y immutable WORM, 24/7 SOC

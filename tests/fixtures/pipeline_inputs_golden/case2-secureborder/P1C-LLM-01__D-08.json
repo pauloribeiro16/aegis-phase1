@@ -1,0 +1,432 @@
+{
+  "case": "case2-secureborder",
+  "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+  "lane": "D-08",
+  "inputs": {
+    "case_id": "case2-secureborder",
+    "domain_id": "D-08",
+    "lane_id": "D-08",
+    "applicable_regs": [
+      "GDPR",
+      "CRA",
+      "NIS2",
+      "AI_Act"
+    ],
+    "company_facts": {
+      "name": "SecureBorder Solutions B.V.",
+      "sector": "Defense, Security & Critical Infrastructure",
+      "jurisdiction": "Netherlands (EU)",
+      "scale": "LARGE",
+      "employees": 450,
+      "role": "controller",
+      "obligated_party": "controller",
+      "complexity_tier": "HIGH",
+      "data_categories": [
+        "personal_data"
+      ],
+      "products": [
+        "SaaS application"
+      ],
+      "role_obligations": [
+        "controller"
+      ],
+      "applicable_regs": [
+        "GDPR",
+        "CRA",
+        "NIS2",
+        "AI_Act"
+      ]
+    },
+    "layer0_subdomain_refs": [
+      {
+        "sub_domain_id": "D-08.1",
+        "title": "D-08.1 General Security Awareness",
+        "domain_id": "D-08",
+        "participating_regulations": [
+          "GDPR",
+          "NIS2",
+          "CRA",
+          "DORA"
+        ],
+        "hso_hl_objective": "General security awareness is established through a documented training programme with population-wide coverage, audience-routing, and governance hooks.",
+        "objective": "General security awareness is established through a documented training programme with population-wide coverage, audience-routing, and governance hooks.",
+        "pairs": [
+          {
+            "id": "D-08.1_GDPR-NIS2",
+            "subdomain_id": "D-08.1",
+            "pair": "GDPR \u2194 NIS2",
+            "reg_a": "GDPR",
+            "reg_b": "NIS2",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when the controller-NSIE's workforce needs both data-protection awareness and cyber-hygiene training).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the controller-NSIE operates a single training programme covering both DPO-catalysed data-protection and hygiene modules)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a unified training curriculum: GDPR module (data-protection awareness, DPO-catalysed) + NIS 2 module (cyber-hygiene baseline, entity-discretionary).",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.1_GDPR-CRA",
+            "subdomain_id": "D-08.1",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N (typically)** \u2014 different audiences (workforce vs. end-user), different objects (regulation compliance awareness vs. product secure-use instructions), different triggers. The CRDA \"different-perspective\" classification is correct but the substantive label is **SCOPE-DISJOINT**.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce two parallel tracks: GDPR Art. 39(1)(a)+(b) workforce awareness (DPO-catalysed) + CRA Annex II \u00a78 user-facing detailed instructions (manufacturer-shipped). The two are addressed at different audiences with no consolidation rule.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.1_GDPR-DORA",
+            "subdomain_id": "D-08.1",
+            "pair": "GDPR \u2194 DORA",
+            "reg_a": "GDPR",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when a DORA financial entity is a controller processing personal data over its own staff).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the DORA financial entity is a controller with workforce awareness obligations)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a DORA-led stack: DORA Art. 13(6) compulsory modules as carrier + GDPR Art. 39(1) data-protection module as sub-component.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.1_NIS2-CRA",
+            "subdomain_id": "D-08.1",
+            "pair": "NIS2 \u2194 CRA",
+            "reg_a": "NIS2",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N (typically)** \u2014 different audiences (workforce vs. end-user), different objects. Substantively scope-disjoint.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce two parallel tracks: NIS 2 Art. 21(2)(g) workforce hygiene + CRA Annex II \u00a78 user-facing instructions. No consolidation rule exists.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.1_NIS2-DORA",
+            "subdomain_id": "D-08.1",
+            "pair": "NIS2 \u2194 DORA",
+            "reg_a": "NIS2",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when a DORA financial entity is also an NSIE).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the DORA financial entity is also an NSIE applying workforce awareness)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a DORA-dominant stack: DORA Art. 13(6) compulsory-modules discharges both DORA's dedicated awareness obligation and NIS 2's Art. 21(2)(g) baseline for DORA financial entities.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.1_CRA-DORA",
+            "subdomain_id": "D-08.1",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N (typically)** \u2014 different audiences (external users vs. internal staff), different objects. Substantively scope-disjoint.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce two parallel tracks: CRA Annex II \u00a78 user-facing instructions + DORA Art. 13(6) internal staff modules. No consolidation rule exists.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I",
+          "Annex II",
+          "Annex VII",
+          "Annex VII (Annex II \u00a78(f)",
+          "Art. 13(18)",
+          "Art. 13(6)",
+          "Art. 13(8)",
+          "Art. 14(4)",
+          "Art. 20(1)",
+          "Art. 20(2)",
+          "Art. 21(1)",
+          "Art. 21(2)",
+          "Art. 26(2)",
+          "Art. 30(4)",
+          "Art. 35",
+          "Art. 39",
+          "Art. 39(1)",
+          "Art. 47(2)",
+          "Art. 5(2)",
+          "\u00a72",
+          "\u00a73",
+          "\u00a74",
+          "\u00a76",
+          "\u00a78",
+          "\u00a79"
+        ],
+        "csf": [
+          "PR.AT-01"
+        ]
+      },
+      {
+        "sub_domain_id": "D-08.2",
+        "title": "D-08.2 Role-Specific Competence",
+        "domain_id": "D-08",
+        "participating_regulations": [
+          "GDPR",
+          "NIS2",
+          "CRA",
+          "DORA",
+          "AI_Act"
+        ],
+        "hso_hl_objective": "Role-specific competence is established through a function-specific depth, audience-routing, competence-criteria-anchored training, and governance hooks architecture.",
+        "objective": "Role-specific competence is established through a function-specific depth, audience-routing, competence-criteria-anchored training, and governance hooks architecture.",
+        "pairs": [
+          {
+            "id": "D-08.2_GDPR-NIS2",
+            "subdomain_id": "D-08.2",
+            "pair": "GDPR \u2194 NIS2",
+            "reg_a": "GDPR",
+            "reg_b": "NIS2",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Conditional (Y when the controller-NSIE trains staff with both data-protection and risk-identification responsibilities).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Conditional (Y when the controller-NSIE adopts the encouragement; N otherwise)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a layered role-specific training stack: GDPR Art. 39(1)(b) DPO-catalysed (entity-side obligation) + NIS 2 Art. 20(2) sentence 2 encouraged (entity-side, conditional on MS encouragement adoption).",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.2_GDPR-CRA",
+            "subdomain_id": "D-08.2",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N** \u2014 different audiences (workforce vs. integrator-B2B), different objects, different triggers. Substantively scope-disjoint.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce two parallel tracks: GDPR Art. 39(1)(b) workforce role-specific + CRA Annex II \u00a78(f) integrator-facing information. CRDA's omission should be corrected by adding a \"scope-disjoint\" classification.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.2_GDPR-DORA",
+            "subdomain_id": "D-08.2",
+            "pair": "GDPR \u2194 DORA",
+            "reg_a": "GDPR",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when the DORA financial entity is a controller processing personal data with role-specific staff).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the DORA financial entity is a controller with role-specific staff)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a DORA-led stack: DORA Art. 13(6) `commensurate to the remit` carrier + GDPR Art. 39(1)(b) role-specific module. CRDA's omission should be corrected by adding a \"complementary\" classification.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.2_GDPR-AI_Act",
+            "subdomain_id": "D-08.2",
+            "pair": "GDPR \u2194 AI_Act",
+            "reg_a": "GDPR",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when the deployer-controller assigns human oversight for high-risk AI processing personal data).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Conditional (Y when the same natural person is both a data-processing staff member and an AI human overseer)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a layered stack: GDPR Art. 39(1)(b) processing-staff role-specific + AI Act Art. 14(4) + Art. 26(2) human-overseer competence. Where the same person holds both roles, the AI Act layer is the additional competence dimension.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.2_NIS2-CRA",
+            "subdomain_id": "D-08.2",
+            "pair": "NIS2 \u2194 CRA",
+            "reg_a": "NIS2",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N** \u2014 different audiences (workforce vs. integrator-B2B), different objects, different triggers. Substantively scope-disjoint.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce two parallel tracks: NIS 2 Art. 20(2) workforce + CRA Annex II \u00a78(f) integrator-facing. CRDA's omission should be corrected by adding a \"scope-disjoint\" classification.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.2_NIS2-DORA",
+            "subdomain_id": "D-08.2",
+            "pair": "NIS2 \u2194 DORA",
+            "reg_a": "NIS2",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when a DORA financial entity is also an NSIE).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the DORA financial entity is also an NSIE applying role-specific training)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a DORA-dominant stack: DORA Art. 13(6) `commensurate to the remit` discharges both DORA's role-specific obligation and NIS 2's encouraged-not-mandatory Art. 20(2) sentence 2 for DORA financial entities.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.2_NIS2-AI_Act",
+            "subdomain_id": "D-08.2",
+            "pair": "NIS2 \u2194 AI_Act",
+            "reg_a": "NIS2",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when an NSIE deploys high-risk AI).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the NSIE deploys high-risk AI and assigns human oversight)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a layered stack: NIS 2 Art. 20(2) sentence 2 baseline + AI Act Art. 14(4) + Art. 26(2) AI-specific competence.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.2_CRA-DORA",
+            "subdomain_id": "D-08.2",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N** \u2014 different audiences (integrator-B2B vs. internal staff), different objects, different triggers. Substantively scope-disjoint.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce two parallel tracks: CRA Annex II \u00a78(f) integrator-facing + DORA Art. 13(6) internal staff. CRDA's omission should be corrected by adding a \"scope-disjoint\" classification.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.2_CRA-AI_Act",
+            "subdomain_id": "D-08.2",
+            "pair": "CRA \u2194 AI_Act",
+            "reg_a": "CRA",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N** \u2014 different audiences, different objects, different triggers. Substantively scope-disjoint.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce two parallel tracks: CRA Annex II \u00a78(f) integrator-facing + AI Act Art. 14(4) + Art. 26(2) AI-overseer competence. CRDA's omission should be corrected by adding a \"scope-disjoint\" classification.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-08.2_DORA-AI_Act",
+            "subdomain_id": "D-08.2",
+            "pair": "DORA \u2194 AI_Act",
+            "reg_a": "DORA",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when the DORA financial entity deploys high-risk AI).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the DORA financial entity deploys high-risk AI)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a DORA-led stack: DORA Art. 13(6) `commensurate to the remit` carrier + AI Act Art. 14(4) + Art. 26(2) AI-overseer competence as an additional sub-component.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I",
+          "Annex II",
+          "Annex IV",
+          "Annex VII",
+          "Annex VII (CRA Annex II \u00a78(f)",
+          "Art. 13(18)",
+          "Art. 13(6)",
+          "Art. 13(8)",
+          "Art. 14",
+          "Art. 14(1)",
+          "Art. 14(4)",
+          "Art. 17(1)",
+          "Art. 20(1)",
+          "Art. 20(2)",
+          "Art. 25",
+          "Art. 26(2)",
+          "Art. 32",
+          "Art. 33",
+          "Art. 34",
+          "Art. 35",
+          "Art. 38",
+          "Art. 39",
+          "Art. 39(1)",
+          "Art. 4(2)",
+          "Art. 5(2)",
+          "Art. 72",
+          "Article 20(2)",
+          "Article 3(23)",
+          "\u00a72",
+          "\u00a73",
+          "\u00a74",
+          "\u00a76",
+          "\u00a78"
+        ],
+        "csf": [
+          "PR.AT-02"
+        ]
+      },
+      {
+        "sub_domain_id": "D-08.3",
+        "title": "D-08.3 Management Board Training",
+        "domain_id": "D-08",
+        "participating_regulations": [
+          "NIS2",
+          "DORA"
+        ],
+        "hso_hl_objective": "Management bodies of essential and important entities (NIS 2) and financial entities (DORA) maintain an executive-literacy substrate with documented training records, governance competence, and personal-capacity threshold for approve+oversee+liable governance duties through a management-body training programme.",
+        "objective": "Management bodies of essential and important entities (NIS 2) and financial entities (DORA) maintain an executive-literacy substrate with documented training records, governance competence, and personal-capacity threshold for approve+oversee+liable governance duties through a management-body training programme.",
+        "pairs": [
+          {
+            "id": "D-08.3_NIS2-DORA",
+            "subdomain_id": "D-08.3",
+            "pair": "NIS2 \u2194 DORA",
+            "reg_a": "NIS2",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when the DORA financial entity is also an NSIE).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the DORA financial entity is also an NSIE applying management-body training)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a DORA-dominant stack: DORA Art. 5(4) `actively keep up to date` + `commensurate to the ICT risk` discharges both DORA's dedicated management-body obligation and NIS 2's Member-State-imposed Art. 20(2) sentence 1 literacy prerequisite for DORA financial entities.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Art. 13(6)",
+          "Art. 20(1)",
+          "Art. 20(2)",
+          "Art. 21",
+          "Art. 21(1)",
+          "Art. 21(2)",
+          "Art. 4",
+          "Art. 4(1)",
+          "Art. 5(2)",
+          "Art. 5(4)",
+          "Art. 91",
+          "Article 6",
+          "\u00a78"
+        ],
+        "csf": [
+          "GV.RR-01"
+        ]
+      }
+    ]
+  },
+  "rendered": {
+    "system_len": 15980,
+    "user_len": 20706
+  }
+}

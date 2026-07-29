@@ -1,0 +1,21 @@
+# AEGIS Phase 1 — Regulatory Applicability (Case 03 — OmniBank Financial Systems)
+# Sourced from Layer 1 decision tree (Methodology-main reference).
+applicable_regulations:
+  - GDPR
+  - CRA
+  - NIS2
+  - DORA
+  - AI_Act
+non_applicable_regulations: []
+applicability_rationale:
+  GDPR: processes_personal_data = true (customer PII, financial transactions)
+  CRA: places_digital_products_eu = true (mobile app + web, Default class)
+  NIS2: banking_sector + employees_50 = true (Essential Entity)
+  DORA: financial_entity_art_2 = true (credit institution, payment service provider)
+  AI_Act: high_risk_ai_annex_iii = true (credit scoring, Annex III)
+clause_count:
+  GDPR: 28
+  CRA: 26
+  NIS2: 29
+  DORA: 38
+  AI_Act: 29

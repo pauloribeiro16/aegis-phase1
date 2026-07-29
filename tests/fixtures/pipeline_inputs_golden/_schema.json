@@ -1,0 +1,191 @@
+{
+  "$comment": "Pipeline input contract — single source of truth for what fields MUST be present in each spec's inputs dict. Loaded by test_pipeline_inputs.py (structural assertions) and by scripts/dev/regenerate-pipeline-inputs-golden.py. Update here when adding new required fields; CI gate (.hooks/ci-pipeline-inputs.sh) will fail if any spec drops a field declared here.",
+
+  "version": "1.0.0",
+  "created_for_correlation": "CORR-070",
+  "created_at": "2026-07-28",
+
+  "specs": {
+    "P1B-LLM-01-INTERPRETATION": {
+      "description": "Per-regulation interpretation. Reads sub-domain refs + filtered catalog + company facts. Output: interpretations + derogations.",
+      "invocation": "per_regulation",
+      "top_level_keys_required": [
+        "case_id",
+        "lane_id",
+        "applicable_regs",
+        "company_facts",
+        "classification",
+        "layer0_subdomain_refs",
+        "layer0_catalog"
+      ],
+      "company_facts_keys_required": [
+        "name",
+        "sector",
+        "jurisdiction",
+        "scale",
+        "employees",
+        "role",
+        "obligated_party",
+        "complexity_tier",
+        "data_categories",
+        "products",
+        "role_obligations",
+        "applicable_regs"
+      ],
+      "classification_keys_required": [
+        "role",
+        "tier",
+        "basis"
+      ],
+      "layer0_catalog_keys_required": [
+        "tipo2",
+        "tipo3"
+      ],
+      "layer0_subdomain_refs_min_count": 1,
+      "per_reg_filter_required": true,
+      "catalog_min_count_per_reg": {
+        "GDPR": 1,
+        "CRA": 2,
+        "NIS2": 1,
+        "DORA": 1,
+        "AI_Act": 1
+      },
+      "user_prompt_max_bytes": 200000,
+      "user_prompt_max_bytes_note": "soft budget; runtime is enforced by per-reg filter (TestRunPhase1BPerRegFilter)",
+      "truncation_marker_expected": null
+    },
+
+    "P1B-LLM-02-RATIONALE": {
+      "description": "Per-regulation rationale synthesis. Reads P1B-01 outputs (interpretations + derogations) + same context as P1B-01. Output: synthesis per regulation.",
+      "invocation": "per_regulation",
+      "top_level_keys_required": [
+        "case_id",
+        "lane_id",
+        "applicable_regs",
+        "company_facts",
+        "classification",
+        "layer0_subdomain_refs",
+        "layer0_catalog",
+        "p1b_llm_01_outputs"
+      ],
+      "company_facts_keys_required": [
+        "name",
+        "sector",
+        "jurisdiction",
+        "scale",
+        "employees",
+        "role",
+        "obligated_party",
+        "complexity_tier",
+        "data_categories",
+        "products",
+        "role_obligations",
+        "applicable_regs"
+      ],
+      "classification_keys_required": [
+        "role",
+        "tier",
+        "basis"
+      ],
+      "layer0_catalog_keys_required": [
+        "tipo2",
+        "tipo3"
+      ],
+      "layer0_subdomain_refs_min_count": 1,
+      "per_reg_filter_required": true,
+      "catalog_min_count_per_reg": {
+        "GDPR": 1,
+        "CRA": 2,
+        "NIS2": 1,
+        "DORA": 1,
+        "AI_Act": 1
+      },
+      "user_prompt_max_bytes": 200000,
+      "user_prompt_max_bytes_note": "soft budget; runtime is enforced by per-reg filter (TestRunPhase1BPerRegFilter)",
+      "p1b_llm_01_outputs_required": true,
+      "p1b_llm_01_outputs_wired_from_p1b01": true,
+      "truncation_marker_expected": null
+    },
+
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION": {
+      "description": "Per-domain overlap classification. Reads sub-domain refs (filtered per domain) + company facts. Output: aggregated_activations per sub-domain.",
+      "invocation": "per_domain_lane",
+      "top_level_keys_required": [
+        "case_id",
+        "domain_id",
+        "lane_id",
+        "applicable_regs",
+        "company_facts",
+        "layer0_subdomain_refs"
+      ],
+      "company_facts_keys_required": [
+        "name",
+        "sector",
+        "jurisdiction",
+        "scale",
+        "employees",
+        "role",
+        "obligated_party",
+        "complexity_tier",
+        "data_categories",
+        "products",
+        "role_obligations",
+        "applicable_regs"
+      ],
+      "layer0_subdomain_refs_min_count": 3,
+      "layer0_subdomain_refs_max_count": 5,
+      "user_prompt_max_bytes": 524288,
+      "truncation_marker_expected": null
+    },
+
+    "P1C-LLM-02-COMPOUND-EVENT": {
+      "description": "Global compound-event detection. Reads aggregated_activations + strategic synthesis + doc07b profile. Output: compound events.",
+      "invocation": "global_reduce",
+      "top_level_keys_required": [
+        "case_id",
+        "lane_id",
+        "applicable_regs",
+        "aggregated_activations",
+        "c03_strategic_synthesis",
+        "doc07b_profile",
+        "sync_conflicts"
+      ],
+      "aggregated_activations_min_count": 1,
+      "doc07b_profile_min_keys": 1,
+      "user_prompt_max_bytes": 524288,
+      "truncation_marker_expected": null
+    },
+
+    "P1C-LLM-03-STRATEGIC-SYNTHESIS": {
+      "description": "Global strategic synthesis. Reads aggregated_activations + doc07b profile. Output: strategic narrative.",
+      "invocation": "global_reduce",
+      "top_level_keys_required": [
+        "case_id",
+        "lane_id",
+        "applicable_regs",
+        "aggregated_activations",
+        "doc07b_profile",
+        "sync_conflicts"
+      ],
+      "aggregated_activations_min_count": 1,
+      "doc07b_profile_min_keys": 1,
+      "user_prompt_max_bytes": 524288,
+      "truncation_marker_expected": null
+    }
+  },
+
+  "known_issues_at_v1_0_0": {
+    "P1B-LLM-02": {
+      "bug_id": "BUG-B (CORR-070)",
+      "description": "phase1_executor.py:207-217 called P1B-LLM-02 with the same inputs as P1B-LLM-01 (did not pass p1b_llm_01_outputs). FIXED in CORR-070: out_01 is now wired via 'p1b_llm_01_outputs': (out_01.get('parsed_output') or {}) in the per-reg loop. p1b_llm_01_outputs is now REQUIRED in the schema and present in all P1B-LLM-02 golden files.",
+      "fix_out_of_scope_for_now": false,
+      "fixed_in": "CORR-070"
+    },
+    "P1B-LLM-01_and_P1B-LLM-02": {
+      "bug_id": "BUG-A (CORR-070) — superseded",
+      "description": "CORR-049 512KB cap truncated the user prompt — layer0_catalog and # TASK were at the tail. Originally mitigated by reordering kwargs (orchestrator.py:1704-1723) in CORR-070. ROOT-CAUSE FIX in CORR-071: per-reg filter in run_phase_1b reduces refs from 38 → 12-27 per lane, making BUG-A structurally impossible. The CORR-070 reorder workaround has been removed; refs and catalog now fit within the cap without ordering tricks. layer0_catalog is still passed first (natural order) for readability, not as a workaround.",
+      "fix_out_of_scope_for_now": false,
+      "fixed_in": "CORR-071"
+    }
+  }
+}

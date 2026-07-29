@@ -1,0 +1,23 @@
+regulation: DORA
+full_name: Digital Operational Resilience Act
+articles:
+  - id: Art. 5
+    title: ICT risk management
+    phase1_relevance: Three lines of defense, ICT risk framework
+  - id: Art. 13
+    title: ICT-related incident management
+    phase1_relevance: 4h initial notification, full report within 72h
+  - id: Art. 18
+    title: Digital operational resilience testing
+    phase1_relevance: Annual testing programme
+  - id: Art. 23
+    title: ICT third-party risk
+    phase1_relevance: Third-party register
+  - id: Art. 28
+    title: ICT third-party register
+    phase1_relevance: Mandatory for in-scope entities
+phase1_summary: |
+  DORA applies to financial entities (credit institutions, insurers, etc.).
+  Phase 1 captures: (a) ICT inventory (critical/important), (b) third-party
+  register with concentration analysis, (c) incident response with 4h SLA,
+  (d) annual testing programme, (e) exit strategies for critical ICT.

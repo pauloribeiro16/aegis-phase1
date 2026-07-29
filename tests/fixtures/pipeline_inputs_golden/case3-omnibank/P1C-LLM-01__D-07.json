@@ -1,0 +1,410 @@
+{
+  "case": "case3-omnibank",
+  "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+  "lane": "D-07",
+  "inputs": {
+    "case_id": "case3-omnibank",
+    "domain_id": "D-07",
+    "lane_id": "D-07",
+    "applicable_regs": [
+      "GDPR",
+      "CRA",
+      "NIS2",
+      "DORA",
+      "AI_Act"
+    ],
+    "company_facts": {
+      "name": "OmniBank Financial Systems S.A.",
+      "sector": "Banking & Financial Services",
+      "jurisdiction": "Germany (EU)",
+      "scale": "LARGE",
+      "employees": 5000,
+      "role": "controller",
+      "obligated_party": "controller",
+      "complexity_tier": "HIGH",
+      "data_categories": [
+        "personal_data"
+      ],
+      "products": [
+        "SaaS application"
+      ],
+      "role_obligations": [
+        "controller"
+      ],
+      "applicable_regs": [
+        "GDPR",
+        "CRA",
+        "NIS2",
+        "DORA",
+        "AI_Act"
+      ]
+    },
+    "layer0_subdomain_refs": [
+      {
+        "sub_domain_id": "D-07.1",
+        "title": "D-07.1 Secure-by-Design Principles",
+        "domain_id": "D-07",
+        "participating_regulations": [
+          "GDPR",
+          "NIS2",
+          "CRA",
+          "DORA",
+          "AI_Act"
+        ],
+        "hso_hl_objective": "Security is integrated into the acquisition, design, development, production, deployment and maintenance of systems and products via documented by-design decisions, risk-assessment propagation, proportionate safeguards, and lifecycle consistency.",
+        "objective": "Security is integrated into the acquisition, design, development, production, deployment and maintenance of systems and products via documented by-design decisions, risk-assessment propagation, proportionate safeguards, and lifecycle consistency.",
+        "pairs": [
+          {
+            "id": "D-07.1_GDPR-NIS2",
+            "subdomain_id": "D-07.1",
+            "pair": "GDPR \u2194 NIS2",
+            "reg_a": "GDPR",
+            "reg_b": "NIS2",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when the same entity is both a controller and an NSIE processing personal data through NIS).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the controller-NSIE designs NIS that processes personal data).** No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a joint by-design stack: GDPR Art. 25(1) outputs (data-protection properties) become inputs to the NIS 2 Art. 21(2)(e) lifecycle evidence trail.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.1_GDPR-CRA",
+            "subdomain_id": "D-07.1",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when the controller deploys a CRA-regulated product that processes personal data, OR when the manufacturer is also a controller for its own product telemetry).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the controller deploys a CRA-regulated product processing personal data)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a 2-track by-design matrix: (1) GDPR Art. 25(1) controller-side personal-data by-design; (2) CRA Art. 13(1)/(2) manufacturer-side product by-design with Annex VII \u00a73 risk-assessment record.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.1_GDPR-DORA",
+            "subdomain_id": "D-07.1",
+            "pair": "GDPR \u2194 DORA",
+            "reg_a": "GDPR",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Conditional (Y when a financial entity is a controller processing personal data over its own ICT systems).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Conditional (Y when a DORA financial entity processes personal data over its ICT systems)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a DORA-layer by-design baseline (operationalised via change management Art. 9(4)(e) + testing Art. 24) augmented by the GDPR Art. 25(1) data-protection by-design overlay for personal-data processing.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.1_GDPR-AI_Act",
+            "subdomain_id": "D-07.1",
+            "pair": "GDPR \u2194 AI_Act",
+            "reg_a": "GDPR",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when a high-risk AI system processes personal data and the provider/deployer is a controller).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the provider-deployer is a controller processing personal data via a high-risk AI system)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a 2-track by-design matrix: (1) GDPR Art. 25(1) data-protection by-design for personal data; (2) AI Act Art. 15(1) + Art. 17(1)(c) AI-system design with QMS design-control. Recital 78 preservation is the operative OJ cross-link.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.1_NIS2-CRA",
+            "subdomain_id": "D-07.1",
+            "pair": "NIS2 \u2194 CRA",
+            "reg_a": "NIS2",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when the entity procures a CRA-regulated product \u2014 they meet at the supplier-customer boundary).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the entity procures a CRA-regulated product and integrates it into NIS)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a supplier-customer interface map: CRA-conformant product serves as upstream gate for NIS 2 Art. 21(2)(e) deployment decisions; NIS 2 entity's supplier-risk register references CRA Annex VII technical documentation.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.1_NIS2-DORA",
+            "subdomain_id": "D-07.1",
+            "pair": "NIS2 \u2194 DORA",
+            "reg_a": "NIS2",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when a DORA financial entity is also an NSIE \u2014 both apply).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when a DORA financial entity is also an NSIE applying maintenance-phase controls)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a DORA-dominant stack: DORA Art. 9(4)(e) six-step process discharges both DORA's dedicated change-management obligation and NIS 2's maintenance-phase security requirement.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.1_NIS2-AI_Act",
+            "subdomain_id": "D-07.1",
+            "pair": "NIS2 \u2194 AI_Act",
+            "reg_a": "NIS2",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when NIS embeds a high-risk AI system).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when NIS embeds high-risk AI)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a layered AI-NIS stack: NIS 2 Art. 21(2)(e) lifecycle evidence + AI Act QMS design verification as separate artefacts.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.1_CRA-DORA",
+            "subdomain_id": "D-07.1",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when a DORA entity procures CRA-regulated products).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the DORA entity is also a CRA product deployer/procurer)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a CRA-as-upstream-gate model: CRA-conformant products are inputs to DORA's Art. 6(1) ICT risk-management framework.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.1_CRA-AI_Act",
+            "subdomain_id": "D-07.1",
+            "pair": "CRA \u2194 AI_Act",
+            "reg_a": "CRA",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (for AI-enabled CRA products, the same product is both CRA-regulated and AI-Act high-risk).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the same product is both CRA-regulated and AI-Act high-risk)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must operationalise CRA Art. 13(4) sentence 2: a unified risk assessment under AI Act Art. 9 substitutes for CRA risk assessment when both apply. QMS (AI Act) + Annex I conformity (CRA) stack with documented cross-walk.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.1_DORA-AI_Act",
+            "subdomain_id": "D-07.1",
+            "pair": "DORA \u2194 AI_Act",
+            "reg_a": "DORA",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when a DORA financial entity deploys high-risk AI).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the DORA financial entity deploys high-risk AI)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a layered stack: DORA Art. 9(4)(e) change-management gate + AI Act QMS design-control governance.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part I",
+          "Annex I Part I (2)",
+          "Annex II",
+          "Annex IV",
+          "Annex VII",
+          "Art. 11",
+          "Art. 12(1)",
+          "Art. 12(2)",
+          "Art. 13",
+          "Art. 13(1)",
+          "Art. 13(18)",
+          "Art. 13(2)",
+          "Art. 13(3)",
+          "Art. 13(4)",
+          "Art. 13(7)",
+          "Art. 13(8)",
+          "Art. 15(1)",
+          "Art. 15(4)",
+          "Art. 17",
+          "Art. 17(1)",
+          "Art. 20(1)",
+          "Art. 21(1)",
+          "Art. 21(2)",
+          "Art. 21(3)",
+          "Art. 24",
+          "Art. 24(1)",
+          "Art. 25(1)",
+          "Art. 25(2)",
+          "Art. 30",
+          "Art. 35(7)",
+          "Art. 5(2)",
+          "Art. 6(1)",
+          "Art. 9",
+          "Art. 9(4)",
+          "\u00a72",
+          "\u00a73"
+        ],
+        "csf": [
+          "PR.PS-06"
+        ]
+      },
+      {
+        "sub_domain_id": "D-07.2",
+        "title": "D-07.2 Secure Coding Practices",
+        "domain_id": "D-07",
+        "participating_regulations": [
+          "CRA",
+          "DORA",
+          "AI_Act"
+        ],
+        "hso_hl_objective": "Coding practices deliver attack-surface limitation, exploitation mitigation, and AI-system attack-defence under an appropriate coding-practice evidence base.",
+        "objective": "Coding practices deliver attack-surface limitation, exploitation mitigation, and AI-system attack-defence under an appropriate coding-practice evidence base.",
+        "pairs": [
+          {
+            "id": "D-07.2_CRA-DORA",
+            "subdomain_id": "D-07.2",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N (typically)** \u2014 different objects (product coding outcomes vs. entity change process), different actors (manufacturer vs. financial entity). Pair is scope-disjoint in the OJ-literal reading; CRDA's \"complementary\" label is more a taxonomy artifact than a substantive relationship.",
+            "downstream_implication": "** Phase 1 entities must NOT treat DORA as a coding-standards authority absent OJ-text evidence (see P0 disagreement). Coding-standards baseline must be built from industry frameworks (NIST SSDF, OWASP SAMM, ISO 27034) and demonstrated against each regulation's outcome (CRA) or process (DORA) requirement.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.2_CRA-AI_Act",
+            "subdomain_id": "D-07.2",
+            "pair": "CRA \u2194 AI_Act",
+            "reg_a": "CRA",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Conditional (Y when the CRA-regulated product is an AI-enabled product with high-risk AI components).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Conditional (Y for AI-enabled high-risk products; N for CRA-regulated products without AI)**. No reclassification required.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a layered coding-defence stack for AI-enabled CRA products: CRA Annex I (2)(j)/(k) generic coding + AI Act Art. 15(4)/(5) AI-specific attack-defence.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-07.2_DORA-AI_Act",
+            "subdomain_id": "D-07.2",
+            "pair": "DORA \u2194 AI_Act",
+            "reg_a": "DORA",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": true,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N (typically)** \u2014 different objects, different actors, different lifecycle stages. Pair is substantively scope-disjoint; CRDA \"complementary\" is a taxonomy artifact.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce two parallel tracks: DORA change-management (Art. 9(4)(e)) + AI Act attack-defence (Art. 15(4)/(5)). No OJ-level consolidation rule exists for coding practices (unlike CRA Art. 13(4) sentence 2 AI-Act-substitution for risk assessment, which does not extend to coding).",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part I (2)",
+          "Annex IV",
+          "Annex VII",
+          "Art. 11(2)",
+          "Art. 11(3)",
+          "Art. 13(1)",
+          "Art. 13(2)",
+          "Art. 13(4)",
+          "Art. 13(6)",
+          "Art. 13(8)",
+          "Art. 15(4)",
+          "Art. 17(1)",
+          "Art. 25",
+          "Art. 25(1)",
+          "Art. 9",
+          "Art. 9(4)",
+          "\u00a72",
+          "\u00a73",
+          "\u00a74"
+        ],
+        "csf": [
+          "PR.PS-06"
+        ]
+      },
+      {
+        "sub_domain_id": "D-07.3",
+        "title": "D-07.3 CI/CD Pipeline Security",
+        "domain_id": "D-07",
+        "participating_regulations": [
+          "NIS2",
+          "CRA"
+        ],
+        "hso_hl_objective": "CI/CD pipeline security delivers build-time control baselines (signed artefacts, build-agent integrity, ephemeral build environments) and update-distribution delivery-path security.",
+        "objective": "CI/CD pipeline security delivers build-time control baselines (signed artefacts, build-agent integrity, ephemeral build environments) and update-distribution delivery-path security.",
+        "pairs": [
+          {
+            "id": "D-07.3_NIS2-CRA",
+            "subdomain_id": "D-07.3",
+            "pair": "NIS2 \u2194 CRA",
+            "reg_a": "NIS2",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N (typically)** \u2014 different objects (entity-side CI/CD pipeline vs. product-side update delivery path), different actors. Pair is substantively scope-disjoint; CRDA \"complementary\" is a taxonomy artifact.",
+            "downstream_implication": "** Phase 1 entities must construct CI/CD baseline from industry frameworks (NIST SP 800-204, OWASP CI/CD Top 10, SLSA). Pipeline-architecture controls (signed artefacts, build-agent integrity, ephemeral build environments) are industry best-practice, not regulatory mandate.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part II (7)",
+          "Art. 21(2)",
+          "Art. 55(1)",
+          "\u00a74"
+        ],
+        "csf": [
+          "PR.PS-06",
+          "ID.RA-01"
+        ]
+      },
+      {
+        "sub_domain_id": "D-07.4",
+        "title": "D-07.4 Change Management",
+        "domain_id": "D-07",
+        "participating_regulations": [
+          "CRA",
+          "DORA"
+        ],
+        "hso_hl_objective": "Change management delivers documented change-management procedures (manufacturer-side series-production conformity + entity-side change-management six-step), risk-assessment-approach, controlled-manner, and substantial-modification assessment with manufacturer-equivalent status consequences where applicable.",
+        "objective": "Change management delivers documented change-management procedures (manufacturer-side series-production conformity + entity-side change-management six-step), risk-assessment-approach, controlled-manner, and substantial-modification assessment with manufacturer-equivalent status consequences where applicable.",
+        "pairs": [
+          {
+            "id": "D-07.4_CRA-DORA",
+            "subdomain_id": "D-07.4",
+            "pair": "CRA \u2194 DORA",
+            "reg_a": "CRA",
+            "reg_b": "DORA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when a DORA financial entity customises a CRA-conformant product, triggering Art. 22 third-party substantial modification = manufacturer).",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the DORA entity customises a CRA-conformant product \u2014 Art. 22 third-party substantial modification)**. No reclassification required.",
+            "downstream_implication": "** Phase 1 entities must implement both regimes' change-management obligations: CRA's substantial-modification assessment for product changes; DORA's six-step process for entity-side changes. The DORA six-step documentation can serve as the evidence trail for CRA Art. 13(14) series-production conformity.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [],
+        "csf": [
+          "PR.PS-02",
+          "PR.PS-06"
+        ]
+      }
+    ]
+  },
+  "rendered": {
+    "system_len": 15980,
+    "user_len": 20157
+  }
+}

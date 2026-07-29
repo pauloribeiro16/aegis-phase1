@@ -1,0 +1,30 @@
+tier: LARGE
+identity:
+  description: "is assessed as a large-scale {sector} entity"
+  employee_phrase: "{employees} employees"
+  scope: "enterprise with multi-domain controls"
+role_separation:
+  dpo: "dedicated, mandatory (GDPR Art. 37(1))"
+  ciso: "dedicated, independent of CIO (DORA Art. 13)"
+  cro: "dedicated (DORA Art. 5)"
+  head_of_ai: "if AI system, dedicated MLRO or VP AI"
+maturity:
+  default_target: 3
+  default_min: 2
+clause_emphasis:
+  - "GDPR Art. 30 (Records of Processing)"
+  - "GDPR Art. 32 (security of processing)"
+  - "GDPR Art. 33 (breach notification)"
+  - "CRA Annex I Part I (essential requirements)"
+  - "CRA Annex II (vulnerability handling)"
+  - "NIS2 essential entity obligations"
+  - "DORA Art. 5 (ICT risk management)"
+  - "DORA Art. 13 (ICT security)"
+  - "DORA Art. 28 (third-party ICT risk)"
+  - "AI Act Annex III (high-risk classification)"
+incident_response:
+  workflow: "tested, with on-call rotation, 24/7 SOC"
+  sla: "NIS2 24h early warning, GDPR 72h, DORA 4h initial"
+third_party:
+  register: "explicit DPA + DORA Art. 28 register + concentration analysis"
+  criticality: "high"

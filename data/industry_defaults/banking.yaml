@@ -1,0 +1,18 @@
+industry: Banking & Financial Services
+jurisdiction_examples: [Germany, France, Netherlands, Spain, Italy]
+primary_supervisors:
+  - BaFin
+  - ECB (for Significant Institutions)
+  - EBA (European Banking Authority)
+retention_standards:
+  - {framework: HGB §257, retention_years: 10, scope: accounting records}
+  - {framework: GwG §8, retention_years: 5, scope: KYC and AML records}
+  - {framework: MiFID II, retention_years: 5, scope: transaction records}
+  - {framework: CRR/CRD IV, retention_years: "indefinite", scope: capital adequacy records}
+typical_systems:
+  core_banking: Temenos T24, Avaloq, Finastra, Mambu
+  aml: NICE Actimize, Oracle Financial Crime, SAS AML
+  kyc: Onfido, Refinitiv World-Check, Jumio
+  payments: SWIFT, SEPA Instant, FPS, TARGET2
+  hsm: Thales Luna, Utimaco, AWS CloudHSM
+default_concentration_risk_threshold_pct: 25

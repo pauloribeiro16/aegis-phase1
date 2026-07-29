@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -79,9 +80,21 @@ def get_layer0_root() -> Path:
 
 
 def get_logs_dir() -> Path:
-    """Return the logs/phase1/ directory (creates if missing)."""
-    _DEFAULT_LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    return _DEFAULT_LOGS_DIR
+    """Return the logs directory for the current run (creates if missing).
+
+    Resolution order (CORR-060 multi-model support):
+      1. ``$AEGIS_LOG_DIR`` env var (set by the runner with the
+         model-specific subdir, e.g. ``logs/phase1/gemma4_e2b``). This is
+         how the v2 runner splits logs by model so we can compare
+         multi-model runs.
+      2. The legacy default ``<repo>/logs/phase1`` (cwd-independent,
+         repo-relative).
+
+    Always creates the directory if missing.
+    """
+    base = Path(os.environ.get("AEGIS_LOG_DIR", _DEFAULT_LOGS_DIR))
+    base.mkdir(parents=True, exist_ok=True)
+    return base
 
 
 def get_validator(
@@ -123,6 +136,7 @@ def get_invoker(
     prompts_root: Path | None = None,
     regulatory_baseline_root: Path | None = None,
     layer0_root: Path | None = None,
+    provider: str = "ollama",  # CORR-062 S2: "ollama" | "minimax"
 ) -> Any:
     """Get a fully-wired UnifiedInvoker with default config (CORR-013).
 
@@ -133,6 +147,12 @@ def get_invoker(
     The returned object is a ``aegis_phase1.llm.UnifiedInvoker``; the
     legacy ``Phase1LLMInvoker`` is still constructed internally as a
     child for the heavy path (strangler pattern, removed in CORR-014).
+
+    CORR-062 S2: ``provider`` defaults to ``"ollama"`` for backward
+    compat. Pass ``"minimax"`` to wire ChatMinimax (M3/M2.7 via the
+    Mavis gateway); the ``base_url`` default then flips to the gateway
+    endpoint, and the heavy child (Phase1LLMInvoker) also routes through
+    ChatMinimax.
     """
     import os
     import warnings
@@ -156,10 +176,23 @@ def get_invoker(
     baseline = regulatory_baseline_root or get_regulatory_baseline_root()
     logs = get_logs_dir()
 
-    model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
-    base_url = base_url or os.getenv(
-        "OLLAMA_BASE_URL", UnifiedInvoker.DEFAULT_BASE_URL
-    )
+    # CORR-067 S3 (follow-up): when provider=minimax, don't pull
+    # Ollama-derived env vars (OLLAMA_MODEL, OLLAMA_BASE_URL) — those
+    # belong to the Ollama path. UnifiedInvoker.__init__ resolves to
+    # the M3 gateway URL and the M3 default model when no explicit
+    # values are given. Passing Ollama defaults would override the
+    # gateway (causing connection-refused on localhost:11434) or
+    # the model name (causing the gateway to reject the request).
+    if provider == "minimax":
+        from aegis_phase1.llm.chat_minimax import DEFAULT_MODEL as M3_DEFAULT_MODEL
+        # honour explicit overrides only
+        model = model or M3_DEFAULT_MODEL
+        base_url = base_url
+    else:
+        model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
+        base_url = base_url or os.getenv(
+            "OLLAMA_BASE_URL", UnifiedInvoker.DEFAULT_BASE_URL
+        )
 
     prompt_loader = PromptLoader(root=prompts)
     catalog_loader = CatalogLoader(root=prompts / "catalogs")
@@ -179,5 +212,6 @@ def get_invoker(
         base_url=base_url,
         langfuse_handler=_langfuse_handler,
         prompts_root=prompts,
+        provider=provider,  # CORR-062 S2
     )
     return invoker

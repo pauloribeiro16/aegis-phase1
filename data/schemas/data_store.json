@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DataStore",
+  "type": "object",
+  "required": ["id", "name", "type"],
+  "properties": {
+    "id": {"type": "string"},
+    "name": {"type": "string"},
+    "type": {"type": "string"},
+    "hosting": {"type": "string"},
+    "classification": {"type": "string"},
+    "retention": {"type": "string"},
+    "encryption_at_rest": {"type": "boolean"},
+    "pii_categories": {"type": "array", "items": {"type": "string"}},
+    "cross_border": {"type": "boolean"},
+    "notes": {"type": "string"}
+  }
+}

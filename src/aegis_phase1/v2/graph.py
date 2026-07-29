@@ -45,7 +45,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
 from aegis_phase1.llm.tracing import get_langfuse_callback
-from aegis_phase1.v2.domain.processor import DOMAIN_NAMES, MapPartialFailure, OllamaUnreachable
+from aegis_phase1.v2.domain.processor import DOMAIN_NAMES, MapPartialFailure, LLMUnreachable
 from aegis_phase1.v2.orchestrator import Phase1Orchestrator
 
 # CORR-049-T7.2: OTel híbrido. Use langfuse.start_as_current_observation
@@ -198,7 +198,7 @@ def _make_map_node(domain_id: str):
                 },
                 "map_complete": {domain_id: True},
             }
-        except OllamaUnreachable:
+        except LLMUnreachable:
             raise
         complete = dict(state.get("map_complete") or {})
         complete[domain_id] = True

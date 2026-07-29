@@ -1,0 +1,51 @@
+# Control evidence — D-04 Incident Response
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D04
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   STORES → data_stores.yaml
+#   SYSTEMS → systems.yaml
+#   FLOWS  → data_flows.yaml
+
+domain_id: D-04
+title: Incident Response
+controls:
+  - control: IR plan and playbooks
+    current_by_tier:
+      MICRO: "Informal; relies on ad-hoc decisions"
+      SMALL: "Documented IR plan; no playbooks per scenario"
+      MEDIUM: "Documented plan + playbooks for top-5 scenarios"
+      LARGE: "Documented plan + scenario playbooks (ransomware, BEC, supply chain); BCM integration"
+      MAX: "Plan + 20+ playbooks; joint IR with ECB / BaFin; mutual-aid with FS-ISAC peers"
+    evidence_refs: ["SYSTEMS"]
+  - control: Detection and monitoring
+    current_by_tier:
+      MICRO: "None; relies on user reports"
+      SMALL: "Centralised log collection on critical apps"
+      MEDIUM: "SIEM with use-case library; 24/5 SOC"
+      LARGE: "24/7 SOC; SOAR automation on Tier-1 alerts; threat-intel enriched detections"
+      MAX: "24/7 SOC + threat hunting team; SOAR + automated containment; CTI feeds from multiple sources"
+    evidence_refs: ["SYSTEMS"]
+  - control: Forensic capability
+    current_by_tier:
+      MICRO: "None"
+      SMALL: "Logs retained 30 days; no forensic tooling"
+      MEDIUM: "Logs 90 days; EDR on endpoints; basic forensic playbooks"
+      LARGE: "Logs 1 year hot + 7 years cold; EDR + network forensics; chain-of-custody process"
+      MAX: "Logs 1y hot / 7y cold; EDR + memory + network + cloud forensics; certified chain-of-custody"
+    evidence_refs: ["STORES"]
+  - control: Notification and communication
+    current_by_tier:
+      MICRO: "Reactive; notifies when forced"
+      SMALL: "GDPR 72h process documented; no formal regulator contact"
+      MEDIUM: "GDPR 72h workflow tested; legal/PR escalation path"
+      LARGE: "GDPR 72h + NIS2 24h early warning + DORA 4h initial; regulator liaison rehearsed"
+      MAX: "Multi-jurisdiction notification runbook; BaFin / ECB / EBA templates pre-approved"
+    evidence_refs: ["SYSTEMS"]
+  - control: Post-incident review
+    current_by_tier:
+      MICRO: "Not performed"
+      SMALL: "After-action notes for major incidents only"
+      MEDIUM: "Post-mortem within 14 days for P1/P2"
+      LARGE: "Blameless post-mortem within 7 days; trend analysis quarterly; DORA Art. 19 lessons-learned"
+      MAX: "Blameless post-mortem within 5 days; cross-entity trend analysis; regulator-facing summaries"
+    evidence_refs: ["SYSTEMS"]

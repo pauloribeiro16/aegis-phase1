@@ -1,0 +1,50 @@
+# Control evidence — D-06 Third-Party Risk
+# Read by: src/aegis_phase1/v2/output/doc_04b.py:_section_control_evidence_D06
+# Each control lists evidence scaled by entity tier (MICRO..MAX).
+# evidence_refs codes correspond to architecture inputs:
+#   SYSTEMS → systems.yaml (cloud and third-party providers)
+#   FLOWS   → data_flows.yaml (cross-border / sub-processor flows)
+
+domain_id: D-06
+title: Third-Party
+controls:
+  - control: Vendor due diligence
+    current_by_tier:
+      MICRO: "None; picks cheapest vendor"
+      SMALL: "Lightweight questionnaire for new SaaS vendors"
+      MEDIUM: "Risk-tiered due diligence; security review for medium+ vendors"
+      LARGE: "Tiered due diligence per DORA Art. 28; on-site for critical; SIG / SIG-Lite for medium"
+      MAX: "Tiered due diligence + on-site + penetration test evidence; ongoing re-assessment annually"
+    evidence_refs: ["SYSTEMS"]
+  - control: Contracts and DPA
+    current_by_tier:
+      MICRO: "Click-through terms only"
+      SMALL: "Standard DPA + security schedule for medium+ vendors"
+      MEDIUM: "Negotiated DPA + security schedule; audit rights for critical vendors"
+      LARGE: "DORA-aligned contracts with exit, audit, sub-processor flow-down, concentration disclosure"
+      MAX: "DORA Art. 30 register-aligned contracts; mandatory audit + exit + step-in rights; ECB oversight"
+    evidence_refs: ["SYSTEMS"]
+  - control: Sub-processor oversight
+    current_by_tier:
+      MICRO: "Not tracked"
+      SMALL: "Sub-processors listed in DPA; no approval flow"
+      MEDIUM: "Sub-processor change notification; right to object for critical vendors"
+      LARGE: "Sub-processor register; change notification with 30-day objection window for critical"
+      MAX: "Real-time sub-processor register; continuous flow-down validation; concentration + jurisdiction risk"
+    evidence_refs: ["SYSTEMS"]
+  - control: Concentration risk
+    current_by_tier:
+      MICRO: "Not assessed"
+      SMALL: "Identifies single points of failure informally"
+      MEDIUM: "Annual concentration analysis for top-5 vendors; substitutability rating"
+      LARGE: "Quarterly concentration analysis; substitutability + exit cost per critical vendor per DORA Art. 28"
+      MAX: "Continuous concentration analysis; 25% threshold monitoring per industry default; ESA reporting ready"
+    evidence_refs: ["SYSTEMS"]
+  - control: Exit strategy
+    current_by_tier:
+      MICRO: "None"
+      SMALL: "Knows where the data is; no documented exit plan"
+      MEDIUM: "Documented exit plan for critical vendors; data return + deletion clauses"
+      LARGE: "Tested exit plans for critical ICT providers; DORA Art. 28(8) exit strategy register"
+      MAX: "Exit plans tested annually with simulated transition; data + code escrow for strategic vendors"
+    evidence_refs: ["SYSTEMS"]

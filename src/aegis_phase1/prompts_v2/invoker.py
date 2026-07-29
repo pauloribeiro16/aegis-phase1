@@ -17,16 +17,20 @@ Flow per call:
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import time
 import traceback
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from langchain_core.runnables.config import RunnableConfig
 
+from aegis_phase1.config.defaults import RAW_OUTPUT_DIR
 from aegis_phase1.prompts_v2.catalog import CatalogLoader
 from aegis_phase1.prompts_v2.llm_inventory import (
     get_invocation_pattern,
@@ -36,7 +40,8 @@ from aegis_phase1.prompts_v2.loader import PromptLoader
 from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 from aegis_phase1.prompts_v2.robust_parser import RobustParser
 from aegis_phase1.prompts_v2.validator import Phase1Validator
-from aegis_phase1.llm.unified import OllamaUnreachableError, probe_ollama
+from aegis_phase1.validator import ContentValidator
+from aegis_phase1.llm.unified import LLMUnreachableError, probe_ollama
 
 # CORR-048: module-level logger. Required for the prompt truncation
 # warning (line ~250) and any other logger calls in this file.
@@ -72,21 +77,36 @@ class Phase1LLMInvoker:
         self,
         prompt_loader: PromptLoader,
         catalog_loader: CatalogLoader | None = None,
-        validator: Phase1Validator | None = None,
+        validator: Phase1Validator | ContentValidator | None = None,
         llm_logger: JSONLLogger | None = None,
         format_logger: JSONLLogger | None = None,
         model: str | None = None,
         base_url: str | None = None,
         timeout: int | None = None,
         langfuse_handler: Any | None = None,
+        provider: str = "ollama",  # CORR-062 S2: "ollama" | "minimax"
     ) -> None:
         self.prompts = prompt_loader
         self.catalogs = catalog_loader
-        self.validator = validator
+        # CORR-061 S2: default to ContentValidator (markdown-only
+        # content-length check) instead of None. Callers can still
+        # pass Phase1Validator explicitly for strict JSON-Schema
+        # validation (legacy path; the source lives in
+        # _archive/corr061/validator.py).
+        self.validator = validator if validator is not None else ContentValidator()
         self.llm_logger = llm_logger
         self.format_logger = format_logger
         self.model = model or self.DEFAULT_MODEL
-        self.base_url = base_url or self.DEFAULT_BASE_URL
+        # CORR-062 S2: when provider=minimax, use the Mavis gateway
+        # base URL (M3 Token Plan endpoint), not Ollama's localhost.
+        if base_url:
+            self.base_url = base_url
+        elif provider == "minimax":
+            from aegis_phase1.llm.chat_minimax import DEFAULT_BASE_URL as _MINIMAX_URL
+            self.base_url = _MINIMAX_URL
+        else:
+            self.base_url = self.DEFAULT_BASE_URL
+        self.provider = provider
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self._langfuse_handler = langfuse_handler
 
@@ -149,6 +169,7 @@ class Phase1LLMInvoker:
         inputs: dict[str, Any],
         max_retries: int | None = None,
         config: RunnableConfig | None = None,
+        state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Invoke a Phase 1 LLM with full orchestration.
 
@@ -156,6 +177,16 @@ class Phase1LLMInvoker:
             spec_id: Canonical Phase 1 LLM ID (e.g. "P1B-LLM-01-INTERPRETATION")
             inputs: Dict of input data (case_facts, regulation, applicable_regs, etc.)
             max_retries: Override default retry count
+            config: Optional LangChain RunnableConfig (callbacks, run_name, etc.)
+            state: Optional pipeline state. When provided, the raw markdown
+                response of each successful attempt is appended to
+                ``state["per_spec_markdown"][spec_id]`` (CORR-061 S3b). For
+                multi-call specs (P1B-LLM-01/02 are called per regulation;
+                P1C-LLM-01 is called per domain) the per-call raw responses
+                are concatenated with a ``\\n\\n---\\n\\n`` separator so the
+                downstream doc renderers see the full spec output in a
+                single string. Pass ``None`` (default) to disable capture
+                (e.g. in tests that don't have an orchestrator state).
 
         Returns:
             {
@@ -196,14 +227,39 @@ class Phase1LLMInvoker:
         # CORR-048: idempotent attach of Langfuse callback. We attach our
         # stored handler (if any) but only if not already present in
         # ``config["callbacks"]`` — prevents double-attach on retry.
+        # CORR-062 S1 v5 fix: ``config["callbacks"]`` may be a list (legacy
+        # call sites, tests) OR a ``BaseCallbackManager`` (LangChain
+        # ``RunnableConfig`` set by ``with_config()`` / ``bind()`` in graph
+        # executor paths — see ``phase1_executor.py:run``). The previous
+        # ``list(config.get("callbacks") or [])`` raised
+        # ``TypeError: 'CallbackManager' object is not iterable`` on the
+        # v4 run when called from the LangGraph path. Defensive read:
         if self._langfuse_handler is not None:
-            existing = list(config.get("callbacks") or [])
-            if self._langfuse_handler not in existing:
-                existing.append(self._langfuse_handler)
-            config = {**config, "callbacks": existing}
+            _cbs = config.get("callbacks")
+            if _cbs is None:
+                _existing: list = []
+            elif isinstance(_cbs, list):
+                _existing = list(_cbs)
+            elif hasattr(_cbs, "handlers"):
+                # BaseCallbackManager — combine regular + inheritable handlers
+                _existing = list(getattr(_cbs, "handlers", []) or []) + list(
+                    getattr(_cbs, "inheritable_handlers", []) or []
+                )
+            else:
+                # Unknown container type — best-effort iterate
+                try:
+                    _existing = list(_cbs)
+                except TypeError:
+                    _existing = []
+            if self._langfuse_handler not in _existing:
+                _existing.append(self._langfuse_handler)
+            config = {**config, "callbacks": _existing}
 
-        if not probe_ollama(base_url=self.base_url):
-            raise OllamaUnreachableError(self.base_url, "Phase1LLMInvoker.invoke")
+        # CORR-064 fix: Ollama probe only meaningful for the Ollama
+        # provider. Calling it on the MiniMax gateway URL would 404
+        # at /api/tags and raise a spurious LLMUnreachableError.
+        if self.provider == "ollama" and not probe_ollama(base_url=self.base_url):
+            raise LLMUnreachableError(self.base_url, "Phase1LLMInvoker.invoke")
 
         all_attempts: list[dict[str, Any]] = []
         total_start = time.time()
@@ -220,6 +276,15 @@ class Phase1LLMInvoker:
             all_attempts.append(attempt_result)
 
             if attempt_result["ok"]:
+                # CORR-061 S3b: capture the raw markdown response to
+                # ``state["per_spec_markdown"][spec_id]`` so the doc
+                # renderers can consume it directly instead of the
+                # legacy typed dicts. Only fires when the caller
+                # passes ``state`` (test paths pass None).
+                if state is not None:
+                    self._capture_per_spec_markdown(
+                        state, spec_id, attempt_result,
+                    )
                 return {
                     "status": "OK",
                     "spec_id": spec_id,
@@ -315,7 +380,9 @@ class Phase1LLMInvoker:
                         pass
             schema = self.prompts.load(spec_id).get("schema") or {}
 
-            # 2. Build Ollama client with optional format constraint
+            # 2. Build the chat client. CORR-062 S2: provider-aware —
+            #    provider="minimax" → ChatMinimax (M3/M2.7 via Mavis
+            #    gateway); otherwise ChatOllama (legacy local path).
             from aegis_phase1.prompts_v2.markdown_parser import MARKDOWN_PARSERS
 
             llm_kwargs: dict[str, Any] = {
@@ -329,7 +396,18 @@ class Phase1LLMInvoker:
             # the instruction. Legacy specs (no parser) keep format=.
             if schema and spec_id not in MARKDOWN_PARSERS:
                 llm_kwargs["format"] = schema
-            llm = ChatOllama(**llm_kwargs)
+            if self.provider == "minimax":
+                # ChatMinimax has its own DEFAULT_BASE_URL; don't pass
+                # base_url= here (we already set self.base_url to the
+                # gateway URL in __init__, which ChatMinimax will pick
+                # up via the constructor below).
+                from aegis_phase1.llm.chat_minimax import ChatMinimax
+                llm = ChatMinimax(
+                    model=self.model,
+                    base_url=self.base_url,
+                )
+            else:
+                llm = ChatOllama(**llm_kwargs)
 
             # 3. Call LLM
             start = time.time()
@@ -376,6 +454,20 @@ class Phase1LLMInvoker:
                 }
                 if self.llm_logger:
                     self.llm_logger.log(error_event)
+                # CORR-061 S4: capture every attempt to disk, even on
+                # connection / timeout failures. The raw response is
+                # empty here — that itself is signal.
+                self._persist_raw_call(
+                    spec_id=spec_id,
+                    attempt=attempt,
+                    prompt_system=prompt["system"],
+                    prompt_user=prompt["user"],
+                    raw_response="",
+                    status="PYTHON_ERROR",
+                    latency_ms=latency_ms,
+                    model=self.model,
+                    error=str(e),
+                )
                 return {
                     "ok": False,
                     "parse_status": "PYTHON_ERROR",
@@ -413,6 +505,20 @@ class Phase1LLMInvoker:
                             "user_prompt_length": len(prompt["user"]),
                         },
                     })
+                # CORR-061 S4: capture every attempt — the raw
+                # response landed but failed to parse; we still want
+                # it on disk so reviewers can see what the model said.
+                self._persist_raw_call(
+                    spec_id=spec_id,
+                    attempt=attempt,
+                    prompt_system=prompt["system"],
+                    prompt_user=prompt["user"],
+                    raw_response=raw,
+                    status="PARSE_ERROR",
+                    latency_ms=latency_ms,
+                    model=self.model,
+                    error=parse_result.error,
+                )
                 return {
                     "ok": False,
                     "parse_status": "PARSE_ERROR",
@@ -490,9 +596,26 @@ class Phase1LLMInvoker:
                     output = {"items": output}
                 validation_result = {"valid": True, "warnings": []}
                 if self.validator:
-                    validation_result = self.validator.validate(
-                        spec_id, output, inputs
-                    )
+                    if isinstance(self.validator, ContentValidator):
+                        # CORR-061 S2: markdown-only path.
+                        # ContentValidator checks raw text length,
+                        # not JSON Schema. Convert its dataclass
+                        # result to the dict shape the rest of
+                        # this method expects.
+                        case_id = (inputs or {}).get("case_id") if inputs else None
+                        _cv = self.validator.validate(
+                            raw, spec_id=spec_id, case_id=case_id,
+                        )
+                        validation_result = {
+                            "valid": _cv.status == "OK",
+                            "errors": list(_cv.errors),
+                            "warnings": list(_cv.warnings),
+                        }
+                    else:
+                        # Legacy JSON Schema path (Phase1Validator)
+                        validation_result = self.validator.validate(
+                            spec_id, output, inputs
+                        )
 
             # Token usage (best-effort; Ollama may not always expose it)
             usage = self._extract_usage(response)
@@ -535,6 +658,23 @@ class Phase1LLMInvoker:
             if self.llm_logger:
                 self.llm_logger.log(call_event)
 
+            # CORR-061 S4: persist every attempt — success (status=OK)
+            # and validation failure (status=SCHEMA_ERROR) both go to
+            # disk so reviewers can audit what the model produced.
+            self._persist_raw_call(
+                spec_id=spec_id,
+                attempt=attempt,
+                prompt_system=prompt["system"],
+                prompt_user=prompt["user"],
+                raw_response=raw,
+                status=status,
+                latency_ms=latency_ms,
+                model=self.model,
+                error=None if validation_result["valid"] else str(
+                    validation_result.get("errors") or "validation failed"
+                ),
+            )
+
             return {
                 "ok": validation_result["valid"],
                 "parse_status": "PARSED",
@@ -542,6 +682,11 @@ class Phase1LLMInvoker:
                 "validation": validation_result,
                 "latency_ms": latency_ms,
                 "usage": usage,
+                # CORR-061 S3b: thread the raw markdown response back
+                # to ``invoke()`` so it can be captured into
+                # ``state["per_spec_markdown"][spec_id]``. Was previously
+                # not returned — only the parsed structured output was.
+                "raw_response": raw,
             }
 
         except Exception as e:
@@ -569,6 +714,20 @@ class Phase1LLMInvoker:
             }
             if self.llm_logger:
                 self.llm_logger.log(error_event)
+            # CORR-061 S4: capture even catastrophic failures. If
+            # ``prompt`` was never bound (render itself blew up) we
+            # write empty placeholders so the file is well-formed.
+            self._persist_raw_call(
+                spec_id=spec_id,
+                attempt=attempt,
+                prompt_system=(prompt.get("system", "") if isinstance(prompt, dict) else ""),
+                prompt_user=(prompt.get("user", "") if isinstance(prompt, dict) else ""),
+                raw_response="",
+                status="PYTHON_ERROR",
+                latency_ms=0.0,
+                model=self.model,
+                error=str(e),
+            )
             return {
                 "ok": False,
                 "parse_status": "PYTHON_ERROR",
@@ -576,6 +735,178 @@ class Phase1LLMInvoker:
                 "validation": None,
                 "parsed_output": None,
             }
+
+    @staticmethod
+    def _capture_per_spec_markdown(
+        state: dict[str, Any],
+        spec_id: str,
+        attempt_result: dict[str, Any],
+    ) -> None:
+        """CORR-061 S3b: append the successful attempt's raw markdown to ``state``.
+
+        Writes to ``state["per_spec_markdown"][spec_id]``. The
+        ``per_spec_markdown`` dict is initialised at orchestrator-load time
+        (see ``Phase1Orchestrator._init_state``) as a
+        ``dict[spec_id, str]`` so a missing key here means the state
+        was not initialised — we initialise it lazily and log a warning.
+
+        For specs invoked multiple times (P1B-LLM-01/02 per regulation,
+        P1C-LLM-01 per domain), each successful call appends its raw
+        response with a markdown horizontal-rule separator
+        (``\\n\\n---\\n\\n``) so the renderer sees the full spec output
+        in a single string. The first call's response is stored verbatim
+        (no leading separator).
+
+        Args:
+            state: Pipeline state (mutated in place).
+            spec_id: Canonical Phase 1 LLM ID.
+            attempt_result: The successful attempt's return value
+                (carries ``raw_response``; threaded through from
+                :meth:`_attempt` since S3b).
+        """
+        raw = attempt_result.get("raw_response")
+        if not raw:
+            return
+
+        bucket = state.setdefault("per_spec_markdown", {})
+        if not isinstance(bucket, dict):
+            logger.warning(
+                "CORR-061 S3b: state['per_spec_markdown'] is not a dict "
+                "(type=%s); re-initialising — downstream renderers may miss "
+                "previous responses",
+                type(bucket).__name__,
+            )
+            bucket = {}
+            state["per_spec_markdown"] = bucket
+
+        existing = bucket.get(spec_id)
+        if isinstance(existing, str) and existing:
+            # Subsequent call for the same spec — append with a
+            # horizontal-rule separator so reviewers can grep the
+            # boundary between lanes.
+            bucket[spec_id] = existing + "\n\n---\n\n" + raw
+        else:
+            bucket[spec_id] = raw
+
+    @staticmethod
+    def _persist_raw_call(
+        spec_id: str,
+        attempt: int,
+        prompt_system: str,
+        prompt_user: str,
+        raw_response: str,
+        status: str,
+        latency_ms: float,
+        model: str,
+        error: str | None = None,
+    ) -> None:
+        """CORR-061 S4: persist every LLM attempt to disk for offline audit.
+
+        Writes TWO files under ``<AEGIS_RAW_OUTPUT_DIR>/<spec_id>/``:
+
+          * ``<UTC-timestamp>__attempt<N>.md``  — YAML frontmatter with
+            metadata, the full system + user prompts (clearly delimited
+            by ``## Prompt (system)`` / ``## Prompt (user)``), and the
+            raw model response. This is the human-review artefact.
+          * ``<UTC-timestamp>__attempt<N>.json`` — the same metadata as
+            structured JSON, plus a 200-char preview of the raw response
+            (the full body is in the ``.md`` to keep the JSON small).
+            This is the programmatic-access artefact.
+
+        Both files are always written; the JSON omits the full prompt
+        body on purpose so the index stays small even for very long
+        prompts (P1C-LLM-01 prompts are ~850KB).
+
+        The base directory is resolved from the ``AEGIS_RAW_OUTPUT_DIR``
+        env var, falling back to the canonical default
+        :data:`aegis_phase1.config.defaults.RAW_OUTPUT_DIR`
+        (``output/phase1/raw``). The directory is created lazily
+        (mkdir -p) on every call — capture works even on the very
+        first attempt of a fresh run.
+
+        Timestamp format: ``YYYY-MM-DDTHH-MM-SS`` in **UTC** (matches
+        the existing ``datetime.now(UTC)`` usage elsewhere in this
+        module; deterministic and timezone-independent for cross-team
+        review).
+
+        Errors during persistence are swallowed with a warning — the
+        run must not be aborted just because disk capture failed. The
+        in-memory state capture (S3b ``_capture_per_spec_markdown``)
+        remains the primary in-process record.
+
+        Args:
+            spec_id: Canonical Phase 1 LLM ID (e.g. ``P1B-LLM-01-INTERPRETATION``).
+            attempt: 1-based attempt number within the retry loop.
+            prompt_system: Full system prompt sent to the model.
+            prompt_user: Full user prompt sent to the model.
+            raw_response: Raw model response (may be empty on connection failure).
+            status: Attempt status (``OK``, ``SCHEMA_ERROR``, ``PARSE_ERROR``,
+                ``PYTHON_ERROR``, ``INSUFFICIENT_EVIDENCE``, …).
+            latency_ms: Wall-clock latency in milliseconds.
+            model: Model tag (e.g. ``gemma4:e2b``).
+            error: Optional human-readable error string; included in
+                frontmatter and JSON when set.
+        """
+        try:
+            base_dir = Path(os.environ.get("AEGIS_RAW_OUTPUT_DIR", RAW_OUTPUT_DIR))
+            spec_dir = base_dir / spec_id
+            spec_dir.mkdir(parents=True, exist_ok=True)
+
+            timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S")
+            md_path = spec_dir / f"{timestamp}__attempt{attempt}.md"
+            json_path = spec_dir / f"{timestamp}__attempt{attempt}.json"
+
+            # YAML frontmatter + prompt + raw response
+            fm_lines = [
+                "---",
+                f"spec_id: {spec_id}",
+                f"attempt: {attempt}",
+                f"model: {model}",
+                f"status: {status}",
+                f"latency_ms: {latency_ms}",
+                f"timestamp: {timestamp}",
+            ]
+            if error:
+                # Use a quoted scalar so newlines / colons in error
+                # text don't break YAML parsing during offline review.
+                escaped = str(error).replace("\n", " ").replace('"', "'")
+                fm_lines.append(f'error: "{escaped}"')
+            fm_lines.append("---")
+            fm_lines.append("")
+
+            md_content = "\n".join(fm_lines) + "\n"
+            md_content += "## Prompt (system)\n\n"
+            md_content += (prompt_system or "(empty)") + "\n\n"
+            md_content += "## Prompt (user)\n\n"
+            md_content += (prompt_user or "(empty)") + "\n\n"
+            md_content += "## Raw response\n\n"
+            md_content += (raw_response or "(empty)") + "\n"
+
+            md_path.write_text(md_content, encoding="utf-8")
+
+            json_content = {
+                "spec_id": spec_id,
+                "attempt": attempt,
+                "model": model,
+                "status": status,
+                "latency_ms": latency_ms,
+                "timestamp": timestamp,
+                "prompt_system_chars": len(prompt_system or ""),
+                "prompt_user_chars": len(prompt_user or ""),
+                "raw_response_chars": len(raw_response or ""),
+                "raw_response_preview": (raw_response or "")[:200],
+                "error": error,
+            }
+            json_path.write_text(
+                json.dumps(json_content, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception as _persist_err:
+            # Never let a capture failure abort the run — log and move on.
+            logger.warning(
+                "CORR-061 S4: failed to persist raw call for %s attempt %d: %s",
+                spec_id, attempt, _persist_err,
+            )
 
     @staticmethod
     def _extract_usage(response: Any) -> dict[str, Any]:

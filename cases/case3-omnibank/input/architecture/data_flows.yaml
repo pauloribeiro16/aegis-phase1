@@ -1,0 +1,96 @@
+# Data Flows (Case 03 — OmniBank Financial Systems S.A.)
+# 10 banking flows: end-user → web/app, CBS → AML, AML → BaFin,
+# KYC → CRM, credit scoring, DPO access, audit log, key rotation,
+# regulatory data lake ingestion.
+# Schema mirrors doc_04a._data_flows_table columns:
+#   id, source, destination, data_type, volume, encryption_in_transit, protocol, subprocessor
+data_flows:
+  - id: FLOW-01
+    source: Retail customer browser (DE/EU)
+    destination: SYS-WEB (AWS Frankfurt)
+    data_type: Customer PII (name, email, phone, address) + authn credentials
+    volume: ~2 M unique customers; ~150 M sessions/month
+    encryption_in_transit: TLS 1.3 (FAPI 2.0 profile)
+    protocol: HTTPS / OAuth2 + PKCE
+    subprocessor: N
+
+  - id: FLOW-02
+    source: SYS-WEB (customer session)
+    destination: SYS-CBS (on-prem Frankfurt)
+    data_type: Account ops (transfers, balance inquiry, payment orders)
+    volume: ~25 M ops/day
+    encryption_in_transit: mTLS 1.3 (mutual, FAPI-aligned)
+    protocol: gRPC over HTTPS / IPSec (DC1↔DC2 fallback)
+    subprocessor: N
+
+  - id: FLOW-03
+    source: SYS-CBS (transaction stream)
+    destination: SYS-AML (NICE Actimize, AWS Frankfurt)
+    data_type: Transactional PII + tx metadata (Art. 4(1) GDPR + GwG)
+    volume: ~25 M tx/day, ~6 TB/day
+    encryption_in_transit: mTLS 1.3 (Kafka + TLS, SASL_SSL)
+    protocol: Kafka over TLS / REST
+    subprocessor: Y (NICE Actimize vendor)
+
+  - id: FLOW-04
+    source: SYS-AML (alerts, STRs)
+    destination: BaFin (FIU Germany via goAML)
+    data_type: Suspicious Transaction Reports (STR), no PII beyond name + IBAN
+    volume: ~150 STRs/month + 50 SARs/month
+    encryption_in_transit: TLS 1.3 (BaFin goAML gateway, X.509)
+    protocol: HTTPS / goAML XML
+    subprocessor: N (regulator)
+
+  - id: FLOW-05
+    source: Customer (in-branch + online)
+    destination: SYS-KYC
+    data_type: Passport, selfie, proof-of-address, liveness video, PEP/sanctions hit
+    volume: ~40 K new KYC/year + ~120 K refresh/year
+    encryption_in_transit: TLS 1.3
+    protocol: HTTPS + multipart upload, S3 presigned URL
+    subprocessor: Y (Onfido, Persona, Refinitiv)
+
+  - id: FLOW-06
+    source: SYS-KYC (PII + tx history)
+    destination: SYS-CREDITAI (on-prem GPU cluster)
+    data_type: Features for credit scoring (PD/LGD models)
+    volume: ~5 TB feature set, weekly refresh
+    encryption_in_transit: mTLS 1.3 (internal VLAN)
+    protocol: Apache Arrow Flight over TLS
+    subprocessor: N
+
+  - id: FLOW-07
+    source: SYS-CREDITAI (model output)
+    destination: SYS-CBS (decision ingest) + SYS-DWH (analytical)
+    data_type: Score + decision (approve / refer / decline) + reasons
+    volume: ~80 K scoring requests/day
+    encryption_in_transit: mTLS 1.3
+    protocol: gRPC + signed payload (Ed25519)
+    subprocessor: N
+
+  - id: FLOW-08
+    source: SYS-CBS / SYS-AML / SYS-PAYMENTS / SYS-WEB
+    destination: STORE-AUDIT-LOG
+    data_type: Immutable audit events (auth, tx, admin actions, AML alerts)
+    volume: ~50 GB/day, ~18 TB/year compressed
+    encryption_in_transit: mTLS 1.3, signed batch manifest (Sigstore)
+    protocol: Kafka over TLS → S3 via Kafka Connect
+    subprocessor: N
+
+  - id: FLOW-09
+    source: STORE-KMS (Thales HSM, primary cluster)
+    destination: STORE-KMS (DR cluster, Munich DC2)
+    data_type: HSM key material (encrypted, quorum-protected)
+    volume: All keys, replicated on rotation
+    encryption_in_transit: mTLS 1.3 (HSM-to-HSM, dedicated VLAN)
+    protocol: Thales pedware + custom replication protocol
+    subprocessor: N
+
+  - id: FLOW-10
+    source: SYS-CBS / SYS-PAYMENTS / SYS-AML
+    destination: STORE-REG-REPORT-LAKE (Iceberg)
+    data_type: Regulatory reporting data (FinRep, CoRep, AnaCredit, GwG)
+    volume: ~500 GB/day, monthly regulatory packs
+    encryption_in_transit: mTLS 1.3
+    protocol: Kafka + Iceberg streaming ingest
+    subprocessor: N

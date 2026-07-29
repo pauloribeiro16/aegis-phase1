@@ -59,7 +59,14 @@ include = ["aegis_phase1*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --tb=short"
+# CORR-059: -n auto enables pytest-xdist parallelism (xdist 3.8.0 installed).
+# Tests are CPU-bound pure-Python (LLM calls all mocked) and construct
+# independent state, so they parallelize near-linearly. -p no:logging silences
+# xdist's verbose "RoutingLog" warnings to keep output clean.
+# --timeout=30 (pytest-timeout 2.4.0) kills any test that hangs >30s — prevents
+# a single broken test (e.g. one that forgot MOCK_LLM=true and fires real
+# Ollama calls against a down server) from blocking the whole suite forever.
+addopts = "-ra --tb=short -n auto -p no:logging --timeout=30"
 markers = [
     "integration: requires running services",
     "slow: long-running tests",

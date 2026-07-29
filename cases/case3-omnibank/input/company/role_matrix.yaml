@@ -1,0 +1,53 @@
+# AEGIS Phase 1 — Role Matrix (Case 03 — OmniBank Financial Systems S.A.)
+# Banking-grade role matrix for 5 regulations × role.
+# Captures the company's role per regulation + native compliance
+# status + inherited obligations + notes.
+gdpr:
+  role: controller
+  native_compliance: true
+  inherited_obligations:
+    - "Article 30 records of processing"
+    - "Article 32 security of processing"
+    - "Article 33 breach notification (72h)"
+    - "Article 35 DPIA (high-risk: credit scoring, large-scale monitoring)"
+    - "Article 28(3) processor DPA + subprocessor register"
+  notes: "Controller for customer + employee data; joint controllership with payment processors for tx-data; processor for B2B partner APIs."
+cra:
+  role: manufacturer
+  native_compliance: true
+  inherited_obligations:
+    - "Annex I essential cybersecurity requirements (parts 1 + 2)"
+    - "Annex VII conformity assessment (Class I internal control)"
+    - "Annex VIII CE marking + technical documentation"
+    - "Article 14 vulnerability handling (24h early warning + 72h notification)"
+  notes: "Mobile app + web platform placed on EU market; Class I (important) due to financial-data handling."
+nis2:
+  role: essential_entity
+  native_compliance: true
+  inherited_obligations:
+    - "Art. 21 cybersecurity risk-management measures (10 items)"
+    - "Art. 23 reporting obligations (early warning 24h, incident 72h, final report 30d)"
+    - "Art. 21(2)(g) supply-chain security"
+    - "Art. 21(2)(j) business continuity and crisis management"
+  notes: "Banking sector = Annex I; ESSENTIAL entity (>250 employees + significant institution)."
+dora:
+  role: financial_entity
+  native_compliance: true
+  inherited_obligations:
+    - "Art. 6 ICT risk management framework"
+    - "Art. 8 ICT systems resilience + DR"
+    - "Art. 12 ICT operations monitoring (24/7 SOC)"
+    - "Art. 17 ICT-related incident management + classification"
+    - "Art. 19 major ICT-related incident reporting (4h initial + 72h intermediate + 1mo final)"
+    - "Art. 28 ICT third-party risk register + concentration risk"
+    - "Art. 30 subcontracting chain (DORA-aligned subprocessor clauses)"
+  notes: "Credit institution (CRR Art. 4(1)(1)) + payment service provider (PSD2 Art. 4(11))."
+ai_act:
+  role: deployer
+  native_compliance: false
+  inherited_obligations:
+    - "Article 26 deployer obligations (human oversight, monitoring, log retention)"
+    - "Article 27 fundamental rights impact assessment (FRIA) for Annex III 5(b)"
+    - "Article 26(5) information to affected natural persons (Art. 13 GDPR-aligned)"
+    - "Article 14 human oversight + robustness"
+  notes: "Credit scoring AI (Annex III 5(b)) is a high-risk system; OmniBank is deployer (not provider); some obligations inherited from the model vendor under contractual SLAs."

@@ -345,6 +345,13 @@ class P1BLLM01Status(str, Enum):
     OK = "OK"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
     INDETERMINATE = "INDETERMINATE"
+    # CORR-065: also accept the legacy/templated values emitted by
+    # the example block in the prompt file (`- applicable: YES/NO`).
+    # The JSON Schema in output_schemas.yaml says OK/INSUFFICIENT_EVIDENCE/
+    # INDETERMINATE, but the example output uses YES/NO/INDETERMINATE —
+    # real models (gemma4:e4b, MiniMax-M3) follow the example.
+    YES = "YES"
+    NO = "NO"
 
 
 class P1BLLM01Confidence(str, Enum):
@@ -360,6 +367,14 @@ class P1BLLM01Applicable(str, Enum):
 
     YES = "YES"
     NO = "NO"
+    # CORR-065: added INDETERMINATE so the parser can accept models
+    # (like MiniMax-M3) that emit bullet-style `## Interpretations`
+    # lists with `(INDETERMINATE)` for catalog entries whose
+    # activation_predicate does not match the company's facts. This
+    # was previously a hard parse error; the enum now matches
+    # P1BLLM01Status and P1BLLM01DerogationVerdict which already
+    # allow INDETERMINATE.
+    INDETERMINATE = "INDETERMINATE"
 
 
 class P1BLLM01DerogationVerdict(str, Enum):
@@ -412,6 +427,42 @@ class P1BLLM01Output(BaseModel):
     confidence: P1BLLM01Confidence
     interpretations: list[P1BLLM01Interpretation] = Field(default_factory=list)
     derogations: list[P1BLLM01Derogation] = Field(default_factory=list)
+
+    model_config = {"extra": "ignore"}
+
+
+class GenericMarkdownOutput(BaseModel):
+    """CORR-066: parser-agnostic markdown container for the 4 LLMs
+    that don't yet have a spec-specific parser
+    (P1B-LLM-02-RATIONALE, P1C-LLM-01-OVERLAP-CLASSIFICATION,
+    P1C-LLM-02-COMPOUND-EVENT, P1C-LLM-03-STRATEGIC-SYNTHESIS).
+
+    These LLMs emit markdown with a `## Status` block (containing
+    `applicable` and `confidence`) plus 1-3 spec-specific body
+    sections (Findings / Rationale / Synthesis / Events / etc).
+    Rather than write a hand-rolled parser per spec, we capture the
+    `## Status` fields structurally and store every other
+    `## Section` body verbatim in ``sections[section_name]``.
+
+    Downstream doc renderers and the v2 orchestrator can use either
+    the structured fields or the raw ``sections`` blob. The
+    raw markdown is also captured separately in
+    ``state['per_spec_markdown'][spec_id]`` (CORR-061 S3b) for
+    renderers that prefer to consume the original text.
+    """
+
+    # Envelope (invoker-injected; LLM never emits)
+    prompt_spec_id: str = ""
+    schema_version: str = "1.0.0"
+    case_id: str = ""
+    invocation_pattern: str = "per_regulation"
+
+    # Content (LLM-emitted, parser-extracted from `## Status`)
+    status: P1BLLM01Status = P1BLLM01Status.OK
+    confidence: P1BLLM01Confidence = P1BLLM01Confidence.MEDIUM
+
+    # Raw sections from the LLM markdown (key = section name, value = body)
+    sections: dict[str, str] = Field(default_factory=dict)
 
     model_config = {"extra": "ignore"}
 

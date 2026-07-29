@@ -5,7 +5,7 @@ Each stage updates V2State and persists to work/state.json.
 
 MAP stage (Sprint MAP-3):
     - Sequential processing (per-domain, one at a time).
-    - Ollama network failures propagate as ``OllamaUnreachable``.
+    - Ollama network failures propagate as ``LLMUnreachable``.
     - Per-domain parse failures accumulate; ``MapPartialFailure`` is
       raised at the end if any domain is still ``FAILED``.
     - ``retry_failed()`` re-processes a chosen subset of failed domains.
@@ -59,6 +59,7 @@ class Phase1Orchestrator:
         preproc_catalog: "PreprocCatalogLoader | None" = None,
         case_profile_loader: "CaseProfileLoader | None" = None,
         catalog_loader: "CatalogLoader | None" = None,
+        run_id: str | None = None,
     ):
         """Initialize the orchestrator.
 
@@ -93,14 +94,33 @@ class Phase1Orchestrator:
         # Set in _load_v2_catalog — see T1 branch below.
         self._skip_reduce_llms = False
         self._skip_phase_1b = False
-        self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
+        # CORR-060 (multi-model eval): when the runner sets AEGIS_LOG_DIR
+        # to a per-model subdir (e.g. logs/phase1/gemma4_e2b), the MAP
+        # per-domain jsonl files land under that model dir, not under
+        # <work_dir>/logs/... . Falls back to legacy <work_dir>/logs/...
+        # when AEGIS_LOG_DIR is unset.
+        import os as _os
+        _log_base = _os.environ.get("AEGIS_LOG_DIR")
+        if _log_base:
+            self.log_dir = Path(_log_base) / "v2" / "map"
+        else:
+            self.log_dir = self.work_dir.parent / "logs" / "phase1" / "v2" / "map"
 
         try:
             from aegis_phase1.llm.tracing import get_langfuse_callback
 
-            _, self._langfuse_handler = get_langfuse_callback()
+            # CORR-063 S4: pass run_id to Langfuse so the 18 traces
+            # of this run share session_id and are groupable in the
+            # UI. If not provided, tracing.py generates a UUID.
+            _, self._langfuse_handler = get_langfuse_callback(run_id=run_id)
+            self.run_id = run_id or (
+                self._langfuse_handler.trace_context.get("session_id")
+                if self._langfuse_handler and hasattr(self._langfuse_handler, "trace_context")
+                else None
+            )
         except Exception:  # noqa: BLE001 — tracing is optional
             self._langfuse_handler = None
+            self.run_id = run_id
 
         if (
             self._langfuse_handler is not None
@@ -154,6 +174,10 @@ class Phase1Orchestrator:
                 # without re-parsing the YAML.
                 self.state["v2_regulatory_rationale"] = dict(profile.regulatory.applicability_rationale)
                 self.state["v2_clause_count_per_reg"] = dict(profile.regulatory.clause_count_per_reg)
+                # CORR-073: GDPR Art. 30 personal-data inventory
+                self.state["v2_personal_data_categories"] = list(
+                    profile.personal_data_categories or []
+                )
                 logger.debug(
                     "T3a: case_profile loaded — %d stakeholders, %d goals, %d architecture sections",
                     len(profile.stakeholders),
@@ -333,23 +357,39 @@ class Phase1Orchestrator:
                         if hasattr(value, "model_dump")
                         else value
                     )
+            # CORR-073: surface personal_data_categories (GDPR Art. 30)
+            # on the v1 company_context shim so doc_04a + future
+            # consumers can read it.
+            pdc = getattr(profile, "personal_data_categories", None) or []
+            if pdc:
+                base["personal_data_categories"] = [dict(c) for c in pdc]
+                base["data_types"] = [dict(c) for c in pdc]
 
         return base
 
     def _build_architecture_inventory(self) -> dict[str, list[dict[str, Any]]]:
-        """Build v1-shape architecture_inventory (dict[str, list[dict]])."""
+        """Build v1-shape architecture_inventory (dict[str, list[dict]]).
+
+        CORR-073: also surfaces ``architecture/data_subjects.yaml`` (if
+        present) under the ``data_subjects`` key so doc_04a §2.4 has data.
+        Pre-CORR-073 the architecture loader only consumed systems /
+        auth_systems / cloud_services / data_flows / data_stores;
+        data_subjects was loaded but not threaded into the inventory.
+        """
         profile = self.state.get("v2_company_profile")
         if profile is None:
             return {}
         arch = profile.architecture
-        return {
+        inv: dict[str, list[dict[str, Any]]] = {
             "N.1_systems": list(arch.systems),
             "N.2_auth": list(arch.auth_systems),
             "N.3_cloud": list(arch.cloud_services),
             "N.4_data_flows": list(arch.data_flows),
             "N.5_data_stores": list(arch.data_stores),
             "N.6_other": [],
+            "data_subjects": list(getattr(arch, "data_subjects", []) or []),
         }
+        return inv
 
     def _build_ontology_shim(self) -> dict[str, Any]:
         """Build v1-shape ontology from v2 pairs.
@@ -357,12 +397,21 @@ class Phase1Orchestrator:
         v1 ontology had: overlaps, regulations, source_regulations, stacks.
         v2 sources give us: v2_pairs (cross-regulation pairs) and
         v2_applicable_regs.
+
+        CORR-073: also threads `company.data_types` from
+        ``v2_personal_data_categories`` so doc_04a §2.3 Personal Data
+        Categories has data to render.
         """
         return {
             "regulations": list(self.state.get("v2_applicable_regs", [])),
             "overlaps": [p.model_dump() for p in self.state.get("v2_pairs", [])],
             "source_regulations": {},
             "stacks": [],
+            "company": {
+                "data_types": list(
+                    self.state.get("v2_personal_data_categories") or []
+                ),
+            },
         }
 
     def _build_preprocessing_shim(self) -> dict[str, Any]:
@@ -487,7 +536,7 @@ class Phase1Orchestrator:
         DomainActivationContext) don't change.
 
         Raises:
-            OllamaUnreachable: Propagated from ``map_single_domain`` when
+            LLMUnreachable: Propagated from ``map_single_domain`` when
                 the LLM is unreachable. The whole MAP stage aborts.
             MapPartialFailure: When ≥1 domain ends with status FAILED
                 (after retries). The state is persisted before raising.
@@ -498,7 +547,7 @@ class Phase1Orchestrator:
         from aegis_phase1.v2.domain.processor import (
             DomainProcessor,
             MapPartialFailure,
-            OllamaUnreachable,
+            LLMUnreachable,
         )
 
         # CORR-040-T2: try the canonical P1C-LLM-01 path first
@@ -523,8 +572,12 @@ class Phase1Orchestrator:
                 self._seed_review_after_map(results)
                 failed = [d for d, r in results.items() if r.get("llm_status") == "FAILED"]
                 if failed:
+                    # CORR-067 S2: pass failed_domains to the exception
+                    # so the runner can decide between graceful partial
+                    # docs and hard abort based on a threshold.
                     raise MapPartialFailure(
-                        f"{len(failed)} domain(s) failed: {failed}"
+                        f"{len(failed)} domain(s) failed: {failed}",
+                        failed_domains=failed,
                     )
                 return self.state
             except MapPartialFailure:
@@ -552,12 +605,18 @@ class Phase1Orchestrator:
         for did in domain_ids:
             try:
                 result = self.map_single_domain(did, processor=processor)
-            except OllamaUnreachable as exc:
-                logger.error("MAP aborted — Ollama unreachable on %s: %s", did, exc)
-                self.state["domain_results"] = results
-                self.state["current_stage"] = "MAP_FAILED"
-                self._persist_state()
-                raise
+            except LLMUnreachable as exc:
+                # CORR-064 S5.2b: do NOT abort the entire MAP. Mark
+                # this domain as failed and continue with the rest.
+                # The chat_minimax retry (S5.1) already tried 3 times
+                # before propagating the exception; if it still
+                # reached here, the failure is likely fatal but
+                # shouldn't poison the other 9 domains.
+                logger.exception(
+                    "MAP raised LLMUnreachable for %s — marking as failed and continuing",
+                    did,
+                )
+                result = self._failed_domain_result(did, exc)
             except Exception as exc:
                 logger.exception("MAP raised for %s: %s", did, exc)
                 result = self._failed_domain_result(did, exc)
@@ -586,7 +645,13 @@ class Phase1Orchestrator:
                 len(failed_domains),
                 failed_domains,
             )
-            raise MapPartialFailure(f"{len(failed_domains)} domain(s) failed: {failed_domains}")
+            # CORR-067 S2: pass failed_domains to the exception so the
+            # runner can decide between graceful partial docs and hard
+            # abort based on a threshold.
+            raise MapPartialFailure(
+                f"{len(failed_domains)} domain(s) failed: {failed_domains}",
+                failed_domains=failed_domains,
+            )
         return self.state
 
     def _map_domains_via_p1c_llm_01(
@@ -622,6 +687,7 @@ class Phase1Orchestrator:
         lane_outputs = executor.run_phase_1c_map(
             case_id=case_id,
             applicable_regs=applicable_regs,
+            state=self.state,
             company_facts=cc,
             layer0_subdomain_refs=self._build_layer0_subdomain_refs(
                 list((self.state.get("subdomains") or {}).keys())
@@ -651,10 +717,30 @@ class Phase1Orchestrator:
                         "layer0_refs": sd.get("layer0_refs", []),
                     }
                 )
+            # CORR-068 S1: also populate the legacy "subdomains" field from
+            # adapted_v3 so downstream consumers (concatenator.py,
+            # reduce_synthesis() lane_outputs) see the actual sub-domain
+            # activations instead of an empty list. Pre-S1 the field was
+            # hardcoded to [] which cascaded into Track B seeing 0
+            # subdomains and the reduce-stage LLMs receiving empty
+            # aggregated_activations.
+            legacy_subdomains = [
+                {
+                    "subdomain_id": sd.get("sub_domain_id", ""),
+                    "id": sd.get("sub_domain_id", ""),
+                    "reg_pair": list(sd.get("reg_pair", []) or []),
+                    "company_scope_verdict": sd.get("company_scope_verdict", ""),
+                    "regulatory_baseline_relationship": sd.get(
+                        "regulatory_baseline_relationship", ""
+                    ),
+                    "layer0_refs": list(sd.get("layer0_refs", []) or []),
+                }
+                for sd in adapted_v3
+            ]
             results[did] = {
                 "domain_id": did,
                 "domain_name": DOMAIN_NAMES.get(did, did),
-                "subdomains": [],
+                "subdomains": legacy_subdomains,
                 "coverage": "SUBSTANTIVE" if adapted_v3 else "NOT_ADDRESSED",
                 "cross_regulation": [],
                 "llm_status": "OK" if status == "OK" else "FAILED",
@@ -687,7 +773,7 @@ class Phase1Orchestrator:
         Invokes ``processor.process(domain_id, state)`` and returns the
         ``DomainResult``-shaped dict. Does NOT catch exceptions; the
         caller (legacy ``map_domains`` or a LangGraph node in S2) owns
-        the try/except policy and ``OllamaUnreachable`` propagation.
+        the try/except policy and ``LLMUnreachable`` propagation.
 
         Args:
             domain_id: Domain identifier (e.g. ``"D-04"``).
@@ -991,6 +1077,7 @@ class Phase1Orchestrator:
                     list((self.state.get("subdomains") or {}).keys())
                 ),
                 config=config,
+                state=self.state,
             )
         except Exception as exc:
             logger.warning("REDUCE-LLM failed (continuing): %s", exc)
@@ -1084,6 +1171,23 @@ class Phase1Orchestrator:
             logger.info("REDUCE-LLM skipped: MOCK_LLM env var set")
             return None
 
+        # CORR-059: defense-in-depth. Even without MOCK_LLM env var, if the
+        # invoker is a real MockInvoker, short-circuit. Prevents tests that
+        # wire MockInvoker but forget the env var from firing real Ollama calls
+        # (which hang forever when Ollama is down). Class-name check is used
+        # instead of isinstance to avoid import cycle with v2.llm, and instead
+        # of getattr(_is_mock) because MagicMock auto-creates attributes
+        # (would false-positive on any MagicMock, breaking legitimate tests
+        # like test_reduce_propagates_model_from_llm_invoker that use MagicMock
+        # to exercise the real reduce path).
+        invoker_cls_name = type(self.llm_invoker).__name__
+        if invoker_cls_name == "MockInvoker":
+            logger.info(
+                "REDUCE-LLM skipped: llm_invoker is %s (mock detected)",
+                invoker_cls_name,
+            )
+            return None
+
         cached = getattr(self, "_phase1_executor_cached", None)
         if cached is not None:
             return cast("Phase1Executor", cached)
@@ -1101,7 +1205,10 @@ class Phase1Orchestrator:
             from aegis_phase1.prompts_v2.factory import get_invoker
             from aegis_phase1.prompts_v2.phase1_executor import invoker_to_executor
 
-            p1_invoker = get_invoker(model=configured_model)
+            p1_invoker = get_invoker(
+                model=configured_model,
+                provider=getattr(self.llm_invoker, "provider", "ollama"),
+            )
             executor = invoker_to_executor(p1_invoker)
             self._phase1_executor_cached = executor
             logger.info(
@@ -1624,6 +1731,11 @@ class Phase1Orchestrator:
         layer0_catalog = self._load_filtered_catalogs_for_reg(reg_id, cc)
 
         case_id = Path(self.state.get("case_path") or "case").name
+        # CORR-071: the orchestrator passes the full set of refs and
+        # the executor (run_phase_1b) filters per-regulation before
+        # invoking the LLM. This makes the CORR-070 BUG-A kwarg-reorder
+        # workaround structurally unnecessary — filtered refs fit
+        # under the CORR-049 512KB cap without ordering tricks.
         result = executor.run_phase_1b(
             case_id=case_id,
             applicable_regs=[reg_id],
@@ -1631,16 +1743,17 @@ class Phase1Orchestrator:
             company_facts=cc,
             coverage_matrix_row=coverage_rows,
             aggregated_activations=aggregated_activations,
+            layer0_catalog=layer0_catalog,
             layer0_subdomain_refs=self._build_layer0_subdomain_refs(
                 list((self.state.get("subdomains") or {}).keys())
             ),
-            layer0_catalog=layer0_catalog,
             classification={
                 "role": cc.get("role") or cc.get("obligated_party") or "controller",
                 "tier": cc.get("complexity_tier") or "LOW",
                 "basis": "Doc 04 §5",
             },
             config=config,
+            state=self.state,
         )
 
         if not isinstance(result, dict):
@@ -1745,6 +1858,12 @@ class Phase1Orchestrator:
             "aggregated_data": {},
             "output_paths": {},
             "errors": [],
+            # CORR-061 S3a: raw markdown capture per LLM spec.
+            # Populated by the invoker after each LLM call (wiring lands
+            # in S3b/S4) as ``state["per_spec_markdown"][spec_id] = raw_response``.
+            # The 9 doc renderers (S3b) will consume this directly instead
+            # of the typed dicts in ``domain_results`` / ``aggregated_data``.
+            "per_spec_markdown": {},
         }
 
     def _persist_state(self) -> None:

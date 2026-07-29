@@ -15,10 +15,10 @@ Behaviour contracts verified here:
   2. ``probe_ollama`` returns False on ``ConnectionRefusedError``.
   3. ``probe_ollama`` returns False on ``TimeoutError``.
   4. ``probe_ollama`` returns False on ``URLError``.
-  5. ``invoke_raw`` raises ``OllamaUnreachableError`` when probe fails.
+  5. ``invoke_raw`` raises ``LLMUnreachableError`` when probe fails.
   6. ``invoke_raw`` does NOT call ``chat.invoke`` when probe fails (no retry).
   7. Probe result is cached within the TTL window (subsequent calls skip probe).
-  8. ``OllamaUnreachableError`` is exported from ``aegis_phase1.llm.unified``.
+  8. ``LLMUnreachableError`` is exported from ``aegis_phase1.llm.unified``.
 """
 from __future__ import annotations
 
@@ -108,17 +108,17 @@ def test_probe_ollama_returns_false_on_url_error():
 
 
 def test_invoke_raw_raises_unreachable_when_probe_fails():
-    """When probe_ollama returns False, invoke_raw raises OllamaUnreachableError."""
+    """When probe_ollama returns False, invoke_raw raises LLMUnreachableError."""
     MockChatOllama, mock_instance = _patched_chat()
     with (
         patch("langchain_ollama.ChatOllama", MockChatOllama),
         patch("aegis_phase1.llm.unified.probe_ollama", return_value=False) as mock_probe,
     ):
-        from aegis_phase1.llm.unified import OllamaUnreachableError, UnifiedInvoker
+        from aegis_phase1.llm.unified import LLMUnreachableError, UnifiedInvoker
 
         invoker = UnifiedInvoker(model="gemma4:e4b")
 
-        with pytest.raises(OllamaUnreachableError) as exc_info:
+        with pytest.raises(LLMUnreachableError) as exc_info:
             invoker.invoke_raw("hi")
 
     assert exc_info.value.base_url == "http://localhost:11434"
@@ -137,11 +137,11 @@ def test_invoke_raw_does_not_retry_when_unreachable():
         patch("langchain_ollama.ChatOllama", MockChatOllama),
         patch("aegis_phase1.llm.unified.probe_ollama", return_value=False),
     ):
-        from aegis_phase1.llm.unified import OllamaUnreachableError, UnifiedInvoker
+        from aegis_phase1.llm.unified import LLMUnreachableError, UnifiedInvoker
 
         invoker = UnifiedInvoker(model="gemma4:e4b")
 
-        with pytest.raises(OllamaUnreachableError):
+        with pytest.raises(LLMUnreachableError):
             invoker.invoke_raw("hi")
 
     mock_instance.invoke.assert_not_called()
@@ -185,24 +185,24 @@ def test_probe_rechecked_after_ttl_expires():
     assert mock_probe.call_count == 2
 
 
-# ─── 8. OllamaUnreachableError is exported ────────────────────────────
+# ─── 8. LLMUnreachableError is exported ────────────────────────────
 
 
 def test_probe_ollama_exception_exported():
-    """OllamaUnreachableError is importable from aegis_phase1.llm.unified."""
+    """LLMUnreachableError is importable from aegis_phase1.llm.unified."""
     from aegis_phase1.llm import unified as unified_mod
-    from aegis_phase1.llm.unified import OllamaUnreachableError
+    from aegis_phase1.llm.unified import LLMUnreachableError
 
-    assert hasattr(unified_mod, "OllamaUnreachableError")
-    assert "OllamaUnreachableError" in unified_mod.__all__
-    assert issubclass(OllamaUnreachableError, RuntimeError)
+    assert hasattr(unified_mod, "LLMUnreachableError")
+    assert "LLMUnreachableError" in unified_mod.__all__
+    assert issubclass(LLMUnreachableError, RuntimeError)
 
 
 def test_ollama_unreachable_error_carries_attributes():
-    """OllamaUnreachableError exposes .base_url and .source attributes."""
-    from aegis_phase1.llm.unified import OllamaUnreachableError
+    """LLMUnreachableError exposes .base_url and .source attributes."""
+    from aegis_phase1.llm.unified import LLMUnreachableError
 
-    exc = OllamaUnreachableError("http://example:11434", "unit-test")
+    exc = LLMUnreachableError("http://example:11434", "unit-test")
     assert exc.base_url == "http://example:11434"
     assert exc.source == "unit-test"
     assert "http://example:11434" in str(exc)

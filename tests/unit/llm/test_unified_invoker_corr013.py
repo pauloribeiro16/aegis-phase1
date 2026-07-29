@@ -78,10 +78,15 @@ def test_unified_invoker_init_defaults():
     assert invoker.base_url == "http://localhost:11434"
     assert invoker.timeout == 120
     assert invoker._heavy is None
+    # CORR-069 S3: UnifiedInvoker now also passes num_ctx=32768 and
+    # num_gpu=99 to ChatOllama (CORR-056 defaults to force all model
+    # layers onto GPU). Update the assertion to expect these kwargs.
     MockChatOllama.assert_called_once_with(
         model="gemma4:e4b",
         base_url="http://localhost:11434",
         timeout=120,
+        num_ctx=32768,
+        num_gpu=99,
     )
 
 
@@ -260,10 +265,17 @@ def test_extract_usage_langchain_core_fallback():
 
 
 def test_extract_usage_empty_returns_zeros():
-    """Empty metadata → zeros, never raises."""
+    """Empty metadata AND empty content → zeros, never raises.
+
+    CORR-069 S2: previously the test passed only metadata dicts but
+    relied on the default _FakeAIMessage(content="ok"), so the
+    char-based estimate fallback (CORR-021) kicked in and returned
+    completion_tokens=1, total_tokens=1 instead of 0. Explicitly
+    pass content="" so the fallback is bypassed.
+    """
     from aegis_phase1.llm.unified import _extract_usage
 
-    msg = _FakeAIMessage(response_metadata={}, usage_metadata={})
+    msg = _FakeAIMessage(content="", response_metadata={}, usage_metadata={})
     usage = _extract_usage(msg)
     assert usage == {
         "prompt_tokens": 0,
@@ -312,7 +324,9 @@ def test_invoke_dispatches_to_spec_when_inputs_is_dict():
 
     result = invoker.invoke("P1B-LLM-01", {"x": 1})
 
-    invoker.invoke_spec.assert_called_once_with("P1B-LLM-01", {"x": 1}, config=None)
+    invoker.invoke_spec.assert_called_once_with(
+        "P1B-LLM-01", {"x": 1}, config=None, state=None
+    )
     invoker.invoke_raw.assert_not_called()
     assert result == {"status": "OK"}
 

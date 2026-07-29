@@ -1,0 +1,20 @@
+regulation: CRA
+full_name: Cyber Resilience Act
+articles:
+  - id: Annex I Part I §1
+    title: Essential cybersecurity requirements
+    phase1_relevance: Products with digital elements
+  - id: Annex I Part I §2
+    title: Vulnerability handling
+    phase1_relevance: SBOM, CVD policy, patch cadence
+  - id: Annex I Part II
+    title: Specific requirements for manufacturers
+    phase1_relevance: Secure development lifecycle
+  - id: Annex VII
+    title: Technical documentation
+    phase1_relevance: Conformity assessment documentation
+phase1_summary: |
+  CRA applies to products with digital elements placed on the EU market.
+  Phase 1 captures: (a) product inventory, (b) SBOM coverage, (c) vulnerability
+  handling process, (d) conformity assessment pathway, (e) technical
+  documentation index.

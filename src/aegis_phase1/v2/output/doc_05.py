@@ -35,7 +35,9 @@ from typing import Any
 
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
+    get_per_spec_markdown,
     markdown_table,
+    render_per_spec_markdown_appendix,
     write_output,
 )
 from aegis_phase1.v2.context.applicability_context import (
@@ -43,6 +45,14 @@ from aegis_phase1.v2.context.applicability_context import (
     build_applicability_context,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
+from aegis_phase1.data.loader import get_regulation_summary
+
+# CORR-061 S3b: spec IDs that this doc consumes from
+# ``state["per_spec_markdown"]``. Kept local to the doc so the
+# spec-to-doc mapping is grep-friendly (see the S3b report for the
+# full mapping table).
+_SPEC_STRATEGIC = "P1C-LLM-03-STRATEGIC-SYNTHESIS"
+_SPEC_RATIONALE = "P1B-LLM-02-RATIONALE"
 
 logger = logging.getLogger(__name__)
 
@@ -50,43 +60,13 @@ _FILENAME = "05_Regulatory_Applicability.md"
 _MAX_FRAGMENT_BYTES = 4000
 _MOCK_TRUTHS = {"1", "true", "yes", "on"}
 
-_REG_THRESHOLDS: dict[str, dict[str, str]] = {
-    "GDPR": {
-        "trigger": "processes personal data of EU data subjects",
-        "size_threshold": "any (no size exemption in Art. 2)",
-        "role_threshold": "controller or processor (Art. 4)",
-        "retention_min": "Art. 5(1)(e) — kept only as long as necessary",
-        "breach_clock": "Art. 33 — controller to SA within 72 h",
-    },
-    "CRA": {
-        "trigger": "places digital products on the EU market",
-        "size_threshold": "any (no size exemption in Art. 2)",
-        "role_threshold": "manufacturer (Art. 3)",
-        "retention_min": "Art. 13(8) support ≥ 5 y; Art. 13(9) updates ≥ 10 y",
-        "breach_clock": "Art. 14 — early warning within 24 h; final ≤ 72 h",
-    },
-    "NIS2": {
-        "trigger": "essential or important entity (Annex I/II)",
-        "size_threshold": "≥ 50 employees OR ≥ €10 M turnover",
-        "role_threshold": "essential entity / important entity",
-        "retention_min": "Art. 21 — record-keeping ≥ 6 months",
-        "breach_clock": "Art. 23 — early warning within 24 h",
-    },
-    "DORA": {
-        "trigger": "financial entity (Art. 2 scope)",
-        "size_threshold": "any financial entity in scope",
-        "role_threshold": "financial entity / ICT third-party provider",
-        "retention_min": "Art. 17 — register of contractual arrangements",
-        "breach_clock": "Art. 19 — initial notification within 4 h, intermediate ≤ 72 h",
-    },
-    "AI Act": {
-        "trigger": "provider / deployer / importer / distributor of AI systems",
-        "size_threshold": "any (provider obligations from Art. 16)",
-        "role_threshold": "provider or deployer",
-        "retention_min": "Art. 12 — logs ≥ 6 months for high-risk",
-        "breach_clock": "Art. 73 — serious incident reporting",
-    },
-}
+
+def _regulatory_summary(regulation: str) -> str:
+    """Return the Phase 1 scope summary for a regulation from data/regulatory/."""
+    try:
+        return get_regulation_summary(regulation)
+    except FileNotFoundError:
+        return ""
 
 
 def render_doc_05(
@@ -137,7 +117,7 @@ def render_doc_05(
     parts.extend(_section_0_applicability_summary(app_ctx))
 
     parts.extend(_section_1_purpose())
-    parts.extend(_section_2_summary(regs))
+    parts.extend(_section_2_summary(regs, app_ctx=app_ctx))
     parts.extend(
         _section_3_per_regulation(regs, assessment_by_reg, ontology)
     )
@@ -153,6 +133,12 @@ def render_doc_05(
         _section_7_regulatory_gaps(ontology, subdomains)
     )
     parts.extend(_section_8_input_to_phase_2(state))
+
+    # CORR-061 S3b: dump every captured per-spec markdown at the end
+    # of the doc so reviewers can see the raw LLM output without
+    # grepping the orchestrator state file. See
+    # :func:`render_per_spec_markdown_appendix`.
+    parts.extend(render_per_spec_markdown_appendix(state))
 
     body = "\n".join(parts)
     frontmatter = _build_frontmatter(state, regs)
@@ -267,25 +253,58 @@ def _section_0_applicability_summary(app_ctx: ApplicabilityContext) -> list[str]
     return parts
 
 
-def _section_2_summary(regs: list[Any]) -> list[str]:
+def _section_2_summary(
+    regs: list[Any], app_ctx: ApplicabilityContext | None = None
+) -> list[str]:
+    """CORR-073: §2 APPLICABLE SUMMARY sources from app_ctx (CORR-038 truth).
+
+    Pre-CORR-073 this section read ``state["regulations"]`` (legacy v1 list)
+    which is empty in v2 — producing "(0) applicable regulations" output
+    despite 5 regs being listed in the frontmatter. The fix: prefer
+    ``app_ctx.applicable_regs`` + ``app_ctx.clause_count_per_reg`` when
+    available; fall back to legacy ``regs`` (with ``clause_count``) so
+    callers that don't pass ``app_ctx`` continue to work.
+
+    ``regs`` is kept in the signature for backwards compatibility with
+    tests + downstream consumers that pass the legacy list.
+    """
     parts: list[str] = []
-    applicable = [r for r in regs if isinstance(r, Mapping) and r.get("applicable")]
-    not_applicable = [r for r in regs if isinstance(r, Mapping) and not r.get("applicable")]
     parts.append("## 2. APPLICABLE SUMMARY\n")
-    parts.append(
-        f"- **Applicable regulations ({len(applicable)}):** "
-        + (", ".join(_abbr(r) for r in applicable) if applicable else "-")
-    )
-    parts.append(
-        f"- **Non-applicable regulations ({len(not_applicable)}):** "
-        + (", ".join(_abbr(r) for r in not_applicable) if not_applicable else "-")
-    )
-    total_clauses = sum(
-        int(r.get("clause_count", 0) or 0)
-        for r in regs
-        if isinstance(r, Mapping)
-    )
-    parts.append(f"- **Total applicable clauses across the case:** {total_clauses}")
+    if app_ctx is not None and (app_ctx.applicable_regs or app_ctx.declared_applicable_regs):
+        # CORR-073: source from canonical ApplicabilityContext.
+        applicable = list(app_ctx.applicable_regs)
+        declared = list(app_ctx.declared_applicable_regs)
+        applicable_set = set(applicable)
+        non_applicable = sorted(set(declared) - applicable_set)
+        total_clauses = sum(int(c or 0) for c in app_ctx.clause_count_per_reg.values())
+        parts.append(
+            f"- **Applicable regulations ({len(applicable)}):** "
+            + (", ".join(applicable) if applicable else "-")
+        )
+        parts.append(
+            f"- **Non-applicable regulations ({len(non_applicable)}):** "
+            + (", ".join(non_applicable) if non_applicable else "-")
+        )
+        parts.append(f"- **Total applicable clauses across the case:** {total_clauses}")
+    else:
+        # Legacy path — preserve behaviour for any caller that hasn't
+        # passed app_ctx (e.g. legacy unit tests).
+        applicable = [r for r in regs if isinstance(r, Mapping) and r.get("applicable")]
+        not_applicable = [r for r in regs if isinstance(r, Mapping) and not r.get("applicable")]
+        parts.append(
+            f"- **Applicable regulations ({len(applicable)}):** "
+            + (", ".join(_abbr(r) for r in applicable) if applicable else "-")
+        )
+        parts.append(
+            f"- **Non-applicable regulations ({len(not_applicable)}):** "
+            + (", ".join(_abbr(r) for r in not_applicable) if not_applicable else "-")
+        )
+        total_clauses = sum(
+            int(r.get("clause_count", 0) or 0)
+            for r in regs
+            if isinstance(r, Mapping)
+        )
+        parts.append(f"- **Total applicable clauses across the case:** {total_clauses}")
     parts.append("")
     return parts
 
@@ -481,6 +500,23 @@ def _section_6_strategic_implications(
     *,
     config: dict[str, Any] | None = None,
 ) -> list[str]:
+    """§6 STRATEGIC IMPLICATIONS — CORR-061 S3b: now consumes P1C-LLM-03 markdown.
+
+    S3a (and prior): the §6.1 Narrative was rendered via
+    :func:`render_mandatory_narrative` (the legacy narrative invoker
+    path) which has no direct spec mapping. S3b replaces this with a
+    read from ``state["per_spec_markdown"]["P1C-LLM-03-STRATEGIC-SYNTHESIS"]``
+    so the strategic narrative is sourced from the canonical 5-LLM
+    pipeline. The deterministic implication table (§6) is unchanged
+    (it is a heuristic over applicable_regs, not LLM-derived).
+
+    When P1C-LLM-03 has not run (deterministic-only / mock / executor
+    failure), a PENDING REVIEW marker is emitted so reviewers can
+    identify the gap at a glance. The ``llm_invoker`` parameter is
+    retained for backward compatibility with existing tests but is
+    unused on the S3b happy path (P1C-LLM-03 is invoked by the
+    executor, not by the renderer).
+    """
     parts: list[str] = []
     parts.append("## 6. STRATEGIC IMPLICATIONS\n")
     parts.append(
@@ -504,34 +540,73 @@ def _section_6_strategic_implications(
         )
     )
     parts.append("")
-    narrative = render_mandatory_narrative(
-        invoker=llm_invoker,
-        prompt=_strategic_prompt(state, rows),
-        section_id="doc_05.section_6.strategic_narrative",
-        max_chars=_MAX_FRAGMENT_BYTES,
-        config=config,
-    )
     parts.append("### 6.1 Narrative\n")
-    parts.append(narrative.rstrip() + "\n")
+    # CORR-061 S3b: consume P1C-LLM-03 raw markdown from
+    # ``state["per_spec_markdown"]`` (wiring lives in
+    # :meth:`Phase1LLMInvoker._capture_per_spec_markdown`).
+    spec_md = get_per_spec_markdown(state, _SPEC_STRATEGIC)
+    if spec_md:
+        parts.append(spec_md.rstrip() + "\n")
+    else:
+        # Fallback to the legacy narrative invoker when the spec has
+        # not been captured yet. The narrative invoker itself returns
+        # a PENDING REVIEW marker when the LLM is unavailable, so the
+        # net behaviour for a missing P1C-LLM-03 response is a
+        # greppable PENDING block.
+        narrative = render_mandatory_narrative(
+            invoker=llm_invoker,
+            prompt=_strategic_prompt(state, rows),
+            section_id="doc_05.section_6.strategic_narrative",
+            max_chars=_MAX_FRAGMENT_BYTES,
+            config=config,
+        )
+        parts.append(narrative.rstrip() + "\n")
     return parts
 
 
 def _render_rationale_by_reg_section(state: dict[str, Any]) -> str:
     """Render §6.1b 'Per-Regulation Rationale (LLM-02 RATIONALE)'.
 
-    Reads ``state["aggregated_data"]["rationale_by_reg"]`` — populated
-    by :meth:`Phase1Orchestrator.run_phase_1b` (which delegates to
-    :class:`Phase1Executor.run_phase_1b` and the P1B-LLM-02
-    RATIONALE spec).
+    CORR-061 S3b: now reads from
+    ``state["per_spec_markdown"]["P1B-LLM-02-RATIONALE"]`` instead of
+    ``state["aggregated_data"]["rationale_by_reg"]``. The legacy
+    typed-state read is preserved as a fallback so deterministic-only
+    runs (where the executor is unavailable but the orchestrator
+    previously populated the typed state) still render sensibly.
 
-    The stored shape is ``{regulation_code: synthesis_dict}`` where
-    ``synthesis_dict`` carries the parsed ``rationale``,
-    ``implications`` and ``gaps`` blocks emitted by the LLM. When the
-    key is missing / None (deterministic-only run, ``--skip-phase-1b``
-    or ``MOCK_LLM``), the function emits a deterministic
-    ``PENDING REVIEW`` placeholder so downstream pipelines can detect
-    the gap deterministically via a grep for the marker.
+    Pre-S3b behaviour: parsed the structured
+    ``{reg_code: synthesis_dict}`` payload, iterated per regulation,
+    and rendered rationale + implications + gaps as labelled sections.
+
+    S3b behaviour: dump the raw markdown response of P1B-LLM-02 (one
+    call per applicable regulation, concatenated with ``---``) under
+    the same §6.1b header. The structured-fields parsing path is
+    removed because the markdown-only contract is the source of
+    truth.
     """
+    spec_md = get_per_spec_markdown(state, _SPEC_RATIONALE)
+    if spec_md:
+        parts: list[str] = []
+        parts.append("\n### 6.1b Per-Regulation Rationale (LLM-02 RATIONALE)\n")
+        parts.append(
+            "Per-regulation rationale + implications + gaps. Generated by "
+            "P1B-LLM-02 RATIONALE. Cross-references Doc 04 facts + "
+            "Regulatory Baseline articles. NO boilerplate "
+            "(per-validation invariant).\n"
+        )
+        parts.append(
+            "*Source: P1B-LLM-02 RATIONALE | "
+            "multi-call concat (one section per applicable regulation, "
+            "separated by `---`)*\n\n"
+        )
+        parts.append(spec_md.rstrip() + "\n")
+        return "".join(parts)
+
+    # Fallback: legacy typed-state path. Kept for the case where the
+    # executor populated ``state["aggregated_data"]["rationale_by_reg"]``
+    # but the S3b wiring (P1B-LLM-02 → per_spec_markdown) did not
+    # capture the raw response (e.g. older executor versions, mock
+    # test paths).
     agg = state.get("aggregated_data")
     rationale_data = (
         agg.get("rationale_by_reg") if isinstance(agg, Mapping) else None
@@ -548,8 +623,8 @@ def _render_rationale_by_reg_section(state: dict[str, Any]) -> str:
             "(`MOCK_LLM=false` and Ollama running) to populate this section.\n"
         )
 
-    parts: list[str] = []
-    parts.append("\n### 6.1b Per-Regulation Rationale (LLM-02 RATIONALE)\n")
+    parts = []
+    parts.append("\n### 6.1b Per-Regulation Rationale (LLM-02 RATIONALE) [legacy typed-state fallback]\n")
     parts.append(
         "Per-regulation rationale + implications + gaps. Generated by "
         "P1B-LLM-02 RATIONALE. Cross-references Doc 04 facts + "
@@ -996,6 +1071,33 @@ def _build_frontmatter(state: dict[str, Any], regs: list[Any]) -> str:
     # so the frontmatter is consistent with §0.
     app_ctx = build_applicability_context(state)
     applicable = list(app_ctx.applicable_regs)
+    # Sprint-2 (CORR-073): case_study falls back to v2_company_facts.name,
+    # then company_facts.name, then case_name, only becoming "UNKNOWN" when
+    # all of those are absent. The prior `getattr(..., "UNKNOWN")` default
+    # hid missing data; this version is explicit about every fallback.
+    case_study: str | None = None
+    if ctx is not None:
+        candidate = getattr(ctx, "company_name", None)
+        if isinstance(candidate, str) and candidate.strip():
+            case_study = candidate
+    if case_study is None:
+        facts = state.get("v2_company_facts")
+        if facts is not None:
+            name_attr = getattr(facts, "name", None)
+            if isinstance(name_attr, str) and name_attr.strip():
+                case_study = name_attr
+    if case_study is None:
+        company_facts = state.get("company_facts")
+        if isinstance(company_facts, Mapping):
+            candidate = company_facts.get("name")
+            if isinstance(candidate, str) and candidate.strip():
+                case_study = candidate
+    if case_study is None:
+        case_name = state.get("case_name")
+        if isinstance(case_name, str) and case_name.strip():
+            case_study = case_name
+    if not case_study:
+        case_study = "UNKNOWN"
     payload: dict[str, Any] = {
         "document_id": "AEGIS-P1-05",
         "title": "Regulatory Applicability Assessment",
@@ -1005,7 +1107,7 @@ def _build_frontmatter(state: dict[str, Any], regs: list[Any]) -> str:
         "updated": now,
         "author": "Executor",
         "status": "DRAFT",
-        "case_study": getattr(ctx, "company_name", "UNKNOWN") if ctx else "UNKNOWN",
+        "case_study": case_study,
         "inputs": [
             "04_Company_Context_Assessment.md",
             "../00_COMMON/01_Company_Context.md",

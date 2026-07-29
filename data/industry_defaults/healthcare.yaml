@@ -1,0 +1,12 @@
+industry: Healthcare
+jurisdiction_examples: [Germany, France, Netherlands]
+primary_supervisors:
+  - BfArM
+  - Local health authorities
+retention_standards:
+  - {framework: MDR, retention_years: 10, scope: medical device records}
+  - {framework: GDPR Art. 9 (special category), retention_years: "as-needed", scope: health data}
+typical_systems:
+  ehr: Epic, Cerner, Allscripts
+  imaging: PACS systems
+default_concentration_risk_threshold_pct: 30

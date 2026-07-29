@@ -9,7 +9,7 @@ Public API:
     filter_articles(state, domain_id) -> list[dict]  (legacy v1)
     build_domain_prompt(state, domain_id) -> str  (legacy v1)
     DomainProcessor.process(domain_id, state) -> DomainResult  (Option C)
-    OllamaUnreachable                              (fatal LLM error)
+    LLMUnreachable                              (fatal LLM error)
     MapPartialFailure                              (some domains failed)
 """
 
@@ -21,7 +21,7 @@ from aegis_phase1.v2.domain.processor import (
     DOMAIN_NAMES,
     DomainProcessor,
     MapPartialFailure,
-    OllamaUnreachable,
+    LLMUnreachable,
 )
 from aegis_phase1.v2.domain.prompt import load_prompt_spec, render_prompt
 from aegis_phase1.v2.domain.prompt_builder import build_domain_prompt
@@ -30,7 +30,7 @@ __all__ = [
     "DOMAIN_NAMES",
     "DomainProcessor",
     "MapPartialFailure",
-    "OllamaUnreachable",
+    "LLMUnreachable",
     "OutputParser",
     "ParseResult",
     "assemble_inputs",

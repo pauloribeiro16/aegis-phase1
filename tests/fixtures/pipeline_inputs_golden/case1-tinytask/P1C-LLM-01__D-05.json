@@ -1,0 +1,305 @@
+{
+  "case": "case1-tinytask",
+  "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+  "lane": "D-05",
+  "inputs": {
+    "case_id": "case1-tinytask",
+    "domain_id": "D-05",
+    "lane_id": "D-05",
+    "applicable_regs": [
+      "GDPR",
+      "CRA"
+    ],
+    "company_facts": {
+      "name": "TinyTask Lda.",
+      "sector": "Technology/Software",
+      "jurisdiction": "Portugal (EU)",
+      "scale": "MICRO",
+      "employees": 8,
+      "role": "controller",
+      "obligated_party": "controller",
+      "complexity_tier": "LOW",
+      "data_categories": [
+        "personal_data"
+      ],
+      "products": [
+        "SaaS application"
+      ],
+      "role_obligations": [
+        "controller"
+      ],
+      "applicable_regs": [
+        "GDPR",
+        "CRA"
+      ]
+    },
+    "layer0_subdomain_refs": [
+      {
+        "sub_domain_id": "D-05.1",
+        "title": "D-05.1 Data Minimisation",
+        "domain_id": "D-05",
+        "participating_regulations": [
+          "GDPR",
+          "CRA",
+          "AI_Act"
+        ],
+        "hso_hl_objective": "Data collected or otherwise acquired is limited to what is adequate, relevant, and necessary in relation to the purpose for which it is processed, with a documented necessity assessment and, where the underlying purpose changes, a compatibility assessment confirming that the new use is consistent with the original. Special-category data is processed only where a narrow exception applies and is documented to that effect.",
+        "objective": "Data collected or otherwise acquired is limited to what is adequate, relevant, and necessary in relation to the purpose for which it is processed, with a documented necessity assessment and, where the underlying purpose changes, a compatibility assessment confirming that the new use is consistent with the original. Special-category data is processed only where a narrow exception applies and is documented to that effect.",
+        "pairs": [
+          {
+            "id": "D-05.1_GDPR-CRA",
+            "subdomain_id": "D-05.1",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Conditional (Y when the same dataset contains personal data and is processed by a CRA-classified product at runtime)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Conditional (Y when the same personal-data stream flows through a CRA-classified product at runtime)**. The two obligations stack rather than contradict.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a 2-track minimisation matrix: (1) GDPR Art. 5(1)(c) + Art. 6(4) personal-data minimisation with compatibility assessment; (2) CRA Annex I Part I (2)(g) product-data minimisation. For CRA-regulated products processing personal data, the union applies. The Art. 6(4) compatibility test is GDPR-only and must be retained as a residual obligation.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-05.1_GDPR-AI_Act",
+            "subdomain_id": "D-05.1",
+            "pair": "GDPR \u2194 AI_Act",
+            "reg_a": "GDPR",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y when training a high-risk AI system with bias-detection needs that cannot be met by other data.",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y only for the narrow Art. 10(5) carve-out scenario: a high-risk AI provider training a system with bias-detection needs that cannot be met by non-special-category data.** Outside that narrow window, the AI Act does not trigger special-category processing, so the pair does not overlap. The pair is therefore scope-disjoint in baseline, with the carve-out as the single overlap point.",
+            "downstream_implication": "** Phase 2 obligation derivation must codify AI Act Art. 10(5) as a **gateway clause** that *expands* the set of permissible special-category processing under GDPR Art. 9(1) when all 6 conditions are satisfied. The CRDA \"contradictory\" label should be corrected to \"scope-disjoint\" with carve-out annotation. Phase 3 case generation must surface the 6-condition matrix explicitly when the case company is a high-risk AI provider processing special-category data for bias correction.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-05.1_CRA-AI_Act",
+            "subdomain_id": "D-05.1",
+            "pair": "CRA \u2194 AI_Act",
+            "reg_a": "CRA",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N (typically)**. They are layered at different lifecycle stages. The only overlap is at the data-flow boundary (training data \u2192 runtime data) which is sequential, not concurrent.",
+            "downstream_implication": "** Phase 2 obligation derivation must produce a 3-track minimisation matrix for AI-enabled CRA products (runtime minimisation + personal-data minimisation + training-data quality). Phase 3 case generation must validate that the runtime product does not retain more data than the training-data quality permits to flow into it.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part I (2)",
+          "Annex VII",
+          "Art. 10",
+          "Art. 10(1)",
+          "Art. 10(2)",
+          "Art. 10(3)",
+          "Art. 10(5)",
+          "Art. 13(2)",
+          "Art. 13(3)",
+          "Art. 25",
+          "Art. 25(1)",
+          "Art. 25(2)",
+          "Art. 3(23)",
+          "Art. 30(1)",
+          "Art. 35",
+          "Art. 35(7)",
+          "Art. 5(1)",
+          "Art. 5(2)",
+          "Art. 6(4)",
+          "Art. 9",
+          "Art. 9(1)",
+          "Art. 9(2)",
+          "\u00a72",
+          "\u00a73"
+        ],
+        "csf": [
+          "ID.AM-03"
+        ]
+      },
+      {
+        "sub_domain_id": "D-05.2",
+        "title": "D-05.2 Retention & Archiving",
+        "domain_id": "D-05",
+        "participating_regulations": [
+          "GDPR",
+          "CRA",
+          "AI_Act"
+        ],
+        "hso_hl_objective": "Data \u2014 across the data classes in scope \u2014 is retained for the period required to satisfy its declared purpose, with documented retention rationale and, where the underlying purpose changes, a reset of the retention clock. Long-term archiving or research-only retention is paired with safeguards proportional to the residual identifiability.",
+        "objective": "Data \u2014 across the data classes in scope \u2014 is retained for the period required to satisfy its declared purpose, with documented retention rationale and, where the underlying purpose changes, a reset of the retention clock. Long-term archiving or research-only retention is paired with safeguards proportional to the residual identifiability.",
+        "pairs": [
+          {
+            "id": "D-05.2_GDPR-CRA",
+            "subdomain_id": "D-05.2",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N (typically)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Conditional (Y when a CRA update-distribution log contains personal data, the controller must apply GDPR Art. 5(1)(e) to the personal data portion; CRA Annex I Part II (7)/(8) applies to the artefact portion independently).** In the typical case (pure update artefacts with no personal data), there is no overlap. The pair is therefore scope-disjoint in baseline.",
+            "downstream_implication": "** Phase 2 obligation derivation must correct CRDA's \"contradictory\" label to \"scope-disjoint\" with separation-architecture requirement. The 3-axis retention policy (GDPR ceiling + CRA availability + AI Act floor) is correct as a *layering* rule, but the CRDA label \"contradictory\" is scope-incorrect. Phase 3 case generation must validate that CRA-regulated products with personal-data-containing update logs apply separation architecture (pseudonymisation, separate retention rules) to honour both",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-05.2_GDPR-AI_Act",
+            "subdomain_id": "D-05.2",
+            "pair": "GDPR \u2194 AI_Act",
+            "reg_a": "GDPR",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when AI-system logs contain personal data)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when AI-system logs contain personal data, both GDPR and AI Act apply on the same log set at the same controller / provider)**. The two obligations are reconcilable within the intersection [6 months, \"necessary\"]. The pair is substantive-complementary, not scope-disjoint.",
+            "downstream_implication": "** Phase 2 obligation derivation must codify AI Act Art. 19(1) as a *floor* within the GDPR Art. 5(1)(e) *ceiling* envelope. The CRDA \"contradictory\" label should be corrected to \"complementary\". Phase 3 case generation must validate that high-risk AI providers set the AI Act 6-month floor as a hard minimum and the GDPR \"necessary\" boundary as the cap.",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          },
+          {
+            "id": "D-05.2_CRA-AI_Act",
+            "subdomain_id": "D-05.2",
+            "pair": "CRA \u2194 AI_Act",
+            "reg_a": "CRA",
+            "reg_b": "AI_Act",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "N",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **N** \u2014 distinct actors, distinct objects, distinct triggers.",
+            "downstream_implication": "** Phase 2 obligation derivation is straightforward: two parallel obligations. No layering required; both apply simultaneously when the same actor is both manufacturer (CRA) and provider (AI Act).",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part II (7)",
+          "Annex I Part II (8)",
+          "Annex II",
+          "Art. 12",
+          "Art. 12(1)",
+          "Art. 12(2)",
+          "Art. 12(4)",
+          "Art. 13(18)",
+          "Art. 13(19)",
+          "Art. 13(8)",
+          "Art. 13(9)",
+          "Art. 19(1)",
+          "Art. 3(1)",
+          "Art. 30(1)",
+          "Art. 5(1)",
+          "Art. 5(2)",
+          "Art. 89(1)",
+          "\u00a77"
+        ],
+        "csf": [
+          "ID.AM-03",
+          "PR.PS-02",
+          "PR.PS-04",
+          "GV.PO-02",
+          "GV.OV-02",
+          "GV.OC-04"
+        ]
+      },
+      {
+        "sub_domain_id": "D-05.3",
+        "title": "D-05.3 Right to Erasure",
+        "domain_id": "D-05",
+        "participating_regulations": [
+          "GDPR",
+          "CRA"
+        ],
+        "hso_hl_objective": "Data held about a person is rendered inaccessible to the controller on the data subject's election, and data held by a product with digital elements is rendered inaccessible to the manufacturer on the user's election, by whichever mechanism \u2014 the controller-side policy execution or the manufacturer-side product affordance \u2014 applies to the data object. Erasure is performed without undue delay and is documented to demonstrate compliance; where a processor is involved, the processor-side mirror ensures deletion-or-return at contract end.",
+        "objective": "Data held about a person is rendered inaccessible to the controller on the data subject's election, and data held by a product with digital elements is rendered inaccessible to the manufacturer on the user's election, by whichever mechanism \u2014 the controller-side policy execution or the manufacturer-side product affordance \u2014 applies to the data object. Erasure is performed without undue delay and is documented to demonstrate compliance; where a processor is involved, the processor-side mirror ensures deletion-or-return at contract end.",
+        "pairs": [
+          {
+            "id": "D-05.3_GDPR-CRA",
+            "subdomain_id": "D-05.3",
+            "pair": "GDPR \u2194 CRA",
+            "reg_a": "GDPR",
+            "reg_b": "CRA",
+            "classification": "",
+            "verified_relationship": "",
+            "layer2_flag": false,
+            "scope_overlap": "Y (when the user is also a data subject and the data is personal)",
+            "scope_disjoint_test": "** Does this pair actually overlap on a single event at a single party? **Y (when the data subject invoking Art. 17(1) is also the user invoking the CRA (2)(m) removal mechanism on a CRA-classified product)**. The two obligations stack \u2014 they do not contradict.",
+            "downstream_implication": "** Phase 2 obligation derivation produces a 2-layer rule: (1) manufacturer-side design obligation (CRA Annex I Part I (2)(m) \u2014 the product must support secure, easy, permanent removal of all data on user election); (2) controller-side rights obligation (GDPR Art. 17 \u2014 the controller must operationalise the data-subject right through that mechanism). Phase 3 case generation must validate that CRA-classified products in case companies expose a deletion API aligned with GDPR Art. 17 obligations (cr",
+            "verbatim_articles": {},
+            "source_subdomain": null
+          }
+        ],
+        "anchors": [
+          "Annex I Part I (2)",
+          "Annex II",
+          "Annex VII",
+          "Art. 12",
+          "Art. 12(1)",
+          "Art. 13(18)",
+          "Art. 17",
+          "Art. 17(1)",
+          "Art. 17(2)",
+          "Art. 17(3)",
+          "Art. 19",
+          "Art. 21",
+          "Art. 28(3)",
+          "Art. 30(1)",
+          "Art. 5(1)",
+          "Art. 5(2)",
+          "Art. 89(1)",
+          "\u00a72",
+          "\u00a76",
+          "\u00a78"
+        ],
+        "csf": [
+          "PR.DS-10",
+          "GV.SC-04"
+        ]
+      },
+      {
+        "sub_domain_id": "D-05.4",
+        "title": "D-05.4 Data Portability",
+        "domain_id": "D-05",
+        "participating_regulations": [
+          "GDPR (sole authority)"
+        ],
+        "hso_hl_objective": "Personal data are exported to the data subject in a structured, commonly used, machine-readable format, and the data subject can transmit those data to another controller without hindrance, subject to the qualifying conditions and exclusions that scope the right.",
+        "objective": "Personal data are exported to the data subject in a structured, commonly used, machine-readable format, and the data subject can transmit those data to another controller without hindrance, subject to the qualifying conditions and exclusions that scope the right.",
+        "pairs": [],
+        "anchors": [
+          "Annex I Part I (2)",
+          "Art. 12(1)",
+          "Art. 12(3)",
+          "Art. 12(5)",
+          "Art. 13(2)",
+          "Art. 14(2)",
+          "Art. 15(3)",
+          "Art. 20",
+          "Art. 20(1)",
+          "Art. 20(2)",
+          "Art. 20(3)",
+          "Art. 20(4)",
+          "Art. 21",
+          "Art. 30(1)",
+          "Art. 35(7)",
+          "Art. 5(2)",
+          "Art. 6(1)"
+        ],
+        "csf": [
+          "PR.DS-10"
+        ]
+      }
+    ]
+  },
+  "rendered": {
+    "system_len": 15980,
+    "user_len": 15644
+  }
+}

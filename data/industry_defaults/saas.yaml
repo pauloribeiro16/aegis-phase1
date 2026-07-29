@@ -1,0 +1,12 @@
+industry: Technology/Software
+jurisdiction_examples: [Portugal, Ireland, Netherlands]
+primary_supervisors: []
+retention_standards:
+  - {framework: GDPR Art. 5(1)(e), retention_years: "as-needed", scope: personal data}
+  - {framework: ISO 27001, retention_years: 3, scope: security logs}
+typical_systems:
+  hosting: AWS, GCP, Azure
+  monitoring: Datadog, New Relic, PagerDuty
+  identity: Auth0, Okta, Keycloak
+  ci_cd: GitHub Actions, GitLab CI
+default_concentration_risk_threshold_pct: 40

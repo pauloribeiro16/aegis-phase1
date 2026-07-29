@@ -1,0 +1,24 @@
+# Stakeholders (Case 02 — SecureBorder Solutions)
+# PLACEHOLDER for the test run — actual stakeholders in PROJECT_STATE.md §4
+stakeholders:
+  - id: SH-01
+    role: Chief Executive Officer (CEO)
+    responsibilities: [executive_sponsor, accountability]
+  - id: SH-02
+    role: Chief Information Security Officer (CISO)
+    responsibilities: [security_lead, iso_27001_chief, team_25_plus]
+  - id: SH-03
+    role: Data Protection Officer (DPO)
+    responsibilities: [gdpr_compliance, biometric_oversight, art_37_mandatory]
+  - id: SH-04
+    role: Head of AI / ML
+    responsibilities: [ai_act_compliance, high_risk_ai_governance]
+  - id: SH-05
+    role: SOC Lead
+    responsibilities: [24_7_monitoring, nis2_incident_response]
+  - id: SH-06
+    role: Engineering Director
+    responsibilities: [cra_critical_class, sbom, vulnerability_handling]
+  - id: SH-07
+    role: External Auditor
+    responsibilities: [iso_27001_audit, ai_act_conformity_assessment]
