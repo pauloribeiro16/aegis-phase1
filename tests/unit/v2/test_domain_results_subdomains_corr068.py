@@ -66,9 +66,15 @@ def test_map_domains_via_p1c_populates_legacy_subdomains_field():
         "applicable_regs": ["GDPR", "CRA"],
         "company_name": "TestCo",
     }
+    orch.state["aggregated_data"] = {
+        "rationale_by_reg": {"GDPR": {"rationale": "applies"}}
+    }
 
     results = orch._map_domains_via_p1c_llm_01(executor)
 
+    assert executor.run_phase_1c_map.call_args.kwargs["p1b_outputs_by_reg"] == {
+        "GDPR": {"rationale": "applies"}
+    }
     assert "D-01" in results
     assert "D-02" in results
 

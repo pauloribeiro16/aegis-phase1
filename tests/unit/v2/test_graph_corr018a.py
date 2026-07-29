@@ -307,7 +307,7 @@ def test_legacy_run_all_unchanged(tmp_path: Any) -> None:
     Acts as a regression guard for the S1 refactor: every legacy public
     method on ``Phase1Orchestrator`` must remain invoked exactly once when
     ``run_all`` is called, in the canonical order
-    ``load → map_domains → run_phase_1b → reduce → generate_outputs``.
+    ``load → run_phase_1b → map_domains → reduce → generate_outputs``.
     """
     from aegis_phase1.v2.orchestrator import Phase1Orchestrator
 
@@ -344,8 +344,8 @@ def test_legacy_run_all_unchanged(tmp_path: Any) -> None:
 
     assert call_order == [
         "load",
-        "map_domains",
         "run_phase_1b",
+        "map_domains",
         "reduce",
         "generate_outputs",
     ], f"unexpected legacy sequence: {call_order!r}"

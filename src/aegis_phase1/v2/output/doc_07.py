@@ -209,7 +209,7 @@ def _section_3_coverage_matrix(
     parts.append("## 3. COVERAGE MATRIX\n")
     parts.append(
         "The matrix below contains one row per sub-domain (38 nominal). "
-        "Each cell carries a regulation abbreviation when that "
+        "Each covered cell carries a check mark and regulation abbreviation when that "
         "regulation has at least one clause mapping onto the sub-domain, "
         "or \"—\" when not applicable. NI (normative intensity) is the "
         "mean of the ``normative_strength`` field across all clauses that "
@@ -220,8 +220,7 @@ def _section_3_coverage_matrix(
         parts.append("_No coverage data available — ontology is empty._\n")
     else:
         headers = ["Sub-domain", "Name"]
-        regulations = [r for r in regs if isinstance(r, Mapping)]
-        headers.extend(_abbr(r) for r in regulations)
+        headers.extend(_regulation_abbrs(regs))
         headers.extend(["Total", "Status", "NI"])
         parts.append(markdown_table(headers, rows))
     parts.append("")
@@ -525,8 +524,7 @@ def _matrix_rows(
     """Build the 38-row coverage matrix as tuples."""
     covered = (subdomains.get("covered") or []) if isinstance(subdomains, Mapping) else []
     not_covered = (subdomains.get("not_covered") or []) if isinstance(subdomains, Mapping) else []
-    regulations = [r for r in regs if isinstance(r, Mapping)]
-    regulation_abbrs = [_abbr(r) for r in regulations]
+    regulation_abbrs = _regulation_abbrs(regs)
 
     cell_index = _build_clause_cell_index(clauses, regulation_abbrs)
     rows: list[tuple[str, ...]] = []
@@ -542,7 +540,7 @@ def _matrix_rows(
         for abbr in regulation_abbrs:
             cell = cell_index.get((sd_id, abbr))
             if cell:
-                cells.append(abbr)
+                cells.append(f"✅ {abbr}")
                 intensity_sums.append(cell["mean"])
                 total += 1
             else:
@@ -615,7 +613,7 @@ def _coverage_counts(
 ) -> dict[str, int]:
     covered = (subdomains.get("covered") or []) if isinstance(subdomains, Mapping) else []
     not_covered = (subdomains.get("not_covered") or []) if isinstance(subdomains, Mapping) else []
-    regulation_abbrs = {_abbr(r) for r in regs if isinstance(r, Mapping)}
+    regulation_abbrs = set(_regulation_abbrs(regs))
     clauses = clauses if isinstance(clauses, list) else []
     applied: dict[str, set[str]] = {sd.get("id", ""): set() for sd in covered if isinstance(sd, Mapping)}
     for clause in clauses:
@@ -703,7 +701,7 @@ def _strategic_implication_rows(
     state: dict[str, Any],
     regs: list[Any],
 ) -> list[tuple[str, str, str, str, str, str]]:
-    applicable = sorted(_abbr(r) for r in regs if isinstance(r, Mapping) and r.get("applicable"))
+    applicable = sorted(_regulation_abbrs(regs, applicable_only=True))
     rows: list[tuple[str, str, str, str, str, str]] = []
     if not applicable:
         return [("SI-000", "—", "—", "No applicable regulations", "—", "LOW")]
@@ -989,6 +987,20 @@ def _abbr(reg: Mapping[str, Any]) -> str:
     return text.upper()
 
 
+def _regulation_abbrs(
+    regs: list[Any], *, applicable_only: bool = False
+) -> list[str]:
+    abbreviations: list[str] = []
+    for regulation in regs:
+        if isinstance(regulation, Mapping):
+            if applicable_only and regulation.get("applicable") is False:
+                continue
+            abbreviations.append(_abbr(regulation))
+        elif isinstance(regulation, str) and regulation:
+            abbreviations.append(regulation.upper())
+    return abbreviations
+
+
 def _should_use_llm(llm_invoker: Any | None) -> bool:
     if llm_invoker is None:
         return False
@@ -1003,7 +1015,7 @@ def _should_use_llm(llm_invoker: Any | None) -> bool:
 def _build_frontmatter(state: dict[str, Any], regs: list[Any]) -> str:
     ctx = state.get("company_context")
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    applicable = sorted(_abbr(r) for r in regs if isinstance(r, Mapping) and r.get("applicable"))
+    applicable = sorted(_regulation_abbrs(regs, applicable_only=True))
     payload: dict[str, Any] = {
         "document_id": "AEGIS-P1-07",
         "title": "Structured Compliance Matrix",
