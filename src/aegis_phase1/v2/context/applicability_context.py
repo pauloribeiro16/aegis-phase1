@@ -383,10 +383,34 @@ def _derive_predicates_from_facts(facts: dict[str, Any]) -> dict[str, Any]:
     dora_financial_entity = bool(
         any(s in sector for s in ("finance", "bank", "insurance"))
     )
+
+    # CORR-060 T6: NIS2 threshold check (Annex I/II sectors + size).
+    # NIS2 only applies when the company is in an Annex I/II sector AND
+    # meets the size threshold (≥50 employees OR ≥€10M revenue). Below
+    # threshold (e.g. TinyTask, 8 employees) nis2_sector stays empty so
+    # _compute_applicable_regs excludes NIS2.
+    nis2_sector = ""  # default: below threshold / not in NIS2 sector
+    # NIS2 Annex I/II sector identifiers (substring matches against the
+    # lowercased sector string). Excludes "software"/"technology" (those
+    # are CRA-relevant but not NIS2 sectors — see CORR-068 regression
+    # `test_heuristic_fallback_when_v2_applicable_regs_empty`).
+    nis2_annex_keywords = (
+        "banking", "health", "insurance", "energy", "transport",
+        "digital infrastructure", "digital-infra", "public admin",
+        "water", "waste", "manufacturing", "chemical", "food",
+        "postal", "space", "research",
+    )
+    employees = int(facts.get("employees") or 0)
+    revenue_eur = int(facts.get("revenue_eur") or 0)
+    in_nis2_sector = any(s in sector for s in nis2_annex_keywords)
+    meets_size_threshold = employees >= 50 or revenue_eur >= 10_000_000
+    if in_nis2_sector and meets_size_threshold:
+        nis2_sector = sector or "Annex I/II"
+
     return {
         "processes_personal_data": processes_personal_data,
         "places_digital_products_eu": places_digital_products_eu,
-        "nis2_sector": "",  # conservatively empty (not applicable)
+        "nis2_sector": nis2_sector,
         "dora_financial_entity": dora_financial_entity,
         "aiact_high_risk_system": False,
     }
