@@ -1,6 +1,6 @@
-# SPEC — Capabilities wired into Doc 04d (remove RACI)
+# SPEC — LLM prompts rewritten in functional vocabulary (no person names)
 
-**Spec ID:** SP-2026-18
+**Spec ID:** SP-2026-19
 **Date:** 2026-07-29
 **Author:** Planner (opencode / MiniMax-M3)
 **Status:** DRAFT
@@ -12,24 +12,37 @@
 
 ### Problem Statement
 
-CORR-074 created the `data/capabilities/{D-XX}.yaml` catalog and `load_capabilities()` loader. Doc 04d however still renders `04d_Org_Roles_RACI.md` with the hardcoded `_RACI_BY_DOMAIN` (40 activities × 6 individual people) and `_STAKEHOLDER_COLUMNS` (6 individual names). The user explicitly said in plan mode (2026-07-29): **"remover isso, o raci não deve estar presente"**.
+CORR-074 delivered `load_capabilities()` + `ROLE_VOCABULARY` (5 functions: DPO, CISO, Engineering, Operations, Governance). CORR-075 removed the RACI table from doc_04d. But 9 LLM narrative-prompts still ask the model to describe companies in terms of people ("Founder #1", "CEO acting as DPO", "Lead Developer", "2 founders"). At a 5000-employee bank, the LLM produces nonsense — the bank doesn't have 2 founders. The user explicitly demanded in plan-mode (2026-07-29): zero person names anywhere in role-bearing prose.
 
-This contract removes the RACI section and replaces it with a **Capability Summary** — a prose + compact list of capability IDs sourced from the new data/capabilities/ catalog. Zero person names. Zero R/A/C/I columns.
+This contract rewrites the 9 LLM prompts to inject a functional context block (roles + applicable capabilities) and remove person-name references.
 
 ### Current State
 
-- `src/aegis_phase1/v2/output/doc_04d.py:80-142` defines `_RACI_BY_DOMAIN` (hardcoded).
-- `src/aegis_phase1/v2/output/doc_04d.py:65-72` defines `_STAKEHOLDER_COLUMNS` (hardcoded).
-- `_section_raci_matrix` renders 6 columns × N activities, with `Board = 2 founders` literal text on large cases.
-- Available infrastructure (delivered by CORR-074): `load_capabilities(domain_id)` + `ROLE_VOCABULARY`.
+9 identified prompt functions:
+
+| # | Function | File | Used by section |
+|---|----------|------|-----------------|
+| 1 | `_reporting_lines_prompt` | `src/aegis_phase1/v2/output/doc_04d.py:932` | doc_04d §5 Reporting Lines |
+| 2 | `_escalation_prompt` | `src/aegis_phase1/v2/output/doc_04d.py:946` | doc_04d §9 Escalation Paths |
+| 3 | `_risk_narrative_prompt` | `src/aegis_phase1/v2/output/doc_04c.py:642` | doc_04c §5.1 Concentration Risk |
+| 4 | `_technical_architecture_prompt` | `src/aegis_phase1/v2/output/doc_04a.py:1004` | doc_04a §1 Technical Architecture |
+| 5 | `_network_topology_prompt` | `src/aegis_phase1/v2/output/doc_04a.py:1016` | doc_04a §1.2 Network Topology |
+| 6 | `_strategic_prompt` | `src/aegis_phase1/v2/output/doc_05.py:966` | doc_05 §6.1 Strategic Narrative |
+| 7 | `_strategic_prompt` | `src/aegis_phase1/v2/output/doc_07.py:764` | doc_07 §6.1 Strategic Narrative |
+| 8 | `_cross_check_prompt` | `src/aegis_phase1/v2/output/doc_07b.py:664` | doc_07b §5.1 Narrative |
+| 9 | `_domain_notes_prompt` | `src/aegis_phase1/v2/output/doc_04b.py:1092` | doc_04b §3 Per-Domain Notes (called 10 times) |
+
+All 9 prompts mention "Founder", "CEO acting as", "CTO as", "Lead Developer", or "2 founders" in the prompt body. The LLM is then asked to produce prose that includes these phrases.
 
 ### Target State
 
-- `_RACI_BY_DOMAIN` and `_STAKEHOLDER_COLUMNS` deleted.
-- `_section_raci_matrix` replaced by `_section_capabilities_summary` rendering prose + a compact list of capability IDs with their accountable function.
-- No `R/A/C/I` table; no person names; no "Founder"/"CEO acting as"/"Lead Developer"/"2 founders" anywhere in the output.
-- Other docs (04a/04b/04c/04e/05/06/07/07b) untouched.
-- Tests confirm: (a) capability summary appears for case 3 (MAX), (b) no person names in output, (c) stakeholder leakage test remains green.
+- Each prompt function takes a `tier` and `applicable_regs` (or accepts `state` and derives them) and prepends a **functional context block** listing:
+  - The 5 functions in `ROLE_VOCABULARY` (`DPO`, `CISO`, `Engineering`, `Operations`, `Governance`).
+  - Tier-scaled role roster from `data/role_models/{tier}.yaml` (only role titles, no person names).
+  - Applicable capabilities from `data/capabilities/` for the applicable regulations.
+- Explicit instruction: "**DO NOT name individuals**. Use function names only."
+- Phrases removed: `Founder`, `CEO acting as`, `CTO as`, `Lead Developer`, `2 founders`, `acting as DPO`, `acting as CISO`.
+- The 9 prompts downstream behaviour unchanged (still produce prose prose, still deterministic fallback when no LLM).
 
 ---
 
@@ -39,83 +52,116 @@ This contract removes the RACI section and replaces it with a **Capability Summa
 
 | # | Requirement | Priority | Rationale |
 |---|-------------|----------|-----------|
-| FR-1 | Delete `_RACI_BY_DOMAIN` and `_STAKEHOLDER_COLUMNS` from `doc_04d.py` | MUST | User explicit: "remover isso" |
-| FR-2 | Replace `_section_raci_matrix` with `_section_capabilities_summary` | MUST | New required section |
-| FR-3 | New section renders: (a) 1-paragraph intro on capabilities-not-people; (b) compact list of capability IDs (CAP-DXX-NNN) with `a_function` per D-XX | MUST | Info-only, no RACI |
-| FR-4 | When `data/capabilities/{D-XX}.yaml` is missing → emit `_(Capability catalog for D-XX not yet authored; see data/capabilities/D-XX.yaml.)_` | MUST | Per user decision #3 (info-only, no PENDING) |
-| FR-5 | No person names in output: `Founder`, `CEO acting as`, `CTO as`, `Lead Developer`, `2 founders` | MUST | User explicit |
-| FR-6 | Update version history: 2.3 entry "Remove RACI; add Capability Summary" | MUST | Doc discovery |
-| FR-7 | Tests: 3 cases (Micro/Large/Max) — capability list renders, no person names | MUST | Validation |
+| FR-1 | Add `_functional_context_block(tier, applicable_regs)` helper in `src/aegis_phase1/v2/output/_functional_prompts.py` (new module) | MUST | Single source for the injected block |
+| FR-2 | All 9 prompts prepend the functional context block before the existing narrative instructions | MUST | Uniform treatment |
+| FR-3 | Prompts explicitly forbid person names: "DO NOT name individuals (no Founder, CEO acting as, CTO as, Lead Developer, 2 founders)" | MUST | User explicit |
+| FR-4 | No targeted phrase appears in any of the 9 prompts | MUST | Verification gate |
+| FR-5 | `render_mandatory_narrative` and `render_doc_XX` functions unchanged in signature | MUST | No call-site changes |
+| FR-6 | When `applicable_regs` is empty or tier is missing, helper returns minimal block (no error) | MUST | Robustness |
 
 ### Non-Functional Requirements
 
 | # | Requirement | Priority | Rationale |
 |---|-------------|----------|-----------|
-| NFR-1 | Only `doc_04d.py` modified | MUST | Other docs untouched |
-| NFR-2 | Full v2 suite pre-existing failures unchanged | MUST | No new regressions |
+| NFR-1 | No new third-party dependencies | MUST | Stdlib + existing data/loaders only |
+| NFR-2 | Helper cacheable on (tier, applicable_regs) tuple | SHOULD | Performance (called 10× in doc_04b) |
 
 ### Constraints
 
-- No mention of "RACI" in the rendered doc body (only in the "we replaced it" narrative in the version history).
-- `data/capabilities/` only has D-01 and D-04 YAMLs (per CORR-074). Other D-XX render the info-only note.
-- `ROLE_VOCABULARY` constants are respected (no out-of-vocab roles in prose).
+- 9 prompt functions are split across 5 files (`doc_04a`, `doc_04b`, `doc_04c`, `doc_04d`, `doc_05`, `doc_07`, `doc_07b`). Each must be modified at its call site.
+- The helper module cannot import from `data/loader.py` circularly; locate it in `src/aegis_phase1/v2/output/_functional_prompts.py` and import `data/loader.py` lazily inside the helper.
+- Renderer behaviour unchanged: when LLM is unavailable, the deterministic fallback still triggers (helpers don't replace the prompt-build call).
+- ROLE_VOCABULARY is the only allowed function vocabulary; no synonyms (e.g., "IT", "Security Team") in the block.
 
 ---
 
 ## Architecture Decisions
 
-### Decision 1: §6 is renumbered and renamed
+### Decision 1: New module `_functional_prompts.py` (not inline edits)
 
-- **Context:** Doc 04d structure is `§1 Purpose → §2 Company-Level → §3 Regulation-Level → §4 Key Roles → §5 Reporting Lines → §6 RACI → §7 Training Status → §8 Compliance Mapping → §9 Escalation → §10 Gaps → §11 Gate`. Removing §6 RACI breaks numbering.
-- **Options:** (A) Renumber subsequent sections; (B) Keep §6 title but emit capability summary; (C) Drop section entirely.
-- **Decision:** A — renumber. `§6 Capability Summary` (new) was `§6 RACI`. Everything after shifts +1.
-- **Rationale:** Stable section numbering is a contract invariant for downstream consumers (PDF parsers, Phase 2B ingestion).
-- **Consequences:** Internal references in `doc_04d.py` between sections need updating.
+- **Context:** 9 prompts across 5 files. A shared helper avoids duplication.
+- **Options:** (A) New module `_functional_prompts.py` with helper; each prompt prepends the helper output. (B) Inline edit each prompt. (C) Subclass `Phase1LLMInvoker` to inject context.
+- **Decision:** A — new module.
+- **Rationale:** Single source-of-truth; easy to test the helper in isolation; no LLM invoker changes.
+- **Consequences:** 9 callers updated to prepend the block. ~5 lines each.
 
-### Decision 2: Capability summary is a TABLE OF CAPABILITY IDs, not a description dump
+### Decision 2: Helper takes tier + applicable_regs, not full state
 
-- **Context:** D-04 has 5 capabilities each with `description`, `obligations`, `a_function`, `r_function`. Listing all fields makes §6 verbose.
-- **Options:** (A) Compact table: ID | Accountable Function | Trigger Obligation; (B) Full dump per capability.
-- **Decision:** A — compact table with the 3 most useful fields. Full dump goes to the per-spec markdown appendix (already exists for all 5 LLM specs; capabilities appendix if added later).
-- **Rationale:** Doc 04d §6 must fit in 1 page. Detail is delegated to the appendix.
-- **Consequences:** Add a 1-line trailer pointing to `data/capabilities/{D-XX}.yaml` for full detail.
+- **Context:** The call sites already have access to `state["company_context"]`; the helper just needs the function roster and applicable capabilities.
+- **Options:** (A) Helper takes `tier: str, applicable_regs: list[str]`; (B) Helper takes `state: dict` and derives internally.
+- **Decision:** A — explicit parameters.
+- **Rationale:** Easier to test (no state construction needed); deterministic output for a given (tier, applicable_regs).
+- **Consequences:** Each call site must extract `tier` and `applicable_regs` from `state` before calling the helper.
 
-### Decision 3: No mapping of capabilities to "extra" sections
+### Decision 3: Capability list is filtered by applicable_regs
 
-- **Context:** Capabilities could be cross-referenced into §7 Training (which function needs which training), §9 Escalation (which function has incident authority), §10 Gaps (which function has 0 capability coverage).
-- **Options:** (A) Cross-reference everywhere; (B) Single source in §6; (C) Cross-reference only in §10 Gaps.
-- **Decision:** C — only §10 Gaps gets a cross-reference (gaps = functions with no capability assigned).
-- **Rationale:** Avoid scope creep. Other sections stay untouched. Gaps are the most actionable area.
+- **Context:** Some capabilities are tied to specific regulations (e.g., `CAP-D01-001` "Encryption at rest" maps to GDPR Art. 32 + CRA Annex I). LLM should only see capabilities for the applicable regs.
+- **Options:** (A) Filter by `applicable_regs` (intersection); (B) Show all capabilities regardless.
+- **Decision:** A — filter.
+- **Rationale:** Minimises prompt size; keeps the LLM focused on what's relevant.
+- **Consequences:** For D-XX domains with no `applicable_regs` in capability YAML, no capability is shown. Capability YAML `obligations` field is the filter source.
+
+### Decision 4: Helper is best-effort silent on missing data
+
+- **Context:** If `data/capabilities/{D-XX}.yaml` is missing, the loader returns `{}`. The helper should not crash.
+- **Options:** (A) Skip the capability row silently; (B) Emit a placeholder line.
+- **Decision:** A — skip.
+- **Rationale:** Matches the user's "info-only" policy (CORR-074 decision #3). Capabilities are informational.
+- **Consequences:** Helper always returns a valid string; never raises.
 
 ---
 
 ## Data Model
 
-No new data structures. Reuses:
-- `load_capabilities(domain_id) -> dict` (CORR-074)
+No new entities. Reuses:
 - `ROLE_VOCABULARY` (CORR-074)
+- `load_capabilities(domain_id)` (CORR-074)
+- `load_role_model(tier)` (CORR-073)
+- `classify_tier(employees, sector, applicable_regs)` (CORR-073)
 
 ---
 
 ## API / Interface Design
 
-### Internal function (replaces existing `_section_raci_matrix`)
+### New module
 
 ```python
-def _section_capabilities_summary(state: dict[str, Any]) -> list[str]:
-    """§6 Capability Summary — prose + compact capability list per D-XX.
+# src/aegis_phase1/v2/output/_functional_prompts.py
+def build_functional_context(tier: str, applicable_regs: list[str]) -> str:
+    """Return functional context block to prepend to LLM prompts.
     
-    Reads `load_capabilities(domain_id)` for each D-01..D-10. Renders info-only
-    note when YAML is missing. Never names individuals.
+    Returns empty string when ROLE_VOCABULARY is empty (defensive).
     """
 ```
 
-### Behavior contract
+### Output format
 
-- For D-XX ∈ {D-01..D-10}:
-  - If `load_capabilities(D-XX)` returns non-empty dict: emit `### D-XX Capability Summary` table with columns `{ID | Accountable Function | Regulation Anchor}`. Sorted by capability ID.
-  - If empty: emit `_(Capability catalog for D-XX not yet authored; see data/capabilities/D-XX.yaml.)_`.
-- Add 1-paragraph intro before the tables: "These capabilities are required by the applicable regulatory perimeter. RACI per individual is intentionally out of scope; capability-to-person allocation is the company's responsibility (see Phase 2B)."
+```
+Functional roles available (DO NOT name individuals):
+- {role_1_title} (reports to {reports_to}, FTE {fte})
+- {role_2_title} (reports to {reports_to}, FTE {fte})
+...
+
+Capabilities required by applicable regulations:
+- {cap_id}: A={a_function}, R={r_function} ({title})
+- {cap_id}: A={a_function}, R={r_function} ({title})
+...
+```
+
+### Function signatures (unchanged)
+
+```python
+def _reporting_lines_prompt(state: dict[str, Any]) -> str: ...   # doc_04d
+def _escalation_prompt(state: dict[str, Any]) -> str: ...        # doc_04d
+def _risk_narrative_prompt(state, cloud, rows) -> str: ...        # doc_04c
+def _technical_architecture_prompt(state, inventory, summary) -> str: ...  # doc_04a
+def _network_topology_prompt(state, inventory) -> str: ...       # doc_04a
+def _strategic_prompt(state, rows) -> str: ...                   # doc_05, doc_07
+def _cross_check_prompt(state, rows) -> str: ...                 # doc_07b
+def _domain_notes_prompt(domain_id, current, target, gap, controls, state) -> str: ...  # doc_04b
+```
+
+Each internally prepends the functional context block.
 
 ---
 
@@ -125,15 +171,22 @@ def _section_capabilities_summary(state: dict[str, Any]) -> list[str]:
 
 | Phase | Name | Scope | Depends On |
 |-------|------|-------|------------|
-| 1 | Replace RACI with Capability Summary | `src/aegis_phase1/v2/output/doc_04d.py` + tests | — |
+| 1 | Helper + 9-prompt refactor | New module + 5 file edits | CORR-074, CORR-075 |
 
 ### File Changes
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/aegis_phase1/v2/output/doc_04d.py` | modify | Delete `_RACI_BY_DOMAIN`, `_STAKEHOLDER_COLUMNS`; replace `_section_raci_matrix` with `_section_capabilities_summary`; renumber §7→§8, §8→§9, §9→§10, §10→§11, §11→§12; update prologue/PR references; add version history entry |
-| `tests/unit/v2/output/test_doc_04d_capability_summary.py` | create | New test: 3 cases (Micro/Large/Max); no person names in output; capability summary section appears |
-| `tests/unit/v2/output/test_doc_04_stakeholder_leakage.py` | modify (if needed) | Update column-abbreviation assertions to reflect new content (kept by §4 Key Roles display) |
+| `src/aegis_phase1/v2/output/_functional_prompts.py` | create | New helper module |
+| `src/aegis_phase1/v2/output/doc_04a.py` | modify | `_technical_architecture_prompt` + `_network_topology_prompt` prepend context |
+| `src/aegis_phase1/v2/output/doc_04b.py` | modify | `_domain_notes_prompt` prepends context (called 10×) |
+| `src/aegis_phase1/v2/output/doc_04c.py` | modify | `_risk_narrative_prompt` prepends context |
+| `src/aegis_phase1/v2/output/doc_04d.py` | modify | `_reporting_lines_prompt` + `_escalation_prompt` prepend context |
+| `src/aegis_phase1/v2/output/doc_05.py` | modify | `_strategic_prompt` prepends context |
+| `src/aegis_phase1/v2/output/doc_07.py` | modify | `_strategic_prompt` prepends context |
+| `src/aegis_phase1/v2/output/doc_07b.py` | modify | `_cross_check_prompt` prepends context |
+| `tests/unit/v2/output/test_functional_prompts.py` | create | Tests for the helper + 9-prompt regression |
+| `execution/CONTRACT-076.md` | create | Contract document |
 
 ---
 
@@ -143,27 +196,31 @@ def _section_capabilities_summary(state: dict[str, Any]) -> list[str]:
 
 | # | Criterion | Test Method |
 |---|-----------|-------------|
-| AC-1 | `doc_04d.py` no longer exports `_RACI_BY_DOMAIN` or `_STAKEHOLDER_COLUMNS` | grep + pytest |
-| AC-2 | All 10 D-XX rendered in §6 as table (if YAML exists) or info-only note (if missing) | pytest 3 cases |
-| AC-3 | No person names in `04d_Org_Roles_RACI.md` output (no `Founder`, `CEO acting as`, `CTO as`, `Lead Developer`, `2 founders`) | pytest regex |
-| AC-4 | Stakeholder leakage test (existência) ainda PASS | pytest |
-| AC-5 | Full v2 suite unchanged (no new regressions in non-infra tests) | pytest |
-| AC-6 | Case 3 (MAX) §6 has ≥7 capability rows (D-01..D-04 + sample) | pytest render |
-| AC-7 | §6 prose intro present (mentions "capabilities" + "out of scope") | pytest render |
+| AC-1 | None of 9 prompts contains banned phrases: `Founder`, `CEO acting as`, `CTO as`, `Lead Developer`, `2 founders`, `acting as DPO`, `acting as CISO` | pytest grep |
+| AC-2 | Each of the 9 prompts contains `ROLE_VOCABULARY` (or "DPO, CISO, Engineering, Operations, Governance") in the injected block | pytest regex |
+| AC-3 | Each of the 9 prompts contains "DO NOT name individuals" (or equivalent) in the injected block | pytest regex |
+| AC-4 | `_functional_prompts.build_functional_context(tier, applicable_regs)` returns deterministic string for same inputs | pytest |
+| AC-5 | For empty applicable_regs, helper returns non-empty block with role roster only | pytest |
+| AC-6 | For tier with sufficient role model (MICRO..MAX), the role roster lists FTE/reports_to for each role | pytest |
+| AC-7 | Existing full v2 suite still green (no new regressions vs main baseline) | pytest |
+| AC-8 | Existing stakeholder leakage test + capability-summary test still PASS | pytest |
+| AC-9 | `legacy_qa_runner.py` (or equivalent manual smoke) still produces 9 markdown files in 4 cases; no schema break | shell |
 
 ### Edge Cases
 
 | # | Edge Case | Expected Behavior |
 |---|-----------|-------------------|
-| EC-1 | `load_capabilities(D-XX)` returns `{}` (missing YAML) | Info-only note in §6 for that D-XX |
-| EC-2 | YAML malformed | Info-only note (C3 fallback propagates) |
-| EC-3 | Capability has no `obligations` field | Table row shows `—` in Regulation Anchor column |
+| EC-1 | `applicable_regs = []` | Helper returns role roster only (no capability block) |
+| EC-2 | `tier = "UNKNOWN"` | Helper falls back to MICRO or empty block |
+| EC-3 | A capability YAML has no `obligations` field | Capability is excluded from the block (no reg mapping) |
+| EC-4 | A capability YAML has `obligations: {reg: [...]}` but `reg` not in applicable_regs | Capability is excluded |
 
 ### Error Scenarios
 
 | # | Error | Expected Behavior |
 |---|-------|-------------------|
-| ES-1 | `load_capabilities()` raises | Caught by `data/loader.py` (silent `{}`) — never reaches renderer |
+| ES-1 | `load_capabilities()` raises | Helper catches silently, skips that domain |
+| ES-2 | `load_role_model()` raises | Helper falls back to empty role roster, continues |
 
 ---
 
@@ -171,9 +228,9 @@ def _section_capabilities_summary(state: dict[str, Any]) -> list[str]:
 
 | Level | What to Test | Method |
 |-------|-------------|--------|
-| Unit | Section renders, no person names, capability list correct | pytest in `tests/unit/v2/output/` |
-| Regression | Stakeholder leakage test, full v2 suite | pytest |
-| Manual | Inspect 3 cases' `04d_Org_Roles_RACI.md` for human verification | output redirect |
+| Unit | Helper deterministic output, empty case, banned-phrase absence | pytest in `tests/unit/v2/output/` |
+| Regression | Existing 9-prompt calls still produce non-empty prompt strings | pytest |
+| Manual | Inspect rendered docs to confirm no person names in output | shell |
 
 ---
 
@@ -181,24 +238,23 @@ def _section_capabilities_summary(state: dict[str, Any]) -> list[str]:
 
 | # | Question | Answer | Impact |
 |---|----------|--------|--------|
-| Q1 | What's the new doc filename? | Keep `04d_Org_Roles_RACI.md` for backward compatibility (PDF parsers, Phase 2B ingest). Add deprecation note in frontmatter. |
+| Q1 | Where does the helper live? | `src/aegis_phase1/v2/output/_functional_prompts.py` (new module) |
+| Q2 | Mirroring across `doc_05.py` and `doc_07.py` (both define `_strategic_prompt`)? | Each file keeps its own function; both call the helper |
 
 ---
 
 ## References
 
-- `execution/SPEC.md` — CORR-074 spec (predecessor)
-- `execution/CONTRACT-074.md` — capabilities catalog delivery
-- `execution/contracts/SC-2026-17.json` — CORR-074 contract
-- `execution/CORR-073.md` — data-driven pipeline extraction
-- `src/aegis_phase1/data/loader.py:load_capabilities`
-- `src/aegis_phase1/v2/output/doc_04d.py` — to be modified
+- `execution/SPEC.md` (CORR-075 spec — predecessor)
+- `execution/contracts/SC-2026-17.json` (CORR-074 contract — capabilities catalog)
+- `execution/contracts/SC-2026-18.json` (CORR-075 contract — Capabilities wired into Doc 04d)
+- `src/aegis_phase1/data/loader.py` — `load_capabilities`, `load_role_model`, `ROLE_VOCABULARY`
 
 ---
 
 ## Sign-off
 
 - [x] Requirements reviewed (per-utilizador 2026-07-29)
-- [x] Architecture decisions approved (per-utilizador)
+- [x] Architecture decisions approved
 - [x] Acceptance criteria validated
 - [ ] Ready for contract generation
