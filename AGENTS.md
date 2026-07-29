@@ -2,7 +2,7 @@
 
 **Purpose:** Onboarding for AI coding agents — AEGIS-KG Phase 1 pipeline.
 **Language:** All content in English (user chats in Portuguese).
-**Last Updated:** 2026-07-28 (post-CORR-072 hierarchical split)
+**Last Updated:** 2026-07-29 (sprint-contract rule added)
 
 ---
 
@@ -78,6 +78,7 @@ cases/
   case1-tinytask/    # SaaS MICRO (2 regs)
   case2-secureborder/ # security MEDIUM (4 regs)
   case3-omnibank/    # banking LARGE (5 regs)
+data/                # YAML sources for tier/role/regulatory/control-evidence (CORR-073). Capabilities loader: data/capabilities/{D-XX}.yaml via data/loader.py:load_capabilities(). ROLE_VOCABULARY ∈ {DPO, CISO, Engineering, Operations, Governance}. Silent {} on missing.
 docs/                # NIST_CSF_2.0_ONLY, PHASE1_FLOW_DESIGN, etc.
 execution/           # CONTRACT-NNN.md, CORR-NNN-RUN-LOG.md, audit reports
 ```
@@ -163,7 +164,7 @@ trigger phrase and load immediately — don't paraphrase.
 
 | Skill | When in this repo |
 |-------|------|
-| `sprint-contract` | 3+ file changes, complex tasks, planning CORR-NNN contracts |
+| `sprint-contract` | **ALWAYS** load when the user asks for a contract (any size, any context); also: 3+ file changes, complex tasks, planning CORR-NNN contracts |
 | `code-review` | Before merging, independent verification of changes |
 | `python-best-practices` | Any Python code change |
 | `project-conventions` | New AEGIS-KG naming, file structure, entity IDs |

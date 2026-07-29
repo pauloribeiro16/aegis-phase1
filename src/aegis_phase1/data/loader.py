@@ -11,16 +11,35 @@ Usage:
 
     roles = load_role_model(tier)
     # Returns: list of role dicts
+
+    caps = load_capabilities("D-01")
+    # Returns: dict with keys ``domain_id``, ``title``, ``capabilities``.
+    # Returns ``{}`` silently for missing domain_id (info-only policy).
 """
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+logger = logging.getLogger(__name__)
+
 DATA_ROOT = Path(__file__).resolve().parent.parent.parent.parent / "data"
+
+# Canonical functional role vocabulary used across capabilities YAMLs.
+# Phase 1 names FUNCTIONS, not people — assignment to individuals is the
+# company's responsibility. Tests import this constant to assert vocabulary
+# compliance (no role outside the set may appear in a YAML).
+ROLE_VOCABULARY: frozenset[str] = frozenset({
+    "DPO",
+    "CISO",
+    "Engineering",
+    "Operations",
+    "Governance",
+})
 
 
 @lru_cache(maxsize=1)
@@ -69,6 +88,34 @@ def load_control_evidence(domain_id: str) -> dict:
     Returns a dict with keys ``domain_id``, ``title``, ``controls``.
     """
     return _load_yaml(str(DATA_ROOT / "control_evidence" / f"{domain_id}.yaml"))
+
+
+@lru_cache(maxsize=1)
+def load_capabilities(domain_id: str) -> dict[str, Any]:
+    """Load data/capabilities/{domain_id}.yaml.
+
+    Returns the parsed YAML as a dict, or an empty dict silently when the
+    file is missing or unreadable. Capabilities are informational — missing
+    catalog entries must NOT raise; callers should branch on truthiness.
+
+    Logs at DEBUG level only (per info-first policy in CORR-074).
+
+    Args:
+        domain_id: Domain identifier matching a filename stem, e.g. ``"D-01"``.
+
+    Returns:
+        Parsed YAML dict, or ``{}`` on absence / parse error.
+    """
+    path = Path("data/capabilities") / f"{domain_id}.yaml"
+    if not path.exists():
+        logger.debug("Capabilities catalog missing for %s; returning empty", domain_id)
+        return {}
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, dict) else {}
+    except Exception as exc:
+        logger.debug("Capabilities catalog unreadable for %s: %s; returning empty", domain_id, exc)
+        return {}
 
 
 def classify_tier(employees: int, sector: str = "", applicable_regs: list[str] | None = None) -> str:

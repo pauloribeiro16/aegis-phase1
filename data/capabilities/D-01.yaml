@@ -1,0 +1,90 @@
+# Capabilities catalog — D-01 Data Protection
+#
+# Read by: src/aegis_phase1/data/loader.py:load_capabilities()
+# Schema: see execution/SPEC.md (SP-2026-17) and execution/CONTRACT-074.md
+# Functions used in this file are drawn from ROLE_VOCABULARY in
+# src/aegis_phase1/data/loader.py:
+#   {DPO, CISO, Engineering, Operations, Governance}
+# capabilities[]: id is unique within this file (CAP-D01-NNN).
+# obligations: optional; format {reg: [article_refs]}. If absent, capability
+# is treated as informational (no regulator mapping).
+# cadence ∈ {continuous, annual, per_release, business_hours}.
+# evidence_refs: list of tags referencing SYSTEMS, STORES, FLOWS inputs.
+
+domain_id: D-01
+title: Data Protection
+description: Protect confidentiality, integrity, and availability of personal and business data at rest, in transit, and across the retention lifecycle.
+applicable_regs:
+  - GDPR
+  - DORA
+capabilities:
+  - id: CAP-D01-001
+    title: Encryption at rest
+    description: Cryptographic protection of stored data with keys managed separately from the data plane. Scaled by entity tier — managed KMS at MICRO/SMALL, customer-managed HSM at LARGE/MAX.
+    a_function: Engineering
+    r_function: CISO
+    required_functions:
+      - Engineering
+      - CISO
+      - Governance
+    cadence: continuous
+    evidence_refs:
+      - STORES
+    obligations:
+      GDPR:
+        - Art.32(1)(a)
+      DORA:
+        - Art.9
+    notes: Storage-level encryption is a baseline expectation; capability escalates with tier (HSM root keys at LARGE+).
+
+  - id: CAP-D01-002
+    title: Encryption in transit
+    description: Cryptographic protection of data on the wire across public and internal flows. mTLS on internal services is the LARGE+ baseline.
+    a_function: Engineering
+    r_function: CISO
+    required_functions:
+      - Engineering
+    cadence: continuous
+    evidence_refs:
+      - FLOWS
+    obligations:
+      GDPR:
+        - Art.32(1)(a)
+    notes: Capability explicit because in-transit controls differ architecturally (TLS termination, cert rotation, mTLS) from at-rest controls.
+
+  - id: CAP-D01-003
+    title: Key management lifecycle
+    description: "Operational lifecycle for cryptographic keys: generation, rotation, escrow, revocation, separation of duties. Lifts from managed KMS at SMALL to dedicated HSM cluster with quorum at MAX."
+    a_function: CISO
+    r_function: Governance
+    required_functions:
+      - CISO
+      - Engineering
+      - Governance
+    cadence: per_release
+    evidence_refs:
+      - SYSTEMS
+      - STORES
+    obligations:
+      DORA:
+        - Art.9
+    notes: Rotation cadence policy tied to a_function review, not implemented silently.
+
+  - id: CAP-D01-004
+    title: Data retention and deletion
+    description: "Enforces GDPR storage limitation (Art.5(1)(e)) and DORA record-keeping requirements. Operational guarantees: TTL on stores, archival schedule, deletion workflow."
+    a_function: Operations
+    r_function: CISO
+    required_functions:
+      - Operations
+      - Engineering
+    cadence: continuous
+    evidence_refs:
+      - STORES
+      - FLOWS
+    obligations:
+      GDPR:
+        - Art.5(1)(e)
+      DORA:
+        - Art.7
+    notes: Distinction from "right to erasure" capability — this is the lifecycle policy; erasure is a consumer-facing request handled elsewhere.

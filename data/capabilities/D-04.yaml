@@ -1,0 +1,111 @@
+# Capabilities catalog — D-04 Incident Response
+#
+# Read by: src/aegis_phase1/data/loader.py:load_capabilities()
+# Schema: see execution/SPEC.md (SP-2026-17) and execution/CONTRACT-074.md
+# Functions used in this file are drawn from ROLE_VOCABULARY in
+# src/aegis_phase1/data/loader.py:
+#   {DPO, CISO, Engineering, Operations, Governance}
+# capabilities[]: id is unique within this file (CAP-D04-NNN).
+# obligations: optional; format {reg: [article_refs]}. If absent, capability
+# is treated as informational (no regulator mapping).
+# cadence ∈ {continuous, annual, per_release, business_hours}.
+# evidence_refs: list of tags referencing SYSTEMS, STORES, FLOWS inputs.
+
+domain_id: D-04
+title: Incident Response
+description: Detect, contain, investigate, and communicate about security incidents. Scales from ad-hoc at MICRO to a 24/7 SOC + joint regulator exercise at MAX.
+applicable_regs:
+  - GDPR
+  - NIS2
+  - DORA
+capabilities:
+  - id: CAP-D04-001
+    title: Detection and monitoring
+    description: Continuous collection and analysis of security telemetry across endpoints, identity layer, network, and applications. SIEM use-case library escalates from ad-hoc user reports (MICRO) to 24/7 SOC + SOAR + threat hunting (MAX).
+    a_function: Operations
+    r_function: CISO
+    required_functions:
+      - Operations
+      - CISO
+    cadence: continuous
+    evidence_refs:
+      - SYSTEMS
+    obligations:
+      NIS2:
+        - Art.21(2)(e)
+      DORA:
+        - Art.17
+    notes: Capability is detection-only; response actions live in CAP-D04-002 and CAP-D04-004.
+
+  - id: CAP-D04-002
+    title: Incident response plan and playbooks
+    description: Documented IR plan with scenario playbooks (ransomware, BEC, supply chain, data breach). Plan reviewed at least annually; lessons-learned captured per incident.
+    a_function: CISO
+    r_function: Governance
+    required_functions:
+      - CISO
+      - Operations
+      - Governance
+    cadence: annual
+    evidence_refs:
+      - SYSTEMS
+    obligations:
+      NIS2:
+        - Art.21(2)(f)
+      DORA:
+        - Art.19
+    notes: Plan existence is necessary but not sufficient — exercises are tracked separately under CAP-D04-004 (recovery) and the post-incident review step.
+
+  - id: CAP-D04-003
+    title: Notification and regulator liaison
+    description: Timely notification to supervisory authorities and data subjects per GDPR 72h, NIS2 24h early warning, DORA 4h initial. Includes regulator-facing pre-approved templates at MAX.
+    a_function: Governance
+    r_function: CISO
+    required_functions:
+      - Governance
+      - Operations
+    cadence: business_hours
+    evidence_refs:
+      - SYSTEMS
+    obligations:
+      GDPR:
+        - Art.33
+      NIS2:
+        - Art.23
+      DORA:
+        - Art.19(4)
+    notes: Distinct from DPO-led data subject notification; liaison function is governance/legal with CISO advisory input.
+
+  - id: CAP-D04-004
+    title: Recovery and continuity
+    description: Restore critical systems and data within RTO/RPO targets. Includes backups, alternate-site exercises, and tabletop drills integrated with business continuity.
+    a_function: Operations
+    r_function: CISO
+    required_functions:
+      - Operations
+      - Engineering
+    cadence: continuous
+    evidence_refs:
+      - STORES
+      - SYSTEMS
+    obligations:
+      DORA:
+        - Art.12
+        - Art.13
+    notes: RTO/RPO targets are company-set; capability reports whether the capability exists, not whether targets are met.
+
+  - id: CAP-D04-005
+    title: Forensic evidence capture
+    description: Chain-of-custody process for logs, memory dumps, network captures, and cloud audit trails. Logs retained 30 days (MICRO) up to 1y hot / 7y cold (MAX).
+    a_function: Operations
+    r_function: Governance
+    required_functions:
+      - Operations
+      - CISO
+    cadence: continuous
+    evidence_refs:
+      - STORES
+    obligations:
+      GDPR:
+        - Art.5(1)(f)
+    notes: "Forensic readiness assumption: logs must be immutable enough to be admissible in regulatory proceedings."
