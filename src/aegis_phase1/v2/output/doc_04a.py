@@ -1004,23 +1004,47 @@ def _should_use_llm(llm_invoker: Any | None) -> bool:
 def _technical_architecture_prompt(
     state: dict[str, Any], inventory: dict[str, list[dict]], summary: str
 ) -> str:
+    """LLM prompt for §1 Technical Architecture narrative.
+
+    Function vocabulary (ROLE_VOCABULARY): DPO, CISO, Engineering,
+    Operations, Governance. Disclaimer: DO NOT name individuals.
+    """
+    from aegis_phase1.v2.output._functional_prompts import (
+        build_functional_context,
+        extract_tier_and_regs,
+    )
     company = _attr(state.get("company_context"), "company_name", default="the company")
-    return (
+    tier, regs = extract_tier_and_regs(state)
+    ctx = build_functional_context(tier, regs)
+    body = (
         f"Produce a 3-4 sentence technical architecture narrative for {company}. "
         f"{summary} The narrative must reflect the actual inventory systems, stores, "
         "and flows. Avoid bullet lists; produce flowing prose suitable for the "
         "## 1. Technical Architecture section of an AEGIS Phase 1 04a document."
     )
+    return f"{ctx}\n\n{body}" if ctx else body
 
 
 def _network_topology_prompt(state: dict[str, Any], inventory: dict[str, list[dict]]) -> str:
+    """LLM prompt for §1.2 Network Topology narrative.
+
+    Function vocabulary (ROLE_VOCABULARY): DPO, CISO, Engineering,
+    Operations, Governance. Disclaimer: DO NOT name individuals.
+    """
+    from aegis_phase1.v2.output._functional_prompts import (
+        build_functional_context,
+        extract_tier_and_regs,
+    )
     company = _attr(state.get("company_context"), "company_name", default="the company")
-    return (
+    tier, regs = extract_tier_and_regs(state)
+    ctx = build_functional_context(tier, regs)
+    body = (
         f"Produce a 3-4 sentence network topology description for {company} based on "
         "the inventoried systems, stores, and flows. Cover the user-to-SYS-01 path, "
         "SYS-01 to SYS-03 traffic, administrative access path, and any absence of "
         "enterprise zones, SOC, or SIEM. Avoid bullet lists."
     )
+    return f"{ctx}\n\n{body}" if ctx else body
 
 
 # ─────────────────────────────────────────────────────────────────────

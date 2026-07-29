@@ -910,25 +910,48 @@ def _regulation_owner(abbrev: str, reg: Mapping[str, Any]) -> str:
 
 
 def _reporting_lines_prompt(state: dict[str, Any]) -> str:
+    """LLM prompt for §5 Reporting Lines narrative.
+
+    Function vocabulary (ROLE_VOCABULARY): DPO, CISO, Engineering,
+    Operations, Governance. Disclaimer: DO NOT name individuals.
+    """
+    from aegis_phase1.v2.output._functional_prompts import (
+        build_functional_context,
+        extract_tier_and_regs,
+    )
     ctx = state.get("company_context")
     name = _attr(ctx, "company_name", default="the company")
     employees = _attr(ctx, "employees", default="")
     tier = _tier_for_state(state)
     board_label = _board_label_for_tier(tier)
     emphasis = ", ".join(load_tier_template(tier).get("clause_emphasis", []))
-    return (
+    fc_tier, fc_regs = extract_tier_and_regs(state)
+    fc_ctx = build_functional_context(fc_tier, fc_regs)
+    body = (
         f"Produce a 4-5 sentence plain-text description of the reporting "
         f"lines at {name} (with {employees or 'a small'} employees), "
         f"tier={tier}. Cover: {board_label}; emphasis on clauses "
         f"({emphasis}). Roles per data/role_models/{tier}.yaml. "
         "Avoid bullet lists."
     )
+    return f"{fc_ctx}\n\n{body}" if fc_ctx else body
 
 
 def _escalation_prompt(state: dict[str, Any]) -> str:
+    """LLM prompt for §9 Escalation Paths narrative.
+
+    Function vocabulary (ROLE_VOCABULARY): DPO, CISO, Engineering,
+    Operations, Governance. Disclaimer: DO NOT name individuals.
+    """
+    from aegis_phase1.v2.output._functional_prompts import (
+        build_functional_context,
+        extract_tier_and_regs,
+    )
     ctx = state.get("company_context")
     name = _attr(ctx, "company_name", default="the company")
-    return (
+    fc_tier, fc_regs = extract_tier_and_regs(state)
+    fc_ctx = build_functional_context(fc_tier, fc_regs)
+    body = (
         f"Produce a 3-4 sentence escalation paths narrative for {name}. "
         "Cover: (1) routine security event escalation (Dev → CTO/CISO); "
         "(2) personal-data incident escalation (Dev → CTO/CISO → "
@@ -938,6 +961,7 @@ def _escalation_prompt(state: dict[str, Any]) -> str:
         "loss of customer trust). Reference GDPR Art. 33 and CRA Annex "
         "I Part II (8)(f). Avoid bullet lists."
     )
+    return f"{fc_ctx}\n\n{body}" if fc_ctx else body
 
 
 def _should_use_llm(llm_invoker: Any | None) -> bool:

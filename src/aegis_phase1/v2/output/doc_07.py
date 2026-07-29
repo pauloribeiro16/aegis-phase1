@@ -765,18 +765,30 @@ def _strategic_prompt(
     state: dict[str, Any],
     rows: list[tuple[str, str, str, str, str, str]],
 ) -> str:
+    """LLM prompt for doc_07 §6.1 Strategic Narrative.
+
+    Function vocabulary (ROLE_VOCABULARY): DPO, CISO, Engineering,
+    Operations, Governance. Disclaimer: DO NOT name individuals.
+    """
+    from aegis_phase1.v2.output._functional_prompts import (
+        build_functional_context,
+        extract_tier_and_regs,
+    )
     ctx = state.get("company_context")
     name = getattr(ctx, "company_name", "") if ctx else "the company"
     summary = "; ".join(
         f"{r[0]} | {r[2]} -> {r[1]} ({r[5]})"
         for r in rows
     )
-    return (
+    tier, regs = extract_tier_and_regs(state)
+    fc_ctx = build_functional_context(tier, regs)
+    body = (
         f"Compose a 3-5 sentence strategic narrative for the structured "
         f"compliance matrix of {name}. Mention complementarity, gaps, "
         f"and time-to-compliance. Anchor the narrative on these "
         f"implications: {summary}"
     )
+    return f"{fc_ctx}\n\n{body}" if fc_ctx else body
 
 
 def _gap_rows(

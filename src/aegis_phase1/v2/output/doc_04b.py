@@ -1105,10 +1105,21 @@ def _domain_notes_prompt(
     controls: list[dict[str, str]],
     state: dict[str, Any],
 ) -> str:
+    """LLM prompt for §3 per-domain notes (called 10x — once per D-XX).
+
+    Function vocabulary (ROLE_VOCABULARY): DPO, CISO, Engineering,
+    Operations, Governance. Disclaimer: DO NOT name individuals.
+    """
+    from aegis_phase1.v2.output._functional_prompts import (
+        build_functional_context,
+        extract_tier_and_regs,
+    )
     name = _DOMAIN_NAME.get(domain_id, domain_id)
     applicable = ", ".join(_attr(state.get("company_context"), "applicable_regs", default=[]) or []) or "-"
     control_summary = "; ".join(c.get("control", "-") for c in controls)
-    return (
+    tier, regs = extract_tier_and_regs(state)
+    ctx = build_functional_context(tier, regs)
+    body = (
         f"Produce a 2-3 sentence Notes narrative for AEGIS domain {domain_id} ({name}) "
         f"with current maturity {current}, target {target}, and gap {gap}. "
         f"Applicable regulations: {applicable}. "
@@ -1116,6 +1127,7 @@ def _domain_notes_prompt(
         "The narrative should reference GDPR Art. 32 / CRA Annex I controls where "
         "relevant and name the most material remediation items. Avoid bullet lists."
     )
+    return f"{ctx}\n\n{body}" if ctx else body
 
 
 def _subdomain_links(domain_id: str) -> list[str]:
