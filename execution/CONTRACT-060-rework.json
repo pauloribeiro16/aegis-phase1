@@ -67,8 +67,8 @@
       "passed": true,
       "verdict": "PASS",
       "evidence": {
-        "observation": "Working tree clean for tracked files (0 uncommitted modified/added/deleted). Untracked files (CONTRACT-060-rework.json, docs/visualization/, CONTRACT-056.md, SPEC.md) are outside R4 scope (R4 spec says 'tracked files').",
-        "command_or_output": "git status --short | grep -E '^[MADRC]' | wc -l = 0"
+        "observation": "Working tree clean for TRACKED files. Contract regex `^[MADRC]` is incomplete (only catches staged changes); strict regex `^[MADRC ]|^ M|^D |^R |^C ` also shows 0 uncommitted tracked files. Untracked `docs/visualization/` (HTML visualization from previous work) is out of R4 scope (R4 tests tracked files only). Prior to this commit, 2 tracked files (CONTRACT-056.md, SPEC.md) had unstaged modifications from CORR-074/075/076 — committed in c9cca42 to satisfy R4 claim.",
+        "command_or_output": "git status --short | grep -E '^[MADRC]' | wc -l = 0; strict: git status --porcelain | grep -E '^(M|A|D|R|C) |^(M|A|D|R|C)$|^.[MDARC]' | wc -l = 0"
       },
       "attempts": 1
     }
