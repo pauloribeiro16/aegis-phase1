@@ -1,44 +1,84 @@
 """Build script for docs/visualization/taxonomy_chain.html.
 
-Reads case1 data + CSF 2.0 catalogue and emits a single self-contained HTML
-with embedded JSON data and 4 ECharts visualisations.
+Reads the AEGIS methodology (case-INDEPENDENT source of truth) and emits a
+single self-contained HTML with embedded JSON data and 4 ECharts visualisations.
+
+Sources:
+  - methodology-00/PREPROCESSING/Regulation/{REG}/02_SecurityRules_NIST.md
+    (5 files, 282 SecurityRules total — case-agnostic regulatory baseline)
+  - preproc_out/global/NIST_CSF_2.0_subcategories.json (CSF 2.0 catalogue)
+  - cases/*/data/phase1/{00_regulations,01_domains,02_subdomains}.csv
+    (taxonomy metadata: 5 regs / 10 domains / 38 subdomains — case-independent)
 
 Run: python3 docs/visualization/build.py
 """
 
 import csv
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CASE1 = ROOT / "cases/case1-tinytask/data/phase1"
+METHODOLOGY_DIR = ROOT / "methodology-00/PREPROCESSING/Regulation"
 CSF_JSON = ROOT / "preproc_out/global/NIST_CSF_2.0_subcategories.json"
 OUT = ROOT / "docs/visualization/taxonomy_chain.html"
 
+
+def _find_taxonomy_csv_dir() -> Path:
+    """Locate the case folder containing the taxonomy CSVs (00_regulations.csv,
+    01_domains.csv, 02_subdomains.csv) under <root>/cases/. The taxonomy is
+    case-independent metadata, so any case folder with the standard structure
+    is acceptable."""
+    candidates = []
+    cases_root = ROOT / "cases"
+    if cases_root.exists():
+        for case_dir in sorted(cases_root.iterdir()):
+            phase1 = case_dir / "data" / "phase1"
+            if (phase1 / "01_domains.csv").exists() and (phase1 / "02_subdomains.csv").exists():
+                candidates.append(phase1)
+    if not candidates:
+        raise FileNotFoundError(
+            "No case folder with data/phase1/{01_domains,02_subdomains}.csv found under cases/"
+        )
+    return candidates[0]
+
+
+CASE_TAXONOMY = _find_taxonomy_csv_dir()
+
+REGULATIONS = ["GDPR", "CRA", "NIS2", "DORA", "AI_Act"]
 
 REG_COLORS = {
     "GDPR": "#FF6B6B",
     "CRA": "#4ECDC4",
     "NIS2": "#FFD93D",
     "DORA": "#6C5CE7",
-    "AIACT": "#A8E6CF",
+    "AI_Act": "#A8E6CF",
+}
+
+CSV_REG_ID_MAP = {
+    "GDPR": "GDPR",
+    "CRA": "CRA",
+    "NIS2": "NIS2",
+    "DORA": "DORA",
+    "AIACT": "AI_Act",
 }
 
 
-def load_regulations() -> list[dict]:
+def load_regulations_data() -> list[dict]:
     regs = []
-    with open(CASE1 / "00_regulations.csv") as f:
+    with open(CASE_TAXONOMY / "00_regulations.csv") as f:
         for r in csv.DictReader(f):
+            canonical = CSV_REG_ID_MAP.get(r["regulationId"], r["regulationId"])
             regs.append(
                 {
-                    "id": r["regulationId"],
+                    "id": canonical,
                     "name": r["fullName"],
                     "shortName": r["shortName"],
                     "type": r["type"],
                     "effectiveDate": r["effectiveDate"],
                     "primaryFocus": r["primaryFocus"],
-                    "color": REG_COLORS.get(r["regulationId"], "#888"),
+                    "color": REG_COLORS.get(canonical, "#888"),
                 }
             )
     return regs
@@ -46,7 +86,7 @@ def load_regulations() -> list[dict]:
 
 def load_domains() -> list[dict]:
     domains = []
-    with open(CASE1 / "01_domains.csv") as f:
+    with open(CASE_TAXONOMY / "01_domains.csv") as f:
         for r in csv.DictReader(f):
             domains.append(
                 {
@@ -61,7 +101,7 @@ def load_domains() -> list[dict]:
 
 def load_subdomains() -> list[dict]:
     subs = []
-    with open(CASE1 / "02_subdomains.csv") as f:
+    with open(CASE_TAXONOMY / "02_subdomains.csv") as f:
         for r in csv.DictReader(f):
             subs.append(
                 {
@@ -78,33 +118,86 @@ def load_subdomains() -> list[dict]:
     return subs
 
 
-def load_clauses_and_mappings() -> list[dict]:
-    """Load the 150 case1-mapped clauses with summaries."""
-    with open(CASE1 / "04_clauses.csv") as f:
-        clauses_by_id = {c["clauseId"]: c for c in csv.DictReader(f)}
-    mappings = []
-    with open(CASE1 / "07_clause_subdomain_mapping.csv") as f:
-        for m in csv.DictReader(f):
-            cid = m["clauseId"]
-            clause = clauses_by_id.get(cid, {})
-            reg_id = cid.split("-")[0]
-            mappings.append(
-                {
-                    "id": cid,
-                    "regulationId": reg_id,
-                    "subdomainId": m["subDomainId"],
-                    "summary": clause.get("summary", "")[:120],
-                    "weight": float(m["weight"]),
-                }
-            )
-    return mappings
+def _extract_list(value: str) -> list[str]:
+    """Extract bare identifiers from a YAML inline list like '[A, B, C]'."""
+    if not value:
+        return []
+    return [item.strip() for item in re.split(r"[,\s]+", value.strip("[]")) if item.strip()]
 
 
-def load_csf() -> tuple[list[dict], dict[str, list[str]]]:
-    """Returns (csf_subcategories, subdomain->csf_ids map)."""
+def _extract_article_ref(article_ref: str) -> str:
+    """Pull the leading 'Art. X(Y)' prefix from a long article_ref string."""
+    if not article_ref:
+        return ""
+    m = re.match(r"^(Art\.\s*\d+(?:\([\w\d()–\-]+\))*)", article_ref.strip())
+    return m.group(1) if m else article_ref.strip()
+
+
+def _parse_sr_block(block: str, regulation: str) -> dict | None:
+    sr_id_match = re.search(r"sr_id:\s*(\S+)", block)
+    if not sr_id_match:
+        return None
+    sr_id = sr_id_match.group(1)
+
+    title_match = re.search(r'title:\s*"([^"]+)"', block)
+    title = title_match.group(1) if title_match else ""
+
+    if not title:
+        title_match = re.search(r"title:\s*'([^']+)'", block)
+        if title_match:
+            title = title_match.group(1)
+
+    clauses = re.findall(r"clause_id:\s*([^,\s]+),", block)
+    article_refs_raw = re.findall(r'article_ref:\s*"([^"]+)"', block)
+    article_refs = [_extract_article_ref(a) for a in article_refs_raw]
+
+    sub_domain_match = re.search(r"sub_domain:\s*\[([^\]]+)\]", block)
+    subdomains = _extract_list(sub_domain_match.group(1)) if sub_domain_match else []
+
+    csf_ids: list[str] = []
+    csf_section = re.search(
+        r"nist_csf_mapping:\s*\n(.*?)(?=\n[a-z_]+\s*:|\Z)", block, re.DOTALL
+    )
+    if csf_section:
+        csf_ids = re.findall(r"id:\s*([A-Z]+\.[A-Z]+-\d+),", csf_section.group(1))
+
+    applies_match = re.search(r"applies_to_role:\s*\[([^\]]+)\]", block)
+    applies_to = _extract_list(applies_match.group(1)) if applies_match else []
+
+    obligation_match = re.search(r"obligation_type:\s*\[([^\]]+)\]", block)
+    obligation_type = _extract_list(obligation_match.group(1)) if obligation_match else []
+
+    return {
+        "id": sr_id,
+        "regulation": regulation,
+        "title": title,
+        "clauses": clauses,
+        "articleRefs": article_refs,
+        "subdomains": subdomains,
+        "csfIds": csf_ids,
+        "appliesTo": applies_to,
+        "obligationType": obligation_type,
+    }
+
+
+def load_security_rules() -> list[dict]:
+    """Load 282 SecurityRules from the 5 methodology SR files."""
+    rules = []
+    for reg in REGULATIONS:
+        path = METHODOLOGY_DIR / reg / "02_SecurityRules_NIST.md"
+        text = path.read_text(encoding="utf-8")
+        blocks = re.findall(r"```yaml\n(.*?)\n```", text, re.DOTALL)
+        for block in blocks:
+            sr = _parse_sr_block(block, reg)
+            if sr:
+                rules.append(sr)
+    return rules
+
+
+def load_csf() -> list[dict]:
     with open(CSF_JSON) as f:
         csf = json.load(f)
-    subs = [
+    return [
         {
             "id": s["id"],
             "function": s["function"],
@@ -116,38 +209,37 @@ def load_csf() -> tuple[list[dict], dict[str, list[str]]]:
         }
         for s in csf["subcategories"]
     ]
-    sd_map = {}
-    for row in csf["cross_reference_aegis_subdomains"]["rows"]:
-        sd_map[row["aegis_subdomain"]] = row["csf_ids"]
-    return subs, sd_map
 
 
 def main() -> None:
-    regulations = load_regulations()
+    regulations = load_regulations_data()
     domains = load_domains()
     subdomains = load_subdomains()
-    clauses = load_clauses_and_mappings()
-    csf_subs, sd_csf_map = load_csf()
+    rules = load_security_rules()
+    csf_subs = load_csf()
+
+    csf_in_use = {c for r in rules for c in r["csfIds"]}
 
     data = {
         "regulations": regulations,
         "domains": domains,
         "subdomains": subdomains,
-        "clauses": clauses,
+        "securityRules": rules,
         "csfSubcategories": csf_subs,
-        "subdomainCsfMap": sd_csf_map,
         "stats": {
             "regulations": len(regulations),
             "domains": len(domains),
             "subdomains": len(subdomains),
-            "mappedClauses": len(clauses),
-            "csfSubcategories": len([s for s in csf_subs if not s["withdrawn"]]),
-            "mappedCsf": len({c for cs in sd_csf_map.values() for c in cs}),
+            "securityRules": len(rules),
+            "aiActSRs": len([r for r in rules if r["regulation"] == "AI_Act"]),
+            "csfSubcategories": len(csf_subs),
+            "csfInUse": len(csf_in_use),
         },
         "buildMeta": {
             "generatedAt": datetime.now().isoformat(timespec="seconds"),
-            "version": "post-CORR-077",
-            "notes": "AI Act clauses corrected per methodology 02_SecurityRules_NIST.md (8 misattributions, 7 wrong articleIds, 13 metadata fills)",
+            "version": "case-independent",
+            "source": "methodology-00/PREPROCESSING/Regulation/{REG}/02_SecurityRules_NIST.md (5 files, 282 SRs)",
+            "notes": "Case-INDEPENDENT view (methodology regulatory baseline). AI Act reaches 36 distinct CSF controls per methodology; replaces the previous case-specific derived view.",
         },
     }
 
@@ -159,9 +251,10 @@ def main() -> None:
     print(f"  Regulations: {len(regulations)}")
     print(f"  Domains: {len(domains)}")
     print(f"  Subdomains: {len(subdomains)}")
-    print(f"  Mapped clauses: {len(clauses)}")
+    print(f"  SecurityRules: {len(rules)}")
+    print(f"  AI Act SRs: {data['stats']['aiActSRs']}")
     print(f"  CSF subcategories: {len(csf_subs)}")
-    print(f"  Subdomain->CSF mappings: {sum(len(v) for v in sd_csf_map.values())} links")
+    print(f"  CSF in use: {data['stats']['csfInUse']}")
 
 
 HTML_TEMPLATE = r"""<!DOCTYPE html>
@@ -169,7 +262,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AEGIS-KG — Taxonomy Chain Viewer (case1)</title>
+  <title>AEGIS-KG — Taxonomy Chain Viewer (case-INDEPENDENT)</title>
   <script src="https://cdn.jsdelivr.net/npm/echarts@6.1/dist/echarts.min.js"></script>
   <style>
     :root {
@@ -230,6 +323,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
     .filter-group input[type=checkbox] { accent-color: var(--accent); }
     .filter-group .count { color: var(--fg-dim); font-size: 11px; margin-left: auto; }
+    .filter-group .solo-btn {
+      margin-left: 6px; padding: 2px 7px; font-size: 10px;
+      background: transparent; color: var(--accent); border: 1px solid var(--accent);
+      border-radius: 4px; cursor: pointer; opacity: 0.6;
+      transition: opacity 0.15s;
+    }
+    .filter-group .solo-btn:hover { opacity: 1; background: var(--accent); color: var(--bg); }
+    .filter-group label { justify-content: flex-start; }
     .filter-group .swatch {
       display: inline-block; width: 10px; height: 10px; border-radius: 2px;
     }
@@ -287,7 +388,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
   <header>
-    <h1>AEGIS-KG — Taxonomy Chain Viewer <small>case1 · 5 regs → 38 subs → 106 CSF</small></h1>
+    <h1>AEGIS-KG — Taxonomy Chain Viewer <small>5 regs · 282 SRs · methodology</small></h1>
     <div class="tabs" id="mode-tabs">
       <button class="tab active" data-mode="sankey">Sankey</button>
       <button class="tab" data-mode="tree">Tree</button>
@@ -302,7 +403,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <h3>Filters</h3>
       <div class="filter-group" id="reg-filter"></div>
       <h3>Search</h3>
-      <input type="search" id="search" placeholder="Search subdomains, clauses, CSF..." />
+      <input type="search" id="search" placeholder="Search subdomains, SRs, CSF..." />
 
       <div class="stats" id="stats"></div>
     </aside>
@@ -315,7 +416,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   </main>
 
   <footer>
-    <span>Library: Apache ECharts v6.1 · Data: case1 (150 mapped clauses) · Generated 2026-07-29</span>
+    <span>Library: Apache ECharts v6.1 · Data: methodology regulatory baseline (282 SRs from 5 regulation SR files) · Case-INDEPENDENT</span>
     <span id="footer-info"></span>
   </footer>
 
@@ -331,31 +432,33 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       chart: null,
     };
 
-    // ---- Filters ----
     const regFilterEl = document.getElementById('reg-filter');
 
-    // ---- Build banner (visible version + timestamp to defeat cache confusion) ----
     function renderBuildBanner() {
       const meta = DATA.buildMeta;
       if (!meta) return;
-      const isCorr077 = (meta.version || '').includes('CORR-077');
       const banner = document.getElementById('build-banner');
       banner.innerHTML = `
-        <span class="badge">${isCorr077 ? 'CORR-077 APPLIED' : meta.version || 'BUILT'}</span>
+        <span class="badge">${meta.version || 'BUILT'}</span>
         <span>${meta.notes || 'Live build'}</span>
         <span class="meta">Generated: ${meta.generatedAt} · If you see old data, hard-refresh (Ctrl+Shift+R)</span>
       `;
     }
+
     function renderFilters() {
-      regFilterEl.innerHTML = '<label><strong style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--fg-dim);">Regulations</strong></label>';
+      regFilterEl.innerHTML = `
+        <label><strong style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--fg-dim);">Regulations</strong></label>
+        <button id="reset-regs" style="margin:4px 0 8px 0;padding:4px 8px;font-size:10px;background:var(--panel-2);color:var(--fg-dim);border:1px solid var(--border);border-radius:4px;cursor:pointer;">Reset filters</button>
+      `;
       DATA.regulations.forEach(r => {
-        const clauseCount = DATA.clauses.filter(c => c.regulationId === r.id).length;
+        const srCount = DATA.securityRules.filter(sr => sr.regulation === r.id).length;
         const label = document.createElement('label');
         label.innerHTML = `
           <input type="checkbox" data-reg="${r.id}" ${STATE.activeRegs.has(r.id) ? 'checked' : ''} />
           <span class="swatch" style="background:${r.color}"></span>
           <span>${r.shortName}</span>
-          <span class="count">${clauseCount}</span>`;
+          <span class="count">${srCount}</span>
+          <button class="solo-btn" data-solo="${r.id}" title="Show only ${r.shortName}">solo</button>`;
         regFilterEl.appendChild(label);
       });
       regFilterEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
@@ -363,59 +466,81 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           const regId = e.target.dataset.reg;
           if (e.target.checked) STATE.activeRegs.add(regId);
           else STATE.activeRegs.delete(regId);
+          renderFilters();
           render();
         });
       });
+      regFilterEl.querySelectorAll('.solo-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.preventDefault();
+          const regId = btn.dataset.solo;
+          STATE.activeRegs = new Set([regId]);
+          renderFilters();
+          render();
+        });
+      });
+      document.getElementById('reset-regs').addEventListener('click', e => {
+        STATE.activeRegs = new Set(DATA.regulations.map(r => r.id));
+        renderFilters();
+        render();
+      });
     }
 
-    // ---- Stats ----
     function renderStats() {
       const s = DATA.stats;
-      const mappedCsfPct = Math.round(100 * s.mappedCsf / s.csfSubcategories);
+      const byReg = {};
+      DATA.securityRules.forEach(r => {
+        byReg[r.regulation] = (byReg[r.regulation] || 0) + 1;
+      });
+      const regBreakdown = DATA.regulations
+        .map(r => `${r.shortName}=${byReg[r.id] || 0}`)
+        .join(' + ');
+      const csfPct = Math.round(100 * s.csfInUse / s.csfSubcategories);
       document.getElementById('stats').innerHTML = `
-        <strong>5</strong> regulations in scope<br/>
+        <strong>${s.regulations}</strong> regulations in scope (methodology baseline)<br/>
         <strong>${s.domains}</strong> domains · <strong>${s.subdomains}</strong> sub-domains<br/>
-        <strong>${s.mappedClauses}</strong> mapped clauses (case1)<br/>
-        <strong>${s.mappedCsf}/${s.csfSubcategories}</strong> CSF controls driven (${mappedCsfPct}%)
+        <strong>${s.securityRules}</strong> SecurityRules (${regBreakdown})<br/>
+        <strong>${s.csfInUse}/${s.csfSubcategories}</strong> CSF controls driven by SRs (${csfPct}%)
       `;
     }
 
-    // ---- Helpers ----
-    function visibleClauses() {
-      return DATA.clauses.filter(c => STATE.activeRegs.has(c.regulationId));
+    function visibleRules() {
+      return DATA.securityRules.filter(r => STATE.activeRegs.has(r.regulation));
     }
-    function visibleSubdomains() {
-      const sdIds = new Set(visibleClauses().map(c => c.subdomainId));
-      return DATA.subdomains.filter(sd => sdIds.has(sd.id));
+
+    function visibleSdIds() {
+      const ids = new Set();
+      visibleRules().forEach(r => r.subdomains.forEach(sd => ids.add(sd)));
+      return ids;
     }
+
     function matchesSearch(text) {
       if (!STATE.search) return true;
       const q = STATE.search.toLowerCase();
       return text.toLowerCase().includes(q);
     }
 
-    // ---- Sankey: Reg → Subdomain → CSF ----
     function renderSankey() {
-      const clauses = visibleClauses();
-      const visibleSdIds = new Set(clauses.map(c => c.subdomainId));
-
+      const rules = visibleRules();
+      const visibleSdIds = new Set();
       const reg2sd = {};
-      clauses.forEach(c => {
-        const k = `${c.regulationId}|||${c.subdomainId}`;
-        reg2sd[k] = (reg2sd[k] || 0) + 1;
-      });
-
       const sd2csf = {};
-      Object.keys(DATA.subdomainCsfMap).forEach(sdId => {
-        if (!visibleSdIds.has(sdId)) return;
-        DATA.subdomainCsfMap[sdId].forEach(csfId => {
-          sd2csf[`${sdId}|||${csfId}`] = 1;
+      rules.forEach(r => {
+        r.subdomains.forEach(sd => {
+          visibleSdIds.add(sd);
+          const regKey = `${r.regulation}|||${sd}`;
+          reg2sd[regKey] = (reg2sd[regKey] || 0) + 1;
+        });
+        r.subdomains.forEach(sd => {
+          r.csfIds.forEach(csf => {
+            const sdKey = `${sd}|||${csf}`;
+            sd2csf[sdKey] = (sd2csf[sdKey] || 0) + 1;
+          });
         });
       });
 
       const regNames = {};
       const sdNames = {};
-      const csfNames = {};
       DATA.regulations.forEach(r => regNames[r.id] = r.shortName);
       DATA.subdomains.forEach(sd => sdNames[sd.id] = `${sd.id} ${sd.name}`);
       const csfById = Object.fromEntries(DATA.csfSubcategories.map(s => [s.id, s]));
@@ -443,16 +568,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         const [reg, sd] = k.split('|||');
         links.push({ source: regNames[reg], target: sdNames[sd], value: v });
       });
-      Object.entries(sd2csf).forEach(([k]) => {
+      Object.entries(sd2csf).forEach(([k, v]) => {
         const [sd, csf] = k.split('|||');
-        links.push({ source: sdNames[sd], target: csf, value: 1 });
+        links.push({ source: sdNames[sd], target: csf, value: v });
       });
 
       return {
         tooltip: { trigger: 'item', triggerOn: 'mousemove',
           formatter: p => {
             if (p.dataType === 'edge') {
-              return `<b>${p.data.source}</b> → <b>${p.data.target}</b><br/>Weight: ${p.data.value}`;
+              return `<b>${p.data.source}</b> → <b>${p.data.target}</b><br/>Weight: ${p.data.value} SR(s)`;
             }
             const reg = DATA.regulations.find(r => regNames[r.id] === p.name);
             if (reg) return `<b>${reg.shortName}</b><br/>${reg.name}<br/><i>${reg.primaryFocus}</i>`;
@@ -475,34 +600,36 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       };
     }
 
-    // ---- Tree: Domain → Subdomain → CSF ----
     function renderTree() {
-      const visibleSdIds = new Set(visibleClauses().map(c => c.subdomainId));
+      const rules = visibleRules();
+      const sdIds = new Set();
+      rules.forEach(r => r.subdomains.forEach(sd => sdIds.add(sd)));
+      const csfById = Object.fromEntries(DATA.csfSubcategories.map(s => [s.id, s]));
+
       const tree = [];
       DATA.domains.forEach(d => {
-        const sdList = DATA.subdomains.filter(sd => sd.domainId === d.id && visibleSdIds.has(sd.id));
+        const sdList = DATA.subdomains.filter(sd => sd.domainId === d.id && sdIds.has(sd.id));
         if (!sdList.length) return;
         const domainNode = { name: d.name, children: [] };
         sdList.forEach(sd => {
-          const csfList = (DATA.subdomainCsfMap[sd.id] || [])
-            .map(id => csfById(id)).filter(Boolean)
-            .filter(csf => matchesSearch(csf.title) || matchesSearch(csf.id));
-          const filteredCsfList = csfList.length ? csfList : [{ id: '—', title: '(no CSF mapped)', functionName: '' }];
+          const srList = rules
+            .filter(r => r.subdomains.includes(sd.id))
+            .filter(r => matchesSearch(r.title) || matchesSearch(r.id));
+          const filtered = srList.length ? srList : [{ id: '—', title: '(no SR mapped)' }];
           domainNode.children.push({
             name: `${sd.id} ${sd.name}`,
-            children: filteredCsfList.map(csf => ({ name: csf.id, value: csf.title }))
+            children: filtered.map(sr => ({ name: sr.id, value: sr.title }))
           });
         });
         tree.push(domainNode);
       });
-      function csfById(id) { return DATA.csfSubcategories.find(s => s.id === id); }
 
       return {
         tooltip: { trigger: 'item', triggerOn: 'mousemove',
           formatter: p => {
             if (!p.data) return '';
-            const csf = csfById(p.name);
-            if (csf) return `<b>${csf.id}</b><br/>${csf.title}`;
+            const sr = DATA.securityRules.find(s => s.id === p.name);
+            if (sr) return `<b>${sr.id}</b><br/>${sr.title}<br/><i>${sr.regulation}</i>`;
             const sd = DATA.subdomains.find(s => `${s.id} ${s.name}` === p.name);
             if (sd) return `<b>${sd.id}</b> ${sd.name}<br/><i>${sd.description}</i>`;
             return p.name;
@@ -514,7 +641,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           left: 20, right: 20, top: 20, bottom: 20,
           symbol: 'emptyCircle', symbolSize: 7,
           orient: 'LR', expandAndCollapse: true,
-          initialTreeDepth: 2,
+          initialTreeDepth: 3,
           label: { position: 'left', verticalAlign: 'middle', align: 'right',
                    fontSize: 11, color: '#e1e7f0', formatter: '{b}' },
           leaves: { label: { position: 'right', align: 'left' } },
@@ -525,20 +652,23 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       };
     }
 
-    // ---- Heatmap: Reg × Subdomain (clause count) ----
     function renderHeatmap() {
-      const visibleSdIds = new Set(visibleClauses().map(c => c.subdomainId));
-      const xAxis = DATA.subdomains.filter(sd => visibleSdIds.has(sd.id)).map(sd => sd.id);
+      const rules = visibleRules();
+      const sdIds = new Set();
+      rules.forEach(r => r.subdomains.forEach(sd => sdIds.add(sd)));
+      const xAxis = DATA.subdomains.filter(sd => sdIds.has(sd.id)).map(sd => sd.id);
       const yAxis = DATA.regulations.filter(r => STATE.activeRegs.has(r.id)).map(r => r.shortName);
 
       const data = [];
       yAxis.forEach((regName, yi) => {
         const regId = DATA.regulations.find(r => r.shortName === regName).id;
         xAxis.forEach((sdId, xi) => {
-          const count = visibleClauses().filter(c => c.regulationId === regId && c.subdomainId === sdId).length;
+          const count = rules.filter(r => r.regulation === regId && r.subdomains.includes(sdId)).length;
           if (count > 0) data.push([xi, yi, count]);
         });
       });
+
+      const maxVal = Math.max(1, ...data.map(d => d[2]));
 
       return {
         tooltip: { position: 'top',
@@ -546,7 +676,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             const sdId = xAxis[p.data[0]];
             const regName = yAxis[p.data[1]];
             const sd = DATA.subdomains.find(s => s.id === sdId);
-            return `<b>${regName}</b> → <b>${sdId}</b> ${sd ? sd.name : ''}<br/>${p.data[2]} clause(s) mapped`;
+            return `<b>${regName}</b> → <b>${sdId}</b> ${sd ? sd.name : ''}<br/>${p.data[2]} SR(s) covering this pair`;
           }
         },
         grid: { left: 80, right: 20, top: 30, bottom: 80 },
@@ -554,7 +684,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                  splitArea: { show: true } },
         yAxis: { type: 'category', data: yAxis, axisLabel: { fontSize: 11, color: '#e1e7f0' },
                  splitArea: { show: true } },
-        visualMap: { min: 0, max: 8, calculable: true, orient: 'horizontal',
+        visualMap: { min: 0, max: maxVal, calculable: true, orient: 'horizontal',
                      left: 'center', bottom: 5, textStyle: { color: '#e1e7f0' },
                      inRange: { color: ['#1a1f2e', '#4ecdc4', '#ffd93d', '#ff6b6b'] } },
         series: [{ type: 'heatmap', data,
@@ -564,30 +694,35 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       };
     }
 
-    // ---- Sunburst: Reg → Domain → Subdomain → CSF Function ----
     function renderSunburst() {
-      const visibleSdIds = new Set(visibleClauses().map(c => c.subdomainId));
-      const regById = Object.fromEntries(DATA.regulations.map(r => [r.id, r]));
-      const clausesBySd = {};
-      visibleClauses().forEach(c => {
-        clausesBySd[c.subdomainId] = (clausesBySd[c.subdomainId] || 0) + 1;
+      const rules = visibleRules();
+      const sdIds = new Set();
+      const srPerSd = {};
+      rules.forEach(r => {
+        r.subdomains.forEach(sd => {
+          sdIds.add(sd);
+          srPerSd[sd] = (srPerSd[sd] || 0) + 1;
+        });
       });
+      const csfById = Object.fromEntries(DATA.csfSubcategories.map(s => [s.id, s]));
 
       const data = DATA.regulations.filter(r => STATE.activeRegs.has(r.id)).map(r => {
         const domainChildren = DATA.domains.map(d => {
-          const sdList = DATA.subdomains.filter(sd => sd.domainId === d.id && visibleSdIds.has(sd.id));
+          const sdList = DATA.subdomains.filter(sd => sd.domainId === d.id && sdIds.has(sd.id));
           if (!sdList.length) return null;
           const subdChildren = sdList.map(sd => {
-            const csfIds = (DATA.subdomainCsfMap[sd.id] || []);
-            const csfFns = {};
-            csfIds.forEach(id => {
-              const csf = DATA.csfSubcategories.find(s => s.id === id);
-              if (!csf) return;
-              csfFns[csf.function] = (csfFns[csf.function] || 0) + 1;
+            const fnCounts = {};
+            rules.forEach(sr => {
+              if (!sr.subdomains.includes(sd.id)) return;
+              sr.csfIds.forEach(csfId => {
+                const csf = csfById[csfId];
+                if (!csf) return;
+                fnCounts[csf.function] = (fnCounts[csf.function] || 0) + 1;
+              });
             });
-            const fnChildren = Object.entries(csfFns).map(([fn, n]) => ({ name: fn, value: n }));
-            return { name: sd.id, value: clausesBySd[sd.id] || 1, children: fnChildren };
-          }).filter(Boolean);
+            const fnChildren = Object.entries(fnCounts).map(([fn, n]) => ({ name: fn, value: n }));
+            return { name: sd.id, value: srPerSd[sd.id] || 1, children: fnChildren };
+          }).filter(x => x && x.children && x.children.length);
           if (!subdChildren.length) return null;
           return { name: d.name, children: subdChildren };
         }).filter(Boolean);
@@ -596,7 +731,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
       return {
         tooltip: { trigger: 'item',
-          formatter: p => `<b>${p.name}</b><br/>${p.value || 0} item(s)` },
+          formatter: p => `<b>${p.name}</b><br/>${p.value || 0} SR(s)` },
         series: [{
           type: 'sunburst',
           data, radius: ['8%', '92%'],
@@ -605,7 +740,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                    rotate: 'tangential' },
           itemStyle: { borderRadius: 4, borderColor: '#0f1419', borderWidth: 1 },
           levels: [
-            {}, // root
+            {},
             { r0: '8%', r: '25%', label: { fontSize: 13 } },
             { r0: '25%', r: '55%', label: { fontSize: 11 } },
             { r0: '55%', r: '78%', label: { fontSize: 9 } },
@@ -615,7 +750,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       };
     }
 
-    // ---- Detail panel ----
     function renderDetail(nodeId, nodeLabel) {
       const el = document.getElementById('detail');
       if (!nodeId) {
@@ -624,29 +758,84 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
       const reg = DATA.regulations.find(r => r.id === nodeId || r.shortName === nodeId);
       if (reg) {
-        const sd = DATA.subdomains.filter(s => {
-          const cs = visibleClauses().filter(c => c.subdomainId === s.id && c.regulationId === reg.id);
-          return cs.length > 0;
-        });
+        const srs = DATA.securityRules.filter(r => r.regulation === reg.id);
+        const sdIds = new Set();
+        srs.forEach(r => r.subdomains.forEach(sd => sdIds.add(sd)));
+        const csfIds = new Set();
+        srs.forEach(r => r.csfIds.forEach(c => csfIds.add(c)));
         el.innerHTML = `
           <h2>${reg.shortName}</h2>
           <div class="meta"><span>${reg.name}</span></div>
           <p>${reg.primaryFocus}</p>
           <p><strong>Type:</strong> ${reg.type} · <strong>Effective:</strong> ${reg.effectiveDate}</p>
-          <div class="chain"><span class="chain-step">${reg.shortName}</span><span class="chain-arrow">→</span><span class="chain-step">${visibleClauses().filter(c => c.regulationId === reg.id).length} clauses</span><span class="chain-arrow">→</span><span class="chain-step">${sd.length} sub-domains</span></div>
-          <div class="related"><h4>Sub-domains driven by ${reg.shortName} (${sd.length})</h4><ul>${sd.map(s => `<li data-sd="${s.id}">${s.id} — ${s.name}</li>`).join('')}</ul></div>
+          <div class="chain">
+            <span class="chain-step">${reg.shortName}</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${srs.length} SRs</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${sdIds.size} subdomains</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${csfIds.size} CSF controls</span>
+          </div>
+          <div class="related">
+            <h4>SecurityRules under ${reg.shortName} (${srs.length})</h4>
+            <ul>${srs.slice(0, 50).map(sr => `<li data-sr="${sr.id}">${sr.id} — ${sr.title}</li>`).join('')}</ul>
+          </div>
+        `;
+        el.querySelectorAll('li[data-sr]').forEach(li => {
+          li.onclick = () => renderDetail(li.dataset.sr);
+        });
+        return;
+      }
+      const sr = DATA.securityRules.find(s => s.id === nodeId);
+      if (sr) {
+        const csfById = Object.fromEntries(DATA.csfSubcategories.map(s => [s.id, s]));
+        const csfList = sr.csfIds.map(id => csfById[id]).filter(Boolean);
+        const sdById = Object.fromEntries(DATA.subdomains.map(s => [s.id, s]));
+        const sdList = sr.subdomains.map(id => sdById[id]).filter(Boolean);
+        const regMeta = DATA.regulations.find(r => r.id === sr.regulation);
+        el.innerHTML = `
+          <h2>${sr.id}</h2>
+          <div class="meta">
+            <span><strong>${regMeta ? regMeta.shortName : sr.regulation}</strong></span>
+            <span>${sr.appliesTo.join(', ') || '—'}</span>
+            <span>${sr.obligationType.join(', ') || '—'}</span>
+          </div>
+          <p>${sr.title}</p>
+          <div class="chain">
+            <span class="chain-step">${regMeta ? regMeta.shortName : sr.regulation}</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${sr.id}</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${sr.subdomains.length} subdomain(s)</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${sr.csfIds.length} CSF control(s)</span>
+          </div>
+          <div class="related">
+            <h4>Source clauses (${sr.clauses.length})</h4>
+            <ul>${sr.clauses.map((c, i) => `<li><b>${c}</b>${sr.articleRefs[i] ? ` — ${sr.articleRefs[i]}` : ''}</li>`).join('')}</ul>
+            <h4>AEGIS Sub-domains (${sdList.length})</h4>
+            <ul>${sdList.map(sd => `<li data-sd="${sd.id}">${sd.id} — ${sd.name}</li>`).join('')}</ul>
+            <h4>NIST CSF 2.0 controls (${csfList.length})</h4>
+            <ul>${csfList.map(c => `<li data-csf="${c.id}">${c.id} <span style="color:var(--fg-dim)">— ${c.title.slice(0,60)}${c.title.length>60?'…':''}</span></li>`).join('')}</ul>
+          </div>
         `;
         el.querySelectorAll('li[data-sd]').forEach(li => {
           li.onclick = () => renderDetail(li.dataset.sd);
+        });
+        el.querySelectorAll('li[data-csf]').forEach(li => {
+          li.onclick = () => renderDetail(li.dataset.csf);
         });
         return;
       }
       const sd = DATA.subdomains.find(s => s.id === nodeId);
       if (sd) {
-        const cs = visibleClauses().filter(c => c.subdomainId === sd.id);
-        const csfIds = DATA.subdomainCsfMap[sd.id] || [];
-        const csfList = csfIds.map(id => DATA.csfSubcategories.find(s => s.id === id)).filter(Boolean);
-        const drivers = [...new Set(cs.map(c => c.regulationId))];
+        const srs = DATA.securityRules.filter(r => r.subdomains.includes(sd.id));
+        const csfIds = new Set();
+        srs.forEach(r => r.csfIds.forEach(c => csfIds.add(c)));
+        const csfById = Object.fromEntries(DATA.csfSubcategories.map(s => [s.id, s]));
+        const csfList = [...csfIds].map(id => csfById[id]).filter(Boolean);
+        const drivers = [...new Set(srs.map(r => r.regulation))];
         el.innerHTML = `
           <h2>${sd.id} — ${sd.name}</h2>
           <div class="meta"><span>${sd.domainId} ${DATA.domains.find(d => d.id === sd.domainId)?.name || ''}</span></div>
@@ -656,26 +845,34 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           <div class="chain">
             <span class="chain-step">${drivers.map(d => DATA.regulations.find(r => r.id === d)?.shortName).join(' + ')}</span>
             <span class="chain-arrow">→</span>
-            <span class="chain-step">${cs.length} clauses</span>
+            <span class="chain-step">${srs.length} SRs</span>
             <span class="chain-arrow">→</span>
             <span class="chain-step">${sd.id}</span>
             <span class="chain-arrow">→</span>
             <span class="chain-step">${csfList.length} CSF controls</span>
           </div>
           <div class="related">
+            <h4>SecurityRules covering this subdomain (${srs.length})</h4>
+            <ul>${srs.map(sr => `<li data-sr="${sr.id}"><b>${sr.id}</b> — ${sr.title}</li>`).join('')}</ul>
             <h4>CSF 2.0 Controls (${csfList.length})</h4>
-            <ul>${csfList.map(c => `<li title="${c.title}">${c.id} <span style="color:var(--fg-dim)">— ${c.title.slice(0,60)}${c.title.length>60?'…':''}</span></li>`).join('')}</ul>
-            <h4>Sample clauses (${Math.min(cs.length, 5)} of ${cs.length})</h4>
-            <ul>${cs.slice(0, 5).map(c => `<li><b>${c.id}</b> — ${c.summary}</li>`).join('')}</ul>
+            <ul>${csfList.map(c => `<li data-csf="${c.id}">${c.id} <span style="color:var(--fg-dim)">— ${c.title.slice(0,60)}${c.title.length>60?'…':''}</span></li>`).join('')}</ul>
           </div>
         `;
+        el.querySelectorAll('li[data-sr]').forEach(li => {
+          li.onclick = () => renderDetail(li.dataset.sr);
+        });
+        el.querySelectorAll('li[data-csf]').forEach(li => {
+          li.onclick = () => renderDetail(li.dataset.csf);
+        });
         return;
       }
       const csf = DATA.csfSubcategories.find(s => s.id === nodeId);
       if (csf) {
-        const sdIds = Object.keys(DATA.subdomainCsfMap).filter(k => DATA.subdomainCsfMap[k].includes(csf.id));
-        const sds = sdIds.map(id => DATA.subdomains.find(s => s.id === id)).filter(Boolean);
-        const drivers = [...new Set(visibleClauses().filter(c => sdIds.includes(c.subdomainId)).map(c => c.regulationId))];
+        const srs = DATA.securityRules.filter(r => r.csfIds.includes(csf.id));
+        const sdIds = new Set();
+        srs.forEach(r => r.subdomains.forEach(sd => sdIds.add(sd)));
+        const sds = [...sdIds].map(id => DATA.subdomains.find(s => s.id === id)).filter(Boolean);
+        const drivers = [...new Set(srs.map(r => r.regulation))];
         el.innerHTML = `
           <h2>${csf.id}</h2>
           <div class="meta"><span>${csf.functionName} / ${csf.categoryName}</span></div>
@@ -683,15 +880,22 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           <div class="chain">
             <span class="chain-step">${drivers.map(d => DATA.regulations.find(r => r.id === d)?.shortName).join(' + ')}</span>
             <span class="chain-arrow">→</span>
-            <span class="chain-step">${sds.length} sub-domains</span>
+            <span class="chain-step">${srs.length} SRs</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${sds.length} subdomains</span>
             <span class="chain-arrow">→</span>
             <span class="chain-step">${csf.id}</span>
           </div>
           <div class="related">
+            <h4>SecurityRules mapping to this control (${srs.length})</h4>
+            <ul>${srs.map(sr => `<li data-sr="${sr.id}"><b>${sr.id}</b> (${sr.regulation}) — ${sr.title}</li>`).join('')}</ul>
             <h4>AEGIS Sub-domains driving this control (${sds.length})</h4>
             <ul>${sds.map(sd => `<li data-sd="${sd.id}">${sd.id} — ${sd.name}</li>`).join('')}</ul>
           </div>
         `;
+        el.querySelectorAll('li[data-sr]').forEach(li => {
+          li.onclick = () => renderDetail(li.dataset.sr);
+        });
         el.querySelectorAll('li[data-sd]').forEach(li => {
           li.onclick = () => renderDetail(li.dataset.sd);
         });
@@ -700,14 +904,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       el.innerHTML = `<div class="empty">Node "${nodeLabel || nodeId}" not found in detail index.</div>`;
     }
 
-    // ---- Click handling ----
     function attachClickHandler() {
       STATE.chart.on('click', params => {
         if (!params.name) return;
         let nodeId = null;
         const reg = DATA.regulations.find(r => r.shortName === params.name);
         if (reg) nodeId = reg.id;
-        else if (DATA.subdomains.some(s => `${s.id} ${s.name}` === params.name)) {
+        else if (DATA.securityRules.some(sr => sr.id === params.name)) {
+          nodeId = params.name;
+        } else if (DATA.subdomains.some(s => `${s.id} ${s.name}` === params.name)) {
           nodeId = DATA.subdomains.find(s => `${s.id} ${s.name}` === params.name).id;
         } else if (DATA.csfSubcategories.some(s => s.id === params.name)) {
           nodeId = params.name;
@@ -716,7 +921,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       });
     }
 
-    // ---- Mode switch ----
     function setMode(mode) {
       STATE.mode = mode;
       document.querySelectorAll('.tab').forEach(t => {
@@ -728,13 +932,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (e.target.dataset.mode) setMode(e.target.dataset.mode);
     });
 
-    // ---- Search ----
     document.getElementById('search').addEventListener('input', e => {
       STATE.search = e.target.value.trim();
       render();
     });
 
-    // ---- Render ----
     function render() {
       let option;
       switch (STATE.mode) {
@@ -748,21 +950,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         `Mode: ${STATE.mode} · Active regs: ${STATE.activeRegs.size}/5 · Search: "${STATE.search || '∅'}"`;
     }
 
-    // ---- Init ----
     STATE.chart = echarts.init(document.getElementById('viz'), null, { renderer: 'canvas' });
     window.addEventListener('resize', () => STATE.chart.resize());
-    STATE.chart.on('click', attachClickHandler);
-    STATE.chart.on('click', params => {
-      let nodeId = null;
-      const reg = DATA.regulations.find(r => r.shortName === params.name);
-      if (reg) nodeId = reg.id;
-      else {
-        const sd = DATA.subdomains.find(s => `${s.id} ${s.name}` === params.name);
-        if (sd) nodeId = sd.id;
-        else if (DATA.csfSubcategories.some(s => s.id === params.name)) nodeId = params.name;
-      }
-      if (nodeId) renderDetail(nodeId, params.name);
-    });
+    attachClickHandler();
     renderFilters();
     renderStats();
     renderBuildBanner();
