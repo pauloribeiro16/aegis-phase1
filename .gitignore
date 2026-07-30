@@ -53,3 +53,9 @@ preproc_out/
 !preproc_out/audit/csf_mapping_report.json
 !preproc_out/audit/so_sr_coherence_report.json
 methodology-00
+
+# Visualization build artifacts (CORR-079: ephemeral, regenerate via build script)
+docs/visualization/__pycache__/
+docs/visualization/build_regulation_chain.py
+docs/visualization/regulation_chain.html
+docs/visualization/taxonomy_chain.html
