@@ -346,7 +346,84 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .stats strong { color: var(--fg); font-weight: 600; }
 
     #viz { width: 100%; height: 100%; min-height: 600px; }
+    #viz-tree { display: none; width: 100%; height: 100%; }
     .tree-mode #viz { min-height: 800px; }
+
+    .tree-list {
+      list-style: none;
+      padding: 12px;
+      margin: 0;
+      font-size: 13px;
+      color: var(--fg);
+      overflow-y: auto;
+      max-height: calc(100vh - 200px);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    .tree-list ul {
+      list-style: none;
+      padding-left: 20px;
+      margin: 4px 0;
+      border-left: 1px dashed rgba(78,205,196,0.2);
+    }
+    .tree-list li {
+      padding: 1px 0;
+      position: relative;
+    }
+    .tree-list details > summary {
+      cursor: pointer;
+      padding: 3px 6px;
+      border-radius: 3px;
+      user-select: none;
+      list-style: none;
+    }
+    .tree-list details > summary::-webkit-details-marker { display: none; }
+    .tree-list details > summary:hover {
+      background: rgba(78,205,196,0.1);
+    }
+    .tree-list details > summary::before {
+      content: '▸';
+      display: inline-block;
+      width: 14px;
+      margin-right: 4px;
+      color: var(--accent);
+      transition: transform 0.15s;
+    }
+    .tree-list details[open] > summary::before {
+      transform: rotate(90deg);
+    }
+    .tree-list .lbl-domain { color: var(--accent); font-weight: 600; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .tree-list .lbl-subdomain { color: #c8d4e6; font-weight: 500; }
+    .tree-list .lbl-sr {
+      color: var(--fg-dim);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 3px;
+      display: block;
+    }
+    .tree-list .lbl-sr:hover {
+      color: var(--fg);
+      background: rgba(78,205,196,0.1);
+    }
+    .tree-list .empty {
+      color: var(--fg-dim);
+      font-style: italic;
+      padding: 4px 24px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .tree-list .badge {
+      display: inline-block;
+      margin-left: 6px;
+      font-size: 10px;
+      padding: 1px 6px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--fg-dim);
+      font-weight: normal;
+    }
+    .tree-list .search-match { background: rgba(255,217,61,0.25); color: var(--fg); }
 
     .detail { font-size: 13px; line-height: 1.5; }
     .detail .empty { color: var(--fg-dim); font-style: italic; padding: 20px 0; text-align: center; }
@@ -444,7 +521,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <span id="sunburst-breadcrumb" style="margin-left:12px; font-size:13px;"></span>
         <span id="sunburst-hint" style="margin-left:16px; font-size:11px; color:var(--fg-dim);"></span>
       </div>
-      <div id="viz"></div>
+      <div id="viz"></div><div id="viz-tree"></div>
     </section>
 
     <div class="detail" id="detail">
@@ -747,13 +824,20 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       };
     }
 
-    function renderTree() {
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[c]);
+    }
+
+    function renderTreeHtml() {
       const rules = visibleRules();
       const sdIds = new Set();
       rules.forEach(r => r.subdomains.forEach(sd => sdIds.add(sd)));
-      const csfById = Object.fromEntries(DATA.csfSubcategories.map(s => [s.id, s]));
 
-      const tree = [];
+      const html = [];
+      html.push('<div class="tree-list">');
+
       DATA.domains
         .slice()
         .sort((a, b) => naturalIdSort(a.id, b.id))
@@ -762,61 +846,56 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             .filter(sd => sd.domainId === d.id && sdIds.has(sd.id))
             .slice()
             .sort((a, b) => naturalIdSort(a.id, b.id));
-          const domainNode = { name: `${d.id} ${d.name}`, children: [] };
-          if (sdList.length === 0) {
-            // Domain without active subdomains (filtered) — show as placeholder so
-            // the user always sees all 10 domains in the tree.
-            domainNode.children = [{
-              name: '(no active SRs for current filters)',
-              itemStyle: { color: '#5a6378', borderColor: '#5a6378' },
-              label: { color: '#8b95a7', fontSize: 10, fontStyle: 'italic' },
-            }];
-          } else {
+
+          const hasSubs = sdList.length > 0;
+          html.push(
+            '<details' + (hasSubs ? '>' : ' open>') +
+            '<summary class="lbl-domain">' + d.id + ' ' + escapeHtml(d.name) +
+            ' <span class="badge">' + (hasSubs ? sdList.length + ' subs' : 'no subs') + '</span></summary>'
+          );
+
+          if (hasSubs) {
+            html.push('<ul>');
             sdList.forEach(sd => {
               const srList = rules
                 .filter(r => r.subdomains.includes(sd.id))
                 .filter(r => matchesSearch(r.title) || matchesSearch(r.id))
                 .slice()
                 .sort((a, b) => a.id.localeCompare(b.id));
-              const filtered = srList.length ? srList : [{ id: '—', title: '(no SR mapped for current search)' }];
-              domainNode.children.push({
-                name: `${sd.id} ${sd.name}`,
-                children: filtered.map(sr => ({ name: sr.id, value: sr.title }))
-              });
+
+              html.push(
+                '<li><details open>' +
+                '<summary class="lbl-subdomain">' + sd.id + ' ' + escapeHtml(sd.name) +
+                ' <span class="badge">' + srList.length + ' SRs</span></summary>'
+              );
+
+              if (srList.length === 0) {
+                html.push('<div class="empty">(no SR for current filters/search)</div>');
+              } else {
+                html.push('<ul>');
+                srList.forEach(sr => {
+                  const title = escapeHtml(sr.title);
+                  html.push(
+                    '<li class="lbl-sr" data-sr-id="' + escapeHtml(sr.id) + '" title="' + title + '">' +
+                    escapeHtml(sr.id) + ' — ' + title +
+                    '</li>'
+                  );
+                });
+                html.push('</ul>');
+              }
+              html.push('</details></li>');
             });
+            html.push('</ul>');
+          } else {
+            html.push('<div class="empty">(no active subdomains for current filters)</div>');
           }
-          tree.push(domainNode);
+          html.push('</details>');
         });
 
-      return {
-        tooltip: { trigger: 'item', triggerOn: 'mousemove',
-          formatter: p => {
-            if (!p.data) return '';
-            const sr = DATA.securityRules.find(s => s.id === p.name);
-            if (sr) return `<b>${sr.id}</b><br/>${sr.title}<br/><i>${sr.regulation}</i>`;
-            const sd = DATA.subdomains.find(s => `${s.id} ${s.name}` === p.name);
-            if (sd) return `<b>${sd.id}</b> ${sd.name}<br/><i>${sd.description}</i>`;
-            return p.name;
-          }
-        },
-        series: [{
-          type: 'tree',
-          data: tree,
-          left: 10, right: 10, top: 10, bottom: 10,
-          layoutAnimation: false,
-          symbol: 'emptyCircle', symbolSize: 7,
-          roam: true,
-          scaleLimit: { min: 0.3, max: 3 },
-          orient: 'TB', expandAndCollapse: true,
-          initialTreeDepth: 1,
-          label: { position: 'left', verticalAlign: 'middle', align: 'right',
-                   fontSize: 11, color: '#e1e7f0', formatter: '{b}' },
-          leaves: { label: { position: 'right', align: 'left' } },
-          lineStyle: { color: '#4ecdc4', curveness: 0.5, width: 1, opacity: 0.6 },
-          itemStyle: { color: '#6c5ce7', borderColor: '#4ecdc4' },
-          emphasis: { focus: 'descendant', itemStyle: { color: '#4ecdc4' } },
-        }],
-      };
+      html.push('</div>');
+
+      const container = document.getElementById('viz-tree');
+      if (container) container.innerHTML = html.join('');
     }
 
     function renderHeatmap() {
@@ -1331,18 +1410,9 @@ function attachClickHandler() {
 
     function setMode(mode) {
       STATE.mode = mode;
-      // Reset sunburst navigation when leaving sunburst mode
       if (mode !== 'sunburst') {
         STATE.sunburstPath = [];
       }
-      const viz = document.getElementById('viz');
-      if (viz) {
-        viz.classList.toggle('tree-mode', mode === 'tree');
-      }
-      // Force chart to resize for the new mode
-      setTimeout(() => {
-        if (STATE.chart) STATE.chart.resize();
-      }, 0);
       document.querySelectorAll('.tab').forEach(t => {
         t.classList.toggle('active', t.dataset.mode === mode);
       });
@@ -1357,23 +1427,45 @@ function attachClickHandler() {
       render();
     });
 
+    // Click delegation: clicking a SR in the tree opens its detail
+    document.addEventListener('click', e => {
+      const el = e.target.closest('.lbl-sr');
+      if (!el) return;
+      const srId = el.getAttribute('data-sr-id');
+      if (srId) {
+        renderDetail(srId, el.textContent);
+      }
+    });
+
     function render() {
       let option;
+      const vizChart = document.getElementById('viz');
+      const vizTree = document.getElementById('viz-tree');
+      if (vizChart) vizChart.style.display = 'none';
+      if (vizTree) vizTree.style.display = 'none';
+
       switch (STATE.mode) {
-        case 'tree': option = renderTree(); break;
-        case 'heatmap': option = renderHeatmap(); break;
+        case 'tree':
+          if (vizTree) vizTree.style.display = 'block';
+          renderTreeHtml();
+          document.getElementById('footer-info').textContent =
+            `Mode: tree · Active regs: ${STATE.activeRegs.size}/5 · Search: "${STATE.search || '∅'}"`;
+          return;
         case 'sunburst':
           option = renderSunburst();
-          // If sunburst returned null (mode mismatch), fall back to clear chart
           if (!option) { STATE.chart.clear(); return; }
+          if (vizChart) vizChart.style.display = 'block';
           break;
-        default: option = renderSankey();
+        case 'heatmap':
+          option = renderHeatmap();
+          if (vizChart) vizChart.style.display = 'block';
+          break;
+        default:
+          option = renderSankey();
+          if (vizChart) vizChart.style.display = 'block';
       }
       STATE.chart.setOption(option, true);
-      // Force resize AFTER setOption so the chart knows the new container size
-      setTimeout(() => {
-        if (STATE.chart) STATE.chart.resize();
-      }, 0);
+      setTimeout(() => { if (STATE.chart) STATE.chart.resize(); }, 0);
       document.getElementById('footer-info').textContent =
         `Mode: ${STATE.mode} · Active regs: ${STATE.activeRegs.size}/5 · Search: "${STATE.search || '∅'}"`;
     }
