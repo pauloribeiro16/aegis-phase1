@@ -1,10 +1,15 @@
-# SPEC — LLM prompts rewritten in functional vocabulary (no person names)
+# SPEC — Sidebar 4 tabs with all methodology information
 
-**Spec ID:** SP-2026-19
-**Date:** 2026-07-29
+**Spec ID:** SP-2026-21
+**Date:** 2026-07-30
 **Author:** Planner (opencode / MiniMax-M3)
 **Status:** DRAFT
 **Level:** spec-first
+**Sprint contract:** [`execution/contracts/SC-2026-21.json`](contracts/SC-2026-21.json)
+**Predecessor contracts:**
+- [CORR-078](CORR-078.md) — wire all ambiguity analyses into the entity graph + fix §2/§3 rendering
+- [CORR-077](CORR-077.md) — AI Act case1 CSV audit corrections
+- [CORR-076](CONTRACT-076.md) — LLM prompts rewritten in functional vocabulary (no person names)
 
 ---
 
@@ -12,37 +17,54 @@
 
 ### Problem Statement
 
-CORR-074 delivered `load_capabilities()` + `ROLE_VOCABULARY` (5 functions: DPO, CISO, Engineering, Operations, Governance). CORR-075 removed the RACI table from doc_04d. But 9 LLM narrative-prompts still ask the model to describe companies in terms of people ("Founder #1", "CEO acting as DPO", "Lead Developer", "2 founders"). At a 5000-employee bank, the LLM produces nonsense — the bank doesn't have 2 founders. The user explicitly demanded in plan-mode (2026-07-29): zero person names anywhere in role-bearing prose.
+The visualization at `docs/visualization/regulation_chain.html` exposes only a fraction of the methodology data living in `Methodology-main/00_METHODOLOGY/PREPROCESSING/`. The user explicitly asked (2026-07-30):
 
-This contract rewrites the 9 LLM prompts to inject a functional context block (roles + applicable capabilities) and remove person-name references.
+> *"Quero meter mais informação, toda a informação que existe nessa pasta de forma organizada."*
 
-### Current State
+The current detail sidebar (`renderFields` at line 1374 of `build_regulation_chain.py`) renders JSON keys recursively, but:
+- **Python loaders strip data** before embedding: Articles lose 4 fields (`security_rules[]`, `security_objectives[]`, `source`, `in_scope_articles_referenced`); Clauses lose 2 (`obligated_party`, `obligation_type`); Regulations lose 3 (`schema_version`, `source`, `chain_version`) + aggregated SOs/SRs.
+- **No access to original methodology MDs**: ~3MB of `.md` files in the methodology folder (per-article analyses, per-clause Berry analyses, validation reports, audit trails, aggregated SOs/SRs) are never surfaced.
 
-9 identified prompt functions:
+The user wants **4 organized tabs** in the detail sidebar so every entity exposes its full data + its source MD + related methodology files.
 
-| # | Function | File | Used by section |
-|---|----------|------|-----------------|
-| 1 | `_reporting_lines_prompt` | `src/aegis_phase1/v2/output/doc_04d.py:932` | doc_04d §5 Reporting Lines |
-| 2 | `_escalation_prompt` | `src/aegis_phase1/v2/output/doc_04d.py:946` | doc_04d §9 Escalation Paths |
-| 3 | `_risk_narrative_prompt` | `src/aegis_phase1/v2/output/doc_04c.py:642` | doc_04c §5.1 Concentration Risk |
-| 4 | `_technical_architecture_prompt` | `src/aegis_phase1/v2/output/doc_04a.py:1004` | doc_04a §1 Technical Architecture |
-| 5 | `_network_topology_prompt` | `src/aegis_phase1/v2/output/doc_04a.py:1016` | doc_04a §1.2 Network Topology |
-| 6 | `_strategic_prompt` | `src/aegis_phase1/v2/output/doc_05.py:966` | doc_05 §6.1 Strategic Narrative |
-| 7 | `_strategic_prompt` | `src/aegis_phase1/v2/output/doc_07.py:764` | doc_07 §6.1 Strategic Narrative |
-| 8 | `_cross_check_prompt` | `src/aegis_phase1/v2/output/doc_07b.py:664` | doc_07b §5.1 Narrative |
-| 9 | `_domain_notes_prompt` | `src/aegis_phase1/v2/output/doc_04b.py:1092` | doc_04b §3 Per-Domain Notes (called 10 times) |
+### Current State (per UX audit subagent 2026-07-30)
 
-All 9 prompts mention "Founder", "CEO acting as", "CTO as", "Lead Developer", or "2 founders" in the prompt body. The LLM is then asked to produce prose that includes these phrases.
+- Detail sidebar layout: 3-column grid `240px | 1fr | 420px` (line 499).
+- Sidebar content: generic `<dl>` grid from `renderField(val, key, depth)` (line 1345), depth limit 3, strings > 600 chars truncated with `…`, `LONG_FIELDS` (18 keys) wrapped in `<details class="narrative">` with 240px scroll cap.
+- **Dead CSS** (defined but unused): `.expand-toggle` (L718), `.raw-json` (L865).
+- Loaders strip the heaviest fields to keep HTML small (3.6MB).
+- Per entity, MD source files exist but are not embedded:
+
+| Entity | MD source file | Size |
+|---|---|---|
+| Regulation | `Regulation/<REG>/00_README.md` | 2-5 KB |
+| Regulation | `01_SecurityObjectives.md`, `02_SecurityRules_NIST.md`, `03_validation_report.md`, `04_deduction_audit.md` | 5-30 KB each |
+| Article | `Regulation/<REG>/Articles/Art_NN.md` | 5-30 KB |
+| Clause | `Regulation/<REG>/Ambiguity/*.md` (file-level, extract per-clause block) | 10-30 KB per file, ~2-5 KB per clause |
+| SO | row in `01_SecurityObjectives.md` + 2 lines context | ~1 KB |
+| SR | `raw_md` already embedded (CORR-078) | varies |
 
 ### Target State
 
-- Each prompt function takes a `tier` and `applicable_regs` (or accepts `state` and derives them) and prepends a **functional context block** listing:
-  - The 5 functions in `ROLE_VOCABULARY` (`DPO`, `CISO`, `Engineering`, `Operations`, `Governance`).
-  - Tier-scaled role roster from `data/role_models/{tier}.yaml` (only role titles, no person names).
-  - Applicable capabilities from `data/capabilities/` for the applicable regulations.
-- Explicit instruction: "**DO NOT name individuals**. Use function names only."
-- Phrases removed: `Founder`, `CEO acting as`, `CTO as`, `Lead Developer`, `2 founders`, `acting as DPO`, `acting as CISO`.
-- The 9 prompts downstream behaviour unchanged (still produce prose prose, still deterministic fallback when no LLM).
+Detail sidebar gains 4 tabs:
+
+| Tab | Content | Loader changes? |
+|---|---|---|
+| **Rendered** | Current view (recursive JSON renderer, depth limits, narrative details) | None |
+| **JSON** | Raw JSON with ALL fields (incl. previously stripped) | YES — loaders must preserve |
+| **Markdown** | Source MD for this entity, rendered client-side via `mdToHtml()` | YES — loaders embed MD |
+| **Context** | Related methodology files + cross-references | YES — loaders embed MD + cross-refs pre-computed |
+
+HTML grows from 3.6 MB → ~6.6 MB. Tabs render on click (content present in DOM but hidden via CSS until activated).
+
+### User-approved decisions (2026-07-30, plan mode)
+
+1. **4 tabs** (Recommended): Rendered / JSON / Markdown / Context
+2. **Embed all** (Recommended): no lazy fetch, all data upfront in DOM. Trade-off: 6.6 MB HTML for zero latency on tab switch.
+3. **MD renderer**: pure JS regex (~80 lines, no external deps). Covers H1-H6, bold/italic, code, code blocks, lists, GFM tables, blockquotes, links, horizontal rules.
+4. **Cross-refs**: simple regex search in embedded JSON. List "Mentioned in: SO-XXX, SR-XXX, CL-XXX" without semantic parsing.
+5. **Tab persistence**: `STATE.activeDetailTab` remembers active tab across item clicks.
+6. **Process**: formal CORR-079 contract with Evaluator subagent (separate from Generator).
 
 ---
 
@@ -52,209 +74,275 @@ All 9 prompts mention "Founder", "CEO acting as", "CTO as", "Lead Developer", or
 
 | # | Requirement | Priority | Rationale |
 |---|-------------|----------|-----------|
-| FR-1 | Add `_functional_context_block(tier, applicable_regs)` helper in `src/aegis_phase1/v2/output/_functional_prompts.py` (new module) | MUST | Single source for the injected block |
-| FR-2 | All 9 prompts prepend the functional context block before the existing narrative instructions | MUST | Uniform treatment |
-| FR-3 | Prompts explicitly forbid person names: "DO NOT name individuals (no Founder, CEO acting as, CTO as, Lead Developer, 2 founders)" | MUST | User explicit |
-| FR-4 | No targeted phrase appears in any of the 9 prompts | MUST | Verification gate |
-| FR-5 | `render_mandatory_narrative` and `render_doc_XX` functions unchanged in signature | MUST | No call-site changes |
-| FR-6 | When `applicable_regs` is empty or tier is missing, helper returns minimal block (no error) | MUST | Robustness |
+| FR-1 | `load_regulations()` loads and embeds `00_README.md` → `rawReadme` field | MUST | User wants methodology MD accessible |
+| FR-2 | `load_regulations()` embeds `01_SecurityObjectives.md`, `02_SecurityRules_NIST.md`, `03_validation_report.md`, `04_deduction_audit.md` → `raw01`, `raw02`, `rawValidation`, `rawAudit` | MUST | All 5 top-level MDs per regulation |
+| FR-3 | `load_regulations()` adds `aggregatedSos[]` (list of full SO dicts for this reg) and `aggregatedSrs[]` (list of full SR dicts) | MUST | Currently only counts |
+| FR-4 | `load_articles()` preserves `security_rules[]` (full SR dicts with rationale, ambiguity_notes) | MUST | Currently stripped, replaced with `securityRuleIds` |
+| FR-5 | `load_articles()` preserves `security_objectives[]` (full SO dicts with description, source_clauses, sub_domains) | MUST | Currently stripped |
+| FR-6 | `load_articles()` preserves `source` (path) and `in_scope_articles_referenced` | MUST | Useful for traceability |
+| FR-7 | `load_articles()` loads `Articles/Art_NN.md` → `rawMd` field | MUST | User's main request |
+| FR-8 | `load_clauses()` preserves `obligated_party` and `obligation_type` fields | MUST | Currently stripped (CORR-078 added `types_found` but not these) |
+| FR-9 | `load_clauses()` extracts per-clause block from `Ambiguity/*.md` → `rawMd` field | MUST | Per-clause MD context |
+| FR-10 | `load_sos()` extracts row + 2 lines context from `01_SecurityObjectives.md` → `rawRow` field | MUST | SO source MD |
+| FR-11 | `load_srs()` verifies `raw_md` already preserved (CORR-078) | MUST | Regression check |
+| FR-12 | HTML template adds `<div class="detail-tabs">` with 4 buttons (Rendered, JSON, Markdown, Context) | MUST | Tab UI |
+| FR-13 | CSS for `.detail-tabs`, `.detail-tab-btn`, `.tab-pane` (reuses existing `.tab-btn` pattern) | MUST | Visual styling |
+| FR-14 | JS `renderDetailTabs(kind, id)` populates 4 `<div class="tab-pane">` containers | MUST | Tab content |
+| FR-15 | JS `mdToHtml(md)` markdown renderer: H1-H6, bold/italic, inline code, code blocks, ordered/unordered lists, GFM tables, blockquotes, links, horizontal rules | MUST | Markdown tab |
+| FR-16 | Markdown tab uses `mdToHtml()` to render the entity's `rawMd` / `rawRow` / `raw_md` field | MUST | Tab content |
+| FR-17 | Context tab (Regulation): lists 5 top-level MDs (filename + size) with click-to-open | MUST | Context navigation |
+| FR-18 | Context tab (Article): cross-reference search — list SOs/SRs/clauses that mention this `article_ref` (regex in embedded JSON) | MUST | Cross-navigation |
+| FR-19 | Context tab (Clause): link to containing `Ambiguity/*.md` file (path embedded in `rawMd` parent reference) | MUST | File context |
+| FR-20 | `STATE.activeDetailTab` persists across item clicks; default `Rendered` | MUST | UX continuity |
 
 ### Non-Functional Requirements
 
 | # | Requirement | Priority | Rationale |
 |---|-------------|----------|-----------|
-| NFR-1 | No new third-party dependencies | MUST | Stdlib + existing data/loaders only |
-| NFR-2 | Helper cacheable on (tier, applicable_regs) tuple | SHOULD | Performance (called 10× in doc_04b) |
+| NFR-1 | HTML final size ≤ 7 MB (current 3.6 + ~3 MB MD) | MUST | Browser performance |
+| NFR-2 | MD renderer ≤ 100 lines of JS | MUST | Maintainability |
+| NFR-3 | Zero regressions on CORR-078 criteria C1-C18 (entity data integrity preserved) | MUST | Don't break previous contract |
+| NFR-4 | Cross-ref search pre-computed at build time (not runtime) — store as field per entity | MUST | Runtime perf |
+| NFR-5 | All paths handle missing files gracefully (`Methodology-main/` may not be symlinked) | MUST | Robustness |
+| NFR-6 | `ruff check` on touched files (only test files since build script is gitignored) → 0 new errors vs baseline 27 | MUST | Lint gate |
+| NFR-7 | All CORR-078 regression tests still pass: `test_clause_parsers.py`, `test_source_role.py`, `test_regulation_chain.py` | MUST | Don't regress |
 
 ### Constraints
 
-- 9 prompt functions are split across 5 files (`doc_04a`, `doc_04b`, `doc_04c`, `doc_04d`, `doc_05`, `doc_07`, `doc_07b`). Each must be modified at its call site.
-- The helper module cannot import from `data/loader.py` circularly; locate it in `src/aegis_phase1/v2/output/_functional_prompts.py` and import `data/loader.py` lazily inside the helper.
-- Renderer behaviour unchanged: when LLM is unavailable, the deterministic fallback still triggers (helpers don't replace the prompt-build call).
-- ROLE_VOCABULARY is the only allowed function vocabulary; no synonyms (e.g., "IT", "Security Team") in the block.
+- **No MD edits** to `Methodology-main/00_METHODOLOGY/PREPROCESSING/`
+- **No new dependencies** (no `marked.js`, no other MD lib) — pure JS regex
+- **1 contract, 4 sequential commits** on branch `feature/aegis-p1-corr-079-rich-sidebars`
+- **Build script is gitignored** — `docs/visualization/build_regulation_chain.py` and `.html` files are NOT committed. Backup to `/tmp/corr078_viz_backup/`.
+- **Embed all** decision: no lazy fetch, no per-entity HTML files
 
 ---
 
 ## Architecture Decisions
 
-### Decision 1: New module `_functional_prompts.py` (not inline edits)
+### Decision 1: Markdown renderer approach
 
-- **Context:** 9 prompts across 5 files. A shared helper avoids duplication.
-- **Options:** (A) New module `_functional_prompts.py` with helper; each prompt prepends the helper output. (B) Inline edit each prompt. (C) Subclass `Phase1LLMInvoker` to inject context.
-- **Decision:** A — new module.
-- **Rationale:** Single source-of-truth; easy to test the helper in isolation; no LLM invoker changes.
-- **Consequences:** 9 callers updated to prepend the block. ~5 lines each.
+- **Context:** Markdown tab needs a JS renderer. Three options:
+  - **A. Pure JS regex** (~80 lines, no deps, covers subset)
+  - **B. `marked.js` embedded** (~50 KB minified, full CommonMark + GFM)
+  - **C. Server-side render at build time** (HTML strings embedded, no runtime render)
+- **Options evaluated:**
+  - A: zero deps, sufficient for 95% of MDs (headings, lists, tables, code, blockquotes)
+  - B: best coverage but adds 50 KB; methodology MDs are simple enough that A suffices
+  - C: shifts work to Python (more code there), but loses interactive feel (no live preview)
+- **Decision:** **A** (pure JS regex). Justification: methodology MDs are well-structured; edge cases handled by graceful fallback (`<pre>` plain).
+- **Consequences:** Renderer covers subset of Markdown. Tables, code blocks, lists, headings all work. Nested edge cases fall back to `<pre>`.
 
-### Decision 2: Helper takes tier + applicable_regs, not full state
+### Decision 2: Cross-reference extraction strategy
 
-- **Context:** The call sites already have access to `state["company_context"]`; the helper just needs the function roster and applicable capabilities.
-- **Options:** (A) Helper takes `tier: str, applicable_regs: list[str]`; (B) Helper takes `state: dict` and derives internally.
-- **Decision:** A — explicit parameters.
-- **Rationale:** Easier to test (no state construction needed); deterministic output for a given (tier, applicable_regs).
-- **Consequences:** Each call site must extract `tier` and `applicable_regs` from `state` before calling the helper.
+- **Context:** Context tab for an Article should list SOs/SRs/clauses that mention `Art. NN`. Options:
+  - **A. Pre-compute at build time:** for each article, scan all embedded SOs/SRs/clauses, build inverse index
+  - **B. Runtime regex search:** search `DATA.sos`, `DATA.srs`, `DATA.clauses` on tab open
+- **Options evaluated:**
+  - A: O(n*m) at build time but instant tab open. Each entity has a `crossRefs: {sos: [...], srs: [...], clauses: [...]}` field
+  - B: O(n*m) per tab open. Slow with 1500+ entities
+- **Decision:** **A** (pre-compute). Justification: 1500 entities × 1500 cross-refs ≈ 2.25M comparisons, but done once at build vs every tab click.
+- **Consequences:** Each entity dict grows by ~1-5 KB (cross-ref lists). Total HTML grows by ~1-2 MB. Acceptable for embed-all approach.
 
-### Decision 3: Capability list is filtered by applicable_regs
+### Decision 3: Tab state persistence
 
-- **Context:** Some capabilities are tied to specific regulations (e.g., `CAP-D01-001` "Encryption at rest" maps to GDPR Art. 32 + CRA Annex I). LLM should only see capabilities for the applicable regs.
-- **Options:** (A) Filter by `applicable_regs` (intersection); (B) Show all capabilities regardless.
-- **Decision:** A — filter.
-- **Rationale:** Minimises prompt size; keeps the LLM focused on what's relevant.
-- **Consequences:** For D-XX domains with no `applicable_regs` in capability YAML, no capability is shown. Capability YAML `obligations` field is the filter source.
-
-### Decision 4: Helper is best-effort silent on missing data
-
-- **Context:** If `data/capabilities/{D-XX}.yaml` is missing, the loader returns `{}`. The helper should not crash.
-- **Options:** (A) Skip the capability row silently; (B) Emit a placeholder line.
-- **Decision:** A — skip.
-- **Rationale:** Matches the user's "info-only" policy (CORR-074 decision #3). Capabilities are informational.
-- **Consequences:** Helper always returns a valid string; never raises.
+- **Context:** When user clicks row A → opens sidebar with Rendered tab → switches to JSON tab → clicks row B → should B open with JSON tab or Rendered?
+- **Options:**
+  - **A. Reset to default** (Rendered) on every click — predictable but annoying
+  - **B. Persist active tab** — user-friendly but surprising for first-time use
+- **Decision:** **B with `STATE.activeDetailTab`** (global state). Justification: power users expect this; first-time users won't notice since default = Rendered.
+- **Consequences:** JS state object grows by one field. No impact on data flow.
 
 ---
 
 ## Data Model
 
-No new entities. Reuses:
-- `ROLE_VOCABULARY` (CORR-074)
-- `load_capabilities(domain_id)` (CORR-074)
-- `load_role_model(tier)` (CORR-073)
-- `classify_tier(employees, sector, applicable_regs)` (CORR-073)
+### Detail sidebar tab structure (HTML)
 
----
-
-## API / Interface Design
-
-### New module
-
-```python
-# src/aegis_phase1/v2/output/_functional_prompts.py
-def build_functional_context(tier: str, applicable_regs: list[str]) -> str:
-    """Return functional context block to prepend to LLM prompts.
-    
-    Returns empty string when ROLE_VOCABULARY is empty (defensive).
-    """
+```html
+<aside class="detail" id="detail">
+  <div class="detail-tabs">
+    <button class="detail-tab-btn active" data-tab="rendered">Rendered</button>
+    <button class="detail-tab-btn" data-tab="json">JSON</button>
+    <button class="detail-tab-btn" data-tab="markdown">Markdown</button>
+    <button class="detail-tab-btn" data-tab="context">Context</button>
+  </div>
+  <div class="detail-tab-body">
+    <div class="tab-pane" data-pane="rendered">... renderFields() output ...</div>
+    <div class="tab-pane" data-pane="json" hidden><pre class="raw-json">{...}</pre></div>
+    <div class="tab-pane" data-pane="markdown" hidden>... mdToHtml(rawMd) ...</div>
+    <div class="tab-pane" data-pane="context" hidden>... cross-refs list ...</div>
+  </div>
+</aside>
 ```
 
-### Output format
+### Per-entity fields added by loaders
 
 ```
-Functional roles available (DO NOT name individuals):
-- {role_1_title} (reports to {reports_to}, FTE {fte})
-- {role_2_title} (reports to {reports_to}, FTE {fte})
-...
+Regulation
+├── rawReadme: str            # NEW — content of 00_README.md
+├── raw01: str                # NEW — content of 01_SecurityObjectives.md
+├── raw02: str                # NEW — content of 02_SecurityRules_NIST.md
+├── rawValidation: str        # NEW — content of 03_validation_report.md
+├── rawAudit: str             # NEW — content of 04_deduction_audit.md
+├── aggregatedSos: list[dict] # NEW — full SO dicts for this reg (from raw01)
+├── aggregatedSrs: list[dict] # NEW — full SR dicts for this reg (from raw02)
+└── crossRefs: dict           # NEW — {sos: [], srs: [], clauses: []} for cross-refs
 
-Capabilities required by applicable regulations:
-- {cap_id}: A={a_function}, R={r_function} ({title})
-- {cap_id}: A={a_function}, R={r_function} ({title})
-...
+Article
+├── securityRules: list[dict] # NEW — full SR dicts (was stripped, only IDs survived)
+├── securityObjectivesFull: list[dict] # NEW — full SO dicts
+├── source: str               # NEW — path to MD
+├── inScopeArticlesReferenced: list[int]  # NEW
+├── rawMd: str                # NEW — content of Articles/Art_NN.md
+└── crossRefs: dict           # NEW
+
+Clause
+├── obligatedParty: str       # NEW (CORR-078 populated but not embedded)
+├── obligationType: str       # NEW
+├── rawMd: str                # NEW — block from Ambiguity/*.md matching this clause ID
+└── crossRefs: dict           # NEW
+
+SO
+├── rawRow: str               # NEW — row + 2 lines context from 01_SecurityObjectives.md
+└── crossRefs: dict           # NEW — list SOs/SRs that reference this SO
+
+SR
+├── raw_md: str               # EXISTS (CORR-078) — verify preserved
+└── crossRefs: dict           # NEW
 ```
 
-### Function signatures (unchanged)
+### `mdToHtml(md: string): string`
 
-```python
-def _reporting_lines_prompt(state: dict[str, Any]) -> str: ...   # doc_04d
-def _escalation_prompt(state: dict[str, Any]) -> str: ...        # doc_04d
-def _risk_narrative_prompt(state, cloud, rows) -> str: ...        # doc_04c
-def _technical_architecture_prompt(state, inventory, summary) -> str: ...  # doc_04a
-def _network_topology_prompt(state, inventory) -> str: ...       # doc_04a
-def _strategic_prompt(state, rows) -> str: ...                   # doc_05, doc_07
-def _cross_check_prompt(state, rows) -> str: ...                 # doc_07b
-def _domain_notes_prompt(domain_id, current, target, gap, controls, state) -> str: ...  # doc_04b
-```
+Converts Markdown subset to HTML:
+- `# H1` … `###### H6` → `<h1>` … `<h6>`
+- `**bold**` → `<strong>`, `*italic*` → `<em>`
+- `` `inline code` `` → `<code>`
+- ` ```lang\n...\n``` ` → `<pre><code class="language-lang">`
+- `- item` / `* item` → `<ul><li>...</li></ul>`
+- `1. item` → `<ol><li>...</li></ol>`
+- `| col1 | col2 |\n| --- | --- |\n| a | b |` → `<table>`
+- `> quote` → `<blockquote>`
+- `[text](url)` → `<a href="url">text</a>`
+- `---` → `<hr>`
+- Plain lines → `<p>`
 
-Each internally prepends the functional context block.
-
----
-
-## Implementation Plan
-
-### Phase Overview (single phase)
-
-| Phase | Name | Scope | Depends On |
-|-------|------|-------|------------|
-| 1 | Helper + 9-prompt refactor | New module + 5 file edits | CORR-074, CORR-075 |
-
-### File Changes
-
-| File | Action | Description |
-|------|--------|-------------|
-| `src/aegis_phase1/v2/output/_functional_prompts.py` | create | New helper module |
-| `src/aegis_phase1/v2/output/doc_04a.py` | modify | `_technical_architecture_prompt` + `_network_topology_prompt` prepend context |
-| `src/aegis_phase1/v2/output/doc_04b.py` | modify | `_domain_notes_prompt` prepends context (called 10×) |
-| `src/aegis_phase1/v2/output/doc_04c.py` | modify | `_risk_narrative_prompt` prepends context |
-| `src/aegis_phase1/v2/output/doc_04d.py` | modify | `_reporting_lines_prompt` + `_escalation_prompt` prepend context |
-| `src/aegis_phase1/v2/output/doc_05.py` | modify | `_strategic_prompt` prepends context |
-| `src/aegis_phase1/v2/output/doc_07.py` | modify | `_strategic_prompt` prepends context |
-| `src/aegis_phase1/v2/output/doc_07b.py` | modify | `_cross_check_prompt` prepends context |
-| `tests/unit/v2/output/test_functional_prompts.py` | create | Tests for the helper + 9-prompt regression |
-| `execution/CONTRACT-076.md` | create | Contract document |
+Fallback: unrecognized syntax → wrap in `<pre>`.
 
 ---
 
-## Acceptance Criteria
+## File changes
 
-### High-Level Criteria
+| File | Action | Why |
+|---|---|---|
+| `docs/visualization/build_regulation_chain.py` | modify — extend 5 loaders + add tabs UI + add `mdToHtml()` | FR-1 to FR-20 |
+| `tests/unit/v2/visualization/test_regulation_chain.py` | modify — add 7+ new tests | NFR-3, validation |
+| `execution/SPEC.md` | update — SP-2026-21 (this file) | process |
+| `execution/CORR-079.md` | create — contract prose doc | process |
+| `execution/CORR-079-RUN-LOG.md` | create — run log evidence | process |
+| `execution/contracts/SC-2026-21.json` | create — sprint contract JSON | process |
+| `execution/QUALITY_LOG.md` | modify — add CORR-079 entry | process |
 
-| # | Criterion | Test Method |
-|---|-----------|-------------|
-| AC-1 | None of 9 prompts contains banned phrases: `Founder`, `CEO acting as`, `CTO as`, `Lead Developer`, `2 founders`, `acting as DPO`, `acting as CISO` | pytest grep |
-| AC-2 | Each of the 9 prompts contains `ROLE_VOCABULARY` (or "DPO, CISO, Engineering, Operations, Governance") in the injected block | pytest regex |
-| AC-3 | Each of the 9 prompts contains "DO NOT name individuals" (or equivalent) in the injected block | pytest regex |
-| AC-4 | `_functional_prompts.build_functional_context(tier, applicable_regs)` returns deterministic string for same inputs | pytest |
-| AC-5 | For empty applicable_regs, helper returns non-empty block with role roster only | pytest |
-| AC-6 | For tier with sufficient role model (MICRO..MAX), the role roster lists FTE/reports_to for each role | pytest |
-| AC-7 | Existing full v2 suite still green (no new regressions vs main baseline) | pytest |
-| AC-8 | Existing stakeholder leakage test + capability-summary test still PASS | pytest |
-| AC-9 | `legacy_qa_runner.py` (or equivalent manual smoke) still produces 9 markdown files in 4 cases; no schema break | shell |
-
-### Edge Cases
-
-| # | Edge Case | Expected Behavior |
-|---|-----------|-------------------|
-| EC-1 | `applicable_regs = []` | Helper returns role roster only (no capability block) |
-| EC-2 | `tier = "UNKNOWN"` | Helper falls back to MICRO or empty block |
-| EC-3 | A capability YAML has no `obligations` field | Capability is excluded from the block (no reg mapping) |
-| EC-4 | A capability YAML has `obligations: {reg: [...]}` but `reg` not in applicable_regs | Capability is excluded |
-
-### Error Scenarios
-
-| # | Error | Expected Behavior |
-|---|-------|-------------------|
-| ES-1 | `load_capabilities()` raises | Helper catches silently, skips that domain |
-| ES-2 | `load_role_model()` raises | Helper falls back to empty role roster, continues |
+**Gitignored artifacts (NOT committed):**
+- `docs/visualization/build_regulation_chain.py` modifications → backup to `/tmp/corr078_viz_backup/`
+- `docs/visualization/regulation_chain.html` regenerated → backup same location
 
 ---
 
-## Testing Strategy
+## Phasing — 4 sequential commits
 
-| Level | What to Test | Method |
-|-------|-------------|--------|
-| Unit | Helper deterministic output, empty case, banned-phrase absence | pytest in `tests/unit/v2/output/` |
-| Regression | Existing 9-prompt calls still produce non-empty prompt strings | pytest |
-| Manual | Inspect rendered docs to confirm no person names in output | shell |
+### Commit 1 — Loaders preserve raw data + MD
+- Extend `load_regulations` (line 73+) to embed 5 top-level MDs + aggregated SOs/SRs
+- Extend `load_articles` (line 117+) to preserve `security_rules[]`, `security_objectives[]`, `source`, `inScopeArticlesReferenced`, `rawMd`
+- Extend `load_clauses` (line 155+) to preserve `obligatedParty`, `obligationType`, `rawMd` (block from Ambiguity)
+- Extend `load_sos` (line 211+) to embed `rawRow` (row + context from 01)
+- Verify `load_srs` preserves `raw_md`
+- Add `crossRefs` field to all entities (pre-computed at build time)
+- Add loader tests in `test_regulation_chain.py`
+
+### Commit 2 — Tab UI in sidebar detail
+- HTML template: replace single `<div class="detail" id="detail">` with tabbed structure
+- CSS for `.detail-tabs`, `.detail-tab-btn`, `.tab-pane`
+- JS `renderDetailTabs(kind, id)` populates 4 panes
+- `STATE.activeDetailTab` for persistence
+- Tests: HTML has 4 tab buttons; clicking switches pane visibility
+
+### Commit 3 — Markdown renderer
+- JS `mdToHtml(md)` function (~80 lines, pure regex)
+- Unit tests with fixtures (headings, lists, tables, code blocks, blockquotes)
+- Apply to Markdown tab content
+- Test: rendered HTML matches expected output for each fixture
+
+### Commit 4 — Context tab + cross-refs
+- For Regulation: Context tab lists 5 top-level MDs (filename + size) with click handler
+- For Article: cross-ref search pre-computed in loader (Commit 1), Context tab renders list
+- For Clause: link to containing Ambiguity file
+- Tests: Context tab content per entity type
+
+Each commit: `ruff check` + targeted pytest + visual check (regenerate HTML, verify tabs render).
 
 ---
 
-## Open Questions
+## Test plan
 
-| # | Question | Answer | Impact |
-|---|----------|--------|--------|
-| Q1 | Where does the helper live? | `src/aegis_phase1/v2/output/_functional_prompts.py` (new module) |
-| Q2 | Mirroring across `doc_05.py` and `doc_07.py` (both define `_strategic_prompt`)? | Each file keeps its own function; both call the helper |
+### Loader tests (Commit 1)
+- `test_articles_have_rawMd`: ≥95% articles have `rawMd` non-empty
+- `test_articles_have_securityRules`: all articles have `securityRules[]` array
+- `test_articles_have_securityObjectivesFull`: all articles have `securityObjectivesFull[]` array
+- `test_clauses_have_rawMd`: ≥80% clauses have `rawMd` (per-clause extraction)
+- `test_clauses_have_obligatedParty`: ≥80% clauses have `obligatedParty` populated
+- `test_regulations_have_5_top_md`: each of 5 regs has all 5 MD fields populated
+- `test_regulations_have_aggregated_sos`: each reg has `aggregatedSos[]` with length matching raw01 row count
+- `test_sos_have_rawRow`: all SOs have `rawRow` non-empty
+
+### UI tests (Commit 2)
+- `test_html_has_4_detail_tabs`: HTML contains "Rendered", "JSON", "Markdown", "Context" button text in detail area
+- `test_html_has_4_tab_panes`: 4 `<div class="tab-pane">` containers
+- `test_STATE_active_detail_tab`: JS state includes `activeDetailTab` field
+
+### Markdown renderer tests (Commit 3)
+- `test_mdToHtml_renders_headings`: `# H1` → `<h1>H1</h1>`, etc. (6 cases)
+- `test_mdToHtml_renders_bold_italic`: `**b**` → `<strong>b</strong>`, `*i*` → `<em>i</em>`
+- `test_mdToHtml_renders_code_block`: triple-backtick block → `<pre><code>`
+- `test_mdToHtml_renders_unordered_list`: `- a\n- b` → `<ul><li>a</li><li>b</li></ul>`
+- `test_mdToHtml_renders_ordered_list`: `1. a\n2. b` → `<ol>`
+- `test_mdToHtml_renders_table`: GFM table → `<table>`
+- `test_mdToHtml_renders_blockquote`: `> q` → `<blockquote>`
+- `test_mdToHtml_renders_link`: `[t](u)` → `<a href="u">t</a>`
+- `test_mdToHtml_fallback_for_unknown`: weird syntax → `<pre>`
+
+### Context tab tests (Commit 4)
+- `test_context_tab_regulation_lists_5_mds`: for reg GDPR, Context shows 5 MD filenames
+- `test_context_tab_article_lists_cross_refs`: for an Article with SOs/SRs referencing it, Context shows them
+- `test_context_tab_clause_links_to_ambiguity_file`: for a clause, Context shows link to containing Ambiguity file
+
+### Regression tests (all commits)
+- All CORR-078 tests still pass (C1-C18 equivalent unit tests)
+- `test_regulation_chain.py` existing tests: 5 passed / 5 total
+- Full suite: 2665 passed, 0 new failures
 
 ---
 
-## References
+## Risks + Rollback
 
-- `execution/SPEC.md` (CORR-075 spec — predecessor)
-- `execution/contracts/SC-2026-17.json` (CORR-074 contract — capabilities catalog)
-- `execution/contracts/SC-2026-18.json` (CORR-075 contract — Capabilities wired into Doc 04d)
-- `src/aegis_phase1/data/loader.py` — `load_capabilities`, `load_role_model`, `ROLE_VOCABULARY`
+| Risk | Mitigation | Rollback |
+|---|---|---|
+| HTML size 3.6 → 6.6 MB exceeds 7 MB target | Lazy: tabs render on click (content in DOM but display:none until tab active). Profile with sample entity. | `--allow-empty` revert commit 1 |
+| MD renderer edge cases (nested tables, escaped chars) | Subset of MD syntax + 9 fixture tests; fallback to `<pre>` plain for unknown | Replace `mdToHtml` with `<pre>` plain (one-line swap) |
+| Cross-ref pre-computation slow at build time | O(n*m) ≈ 2.25M comparisons; ~1-2s build time acceptable | Remove `crossRefs` field; Context tab shows "not available" |
+| Missing `Methodology-main/` symlink | Try/except + "MD not available" message in tab | Defensive: silent fallback |
+| Browser can't handle 6.6 MB HTML | Test in target browser; consider gzip transfer (server-side) | Reduce embedded MDs (drop audit/validation, keep only raw01/raw02) |
 
 ---
 
-## Sign-off
+## Out of scope
 
-- [x] Requirements reviewed (per-utilizador 2026-07-29)
-- [x] Architecture decisions approved
-- [x] Acceptance criteria validated
-- [ ] Ready for contract generation
+- Renaming entities
+- Refreshing preproc_out (already done in CORR-078)
+- Filtering / sorting changes (user explicitly said "só por-item")
+- New JSON fields in preproc_out (CORR-078 already added `source_role`, `instances`, `types_found`)
+- Touching `Methodology-main/` MDs
+- `taxonomy_chain.html` (different viz, not in scope)
+
+---
+
+**Status:** DRAFT → user approval → ANCHORED → Generator implementation begins.

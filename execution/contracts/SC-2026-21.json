@@ -1,0 +1,355 @@
+{
+  "contract_id": "SC-2026-21",
+  "feature": "Sidebar 4 tabs with all methodology information",
+  "date": "2026-07-30",
+  "planner": "opencode (MiniMax-M3)",
+  "spec_file": "execution/SPEC.md",
+  "contract_md": "execution/CORR-079.md",
+  "status": "DRAFT",
+  "phase": "1 of 4",
+  "depends_on": "CORR-078 (SC-2026-20) + CORR-077 + CORR-076 + CORR-074",
+  "parallel_group": "G0",
+  "parent_goal": "execution/CORR-079.md",
+  "trials": 1,
+  "pass_threshold": "1/1",
+  "scope": "Add 4 organized tabs (Rendered / JSON / Markdown / Context) to the detail sidebar in docs/visualization/regulation_chain.html. Extend 5 Python loaders in build_regulation_chain.py to preserve raw JSON fields stripped by CORR-078 and embed source MD files from Methodology-main/00_METHODOLOGY/PREPROCESSING/. Add pure JS markdown renderer (mdToHtml) for the Markdown tab. Pre-compute cross-references at build time for the Context tab. HTML grows from 3.6 MB to ~6.6 MB. 4 sequential commits on branch feature/aegis-p1-corr-079-rich-sidebars. Build script is gitignored — modifications NOT committed, backup to /tmp/corr078_viz_backup/.",
+  "criteria": [
+    {
+      "id": "C1",
+      "description": "load_articles() populates securityRules[] (full SR dicts, not just IDs) for ≥95% articles",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\narts = br.load_articles()\nwith_sr = sum(1 for a in arts if a.get('securityRules') and len(a.get('securityRules', [])) > 0)\ntotal = len(arts)\nratio = with_sr / total if total else 0\nassert ratio >= 0.95, f'only {with_sr}/{total} ({ratio:.1%}) have securityRules[]'\nprint(f'OK: {with_sr}/{total} articles have securityRules[]')\n\"",
+      "expected": "OK: ≥95% articles have securityRules[]",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C2",
+      "description": "load_articles() populates securityObjectivesFull[] (full SO dicts) for ≥95% articles",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\narts = br.load_articles()\nwith_so = sum(1 for a in arts if a.get('securityObjectivesFull') and len(a.get('securityObjectivesFull', [])) > 0)\ntotal = len(arts)\nratio = with_so / total if total else 0\nassert ratio >= 0.95, f'only {with_so}/{total} ({ratio:.1%}) have securityObjectivesFull[]'\nprint(f'OK: {with_so}/{total} articles have securityObjectivesFull[]')\n\"",
+      "expected": "OK: ≥95% articles have securityObjectivesFull[]",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C3",
+      "description": "load_articles() populates rawMd (content of Articles/Art_NN.md) for ≥95% articles",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\narts = br.load_articles()\nwith_md = sum(1 for a in arts if len(a.get('rawMd', '')) > 100)\ntotal = len(arts)\nratio = with_md / total if total else 0\nassert ratio >= 0.95, f'only {with_md}/{total} ({ratio:.1%}) have rawMd > 100 chars'\nprint(f'OK: {with_md}/{total} articles have rawMd')\n\"",
+      "expected": "OK: ≥95% articles have rawMd content",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C4",
+      "description": "load_clauses() populates obligatedParty and obligationType for ≥80% clauses",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nclauses = br.load_clauses()\nwith_party = sum(1 for c in clauses if c.get('obligatedParty'))\ntotal = len(clauses)\nratio = with_party / total if total else 0\nassert ratio >= 0.80, f'only {with_party}/{total} ({ratio:.1%}) have obligatedParty'\nprint(f'OK: {with_party}/{total} clauses have obligatedParty')\n\"",
+      "expected": "OK: ≥80% clauses have obligatedParty populated",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C5",
+      "description": "load_clauses() populates rawMd (per-clause block from Ambiguity) for ≥80% clauses",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nclauses = br.load_clauses()\nwith_md = sum(1 for c in clauses if len(c.get('rawMd', '')) > 50)\ntotal = len(clauses)\nratio = with_md / total if total else 0\nassert ratio >= 0.80, f'only {with_md}/{total} ({ratio:.1%}) have rawMd > 50 chars'\nprint(f'OK: {with_md}/{total} clauses have rawMd')\n\"",
+      "expected": "OK: ≥80% clauses have rawMd content",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C6",
+      "description": "load_regulations() populates rawReadme, raw01, raw02, rawValidation, rawAudit for all 5 regulations",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nregs = br.load_regulations()\nFIELDS = ['rawReadme', 'raw01', 'raw02', 'rawValidation', 'rawAudit']\nmissing = []\nfor r in regs:\n    for f in FIELDS:\n        if len(r.get(f, '')) < 50:\n            missing.append((r.get('id'), f))\nassert len(missing) == 0, f'missing fields: {missing}'\ntotal = len(regs) * len(FIELDS)\nprint(f'OK: {len(regs)} regs × {len(FIELDS)} MDs = {total} fields all populated')\n\"",
+      "expected": "OK: 5 regulations × 5 MDs = 25 fields all populated",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C7",
+      "description": "load_regulations() populates aggregatedSos[] and aggregatedSrs[] lists with non-trivial content",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nregs = br.load_regulations()\nfor r in regs:\n    reg_id = r.get('id', '?')\n    sos = r.get('aggregatedSos', [])\n    srs = r.get('aggregatedSrs', [])\n    assert len(sos) > 5, f'{reg_id}: aggregatedSos has only {len(sos)} items'\n    assert len(srs) > 5, f'{reg_id}: aggregatedSrs has only {len(srs)} items'\nprint(f'OK: all {len(regs)} regs have aggregatedSos and aggregatedSrs with >5 items each')\n\"",
+      "expected": "OK: all regulations have aggregatedSos[] and aggregatedSrs[] with >5 items",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C8",
+      "description": "load_sos() populates rawRow (row + context from 01_SecurityObjectives.md) for ≥95% SOs",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nsos = br.load_sos()\nwith_row = sum(1 for s in sos if len(s.get('rawRow', '')) > 20)\ntotal = len(sos)\nratio = with_row / total if total else 0\nassert ratio >= 0.95, f'only {with_row}/{total} ({ratio:.1%}) have rawRow'\nprint(f'OK: {with_row}/{total} SOs have rawRow')\n\"",
+      "expected": "OK: ≥95% SOs have rawRow populated",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C9",
+      "description": "load_srs() preserves raw_md (CORR-078 regression check)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nsrs = br.load_srs()\nwith_md = sum(1 for s in srs if len(s.get('raw_md', '')) > 50)\ntotal = len(srs)\nratio = with_md / total if total else 0\nassert ratio >= 0.95, f'only {with_md}/{total} ({ratio:.1%}) have raw_md'\nprint(f'OK: {with_md}/{total} SRs have raw_md')\n\"",
+      "expected": "OK: ≥95% SRs have raw_md preserved (no regression from CORR-078)",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C10",
+      "description": "All entities have crossRefs field (pre-computed inverse index)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nall_entities = []\nall_entities.extend([(a['id'], a.get('crossRefs')) for a in br.load_articles()])\nall_entities.extend([(c['id'], c.get('crossRefs')) for c in br.load_clauses()])\nall_entities.extend([(s['id'], s.get('crossRefs')) for s in br.load_sos()])\nall_entities.extend([(s['id'], s.get('crossRefs')) for s in br.load_srs()])\nmissing = [eid for eid, cr in all_entities if not isinstance(cr, dict) or not all(k in cr for k in ['sos', 'srs', 'clauses'])]\nassert len(missing) == 0, f'{len(missing)} entities missing crossRefs'\nprint(f'OK: {len(all_entities)} entities all have crossRefs dict')\n\"",
+      "expected": "OK: all entities have crossRefs dict with sos/srs/clauses keys",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C11",
+      "description": "HTML output contains <div class=\"detail-tabs\"> with 4 <button> elements (Rendered, JSON, Markdown, Context)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nhtml = br.build_html()\nfor tab in ['Rendered', 'JSON', 'Markdown', 'Context']:\n    assert f'data-tab=\\\"' + tab.lower() + '\\\"' in html.lower() or f'>{tab}<' in html, f'tab {tab} not in HTML'\nbtn_count = html.count('detail-tab-btn')\nassert btn_count >= 4, f'only {btn_count} detail-tab-btn elements'\nprint(f'OK: HTML has {btn_count} detail-tab-btn elements covering 4 tabs')\n\"",
+      "expected": "OK: HTML has 4 tab buttons for Rendered/JSON/Markdown/Context",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C12",
+      "description": "HTML output contains 4 <div class=\"tab-pane\"> containers",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nhtml = br.build_html()\ncount = html.count('class=\\\"tab-pane\\\"')\nassert count >= 4, f'only {count} tab-pane containers'\nprint(f'OK: HTML has {count} tab-pane containers')\n\"",
+      "expected": "OK: HTML has ≥4 tab-pane containers",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C13",
+      "description": "JS STATE includes activeDetailTab field defaulting to 'rendered'",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nsys.path.insert(0, 'docs/visualization')\nimport build_regulation_chain as br\nhtml = br.build_html()\nassert 'activeDetailTab' in html, 'STATE.activeDetailTab not in HTML JS'\nassert 'activeDetailTab: \\\"rendered\\\"' in html or \\\"activeDetailTab: 'rendered'\\\" in html, 'default value not rendered'\nprint('OK: STATE.activeDetailTab defaults to rendered')\n\"",
+      "expected": "OK: STATE.activeDetailTab field with default 'rendered' in embedded JS",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C14",
+      "description": "Click handler switches detail tab visibility (hidden attribute toggled)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport re\nwith open('docs/visualization/build_regulation_chain.py') as f:\n    src = f.read()\n# Verify switchDetailTab function exists and toggles hidden\nassert 'switchDetailTab' in src or 'switchTab.*detail' in src.lower(), 'no switchDetailTab function'\nassert 'hidden' in src, 'no hidden attribute toggle'\nassert re.search(r'detail-tab-btn.*hidden|hidden.*detail-tab-btn', src, re.DOTALL), 'tab button not wired to hidden toggle'\nprint('OK: switchDetailTab function toggles hidden attribute')\n\"",
+      "expected": "OK: switchDetailTab toggles hidden attribute on tab panes",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C15",
+      "description": "mdToHtml renders headings (H1-H6)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nimport re\nwith open('docs/visualization/build_regulation_chain.py') as f:\n    src = f.read()\n# Extract mdToHtml function (between def and next def at same indent)\nm = re.search(r'def mdToHtml\\(md[^)]*\\)[^:]*:\\s*\\n(.+?)(?=\\ndef |\\nclass |\\Z)', src, re.DOTALL)\nif not m:\n    # Try inline (arrow function or const)\n    m = re.search(r'(?:function\\s+)?mdToHtml\\s*[=(][^=]*[=)]\\s*[{](.+?)[}]\\s*[;]?', src, re.DOTALL)\nbody = m.group(1) if m else ''\nassert body, 'mdToHtml function not found'\nassert 'h1' in body.lower() and 'h6' in body.lower(), 'mdToHtml does not handle H1-H6'\nprint('OK: mdToHtml handles headings (H1-H6)')\n\"",
+      "expected": "OK: mdToHtml function defined and handles H1-H6 headings",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C16",
+      "description": "mdToHtml renders bold (**) and italic (*)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nimport re\nwith open('docs/visualization/build_regulation_chain.py') as f:\n    src = f.read()\nm = re.search(r'(?:def\\s+mdToHtml|function\\s+mdToHtml|mdToHtml\\s*[=(])(.{200,4000})', src, re.DOTALL)\nbody = m.group(1) if m else ''\nassert 'strong' in body or '**' in body.replace('\\\\*\\\\*', ''), 'bold handling not present'\nassert 'em' in body or 'italic' in body.lower(), 'italic handling not present'\nprint('OK: mdToHtml handles bold and italic')\n\"",
+      "expected": "OK: mdToHtml handles bold (**) and italic (*)",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C17",
+      "description": "mdToHtml renders unordered lists (- item, * item)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nimport re\nwith open('docs/visualization/build_regulation_chain.py') as f:\n    src = f.read()\nm = re.search(r'(?:def\\s+mdToHtml|function\\s+mdToHtml|mdToHtml\\s*[=(])(.{200,4000})', src, re.DOTALL)\nbody = m.group(1) if m else ''\nassert '<ul' in body or '<li' in body, 'unordered list handling not present'\nprint('OK: mdToHtml handles unordered lists')\n\"",
+      "expected": "OK: mdToHtml handles unordered lists",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C18",
+      "description": "mdToHtml renders GFM tables (| col | col |\\n| --- | --- |\\n| a | b |)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nimport re\nwith open('docs/visualization/build_regulation_chain.py') as f:\n    src = f.read()\nm = re.search(r'(?:def\\s+mdToHtml|function\\s+mdToHtml|mdToHtml\\s*[=(])(.{200,4000})', src, re.DOTALL)\nbody = m.group(1) if m else ''\nassert '<table' in body or 'th' in body or 'tr' in body or 'td' in body, 'table handling not present'\nprint('OK: mdToHtml handles GFM tables')\n\"",
+      "expected": "OK: mdToHtml handles GFM tables",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C-REG1",
+      "description": "All CORR-078 unit tests still pass (no regression)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -m pytest tests/unit/scripts/preprocess/test_clause_parsers.py tests/unit/scripts/preprocess/test_source_role.py tests/unit/v2/visualization/test_regulation_chain.py -v --no-header -o 'addopts=-ra --tb=line' 2>&1 | tail -5",
+      "expected": "All CORR-078 tests PASS",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C-REG2",
+      "description": "Full unit suite: 0 NEW failures vs baseline (69 pre-existing infra failures tolerated)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -m pytest tests/unit/ -m 'not slow' -n auto -q --no-header -o 'addopts=-ra --tb=line' 2>&1 | tail -5",
+      "expected": "Failure count ≤69 (baseline) and no NEW failures in tests/unit/scripts/ or tests/unit/v2/visualization/",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C-REG3",
+      "description": "ruff check on test file: 0 new errors vs baseline",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && ../shared-venv-root/bin/python -m ruff check tests/unit/v2/visualization/test_regulation_chain.py 2>&1 | tail -3",
+      "expected": "exit 0 or same error count as baseline",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    }
+  ],
+  "quality_dimensions": [
+    {
+      "name": "Correctness",
+      "threshold": "100% (21 criteria pass)",
+      "result": null
+    },
+    {
+      "name": "Data Integrity",
+      "threshold": "100% (all MD content accessible; no data loss)",
+      "result": null
+    },
+    {
+      "name": "No Regressions",
+      "threshold": "100% (CORR-078 C1-C18 still pass)",
+      "result": null
+    },
+    {
+      "name": "UX Completeness",
+      "threshold": "100% (4 tabs visible per entity)",
+      "result": null
+    }
+  ],
+  "risks": [
+    "HTML size 3.6 → 6.6 MB may exceed browser memory limits — mitigated by lazy rendering (display:none until tab active) and gzip transfer",
+    "MD renderer edge cases (nested tables, escape chars) — mitigated by 9 fixture tests + <pre> fallback",
+    "Cross-ref pre-computation slow at build time — mitigated by O(n*m) with early termination; ~1-2s acceptable",
+    "Methodology-main symlink may not be present — mitigated by try/except + 'MD not available' fallback",
+    "build script is gitignored — mitigated by backup to /tmp/corr078_viz_backup/ after each commit"
+  ],
+  "files_to_change": [
+    {
+      "file": "docs/visualization/build_regulation_chain.py",
+      "action": "modify",
+      "why": "Extend 5 loaders, add tab UI, add mdToHtml() — gitignored, backup to /tmp/corr078_viz_backup/"
+    },
+    {
+      "file": "docs/visualization/regulation_chain.html",
+      "action": "regenerate",
+      "why": "Output of build script — gitignored, backup same location"
+    },
+    {
+      "file": "tests/unit/v2/visualization/test_regulation_chain.py",
+      "action": "modify",
+      "why": "Add 11 new tests for C1-C10 + C11-C14 + C15-C18"
+    },
+    {
+      "file": "execution/SPEC.md",
+      "action": "update",
+      "why": "SP-2026-21 spec"
+    },
+    {
+      "file": "execution/CORR-079.md",
+      "action": "create",
+      "why": "Contract prose doc"
+    },
+    {
+      "file": "execution/CORR-079-RUN-LOG.md",
+      "action": "create",
+      "why": "Run log with evidence"
+    },
+    {
+      "file": "execution/contracts/SC-2026-21.json",
+      "action": "create",
+      "why": "Sprint contract JSON"
+    },
+    {
+      "file": "execution/QUALITY_LOG.md",
+      "action": "modify",
+      "why": "Add CORR-079 entry"
+    }
+  ],
+  "correction_loop": {
+    "max_cycles": 3,
+    "current_cycle": 0
+  },
+  "sign_off": {
+    "user_approved": false,
+    "user_approval_note": null,
+    "generator_implemented": false,
+    "generator_commit": null,
+    "evaluator_verified": false,
+    "evaluator_verdict": null,
+    "quality_log_updated": false,
+    "contract_md": "execution/CORR-079.md"
+  }
+}
