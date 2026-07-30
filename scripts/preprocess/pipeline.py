@@ -108,6 +108,11 @@ import re as _re_layout
 
 _D_XX_RE = _re_layout.compile(r"^D-(\d{2})(?:\.\d+)?$")
 
+# CORR-078 (C1): centralised SO-id pattern, accepts mixed-case prefixes
+# (e.g. ``SO-AI_Act-013``). Exposed as ``_SO_ID_RE`` at module level for
+# contract test introspection (SC-2026-20.json C1 test_command imports it).
+_SO_ID_RE = _re_layout.compile(r"SO-[A-Za-z][A-Za-z_0-9]*-\d{3}")
+
 
 def _d_xx_from_subdomain_id(sid: str | None) -> str | None:
     """Extract the parent D-XX from a subdomain id like D-04.3 → D-04.
@@ -1517,9 +1522,26 @@ def parse_root_csf_structured(path: Path) -> dict[str, Any]:
     }
 
 
-def parse_article_split(path: Path, regulation: str) -> dict[str, Any]:
-    """Parse one ``Articles/Art_NN.md`` file into a structured Article entity."""
-    text = path.read_text(encoding="utf-8")
+def parse_article_split(
+    path: str | Path,
+    regulation: str | None = None,
+) -> dict[str, Any]:
+    """Parse one ``Articles/Art_NN.md`` file into a structured Article entity.
+
+    CORR-078: accepts a string path (with auto-conversion to ``Path``) and an
+    optional ``regulation`` argument. When omitted, the regulation is inferred
+    from the path's first matching directory name under
+    ``PREPROCESSING/Regulation/<REG>/``.
+    """
+    p = Path(path) if not isinstance(path, Path) else path
+    if regulation is None:
+        # Infer from path: e.g. ".../Regulation/AI_Act/Articles/Art_3.md"
+        m = re.search(r"Regulation[/\\]([A-Za-z_]+)[/\\]Articles[/\\]", str(p))
+        if m:
+            regulation = m.group(1)
+        else:
+            regulation = "UNKNOWN"
+    text = p.read_text(encoding="utf-8")
     fm, body = parse_frontmatter(text)
     article_ref = str(fm.get("article", "UNKNOWN"))
 
@@ -1538,8 +1560,7 @@ def parse_article_split(path: Path, regulation: str) -> dict[str, Any]:
                 continue
             so_id = row[0].strip()
             # CORR-078 (C1): accept mixed-case SO prefixes (e.g. SO-AI_Act-013)
-            from .parsers.aggregated.security_objectives import _SO_ID_RE as _SO_PAT
-            if not _SO_PAT.fullmatch(so_id):
+            if not _SO_ID_RE.fullmatch(so_id):
                 continue
             so_list.append(
                 {

@@ -351,6 +351,16 @@ def _extract_clauses_gdpr_style(body: str, regulation: str) -> list[dict[str, An
         # ----- Intra-section notes -----
         notes = _extract_intra_section_notes(block)
 
+        # CORR-078 (C12): ``types_found`` derived from instance Berry labels,
+        # so build-script consumers can scan it directly. Also include the
+        # pipe-metadata ``type`` if it is one of the canonical Berry labels
+        # (e.g. ``data-subject-facing`` → not a Berry, but future-proofing).
+        types_found = sorted({
+            i.get("label")
+            for i in instances
+            if i.get("label") in {"VAG", "POLY", "COORD", "SCOPE-Q"}
+        })
+
         clauses.append(
             {
                 "id": clause_id,
@@ -362,6 +372,7 @@ def _extract_clauses_gdpr_style(body: str, regulation: str) -> list[dict[str, An
                 "obligation_type": meta.get("obligationType", ""),
                 "source_locus": source_locus,
                 "instances": instances,
+                "types_found": types_found,
                 "intra_section_notes": notes,
                 "berry_anchors": berries,
             }
@@ -397,6 +408,14 @@ def _extract_clauses_h3_style(
         berries = _extract_berries(block)
         # Intra-section notes
         notes = _extract_intra_section_notes(block)
+        # CORR-078 (C12): also expose a `types_found` array derived from the
+        # parsed instances' Berry labels, so build-script consumers can scan
+        # it without walking the nested ``instances[]`` array.
+        types_found = sorted({
+            i.get("label")
+            for i in instances
+            if i.get("label") in {"VAG", "POLY", "COORD", "SCOPE-Q"}
+        })
         clauses.append(
             {
                 "id": clause_id,
@@ -405,6 +424,7 @@ def _extract_clauses_h3_style(
                 "title": title,
                 "source_locus": source_locus,
                 "instances": instances,
+                "types_found": types_found,
                 "intra_section_notes": notes,
                 "berry_anchors": berries,
             }
