@@ -573,14 +573,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     // CSF Function order: GV, ID, PR, DE, RS, RC (per NIST CSF 2.0 official ordering)
     const FUNCTION_ORDER = {GV: 0, ID: 1, PR: 2, DE: 3, RS: 4, RC: 5};
 
-    // CSF color by Function (6 distinct colors for instant visual recognition)
+    // CSF 2.0 official palette (nist.gov/cyberframework/faqs "Six Functions Graphic")
+    // Pastel tones designed for light bg; we use dark text on CSF nodes for contrast.
     const CSF_COLOR = {
-      GV: '#4ecdc4',  // teal
-      ID: '#6c5ce7',  // lilac
-      PR: '#ffd93d',  // amber
-      DE: '#ff6b6b',  // coral
-      RS: '#a8e6cf',  // mint
-      RC: '#f9a8d4',  // pink
+      GV: '#f9f49d',  // Govern — pale yellow
+      ID: '#4bb2e0',  // Identify — sky blue
+      PR: '#9292ea',  // Protect — lavender
+      DE: '#fab746',  // Detect — orange
+      RS: '#f97367',  // Respond — coral
+      RC: '#7df49f',  // Recover — mint green
     };
 
     function csfOrderKey(c) {
@@ -674,8 +675,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .slice()
         .sort(csfCompare)
         .forEach(s => {
-          const color = CSF_COLOR[s.function] || '#4ecdc4';
-          nodes.push({ name: s.id, depth: 3, itemStyle: { color, borderColor: color }, value: csfWeight[s.id] || 0 });
+          const color = CSF_COLOR[s.function] || '#f9f49d';
+          nodes.push({
+            name: s.id,
+            depth: 3,
+            itemStyle: { color, borderColor: color },
+            value: csfWeight[s.id] || 0,
+            label: { color: '#0f1419', fontSize: 9, fontWeight: 'bold' },
+          });
         });
 
       const links = [];
