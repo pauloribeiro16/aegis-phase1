@@ -853,8 +853,16 @@ def _extract_synthesis_file(path: Path, body: str, fm: dict[str, Any]) -> dict[s
 # ─── Public entry: parse a single Ambiguity file ───────────────────────
 
 
-def parse_ambiguity_file(path: Path, regulation: str) -> dict[str, Any]:
+def parse_ambiguity_file(
+    path: str | Path,
+    regulation: str | None = None,
+) -> dict[str, Any]:
     """Parse one Ambiguity/{REG}/*.md file and return a structured dict.
+
+    CORR-078: ``regulation`` is optional — when omitted, the regulation is
+    inferred from the path's first matching directory name under
+    ``PREPROCESSING/Regulation/<REG>/``. Both string and Path inputs are
+    accepted (string is converted to Path).
 
     The result has TWO top-level keys:
 
@@ -865,10 +873,15 @@ def parse_ambiguity_file(path: Path, regulation: str) -> dict[str, Any]:
     Plus a discriminator ``kind``: ``index``, ``synthesis``,
     ``cross_article``, or ``per_article``.
     """
-    text = path.read_text(encoding="utf-8")
+    p = Path(path) if not isinstance(path, Path) else path
+    if regulation is None:
+        # Infer from path: ".../Regulation/AI_Act/Ambiguity/01_AI_Act_Art9_..."
+        m = re.search(r"Regulation[/\\]([A-Za-z_]+)[/\\]Ambiguity[/\\]", str(p))
+        regulation = m.group(1) if m else "UNKNOWN"
+    text = p.read_text(encoding="utf-8")
     fm, body = parse_frontmatter(text)
 
-    stem = path.stem
+    stem = p.stem
     # Discriminate by filename
     if stem.startswith("00_"):
         kind = "index"

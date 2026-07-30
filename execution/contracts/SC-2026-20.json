@@ -1,0 +1,343 @@
+{
+  "contract_id": "SC-2026-20",
+  "feature": "Wire all ambiguity analyses into the entity graph + fix §2/§3 rendering in regulation_chain.html",
+  "date": "2026-07-30",
+  "planner": "opencode (MiniMax-M3)",
+  "spec_file": "execution/SPEC.md",
+  "contract_md": "execution/CORR-078.md",
+  "status": "DRAFT",
+  "phase": "1 of 4",
+  "depends_on": "CORR-077 (CSV audit) + CORR-076 (functional prompts) + CORR-074 (capabilities catalog)",
+  "parallel_group": "G0",
+  "parent_goal": "execution/CORR-078.md",
+  "trials": 1,
+  "pass_threshold": "1/1",
+  "scope": "Fix 5 preprocessor regex/parser bugs that silently drop Berry Instance analysis from MD source. Add source_role schema field (computed from 00_README.md in-scope list, not MD edit). Fix build script to union SOs (top-level + linked_objectives), filter out_of_scope articles from §2, and split Type column into 4 boolean columns VAG/POLY/COORD/SCOPE-Q. Regenerate golden fixtures with evidence captured in execution/CORR-078-RUN-LOG.md. No MD changes. 4 sequential commits on branch feature/aegis-p1-corr-078-ambiguity-wiring.",
+  "criteria": [
+    {
+      "id": "C1",
+      "description": "Regex _SO_ID_RE in pipeline.py:1513 and security_objectives.py:62 accepts mixed-case IDs (e.g., SO-AI_Act-013)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport re\nfrom scripts.preprocess.pipeline import _SO_ID_RE if hasattr(__import__('scripts.preprocess.pipeline', fromlist=['']), '_SO_ID_RE') else re.compile(r'SO-[A-Za-z][A-Za-z_0-9]*-\\d{3}')\n# Try to find the actual constant; fall back to expected pattern\npat = None\ntry:\n    from scripts.preprocess.pipeline import _SO_ID_RE as pat\nexcept (ImportError, AttributeError):\n    from scripts.preprocess.parsers.aggregated.security_objectives import _SO_ID_RE as pat\nassert pat.fullmatch('SO-AI_Act-013'), 'SO-AI_Act-013 not matched'\nassert pat.fullmatch('SO-GDPR-001'), 'SO-GDPR-001 not matched'\nassert pat.fullmatch('SO-CRA-001'), 'SO-CRA-001 not matched'\nassert pat.fullmatch('SO-DORA-001'), 'SO-DORA-001 not matched'\nassert pat.fullmatch('SO-NIS2-001'), 'SO-NIS2-001 not matched'\nassert not pat.fullmatch('SO-AIact-013'), 'should not match malformed ID'\nprint('OK: _SO_ID_RE accepts mixed-case IDs')\n\"",
+      "expected": "OK: _SO_ID_RE accepts mixed-case IDs",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C2",
+      "description": "parse_article_split('Art_3.md') returns security_objectives with ≥1 entry (currently always [] due to C1 bug)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nfrom scripts.preprocess.pipeline import parse_article_split\nr = parse_article_split('Methodology-main/00_METHODOLOGY/PREPROCESSING/Regulation/AI_Act/Articles/Art_3.md')\nassert len(r.get('security_objectives', [])) >= 1, f'expected ≥1 SO, got {len(r.get(\\\"security_objectives\\\", []))}'\nassert len(r.get('security_rules', [])) >= 1\nprint(f'OK: Art_3 parsed with {len(r[\\\"security_objectives\\\"])} SOs and {len(r[\\\"security_rules\\\"])} SRs')\n\"",
+      "expected": "OK: Art_3 parsed with ≥1 SO and ≥1 SR",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C3",
+      "description": "parse_ambiguity_file('01_AI_Act_Art9_RiskMgmt.md') returns clauses with non-empty instances[] (currently all skeleton)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nfrom scripts.preprocess.pipeline import parse_ambiguity_file\nr = parse_ambiguity_file('Methodology-main/00_METHODOLOGY/PREPROCESSING/Regulation/AI_Act/Ambiguity/01_AI_Act_Art9_RiskMgmt.md')\nclauses = r.get('clauses', [])\nassert len(clauses) >= 4, f'expected ≥4 clauses, got {len(clauses)}'\nnon_skeleton = [c for c in clauses if not c.get('is_skeleton', False)]\nassert len(non_skeleton) >= 1, f'expected ≥1 non-skeleton clause, got {len(non_skeleton)}'\nlabeled = [c for c in clauses if any(i.get('label') for i in c.get('instances', []))]\nassert len(labeled) >= 1, f'expected ≥1 clause with labeled instances'\nprint(f'OK: Art9_RiskMgmt parsed with {len(clauses)} clauses, {len(non_skeleton)} non-skeleton, {len(labeled)} with instances')\n\"",
+      "expected": "OK: AI_Act Art9_RiskMgmt parsed with non-skeleton clauses and labeled instances",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C4",
+      "description": "parse_ambiguity_file('03_GDPR_Ch3_Rights.md') returns GDPR-RT01 with instances[0].label populated (Berry label: VAG/POLY/COORD/SCOPE-Q)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nfrom scripts.preprocess.pipeline import parse_ambiguity_file\nr = parse_ambiguity_file('Methodology-main/00_METHODOLOGY/PREPROCESSING/Regulation/GDPR/Ambiguity/03_GDPR_Ch3_Rights.md')\nclauses = r.get('clauses', [])\nrt01 = next((c for c in clauses if c.get('id') == 'GDPR-RT01'), None)\nassert rt01 is not None, 'GDPR-RT01 not found'\nassert len(rt01.get('instances', [])) >= 1, f'GDPR-RT01 has no instances'\nlabel = rt01['instances'][0].get('label', '')\nassert label in {'VAG', 'POLY', 'COORD', 'SCOPE-Q', 'Compound', 'Independent'}, f'unexpected label: {label}'\nprint(f'OK: GDPR-RT01 has {len(rt01[\\\"instances\\\"])} instances, first label={label}')\n\"",
+      "expected": "OK: GDPR-RT01 has instances with valid Berry label",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C5",
+      "description": "GDPR clauses have populated type, obligated_party, obligation_type (currently all empty strings)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nfrom scripts.preprocess.pipeline import parse_ambiguity_file\nr = parse_ambiguity_file('Methodology-main/00_METHODOLOGY/PREPROCESSING/Regulation/GDPR/Ambiguity/03_GDPR_Ch3_Rights.md')\nclauses = r.get('clauses', [])\npopulated = [c for c in clauses if c.get('type') and c.get('obligated_party')]\nassert len(populated) >= 10, f'expected ≥10 GDPR Ch3 clauses with type+obligated_party, got {len(populated)}'\nrt01 = next((c for c in clauses if c.get('id') == 'GDPR-RT01'), None)\nassert rt01 is not None\nassert rt01.get('type') == 'data-subject-facing', f'GDPR-RT01.type={rt01.get(\\\"type\\\")}'\nassert rt01.get('obligated_party') == 'CONTROLLER', f'GDPR-RT01.obligated_party={rt01.get(\\\"obligated_party\\\")}'\nprint(f'OK: {len(populated)}/{len(clauses)} GDPR Ch3 clauses have type+obligated_party populated')\n\"",
+      "expected": "OK: GDPR clauses have populated type/obligated_party (≥10/20 for Ch3)",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C6",
+      "description": "GDPR clauses use H4 title (e.g., 'Transparency modalities') instead of 'Verbatim (with highlighting)'",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nfrom scripts.preprocess.pipeline import parse_ambiguity_file\nr = parse_ambiguity_file('Methodology-main/00_METHODOLOGY/PREPROCESSING/Regulation/GDPR/Ambiguity/03_GDPR_Ch3_Rights.md')\nclauses = r.get('clauses', [])\nrt01 = next((c for c in clauses if c.get('id') == 'GDPR-RT01'), None)\nassert rt01 is not None\ntitle = rt01.get('title', '')\nassert 'Transparency modalities' in title, f'GDPR-RT01.title={title!r}'\nassert 'Verbatim' not in title, f'GDPR-RT01.title still has Verbatim: {title!r}'\nprint(f'OK: GDPR-RT01.title={title!r}')\n\"",
+      "expected": "OK: GDPR-RT01.title='Transparency modalities' (no 'Verbatim')",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C7",
+      "description": "Each regulation/<REG>/articles/Art_*.json has source_role ∈ {primary_source, supporting_citation, out_of_scope}",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport json\nfrom pathlib import Path\nVALID = {'primary_source', 'supporting_citation', 'out_of_scope'}\ntotal = 0\nfor art_dir in Path('preproc_out/regulation').glob('*/articles'):\n    for f in sorted(art_dir.glob('Art_*.json')):\n        d = json.loads(f.read_text())\n        total += 1\n        sr = d.get('source_role')\n        assert sr in VALID, f'{f}: source_role={sr!r} not in {VALID}'\nprint(f'OK: {total} articles, all have valid source_role')\n\"",
+      "expected": "OK: all ~140 articles have valid source_role",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C8",
+      "description": "In-scope count per regulation matches 00_README.md enumeration",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport json\nfrom pathlib import Path\nEXPECTED = {\n    'AI_Act': 13,  # per 00_README.md:56 (Art. 9, 10, 12, 13, 14, 15, 17, 19, 26, 55, 72, 73, 74)\n    # GDPR, CRA, DORA, NIS2: read from respective 00_README.md; minimum 5 each\n}\nfor reg, expected_count in EXPECTED.items():\n    art_dir = Path(f'preproc_out/regulation/{reg}/articles')\n    primary = sum(1 for f in art_dir.glob('Art_*.json') if json.loads(f.read_text()).get('source_role') == 'primary_source')\n    assert primary == expected_count, f'{reg}: expected {expected_count} primary_source, got {primary}'\n    print(f'OK: {reg} has {primary} primary_source articles')\n\"",
+      "expected": "OK: AI_Act has 13 primary_source articles (matches 00_README.md:56)",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0,
+      "notes": "Counts for GDPR/CRA/DORA/NIS2 are read from their respective 00_README.md during implementation. AI_Act=13 is the locked-in check."
+    },
+    {
+      "id": "C9",
+      "description": "Build script filters out_of_scope articles from §2 rendering",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nfrom docs.visualization.build_regulation_chain import load_articles\narts = load_articles()\noos = [a for a in arts if a.get('source_role') == 'out_of_scope']\nassert len(oos) == 0, f'{len(oos)} out_of_scope articles not filtered'\ntotal = len(arts)\nassert total < 140, f'filter not applied: got {total} articles (expected <140 after filter)'\nprint(f'OK: {total} articles after filtering out_of_scope')\n\"",
+      "expected": "OK: out_of_scope articles filtered; total < 140",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C10",
+      "description": "Build script computes securityObjectives as union of top-level security_objectives + inner security_rules[].linked_objectives",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nfrom docs.visualization.build_regulation_chain import load_articles\narts = load_articles()\nai_articles = [a for a in arts if a.get('regulation') == 'AI_Act']\nzero_sos = [a for a in ai_articles if len(a.get('securityObjectives', [])) == 0]\nassert len(zero_sos) == 0, f'{len(zero_sos)}/{len(ai_articles)} AI_Act articles have 0 SOs after union fix'\nprint(f'OK: {len(ai_articles)} AI_Act articles, all with ≥1 SO after union')\n\"",
+      "expected": "OK: all AI_Act articles have ≥1 SO after union fix",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C11",
+      "description": "§3 table has 4 boolean columns VAG, POLY, COORD, SCOPE-Q",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nfrom docs.visualization.build_regulation_chain import build_html\nhtml = build_html(articles=[], clauses=[], sos=[], srs=[])\nfor col in ['VAG', 'POLY', 'COORD', 'SCOPE-Q']:\n    assert f'>{col}<' in html or f'\"{col}\"' in html, f'column {col} not in HTML output'\nprint('OK: HTML has 4 columns VAG/POLY/COORD/SCOPE-Q')\n\"",
+      "expected": "OK: HTML output contains 4 Berry category columns",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0,
+      "notes": "Test command depends on actual build_html signature — Generator adapts during implementation."
+    },
+    {
+      "id": "C12",
+      "description": "§3 cells populated (not —) for AI_Act and GDPR clauses driven by types_found[] and instances[].label",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport json\nfrom pathlib import Path\n# Check per-clause shards\nai_populated = sum(1 for f in Path('preproc_out/entities/clauses/_root/AI_Act').glob('*.json') if any(t in json.loads(f.read_text()).get('types_found', []) for t in ['VAG', 'POLY', 'COORD', 'SCOPE-Q']))\ngdpr_populated = sum(1 for f in Path('preproc_out/entities/clauses/_root/GDPR').glob('*.json') if any(t in json.loads(f.read_text()).get('types_found', []) for t in ['VAG', 'POLY', 'COORD', 'SCOPE-Q']))\nai_total = sum(1 for _ in Path('preproc_out/entities/clauses/_root/AI_Act').glob('*.json'))\ngdpr_total = sum(1 for _ in Path('preproc_out/entities/clauses/_root/GDPR').glob('*.json'))\nassert ai_populated == ai_total, f'AI_Act: only {ai_populated}/{ai_total} have types_found populated'\nassert gdpr_populated >= 50, f'GDPR: only {gdpr_populated}/{gdpr_total} have types_found populated (expected ≥50)'\nprint(f'OK: AI_Act {ai_populated}/{ai_total}, GDPR {gdpr_populated}/{gdpr_total} clauses have types_found')\n\"",
+      "expected": "OK: AI_Act all clauses + ≥50/86 GDPR clauses have types_found populated",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C13",
+      "description": "REGRESSION: CRA parser still produces clauses with instances[0].label='POLY' for CRA-CL14",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys\nsys.path.insert(0, 'src')\nfrom scripts.preprocess.pipeline import parse_ambiguity_file\nr = parse_ambiguity_file('Methodology-main/00_METHODOLOGY/PREPROCESSING/Regulation/CRA/Ambiguity/03_CRA_Art13_Manufacturers.md')\nclauses = r.get('clauses', [])\ncl14 = next((c for c in clauses if c.get('id') == 'CRA-CL14'), None)\nassert cl14 is not None, 'CRA-CL14 not found'\nassert len(cl14.get('instances', [])) >= 1, 'CRA-CL14 has no instances'\nlabel = cl14['instances'][0].get('label', '')\nassert label == 'POLY', f'CRA-CL14 instance 0 label={label!r}, expected POLY'\nprint(f'OK: CRA-CL14 still has {len(cl14[\\\"instances\\\"])} instances, label[0]={label}')\n\"",
+      "expected": "OK: CRA-CL14 still has POLY-labeled instance (no regression)",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C14",
+      "description": "REGRESSION: DORA and NIS2 parsers still populate instances[] for their clauses (≥73 DORA + ≥53 NIS2)",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport json\nfrom pathlib import Path\ndora_dir = Path('preproc_out/entities/clauses/_root/DORA')\nnis2_dir = Path('preproc_out/entities/clauses/_root/NIS2')\ndora_with_inst = sum(1 for f in dora_dir.glob('*.json') if json.loads(f.read_text()).get('instances'))\nnis2_with_inst = sum(1 for f in nis2_dir.glob('*.json') if json.loads(f.read_text()).get('instances'))\ndora_total = sum(1 for _ in dora_dir.glob('*.json'))\nnis2_total = sum(1 for _ in nis2_dir.glob('*.json'))\nassert dora_with_inst >= 73, f'DORA regression: only {dora_with_inst}/{dora_total} have instances (expected ≥73)'\nassert nis2_with_inst >= 50, f'NIS2 regression: only {nis2_with_inst}/{nis2_total} have instances (expected ≥50)'\nprint(f'OK: DORA {dora_with_inst}/{dora_total}, NIS2 {nis2_with_inst}/{nis2_total} clauses have instances')\n\"",
+      "expected": "OK: DORA ≥73 clauses with instances, NIS2 ≥50 clauses with instances",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0,
+      "notes": "Pre-CORR-078 baseline: DORA=73, NIS2=53 (per diagnosis subagent)."
+    },
+    {
+      "id": "C15",
+      "description": "Golden fixtures regenerated; diff captured in execution/CORR-078-RUN-LOG.md",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && test -f execution/CORR-078-RUN-LOG.md && echo 'RUN-LOG EXISTS' || echo 'RUN-LOG MISSING'; ls tests/fixtures/pipeline_inputs_golden/ | wc -l",
+      "expected": "execution/CORR-078-RUN-LOG.md exists with diff evidence",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C16",
+      "description": "ruff check on touched files: zero new errors vs baseline 27",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && ../shared-venv-root/bin/python -m ruff check scripts/preprocess/pipeline.py scripts/preprocess/parsers/entities/clause.py scripts/preprocess/parsers/aggregated/security_objectives.py docs/visualization/build_regulation_chain.py tests/unit/scripts/preprocess/ tests/unit/v2/visualization/ 2>&1 | tail -3",
+      "expected": "exit 0 or same error count as main baseline (27)",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C17",
+      "description": "Full unit suite: ≤28 pre-existing failures, zero NEW failures in tests/unit/v2/, tests/unit/data/, tests/unit/scripts/",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -m pytest tests/unit/ -m 'not slow' -q --no-header -o 'addopts=-ra --tb=line' 2>&1 | tail -5",
+      "expected": "Failure count ≤28 (baseline) AND no NEW failures vs main",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C18",
+      "description": "CI gates pass: ci-pipeline-inputs.sh + ci-frameworks.sh",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && bash .hooks/ci-pipeline-inputs.sh && bash .hooks/ci-frameworks.sh && echo 'CI GATES PASS'",
+      "expected": "exit 0 — 'CI GATES PASS'",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    }
+  ],
+  "quality_dimensions": [
+    {
+      "name": "Correctness",
+      "threshold": "100% (18 criteria pass)",
+      "result": null
+    },
+    {
+      "name": "Pattern Compliance",
+      "threshold": "100% (project-conventions: type hints, logger, no except: pass)",
+      "result": null
+    },
+    {
+      "name": "No Regressions",
+      "threshold": "100% (CRA/DORA/NIS2 parsers unchanged, baseline 28 infra failures)",
+      "result": null
+    },
+    {
+      "name": "Data Integrity",
+      "threshold": "100% (all MD Instance blocks reach JSON entities)",
+      "result": null
+    }
+  ],
+  "risks": [
+    "Regex changes in C1-C6 could regress CRA/DORA/NIS2 parsers — mitigated by C13/C14 regression tests",
+    "GDPR _extract_clauses_gdpr_style rewrite risks data loss — mitigated by C5/C6 strict superset check (currently empty fields become populated)",
+    "source_role schema addition could break downstream consumers — mitigated by additive field design (Literal union)",
+    "out_of_scope filter hides info — mitigated by keeping source_role in JSON for downstream lookup",
+    "4-column UX change in §3 breaks user expectations — documented in CORR-078.md Implementation notes",
+    "Golden regen is a CORR-058 gate — requires execution/CORR-078-RUN-LOG.md with diff evidence"
+  ],
+  "files_to_change": [
+    {
+      "file": "scripts/preprocess/pipeline.py",
+      "action": "modify",
+      "why": "C1: _SO_ID_RE regex; C6: read 00_README.md for source_role"
+    },
+    {
+      "file": "scripts/preprocess/parsers/aggregated/security_objectives.py",
+      "action": "modify",
+      "why": "C1: _SO_ID_RE regex (same fix as pipeline.py)"
+    },
+    {
+      "file": "scripts/preprocess/parsers/entities/clause.py",
+      "action": "modify",
+      "why": "C2: _AI_ACT_H3_RE; C3: _INSTANCE_RE; C4: _extract_clauses_gdpr_style rewrite; C5: _V01_H3_CLAUSE_RE; C6: compute_source_role helper"
+    },
+    {
+      "file": "docs/visualization/build_regulation_chain.py",
+      "action": "modify",
+      "why": "C9: filter out_of_scope; C10: union SOs; C11/C12: 4-column Type split"
+    },
+    {
+      "file": "tests/unit/scripts/preprocess/test_clause_parsers.py",
+      "action": "create",
+      "why": "C1-C6 + C13/C14 parser regression tests"
+    },
+    {
+      "file": "tests/unit/scripts/preprocess/test_source_role.py",
+      "action": "create",
+      "why": "C7/C8 source_role computation tests"
+    },
+    {
+      "file": "tests/unit/v2/visualization/test_regulation_chain.py",
+      "action": "create",
+      "why": "C9-C12 build script rendering tests"
+    },
+    {
+      "file": "tests/fixtures/pipeline_inputs_golden/",
+      "action": "regenerate",
+      "why": "C15: golden regen for CORR-058 gate"
+    },
+    {
+      "file": "execution/CORR-078.md",
+      "action": "create",
+      "why": "Contract prose doc"
+    },
+    {
+      "file": "execution/CORR-078-RUN-LOG.md",
+      "action": "create",
+      "why": "C15: golden diff evidence"
+    },
+    {
+      "file": "execution/SPEC.md",
+      "action": "update",
+      "why": "SP-2026-20 spec"
+    },
+    {
+      "file": "execution/contracts/SC-2026-20.json",
+      "action": "create",
+      "why": "Sprint contract JSON"
+    }
+  ],
+  "correction_loop": {
+    "max_cycles": 3,
+    "current_cycle": 0
+  },
+  "sign_off": {
+    "user_approved": false,
+    "user_approval_note": null,
+    "generator_implemented": false,
+    "generator_commit": null,
+    "evaluator_verified": false,
+    "evaluator_verdict": null,
+    "quality_log_updated": false,
+    "contract_md": "execution/CORR-078.md"
+  }
+}

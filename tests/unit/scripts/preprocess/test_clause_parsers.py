@@ -38,7 +38,7 @@ requires_methodology = pytest.mark.skipif(
 
 @requires_methodology
 def test_c1_so_id_re_accepts_mixed_case() -> None:
-    """_SO_ID_RE accepts SO-AI_Act-013 etc."""
+    """_SO_ID_RE accepts SO-AI_Act-013 etc. (per contract SC-2026-20.json C1)."""
     from scripts.preprocess.parsers.aggregated.security_objectives import (
         _SO_ID_RE as SO_PAT,
     )
@@ -47,7 +47,7 @@ def test_c1_so_id_re_accepts_mixed_case() -> None:
     assert SO_PAT.fullmatch("SO-CRA-001")
     assert SO_PAT.fullmatch("SO-DORA-001")
     assert SO_PAT.fullmatch("SO-NIS2-001")
-    assert SO_PAT.fullmatch("SO-a-013")  # all-lowercase alpha prefix is OK
+    assert not SO_PAT.fullmatch("SO-AIact-013")  # no underscore + lowercase suffix
     assert not SO_PAT.fullmatch("SO--013")  # empty prefix not OK
 
 

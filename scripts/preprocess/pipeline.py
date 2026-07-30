@@ -109,9 +109,12 @@ import re as _re_layout
 _D_XX_RE = _re_layout.compile(r"^D-(\d{2})(?:\.\d+)?$")
 
 # CORR-078 (C1): centralised SO-id pattern, accepts mixed-case prefixes
-# (e.g. ``SO-AI_Act-013``). Exposed as ``_SO_ID_RE`` at module level for
-# contract test introspection (SC-2026-20.json C1 test_command imports it).
-_SO_ID_RE = _re_layout.compile(r"SO-[A-Za-z][A-Za-z_0-9]*-\d{3}")
+# (e.g. ``SO-AI_Act-013``). The first segment after ``SO-`` must be
+# uppercase/digit only (``GDPR`` / ``CRA`` / ``DORA`` / ``NIS2``); an
+# optional ``_<Segment>`` follows for mixed-case regs (``AI_Act``).
+# ``SO-AIact-013`` (all-lowercase, no underscore) is rejected by contract
+# C1 — see SC-2026-20.json test_command.
+_SO_ID_RE = _re_layout.compile(r"SO-[A-Z][A-Z0-9]*(?:_[A-Z][A-Za-z0-9]*)?-\d{3}")
 
 
 def _d_xx_from_subdomain_id(sid: str | None) -> str | None:

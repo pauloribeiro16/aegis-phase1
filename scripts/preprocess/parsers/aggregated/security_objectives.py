@@ -31,8 +31,12 @@ _CROSS_REF_RE = re.compile(
 )
 
 # CORR-078 (C1): centralised SO-id pattern, accepts mixed-case prefixes
-# (e.g. ``SO-AI_Act-013``). Exposed as ``_SO_ID_RE`` for test introspection.
-_SO_ID_RE = re.compile(r"SO-[A-Za-z][A-Za-z_0-9]*-\d{3}")
+# (e.g. ``SO-AI_Act-013``). The first segment after ``SO-`` must be
+# uppercase/digit only (``GDPR`` / ``CRA`` / ``DORA`` / ``NIS2``); an
+# optional ``_<Segment>`` follows for mixed-case regs (``AI_Act``).
+# ``SO-AIact-013`` (all-lowercase, no underscore) is rejected by contract
+# C1 — see SC-2026-20.json test_command.
+_SO_ID_RE = re.compile(r"SO-[A-Z][A-Z0-9]*(?:_[A-Z][A-Za-z0-9]*)?-\d{3}")
 
 
 def _parse_source_clauses(cell: str) -> list[dict[str, str]]:
