@@ -749,6 +749,14 @@ def _process_regulation(
 
         # Per-article splits
         articles_dir = reg_dir_entry / "Articles"
+        # CORR-078 (WS2): read in-scope article list once per regulation, then
+        # compute ``source_role`` for every Art_*.md shard.
+        readme_path = reg_dir_entry / "00_README.md"
+        from .source_role import compute_source_role, extract_in_scope_articles
+
+        in_scope = extract_in_scope_articles(readme_path)
+        logger.info("%s: %d in-scope articles", regulation, len(in_scope))
+
         if articles_dir.is_dir():
             for src in sorted(articles_dir.glob("Art_*.md")):
                 shard_path = f"regulation/{regulation}/articles/{src.stem}.json"
@@ -756,6 +764,23 @@ def _process_regulation(
                     parsed = parse_article_split(src, regulation)
                     for w in parsed.get("warnings", []):
                         idx.add_warning(str(src), w)
+                    # CORR-078 (WS2): stamp source_role on each article JSON.
+                    parsed["source_role"] = compute_source_role(
+                        parsed, in_scope, regulation
+                    )
+                    # Also record which in-scope articles this file references
+                    # (so downstream consumers can build a citation graph).
+                    own_refs = {
+                        int(am.group(1))
+                        for am in re.finditer(
+                            r"Art\.\s*(\d{1,3})",
+                            str(parsed.get("article_ref", "")),
+                        )
+                    }
+                    cited_in_scope = sorted(
+                        n for n in own_refs if n in set(in_scope)
+                    )
+                    parsed["in_scope_articles_referenced"] = cited_in_scope
                     article_id = parsed["id"]
                     parsed.pop("_id", None)
                     idx.add(article_id, parsed, shard_path)
