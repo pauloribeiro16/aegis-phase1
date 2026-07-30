@@ -8,6 +8,7 @@ Run: python3 docs/visualization/build.py
 
 import csv
 import json
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -143,10 +144,16 @@ def main() -> None:
             "csfSubcategories": len([s for s in csf_subs if not s["withdrawn"]]),
             "mappedCsf": len({c for cs in sd_csf_map.values() for c in cs}),
         },
+        "buildMeta": {
+            "generatedAt": datetime.now().isoformat(timespec="seconds"),
+            "version": "post-CORR-077",
+            "notes": "AI Act clauses corrected per methodology 02_SecurityRules_NIST.md (8 misattributions, 7 wrong articleIds, 13 metadata fills)",
+        },
     }
 
     html = HTML_TEMPLATE.replace("__DATA_JSON__", json.dumps(data, ensure_ascii=False))
     OUT.write_text(html, encoding="utf-8")
+    print(f"  Generated at: {data['buildMeta']['generatedAt']}  ({data['buildMeta']['version']})")
     size_kb = OUT.stat().st_size / 1024
     print(f"Wrote {OUT} ({size_kb:.1f} KB)")
     print(f"  Regulations: {len(regulations)}")
@@ -260,6 +267,18 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .detail .related li:hover { text-decoration: underline; }
     .detail p { margin: 8px 0; }
 
+    .build-banner {
+      width: 100%; margin-top: 8px; padding: 6px 14px; font-size: 12px;
+      background: rgba(78,205,196,0.12); border: 1px solid rgba(78,205,196,0.35);
+      border-radius: 6px; color: var(--accent); font-weight: 600;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .build-banner .badge {
+      background: var(--accent); color: var(--bg); padding: 2px 8px;
+      border-radius: 4px; font-size: 10px; letter-spacing: 0.5px;
+    }
+    .build-banner .meta { color: var(--fg-dim); font-weight: 400; font-size: 11px; }
+
     footer {
       padding: 8px 24px; background: var(--panel); border-top: 1px solid var(--border);
       font-size: 11px; color: var(--fg-dim); display: flex; justify-content: space-between;
@@ -275,6 +294,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <button class="tab" data-mode="heatmap">Heatmap</button>
       <button class="tab" data-mode="sunburst">Sunburst</button>
     </div>
+    <div class="build-banner" id="build-banner"></div>
   </header>
 
   <main>
@@ -313,6 +333,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     // ---- Filters ----
     const regFilterEl = document.getElementById('reg-filter');
+
+    // ---- Build banner (visible version + timestamp to defeat cache confusion) ----
+    function renderBuildBanner() {
+      const meta = DATA.buildMeta;
+      if (!meta) return;
+      const isCorr077 = (meta.version || '').includes('CORR-077');
+      const banner = document.getElementById('build-banner');
+      banner.innerHTML = `
+        <span class="badge">${isCorr077 ? 'CORR-077 APPLIED' : meta.version || 'BUILT'}</span>
+        <span>${meta.notes || 'Live build'}</span>
+        <span class="meta">Generated: ${meta.generatedAt} · If you see old data, hard-refresh (Ctrl+Shift+R)</span>
+      `;
+    }
     function renderFilters() {
       regFilterEl.innerHTML = '<label><strong style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--fg-dim);">Regulations</strong></label>';
       DATA.regulations.forEach(r => {
@@ -732,6 +765,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     });
     renderFilters();
     renderStats();
+    renderBuildBanner();
     render();
   })();
   </script>
