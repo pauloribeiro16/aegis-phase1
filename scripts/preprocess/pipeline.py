@@ -29,6 +29,7 @@ from .parsers.entities.csf import (
     parse_csf_special_tokens_full,
 )
 from .parsers.entities.csf_xlsx import build_shard, parse_csf2
+
 # ARCHIVED in CORR-028 (2026-07-20): CSF 1.1 → 2.0 lineage mapping is no longer
 # emitted. The mapping is preserved as a snapshot in archive/csf_v11_v20_mapping/
 # for audit. Restore by re-enabling the import and the block in _process_csf_xlsx.
@@ -104,6 +105,7 @@ def _write_json(path: Path, data: Any) -> tuple[int, str]:
 # The mapping is intentionally centralised here so the on-disk layout
 # has a single source of truth.
 import re as _re_layout
+
 _D_XX_RE = _re_layout.compile(r"^D-(\d{2})(?:\.\d+)?$")
 
 
@@ -1510,7 +1512,9 @@ def parse_article_split(path: Path, regulation: str) -> dict[str, Any]:
             if len(row) < 4:
                 continue
             so_id = row[0].strip()
-            if not re.fullmatch(r"SO-[A-Z_0-9]+-\d{3}", so_id):
+            # CORR-078 (C1): accept mixed-case SO prefixes (e.g. SO-AI_Act-013)
+            from .parsers.aggregated.security_objectives import _SO_ID_RE as _SO_PAT
+            if not _SO_PAT.fullmatch(so_id):
                 continue
             so_list.append(
                 {

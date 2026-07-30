@@ -69,8 +69,12 @@ _GDPR_CLAUSE_RE = re.compile(
 )
 # v0.1 cross-article (legacy pilot): H3 ``### 2.1 GDPR-C01 — Art. 5(1)(c) Title``
 # followed by Source locus + bullet items with ``* **TAG — SEV — `token`**``
+# CORR-078 (C5): accept 1 OR 2 em-dashes between id-article-title.
 _V01_H3_CLAUSE_RE = re.compile(
-    r"^###\s+(?P<num>\d+\.\d+)\s+(?P<id>(?:GDPR|NIS2|CRA|DORA|AI_Act|AIACT)-C\d+(?:[a-z]|\(T5 ref\))?)\s*—\s*(?P<article>Art\.[^—]+?)\s*—\s*(?P<title>.+?)\s*$",
+    r"^###\s+(?P<num>\d+\.\d+)\s+(?P<id>(?:GDPR|NIS2|CRA|DORA|AI_Act|AIACT)-C\d+(?:[a-z]|\(T5 ref\))?)"
+    r"\s*—\s*(?P<article>Art\.[^—]+?)"
+    r"(?:\s*—\s*(?P<title>.+?)|(?P<title_inline>\s+.+?))"
+    r"\s*$",
     re.MULTILINE,
 )
 _V01_BULLET_RE = re.compile(
@@ -97,8 +101,9 @@ _DORA_ARTICLE_RE = re.compile(
     re.MULTILINE,
 )
 # AI_Act-style: ``### 3.N AIA-Cxx — Art. NN(N) <title>``
+# CORR-078 (C2): also accept canonical AI_Act-CLxx and intermediate AIACT-Cxx IDs.
 _AI_ACT_H3_RE = re.compile(
-    r"^###\s+(?P<num>\d+\.\d+)\s+(?P<id>AIA-C\d+)\s*—\s*(?P<article>Art\.[^—]+?)\s+(?P<title>.+?)\s*$",
+    r"^###\s+(?P<num>\d+\.\d+)\s+(?P<id>(?:AIACT|AI_Act|AIA)-C[LP]?\d+(?:[a-z]|\(T5 ref\))?)\s*—\s*(?P<article>Art\.[^—]+?)\s+(?P<title>.+?)\s*$",
     re.MULTILINE,
 )
 _AI_ACT_H3_NUMONLY_RE = re.compile(
@@ -107,8 +112,12 @@ _AI_ACT_H3_NUMONLY_RE = re.compile(
 )
 
 # Instance label: ``**Instance N — <LABEL> — S<SEV> — `xxx`**``
+# CORR-078 (C3): also accept GDPR slash-separated format
+# ``**Instance N — <LABEL> / S<SEV> / `xxx`**`` (token may be unquoted).
+# Severity is required in either format; token may be backticked or bare.
 _INSTANCE_RE = re.compile(
-    r"\*\*Instance\s+(?P<n>\d+)\s+—\s+(?P<label>.+?)\s+—\s+S(?P<sev>[123])\s+—\s+`(?P<token>[^`]+)`\*\*"
+    r"\*\*Instance\s+(?P<n>\d+)\s+—\s+(?P<label>.+?)"
+    r"\s+(?:—|/)\s+S(?P<sev>[123])\s+(?:—|/)\s+`?(?P<token>[^`*\n][^*]*?)`?\*\*"
 )
 # Italic Berry anchor (used in H3-style): ``*Berry anchor:* §3.3.1``
 _BERRY_ITALIC_RE = re.compile(
@@ -206,10 +215,11 @@ def _extract_one_instance(block: str) -> dict[str, Any] | None:
         readings_by_label.setdefault(r["reading"], {}).update(r)
     # Preserve R1, R2, R3, R4 order
     readings = []
-    for label in sorted(
+    # CORR-078: rename loop variable to avoid shadowing `label` (the Berry label).
+    for r_label in sorted(
         readings_by_label.keys(), key=lambda k: int(k[1:]) if k[1:].isdigit() else 999
     ):
-        readings.append(readings_by_label[label])
+        readings.append(readings_by_label[r_label])
     # Severity rationale: text after the variant table until next *Berry* / end
     berry_m = _BERRY_ITALIC_RE.search(body)
     end = berry_m.start() if berry_m else len(body)
@@ -250,6 +260,21 @@ def _extract_one_instance(block: str) -> dict[str, Any] | None:
 def _extract_clauses_gdpr_style(body: str, regulation: str) -> list[dict[str, Any]]:
     """GDPR (and similarly CRA-03_CRA.md, NIS2-04_NIS2.md, DORA-05_DORA.md)
     format: each clause is delimited by ``**Clause: <id>``** markers.
+
+    CORR-078 (C4/C5/C6): GDPR v0.2 uses pipe-separated metadata on the
+    ``**Clause:``** line itself rather than a yaml block, and the clause
+    title lives on the ``#### <Article> — <title>`` H4 heading directly
+    preceding the ``**Clause:``** marker.
+
+    Expected layout::
+
+        #### Art. 12(1) — Transparency modalities
+        **Clause: GDPR-RT01** | type: data-subject-facing | obligatedParty: CONTROLLER | obligationType: PER-INTERACTION
+
+        **Berry anchor:** §5.1 (...).
+
+        **Instance 1 — VAG / S3 / six adjectives on information form**
+        ...
     """
     clauses: list[dict[str, Any]] = []
     matches = list(_GDPR_CLAUSE_RE.finditer(body))
@@ -258,10 +283,12 @@ def _extract_clauses_gdpr_style(body: str, regulation: str) -> list[dict[str, An
         end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
         block = body[start:end]
         clause_id = m.group("id")
-        # Extract the metadata block (id, type, obligatedParty, obligationType, ...).
-        # The first ```yaml``` block usually has the metadata.
-        yaml_blocks = extract_fenced_blocks(block, lang="yaml")
+
+        # ----- Metadata (C4) -----
+        # Try yaml-block first (older CRA/NIS2/DORA chapters); fall back to
+        # pipe-separated metadata on the **Clause:** line itself (GDPR v0.2).
         meta: dict[str, Any] = {}
+        yaml_blocks = extract_fenced_blocks(block, lang="yaml")
         for _, ybody in yaml_blocks:
             try:
                 parsed = yaml.safe_load(ybody)
@@ -269,30 +296,61 @@ def _extract_clauses_gdpr_style(body: str, regulation: str) -> list[dict[str, An
                 continue
             if isinstance(parsed, dict):
                 meta.update(parsed)
-                break  # only the first yaml block per clause carries metadata
-        # Title: look for an H3 right before the **Clause:** marker
+                break
+        if not meta:
+            # Pipe-separated: ``**Clause: GDPR-RT01** | type: data-subject-facing
+            # | obligatedParty: CONTROLLER | obligationType: PER-INTERACTION``
+            # Read the **Clause:** line itself (up to first blank line).
+            line_end = block.find("\n\n")
+            clause_line = block[: line_end] if line_end != -1 else block
+            type_m = re.search(r"type:\s*([^|]+?)\s*(?:\||\Z)", clause_line)
+            obligated_m = re.search(r"obligatedParty:\s*([A-Z_]+)", clause_line)
+            obligation_m = re.search(
+                r"obligationType:\s*([A-Z][A-Z_\-]*)", clause_line
+            )
+            article_m = re.search(
+                r"article:\s*(?:Art\.\s*)?(\d+(?:\([^)]+\))?(?:\s*sentence\s*\d+)?)",
+                clause_line,
+            )
+            if type_m:
+                meta["type"] = type_m.group(1).strip()
+            if obligated_m:
+                meta["obligatedParty"] = obligated_m.group(1).strip()
+            if obligation_m:
+                meta["obligationType"] = obligation_m.group(1).strip()
+            if article_m:
+                meta["article"] = "Art. " + article_m.group(1).strip()
+
+        # ----- Title (C5/C6) -----
+        # Prefer the H4 ``#### Art. NN(p) — <title>`` heading immediately
+        # preceding the **Clause:** marker (GDPR v0.2). Fall back to H3 for
+        # legacy CRA/NIS2/DORA files.
         title = ""
-        h3_m = re.search(r"^###\s+(.+?)$", body[:start], re.MULTILINE)
-        if h3_m:
-            title = h3_m.group(1).strip()
-        # Fallback title from H4
+        h4_m = re.search(r"^####\s+(.+?)$", body[:start], re.MULTILINE)
+        if h4_m:
+            title = h4_m.group(1).strip()
         if not title:
-            h4_m = re.search(r"^####\s+(.+?)$", body[:start], re.MULTILINE)
-            if h4_m:
-                title = h4_m.group(1).strip()
-        # Instances: find all instance blocks in the clause body
+            h3_m = re.search(r"^###\s+(.+?)$", body[:start], re.MULTILINE)
+            if h3_m:
+                title = h3_m.group(1).strip()
+
+        # ----- Instances (C3 via _INSTANCE_RE which accepts both separators) -----
         instances = _extract_all_instances_in_block(block)
-        # Berry anchor (bold, GDPR-style)
+
+        # ----- Berry anchor (bold, GDPR-style) -----
         berries = _extract_berries(block)
-        # Source locus: the **Source locus:** / **Berry anchor:** pattern
+
+        # ----- Source locus -----
         source_m = re.search(
             r"\*\*Source\s+locus:\*\*\s*\n\s*>\s*\"?(.+?)\"?\s*(?=\n\n|\Z)",
             block,
             re.DOTALL,
         )
         source_locus = source_m.group(1).strip() if source_m else ""
-        # Intra-section notes
+
+        # ----- Intra-section notes -----
         notes = _extract_intra_section_notes(block)
+
         clauses.append(
             {
                 "id": clause_id,
@@ -568,6 +626,10 @@ def _extract_clauses_v01(body: str, regulation: str) -> list[dict[str, Any]]:
 def _extract_all_instances_in_block(block: str) -> list[dict[str, Any]]:
     """Find every ``**Instance N — ... — S<SEV> — `xxx`**`` block within
     ``block`` and extract it. Skips anything that isn't an Instance block.
+
+    CORR-078 (C13): results are sorted by Berry label priority (most-ambiguous
+    first — POLY > COORD > SCOPE-Q > VAG > others) so that the primary
+    ambiguity surfaces as ``instances[0]``.
     """
     out: list[dict[str, Any]] = []
     # Find all Instance label positions
@@ -587,6 +649,15 @@ def _extract_all_instances_in_block(block: str) -> list[dict[str, Any]]:
         instance = _extract_one_instance(block[start:end] + sub_block)
         if instance:
             out.append(instance)
+    # CORR-078: sort by Berry priority (POLY first) + preserve original order
+    # within the same label.
+    BERRY_PRIORITY = {"POLY": 0, "COORD": 1, "SCOPE-Q": 2, "VAG": 3}
+    out.sort(
+        key=lambda inst: (
+            BERRY_PRIORITY.get(inst.get("label", ""), 99),
+            inst.get("instance_n", 999),
+        )
+    )
     return out
 
 

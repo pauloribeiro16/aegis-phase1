@@ -27,8 +27,12 @@ _CLAUSE_REF_RE = re.compile(
 )
 # ``SO-GDPR-001 (cross-ref)`` → ("SO-GDPR-001", True)
 _CROSS_REF_RE = re.compile(
-    r"^SO-([A-Z_0-9]+)-(\d+)\s*\(cross-ref\)\s*$",
+    r"^SO-([A-Za-z][A-Za-z_0-9]*)-(\d+)\s*\(cross-ref\)\s*$",
 )
+
+# CORR-078 (C1): centralised SO-id pattern, accepts mixed-case prefixes
+# (e.g. ``SO-AI_Act-013``). Exposed as ``_SO_ID_RE`` for test introspection.
+_SO_ID_RE = re.compile(r"SO-[A-Za-z][A-Za-z_0-9]*-\d{3}")
 
 
 def _parse_source_clauses(cell: str) -> list[dict[str, str]]:
@@ -58,8 +62,8 @@ def _row_to_so(row: list[str], regulation: str) -> dict[str, Any] | None:
         cross_ref = True
     else:
         so_id = so_id_raw
-    # Validate
-    if not re.fullmatch(r"SO-[A-Z_0-9]+-\d{3}", so_id):
+    # Validate — CORR-078 (C1): accept mixed-case prefixes (e.g. SO-AI_Act-013)
+    if not _SO_ID_RE.fullmatch(so_id):
         return None
     return {
         "id": so_id,
