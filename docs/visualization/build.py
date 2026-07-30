@@ -384,6 +384,35 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       padding: 8px 24px; background: var(--panel); border-top: 1px solid var(--border);
       font-size: 11px; color: var(--fg-dim); display: flex; justify-content: space-between;
     }
+
+    #sunburst-nav {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--border);
+      min-height: 36px;
+    }
+    #sunburst-nav[hidden] { display: none; }
+    .bc-item {
+      cursor: pointer;
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: background 0.15s;
+    }
+    .bc-item:hover {
+      background: rgba(78, 205, 196, 0.15);
+    }
+    .bc-sep {
+      color: var(--fg-dim);
+      margin: 0 4px;
+    }
+    .bc-current {
+      color: var(--fg);
+      font-weight: 600;
+      padding: 2px 6px;
+    }
   </style>
 </head>
 <body>
@@ -408,7 +437,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="stats" id="stats"></div>
     </aside>
 
-    <section><div id="viz"></div></section>
+    <section>
+      <div id="sunburst-nav" style="display:none; padding:8px 12px; background:var(--panel-2); border-bottom:1px solid var(--border);">
+        <button id="sunburst-back" style="padding:4px 10px; background:var(--panel); color:var(--accent); border:1px solid var(--accent); border-radius:4px; cursor:pointer; font-size:12px;">← Back</button>
+        <span id="sunburst-breadcrumb" style="margin-left:12px; font-size:13px;"></span>
+        <span id="sunburst-hint" style="margin-left:16px; font-size:11px; color:var(--fg-dim);"></span>
+      </div>
+      <div id="viz"></div>
+    </section>
 
     <div class="detail" id="detail">
       <div class="empty">Click a node in the visualization to inspect its details, upstream regulations, and downstream CSF mappings.</div>
@@ -429,6 +465,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       activeRegs: new Set(DATA.regulations.map(r => r.id)),
       search: '',
       selectedNode: null,
+      sunburstPath: [],   // ['GDPR', 'D-04', 'D-04.3'] — empty = Level 0 (5 regulations)
+                         // Other modes force this to [] when switched
       chart: null,
     };
 
@@ -467,6 +505,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           if (e.target.checked) STATE.activeRegs.add(regId);
           else STATE.activeRegs.delete(regId);
           renderFilters();
+          // If we're in sunburst and the selected regulation is no longer active, reset
+          if (STATE.mode === 'sunburst' && STATE.sunburstPath.length > 0) {
+            const pathRegId = DATA.regulations.find(r => r.shortName === STATE.sunburstPath[0])?.id;
+            if (!pathRegId || !STATE.activeRegs.has(pathRegId)) {
+              STATE.sunburstPath = [];
+            }
+          }
           render();
         });
       });
@@ -520,16 +565,48 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return text.toLowerCase().includes(q);
     }
 
+    // Natural sort for D-XX.Y style IDs (D-01.1 < D-01.2 < D-01.10 < D-02.1)
+    function naturalIdSort(a, b) {
+      return a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'});
+    }
+
+    // CSF Function order: GV, ID, PR, DE, RS, RC (per NIST CSF 2.0 official ordering)
+    const FUNCTION_ORDER = {GV: 0, ID: 1, PR: 2, DE: 3, RS: 4, RC: 5};
+
+    // CSF color by Function (6 distinct colors for instant visual recognition)
+    const CSF_COLOR = {
+      GV: '#4ecdc4',  // teal
+      ID: '#6c5ce7',  // lilac
+      PR: '#ffd93d',  // amber
+      DE: '#ff6b6b',  // coral
+      RS: '#a8e6cf',  // mint
+      RC: '#f9a8d4',  // pink
+    };
+
+    function csfOrderKey(c) {
+      return [FUNCTION_ORDER[c.function] ?? 99, c.categoryId || '', c.id || ''];
+    }
+    function csfCompare(a, b) {
+      const ka = csfOrderKey(a), kb = csfOrderKey(b);
+      return (ka[0]-kb[0]) || ka[1].localeCompare(kb[1]) || ka[2].localeCompare(kb[2]);
+    }
+
     function renderSankey() {
       const rules = visibleRules();
-      const visibleSdIds = new Set();
-      const reg2sd = {};
+      const sdToDomain = {};
+      DATA.subdomains.forEach(sd => { sdToDomain[sd.id] = sd.domainId; });
+
+      const reg2dom = {};
+      const dom2sd = {};
       const sd2csf = {};
       rules.forEach(r => {
         r.subdomains.forEach(sd => {
-          visibleSdIds.add(sd);
-          const regKey = `${r.regulation}|||${sd}`;
-          reg2sd[regKey] = (reg2sd[regKey] || 0) + 1;
+          const dom = sdToDomain[sd];
+          if (!dom) return;
+          const rdKey = `${r.regulation}|||${dom}`;
+          reg2dom[rdKey] = (reg2dom[rdKey] || 0) + 1;
+          const dsKey = `${dom}|||${sd}`;
+          dom2sd[dsKey] = (dom2sd[dsKey] || 0) + 1;
         });
         r.subdomains.forEach(sd => {
           r.csfIds.forEach(csf => {
@@ -539,34 +616,76 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         });
       });
 
+      const visibleDomIds = new Set(Object.keys(reg2dom).map(k => k.split('|||')[1]));
+      const visibleSdIds = new Set(Object.keys(dom2sd).map(k => k.split('|||')[1]));
+      const visibleCsfIds = new Set(Object.keys(sd2csf).map(k => k.split('|||')[1]));
+
       const regNames = {};
       const sdNames = {};
+      const domNames = {};
       DATA.regulations.forEach(r => regNames[r.id] = r.shortName);
       DATA.subdomains.forEach(sd => sdNames[sd.id] = `${sd.id} ${sd.name}`);
+      DATA.domains.forEach(d => domNames[d.id] = `${d.id} ${d.name}`);
       const csfById = Object.fromEntries(DATA.csfSubcategories.map(s => [s.id, s]));
+
+      const regWeight = {};
+      const domWeight = {};
+      const sdWeight = {};
+      const csfWeight = {};
+      rules.forEach(r => {
+        r.subdomains.forEach(sd => {
+          const dom = sdToDomain[sd];
+          if (!dom) return;
+          regWeight[r.regulation] = (regWeight[r.regulation] || 0) + 1;
+          domWeight[dom] = (domWeight[dom] || 0) + 1;
+          sdWeight[sd] = (sdWeight[sd] || 0) + 1;
+        });
+        r.csfIds.forEach(csf => {
+          csfWeight[csf] = (csfWeight[csf] || 0) + 1;
+        });
+      });
 
       const nodes = [];
       const nodeIdx = {};
-      function addNode(name, depth, itemStyle) {
+      function addNode(name, depth, itemStyle, value) {
         if (nodeIdx[name] !== undefined) return;
         nodeIdx[name] = nodes.length;
-        nodes.push({ name, depth, itemStyle });
+        nodes.push({ name, depth, itemStyle, value });
       }
       DATA.regulations.filter(r => STATE.activeRegs.has(r.id)).forEach(r => {
-        addNode(regNames[r.id], 0, { color: r.color, borderColor: r.color });
+        nodes.push({ name: regNames[r.id], depth: 0, itemStyle: { color: r.color, borderColor: r.color }, value: regWeight[r.id] || 0 });
       });
-      DATA.subdomains.filter(sd => visibleSdIds.has(sd.id)).forEach(sd => {
-        addNode(sdNames[sd.id], 1, { color: '#6c5ce7', borderColor: '#6c5ce7' });
-      });
-      const visibleCsfIds = new Set(Object.keys(sd2csf).map(k => k.split('|||')[1]));
-      DATA.csfSubcategories.filter(s => visibleCsfIds.has(s.id)).forEach(s => {
-        addNode(s.id, 2, { color: '#4ecdc4', borderColor: '#4ecdc4' });
-      });
+      DATA.domains
+        .filter(d => visibleDomIds.has(d.id))
+        .slice()
+        .sort((a, b) => naturalIdSort(a.id, b.id))
+        .forEach(d => {
+          nodes.push({ name: domNames[d.id], depth: 1, itemStyle: { color: '#5a6378', borderColor: '#5a6378' }, value: domWeight[d.id] || 0 });
+        });
+      DATA.subdomains
+        .filter(sd => visibleSdIds.has(sd.id))
+        .slice()
+        .sort((a, b) => naturalIdSort(a.id, b.id))
+        .forEach(sd => {
+          nodes.push({ name: sdNames[sd.id], depth: 2, itemStyle: { color: '#6c5ce7', borderColor: '#6c5ce7' }, value: sdWeight[sd.id] || 0 });
+        });
+      DATA.csfSubcategories
+        .filter(s => visibleCsfIds.has(s.id))
+        .slice()
+        .sort(csfCompare)
+        .forEach(s => {
+          const color = CSF_COLOR[s.function] || '#4ecdc4';
+          nodes.push({ name: s.id, depth: 3, itemStyle: { color, borderColor: color }, value: csfWeight[s.id] || 0 });
+        });
 
       const links = [];
-      Object.entries(reg2sd).forEach(([k, v]) => {
-        const [reg, sd] = k.split('|||');
-        links.push({ source: regNames[reg], target: sdNames[sd], value: v });
+      Object.entries(reg2dom).forEach(([k, v]) => {
+        const [reg, dom] = k.split('|||');
+        links.push({ source: regNames[reg], target: domNames[dom], value: v });
+      });
+      Object.entries(dom2sd).forEach(([k, v]) => {
+        const [dom, sd] = k.split('|||');
+        links.push({ source: domNames[dom], target: sdNames[sd], value: v });
       });
       Object.entries(sd2csf).forEach(([k, v]) => {
         const [sd, csf] = k.split('|||');
@@ -581,6 +700,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             }
             const reg = DATA.regulations.find(r => regNames[r.id] === p.name);
             if (reg) return `<b>${reg.shortName}</b><br/>${reg.name}<br/><i>${reg.primaryFocus}</i>`;
+            const dom = DATA.domains.find(d => domNames[d.id] === p.name);
+            if (dom) {
+              const regSet = new Set();
+              rules.forEach(r => {
+                if (r.subdomains.some(sd => sdToDomain[sd] === dom.id)) regSet.add(r.regulation);
+              });
+              const subInDom = DATA.subdomains
+                .filter(sd => sd.domainId === dom.id && visibleSdIds.has(sd.id))
+                .slice()
+                .sort((a, b) => naturalIdSort(a.id, b.id));
+              const regShorts = [...regSet].map(rid => DATA.regulations.find(r => r.id === rid)?.shortName).filter(Boolean);
+              return `<b>${dom.id} ${dom.name}</b><br/><i>${dom.description}</i><br/>Regulations: ${regShorts.join(', ')}<br/>Active subdomains: ${subInDom.length}`;
+            }
             const sd = DATA.subdomains.find(s => sdNames[s.id] === p.name);
             if (sd) return `<b>${sd.id}</b> ${sd.name}<br/><i>${sd.description}</i>`;
             const csf = csfById[p.name];
@@ -596,6 +728,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.45 },
           label: { fontSize: 10, color: '#e1e7f0' },
           nodeWidth: 14, nodeGap: 8,
+          layoutIterations: 32,
         }],
       };
     }
@@ -607,22 +740,30 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const csfById = Object.fromEntries(DATA.csfSubcategories.map(s => [s.id, s]));
 
       const tree = [];
-      DATA.domains.forEach(d => {
-        const sdList = DATA.subdomains.filter(sd => sd.domainId === d.id && sdIds.has(sd.id));
-        if (!sdList.length) return;
-        const domainNode = { name: d.name, children: [] };
-        sdList.forEach(sd => {
-          const srList = rules
-            .filter(r => r.subdomains.includes(sd.id))
-            .filter(r => matchesSearch(r.title) || matchesSearch(r.id));
-          const filtered = srList.length ? srList : [{ id: '—', title: '(no SR mapped)' }];
-          domainNode.children.push({
-            name: `${sd.id} ${sd.name}`,
-            children: filtered.map(sr => ({ name: sr.id, value: sr.title }))
+      DATA.domains
+        .slice()
+        .sort((a, b) => naturalIdSort(a.id, b.id))
+        .forEach(d => {
+          const sdList = DATA.subdomains
+            .filter(sd => sd.domainId === d.id && sdIds.has(sd.id))
+            .slice()
+            .sort((a, b) => naturalIdSort(a.id, b.id));
+          if (!sdList.length) return;
+          const domainNode = { name: d.name, children: [] };
+          sdList.forEach(sd => {
+            const srList = rules
+              .filter(r => r.subdomains.includes(sd.id))
+              .filter(r => matchesSearch(r.title) || matchesSearch(r.id))
+              .slice()
+              .sort((a, b) => a.id.localeCompare(b.id));
+            const filtered = srList.length ? srList : [{ id: '—', title: '(no SR mapped)' }];
+            domainNode.children.push({
+              name: `${sd.id} ${sd.name}`,
+              children: filtered.map(sr => ({ name: sr.id, value: sr.title }))
+            });
           });
+          tree.push(domainNode);
         });
-        tree.push(domainNode);
-      });
 
       return {
         tooltip: { trigger: 'item', triggerOn: 'mousemove',
@@ -656,7 +797,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const rules = visibleRules();
       const sdIds = new Set();
       rules.forEach(r => r.subdomains.forEach(sd => sdIds.add(sd)));
-      const xAxis = DATA.subdomains.filter(sd => sdIds.has(sd.id)).map(sd => sd.id);
+      const xAxis = DATA.subdomains
+        .filter(sd => sdIds.has(sd.id))
+        .slice()
+        .sort((a, b) => naturalIdSort(a.id, b.id))
+        .map(sd => sd.id);
       const yAxis = DATA.regulations.filter(r => STATE.activeRegs.has(r.id)).map(r => r.shortName);
 
       const data = [];
@@ -695,62 +840,217 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function renderSunburst() {
-      const rules = visibleRules();
-      const sdIds = new Set();
-      const srPerSd = {};
-      rules.forEach(r => {
-        r.subdomains.forEach(sd => {
-          sdIds.add(sd);
-          srPerSd[sd] = (srPerSd[sd] || 0) + 1;
-        });
-      });
-      const csfById = Object.fromEntries(DATA.csfSubcategories.map(s => [s.id, s]));
+      // Show navigation bar only in sunburst mode
+      const nav = document.getElementById('sunburst-nav');
+      if (STATE.mode === 'sunburst') {
+        nav.style.display = 'flex';
+      } else {
+        nav.style.display = 'none';
+        return null; // hide via empty option
+      }
 
-      const data = DATA.regulations.filter(r => STATE.activeRegs.has(r.id)).map(r => {
-        const domainChildren = DATA.domains.map(d => {
-          const sdList = DATA.subdomains.filter(sd => sd.domainId === d.id && sdIds.has(sd.id));
-          if (!sdList.length) return null;
-          const subdChildren = sdList.map(sd => {
-            const fnCounts = {};
-            rules.forEach(sr => {
-              if (!sr.subdomains.includes(sd.id)) return;
-              sr.csfIds.forEach(csfId => {
-                const csf = csfById[csfId];
-                if (!csf) return;
-                fnCounts[csf.function] = (fnCounts[csf.function] || 0) + 1;
-              });
+      const path = STATE.sunburstPath;
+      let data = [];
+      let centerText = 'AEGIS-KG';
+      let hintText = '';
+
+      if (path.length === 0) {
+        // Level 0: 5 regulations as base
+        data = DATA.regulations
+          .filter(r => STATE.activeRegs.has(r.id))
+          .map(r => {
+            // Count SRs per regulation (used for sizing)
+            const srCount = DATA.securityRules.filter(s => s.regulation === r.id).length;
+            return {
+              name: r.shortName,
+              value: srCount,
+              itemStyle: { color: r.color, borderColor: r.color },
+            };
+          });
+        centerText = 'AEGIS-KG';
+        hintText = 'Click a regulation to drill down';
+      } else if (path.length === 1) {
+        // Level 1: domains under this regulation
+        const regId = DATA.regulations.find(r => r.shortName === path[0])?.id;
+        const reg = DATA.regulations.find(r => r.id === regId);
+        if (!reg) { STATE.sunburstPath = []; return renderSunburst(); }
+        centerText = `${reg.shortName} (${path[0]})`;
+        hintText = 'Click a domain to drill down';
+
+        // Find domains covered by this regulation (collect from SRs)
+        const regSrs = DATA.securityRules.filter(s => s.regulation === regId);
+        const domSrCount = {};
+        regSrs.forEach(sr => {
+          sr.subdomains.forEach(sdId => {
+            const sdInfo = DATA.subdomains.find(x => x.id === sdId);
+            if (!sdInfo) return;
+            const domId = sdInfo.domainId;
+            domSrCount[domId] = (domSrCount[domId] || 0) + 1;
+          });
+        });
+
+        const sortedDomIds = Object.keys(domSrCount).sort(naturalIdSort);
+        data = [{
+          name: reg.shortName,
+          itemStyle: { color: reg.color },
+          children: sortedDomIds.map(domId => {
+            const d = DATA.domains.find(x => x.id === domId);
+            return {
+              name: `${d.id} ${d.name}`,
+              value: domSrCount[domId],
+              itemStyle: { color: '#5a6378', borderColor: '#5a6378' },
+            };
+          }),
+        }];
+      } else if (path.length === 2) {
+        // Level 2: subdomains under this (reg, domain)
+        const regId = DATA.regulations.find(r => r.shortName === path[0])?.id;
+        const dom = DATA.domains.find(d => d.id === path[1]);
+        if (!regId || !dom) {
+          STATE.sunburstPath = path.slice(0, 1);
+          return renderSunburst();
+        }
+        centerText = `${path[0]} › ${dom.id}`;
+
+        // Find subdomains of this domain covered by this regulation
+        const regSrs = DATA.securityRules.filter(s => s.regulation === regId);
+        const subSrCount = {};
+        regSrs.forEach(sr => {
+          sr.subdomains.forEach(sdId => {
+            const sdInfo = DATA.subdomains.find(x => x.id === sdId);
+            if (sdInfo && sdInfo.domainId === dom.id) {
+              subSrCount[sdId] = (subSrCount[sdId] || 0) + 1;
+            }
+          });
+        });
+
+        const sortedSubIds = Object.keys(subSrCount).sort(naturalIdSort);
+        data = [{
+          name: dom.id,
+          itemStyle: { color: '#5a6378' },
+          children: sortedSubIds.map(sdId => {
+            const sd = DATA.subdomains.find(x => x.id === sdId);
+            return {
+              name: `${sd.id} ${sd.name}`,
+              value: subSrCount[sdId],
+              itemStyle: { color: '#6c5ce7', borderColor: '#6c5ce7' },
+            };
+          }),
+        }];
+        hintText = 'Click a subdomain to see CSF mappings';
+      } else if (path.length === 3) {
+        // Level 3: CSF controls (grouped by Function) under this (reg, domain, subdomain)
+        const regId = DATA.regulations.find(r => r.shortName === path[0])?.id;
+        const dom = DATA.domains.find(d => d.id === path[1]);
+        const sd = DATA.subdomains.find(x => x.id === path[2]);
+        if (!regId || !dom || !sd) {
+          STATE.sunburstPath = path.slice(0, 2);
+          return renderSunburst();
+        }
+        centerText = `${sd.id} ${sd.name}`;
+
+        // Find CSF counts via SRs covering (reg, sd)
+        const regSrs = DATA.securityRules.filter(s => s.regulation === regId);
+        const csfCount = {};
+        regSrs.forEach(sr => {
+          if (sr.subdomains.includes(sd.id)) {
+            sr.csfIds.forEach(csfId => {
+              const csf = DATA.csfSubcategories.find(c => c.id === csfId);
+              if (csf) {
+                const fn = csf.function;
+                csfCount[fn] = (csfCount[fn] || 0) + 1;
+              }
             });
-            const fnChildren = Object.entries(fnCounts).map(([fn, n]) => ({ name: fn, value: n }));
-            return { name: sd.id, value: srPerSd[sd.id] || 1, children: fnChildren };
-          }).filter(x => x && x.children && x.children.length);
-          if (!subdChildren.length) return null;
-          return { name: d.name, children: subdChildren };
-        }).filter(Boolean);
-        return { name: r.shortName, itemStyle: { color: r.color }, children: domainChildren };
-      }).filter(d => d.children && d.children.length);
+          }
+        });
+
+        const sortedFns = Object.entries(csfCount)
+          .sort((a, b) => (FUNCTION_ORDER[a[0]] ?? 99) - (FUNCTION_ORDER[b[0]] ?? 99))
+          .map(([fn, n]) => ({
+            name: fn,
+            value: n,
+            itemStyle: { color: CSF_COLOR[fn] || '#888', borderColor: CSF_COLOR[fn] || '#888' },
+          }));
+
+        data = [{
+          name: sd.id,
+          itemStyle: { color: '#6c5ce7' },
+          children: sortedFns,
+        }];
+        hintText = 'CSF controls grouped by Function (GV→ID→PR→DE→RS→RC)';
+      }
+
+      // Render breadcrumb
+      renderBreadcrumb();
+      document.getElementById('sunburst-hint').textContent = hintText;
 
       return {
-        tooltip: { trigger: 'item',
-          formatter: p => `<b>${p.name}</b><br/>${p.value || 0} SR(s)` },
+        tooltip: { trigger: 'item', formatter: p => `<b>${p.name}</b><br/>${p.value || 0} SR(s)` },
         series: [{
           type: 'sunburst',
-          data, radius: ['8%', '92%'],
-          sort: undefined, emphasis: { focus: 'ancestor' },
-          label: { color: '#0f1419', fontSize: 10, fontWeight: 'bold',
-                   rotate: 'tangential' },
-          itemStyle: { borderRadius: 4, borderColor: '#0f1419', borderWidth: 1 },
+          data,
+          radius: ['12%', '92%'],
+          sort: null,
+          emphasis: { focus: 'ancestor' },
+          label: {
+            color: '#0f1419',
+            fontSize: 10,
+            fontWeight: 'bold',
+            rotate: 'tangential',
+            formatter: '{b}\n{c}'
+          },
+          itemStyle: { borderRadius: 4, borderColor: '#0f1419', borderWidth: 2 },
           levels: [
             {},
-            { r0: '8%', r: '25%', label: { fontSize: 13 } },
-            { r0: '25%', r: '55%', label: { fontSize: 11 } },
-            { r0: '55%', r: '78%', label: { fontSize: 9 } },
-            { r0: '78%', r: '92%', label: { fontSize: 9 } },
+            { r0: '12%', r: '30%', label: { fontSize: 13 } },
+            { r0: '30%', r: '60%', label: { fontSize: 11 } },
+            { r0: '60%', r: '80%', label: { fontSize: 9 } },
+            { r0: '80%', r: '92%', label: { fontSize: 9 } },
           ],
         }],
       };
     }
 
-    function renderDetail(nodeId, nodeLabel) {
+    function renderBreadcrumb() {
+      const path = STATE.sunburstPath;
+      const bc = document.getElementById('sunburst-breadcrumb');
+      const back = document.getElementById('sunburst-back');
+      if (!bc) return;
+
+      if (path.length === 0) {
+        bc.innerHTML = '<span style="color:var(--fg-dim);">Home (5 regulations)</span>';
+        back.style.display = 'none';
+        return;
+      }
+
+      back.style.display = '';
+      const items = ['<span class="bc-item" data-level="0">Home</span>'];
+      path.forEach((p, i) => {
+        const isLast = (i === path.length - 1);
+        items.push('<span class="bc-sep">›</span>');
+        if (isLast) {
+          items.push(`<span class="bc-current">${p}</span>`);
+        } else {
+          items.push(`<span class="bc-item" data-level="${i + 1}">${p}</span>`);
+        }
+      });
+      bc.innerHTML = items.join('');
+
+      bc.querySelectorAll('.bc-item').forEach(item => {
+        item.onclick = () => {
+          const target = parseInt(item.dataset.level);
+          STATE.sunburstPath = STATE.sunburstPath.slice(0, target);
+          render();
+        };
+      });
+
+      back.onclick = () => {
+        STATE.sunburstPath.pop();
+        render();
+      };
+    }
+
+function renderDetail(nodeId, nodeLabel) {
       const el = document.getElementById('detail');
       if (!nodeId) {
         el.innerHTML = '<div class="empty">Click a node in the visualization to inspect its details, upstream regulations, and downstream CSF mappings.</div>';
@@ -782,6 +1082,49 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             <ul>${srs.slice(0, 50).map(sr => `<li data-sr="${sr.id}">${sr.id} — ${sr.title}</li>`).join('')}</ul>
           </div>
         `;
+        el.querySelectorAll('li[data-sr]').forEach(li => {
+          li.onclick = () => renderDetail(li.dataset.sr);
+        });
+        return;
+      }
+      const dom = DATA.domains.find(d => d.id === nodeId);
+      if (dom) {
+        const subInDom = DATA.subdomains.filter(sd => sd.domainId === dom.id);
+        const subIds = new Set(subInDom.map(sd => sd.id));
+        const visibleSrs = DATA.securityRules.filter(r => STATE.activeRegs.has(r.regulation) && r.subdomains.some(sd => subIds.has(sd)));
+        const srs = DATA.securityRules.filter(r => r.subdomains.some(sd => subIds.has(sd)));
+        const drivers = [...new Set(srs.map(r => r.regulation))];
+        const csfIds = new Set();
+        visibleSrs.forEach(r => r.csfIds.forEach(c => csfIds.add(c)));
+        const activeSdIds = new Set();
+        visibleSrs.forEach(r => r.subdomains.forEach(sd => { if (subIds.has(sd)) activeSdIds.add(sd); }));
+        const activeSdList = [...activeSdIds].sort(naturalIdSort);
+        el.innerHTML = `
+          <h2>${dom.id} — ${dom.name}</h2>
+          <div class="meta"><span>Primary driver: ${dom.primaryRegulatoryDriver}</span></div>
+          <p>${dom.description}</p>
+          <div class="chain">
+            <span class="chain-step">${drivers.map(d => DATA.regulations.find(r => r.id === d)?.shortName).join(' + ')}</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${srs.length} SRs</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${activeSdList.length} active subdomains</span>
+            <span class="chain-arrow">→</span>
+            <span class="chain-step">${csfIds.size} CSF controls</span>
+          </div>
+          <div class="related">
+            <h4>Active subdomains within ${dom.id} (${activeSdList.length})</h4>
+            <ul>${activeSdList.map(id => {
+              const sd = DATA.subdomains.find(s => s.id === id);
+              return `<li data-sd="${id}">${id} — ${sd?.name || ''}</li>`;
+            }).join('')}</ul>
+            <h4>SecurityRules in this domain (${srs.length})</h4>
+            <ul>${srs.slice(0, 50).map(sr => `<li data-sr="${sr.id}">${sr.id} — ${sr.title}</li>`).join('')}</ul>
+          </div>
+        `;
+        el.querySelectorAll('li[data-sd]').forEach(li => {
+          li.onclick = () => renderDetail(li.dataset.sd);
+        });
         el.querySelectorAll('li[data-sr]').forEach(li => {
           li.onclick = () => renderDetail(li.dataset.sr);
         });
@@ -904,18 +1247,57 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       el.innerHTML = `<div class="empty">Node "${nodeLabel || nodeId}" not found in detail index.</div>`;
     }
 
-    function attachClickHandler() {
+    function handleSunburstClick(params) {
+      if (!params.name) return;
+      const path = STATE.sunburstPath;
+
+      if (path.length === 0) {
+        // Level 0 → Level 1: clicked a regulation
+        const clicked = DATA.regulations.find(r => r.shortName === params.name);
+        if (clicked && STATE.activeRegs.has(clicked.id)) {
+          STATE.sunburstPath = [clicked.shortName];
+          render();
+        }
+      } else if (path.length === 1) {
+        // Level 1 → Level 2: clicked a domain node (named like "D-04 Incident Response")
+        const dom = DATA.domains.find(d => `${d.id} ${d.name}` === params.name);
+        if (dom) {
+          STATE.sunburstPath = [...path, dom.id];
+          render();
+        }
+      } else if (path.length === 2) {
+        // Level 2 → Level 3: clicked a subdomain node (named like "D-04.3 Notification")
+        const sub = DATA.subdomains.find(s => `${s.id} ${s.name}` === params.name);
+        if (sub) {
+          STATE.sunburstPath = [...path, sub.id];
+          render();
+        }
+      }
+      // At Level 3 (CSF), no further drill-down; clicks there fall through to detail panel
+    }
+
+function attachClickHandler() {
       STATE.chart.on('click', params => {
+        // If sunburst mode and path is being built, drill down instead of showing detail
+        if (STATE.mode === 'sunburst' && STATE.sunburstPath.length < 3) {
+          handleSunburstClick(params);
+          return;
+        }
+        // Otherwise, existing detail handler
         if (!params.name) return;
         let nodeId = null;
-        const reg = DATA.regulations.find(r => r.shortName === params.name);
-        if (reg) nodeId = reg.id;
-        else if (DATA.securityRules.some(sr => sr.id === params.name)) {
-          nodeId = params.name;
-        } else if (DATA.subdomains.some(s => `${s.id} ${s.name}` === params.name)) {
-          nodeId = DATA.subdomains.find(s => `${s.id} ${s.name}` === params.name).id;
-        } else if (DATA.csfSubcategories.some(s => s.id === params.name)) {
-          nodeId = params.name;
+        const dom = DATA.domains.find(d => `${d.id} ${d.name}` === params.name);
+        if (dom) nodeId = dom.id;
+        else {
+          const reg = DATA.regulations.find(r => r.shortName === params.name);
+          if (reg) nodeId = reg.id;
+          else if (DATA.securityRules.some(sr => sr.id === params.name)) {
+            nodeId = params.name;
+          } else if (DATA.subdomains.some(s => `${s.id} ${s.name}` === params.name)) {
+            nodeId = DATA.subdomains.find(s => `${s.id} ${s.name}` === params.name).id;
+          } else if (DATA.csfSubcategories.some(s => s.id === params.name)) {
+            nodeId = params.name;
+          }
         }
         if (nodeId) renderDetail(nodeId, params.name);
       });
@@ -923,6 +1305,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function setMode(mode) {
       STATE.mode = mode;
+      // Reset sunburst navigation when leaving sunburst mode
+      if (mode !== 'sunburst') {
+        STATE.sunburstPath = [];
+      }
       document.querySelectorAll('.tab').forEach(t => {
         t.classList.toggle('active', t.dataset.mode === mode);
       });
@@ -942,7 +1328,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       switch (STATE.mode) {
         case 'tree': option = renderTree(); break;
         case 'heatmap': option = renderHeatmap(); break;
-        case 'sunburst': option = renderSunburst(); break;
+        case 'sunburst':
+          option = renderSunburst();
+          // If sunburst returned null (mode mismatch), fall back to clear chart
+          if (!option) { STATE.chart.clear(); return; }
+          break;
         default: option = renderSankey();
       }
       STATE.chart.setOption(option, true);
