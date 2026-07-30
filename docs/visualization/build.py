@@ -345,7 +345,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
     .stats strong { color: var(--fg); font-weight: 600; }
 
-    #viz { width: 100%; height: 100%; min-height: 500px; }
+    #viz { width: 100%; height: 100%; min-height: 600px; }
+    .tree-mode #viz { min-height: 800px; }
 
     .detail { font-size: 13px; line-height: 1.5; }
     .detail .empty { color: var(--fg-dim); font-style: italic; padding: 20px 0; text-align: center; }
@@ -801,7 +802,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         series: [{
           type: 'tree',
           data: tree,
-          left: 20, right: 20, top: 20, bottom: 20,
+          left: 10, right: 10, top: 10, bottom: 10,
+          layoutAnimation: false,
           symbol: 'emptyCircle', symbolSize: 7,
           roam: true,
           scaleLimit: { min: 0.3, max: 3 },
@@ -1333,6 +1335,14 @@ function attachClickHandler() {
       if (mode !== 'sunburst') {
         STATE.sunburstPath = [];
       }
+      const viz = document.getElementById('viz');
+      if (viz) {
+        viz.classList.toggle('tree-mode', mode === 'tree');
+      }
+      // Force chart to resize for the new mode
+      setTimeout(() => {
+        if (STATE.chart) STATE.chart.resize();
+      }, 0);
       document.querySelectorAll('.tab').forEach(t => {
         t.classList.toggle('active', t.dataset.mode === mode);
       });
@@ -1360,12 +1370,21 @@ function attachClickHandler() {
         default: option = renderSankey();
       }
       STATE.chart.setOption(option, true);
+      // Force resize AFTER setOption so the chart knows the new container size
+      setTimeout(() => {
+        if (STATE.chart) STATE.chart.resize();
+      }, 0);
       document.getElementById('footer-info').textContent =
         `Mode: ${STATE.mode} · Active regs: ${STATE.activeRegs.size}/5 · Search: "${STATE.search || '∅'}"`;
     }
 
     STATE.chart = echarts.init(document.getElementById('viz'), null, { renderer: 'canvas' });
     window.addEventListener('resize', () => STATE.chart.resize());
+    // Set initial tree-mode class on load
+    const vizInit = document.getElementById('viz');
+    if (vizInit && STATE.mode === 'tree') {
+      vizInit.classList.add('tree-mode');
+    }
     attachClickHandler();
     renderFilters();
     renderStats();
