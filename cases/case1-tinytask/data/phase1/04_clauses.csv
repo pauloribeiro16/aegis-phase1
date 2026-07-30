@@ -5842,7 +5842,7 @@ have appropriate and comprehensive documented policies for patches and updates.
 For the purposes of the first subparagraph, point (b), financial entities shall design the network connection infrastructure in a way that allows it to be instantaneously severed or segmented in order to minimise and prevent contagion, especially for interconnected financial processes.
 
 For the purposes of the first subparagraph, point (e), the ICT change management process shall be approved by appropriate lines of management and shall have specific protocols in place.",FINANCIAL_ENTITY,ONE_TIME,2,YES,,,,P1,case1,,,,,
-AIA-C01,AI_ACT-Art9,AI_ACT,,Impact & Risk Assessments,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+AIA-C01,AI_ACT-Art 9(1),AI_ACT,,Impact & Risk Assessments,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
 
 2. The risk management system shall be understood as a continuous iterative process planned and run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic review and updating. It shall comprise the following steps:
 
@@ -5893,7 +5893,7 @@ With a view to eliminating or reducing risks related to the use of the high-risk
 9. When implementing the risk management system as provided for in paragraphs 1 to 7, providers shall give consideration to whether in view of its intended purpose the high-risk AI system is likely to have an adverse impact on persons under the age of 18 and, as appropriate, other vulnerable groups.
 
 10. For providers of high-risk AI systems that are subject to requirements regarding internal risk management processes under other relevant provisions of Union law, the aspects provided in paragraphs 1 to 9 may be part of, or combined with, the risk management procedures established pursuant to that law.",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C02,AI_ACT-Art9,AI_ACT,,Impact & Risk Assessments,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+AIA-C02,AI_ACT-Art 9(2),AI_ACT,,Impact & Risk Assessments,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
 
 2. The risk management system shall be understood as a continuous iterative process planned and run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic review and updating. It shall comprise the following steps:
 
@@ -5944,7 +5944,7 @@ With a view to eliminating or reducing risks related to the use of the high-risk
 9. When implementing the risk management system as provided for in paragraphs 1 to 7, providers shall give consideration to whether in view of its intended purpose the high-risk AI system is likely to have an adverse impact on persons under the age of 18 and, as appropriate, other vulnerable groups.
 
 10. For providers of high-risk AI systems that are subject to requirements regarding internal risk management processes under other relevant provisions of Union law, the aspects provided in paragraphs 1 to 9 may be part of, or combined with, the risk management procedures established pursuant to that law.",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C03,AI_ACT-Art9,AI_ACT,,Vulnerability Identification,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+AIA-C03,AI_ACT-Art 9(6)+(7),AI_ACT,,Vulnerability Identification,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
 
 2. The risk management system shall be understood as a continuous iterative process planned and run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic review and updating. It shall comprise the following steps:
 
@@ -5995,7 +5995,7 @@ With a view to eliminating or reducing risks related to the use of the high-risk
 9. When implementing the risk management system as provided for in paragraphs 1 to 7, providers shall give consideration to whether in view of its intended purpose the high-risk AI system is likely to have an adverse impact on persons under the age of 18 and, as appropriate, other vulnerable groups.
 
 10. For providers of high-risk AI systems that are subject to requirements regarding internal risk management processes under other relevant provisions of Union law, the aspects provided in paragraphs 1 to 9 may be part of, or combined with, the risk management procedures established pursuant to that law.",PROVIDER,PERIODIC,2,YES,,,,P1,case1,,,,,
-AIA-C04,AI_ACT-Art9,AI_ACT,,Threat-Led Penetration Testing,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+AIA-C04,AI_ACT-Art 9(6)+(7),AI_ACT,,Threat-Led Penetration Testing,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
 
 2. The risk management system shall be understood as a continuous iterative process planned and run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic review and updating. It shall comprise the following steps:
 
@@ -6046,7 +6046,7 @@ With a view to eliminating or reducing risks related to the use of the high-risk
 9. When implementing the risk management system as provided for in paragraphs 1 to 7, providers shall give consideration to whether in view of its intended purpose the high-risk AI system is likely to have an adverse impact on persons under the age of 18 and, as appropriate, other vulnerable groups.
 
 10. For providers of high-risk AI systems that are subject to requirements regarding internal risk management processes under other relevant provisions of Union law, the aspects provided in paragraphs 1 to 9 may be part of, or combined with, the risk management procedures established pursuant to that law.",PROVIDER,PERIODIC,2,YES,,,,P1,case1,,,,,
-AIA-C05,AI_ACT-Art10,AI_ACT,,Data Minimization,"1. High-risk AI systems which make use of techniques involving the training of AI models with data shall be developed on the basis of training, validation and testing data sets that meet the quality criteria referred to in paragraphs 2 to 5 whenever such data sets are used.
+AIA-C05,AI_ACT-Art 10(1)+(2),AI_ACT,,Data Minimization,"1. High-risk AI systems which make use of techniques involving the training of AI models with data shall be developed on the basis of training, validation and testing data sets that meet the quality criteria referred to in paragraphs 2 to 5 whenever such data sets are used.
 
 2. Training, validation and testing data sets shall be subject to data governance and management practices appropriate for the intended purpose of the high-risk AI system. Those practices shall concern in particular:
 
@@ -6113,7 +6113,7 @@ the special categories of personal data are deleted once the bias has been corre
 the records of processing activities pursuant to Regulations (EU) 2016/679 and (EU) 2018/1725 and Directive (EU) 2016/680 include the reasons why the processing of special categories of personal data was strictly necessary to detect and correct biases, and why that objective could not be achieved by processing other data.
 
 6. For the development of high-risk AI systems not using techniques involving the training of AI models, paragraphs 2 to 5 apply only to the testing data sets.",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C06,AI_ACT-Art10,AI_ACT,,Data Minimization,"1. High-risk AI systems which make use of techniques involving the training of AI models with data shall be developed on the basis of training, validation and testing data sets that meet the quality criteria referred to in paragraphs 2 to 5 whenever such data sets are used.
+AIA-C06,AI_ACT-Art 10(1)+(2),AI_ACT,,Data Minimization,"1. High-risk AI systems which make use of techniques involving the training of AI models with data shall be developed on the basis of training, validation and testing data sets that meet the quality criteria referred to in paragraphs 2 to 5 whenever such data sets are used.
 
 2. Training, validation and testing data sets shall be subject to data governance and management practices appropriate for the intended purpose of the high-risk AI system. Those practices shall concern in particular:
 
@@ -6180,7 +6180,7 @@ the special categories of personal data are deleted once the bias has been corre
 the records of processing activities pursuant to Regulations (EU) 2016/679 and (EU) 2018/1725 and Directive (EU) 2016/680 include the reasons why the processing of special categories of personal data was strictly necessary to detect and correct biases, and why that objective could not be achieved by processing other data.
 
 6. For the development of high-risk AI systems not using techniques involving the training of AI models, paragraphs 2 to 5 apply only to the testing data sets.",PROVIDER,ONE_TIME,2,YES,,,,P1,case1,,,,,
-AIA-C07,AI_ACT-Art10,AI_ACT,,Retention & Archiving,"1. High-risk AI systems which make use of techniques involving the training of AI models with data shall be developed on the basis of training, validation and testing data sets that meet the quality criteria referred to in paragraphs 2 to 5 whenever such data sets are used.
+AIA-C07,AI_ACT-Art 10(3),AI_ACT,,Retention & Archiving,"1. High-risk AI systems which make use of techniques involving the training of AI models with data shall be developed on the basis of training, validation and testing data sets that meet the quality criteria referred to in paragraphs 2 to 5 whenever such data sets are used.
 
 2. Training, validation and testing data sets shall be subject to data governance and management practices appropriate for the intended purpose of the high-risk AI system. Those practices shall concern in particular:
 
@@ -6247,7 +6247,7 @@ the special categories of personal data are deleted once the bias has been corre
 the records of processing activities pursuant to Regulations (EU) 2016/679 and (EU) 2018/1725 and Directive (EU) 2016/680 include the reasons why the processing of special categories of personal data was strictly necessary to detect and correct biases, and why that objective could not be achieved by processing other data.
 
 6. For the development of high-risk AI systems not using techniques involving the training of AI models, paragraphs 2 to 5 apply only to the testing data sets.",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C08,AI_ACT-Art5,AI_ACT,,Data Minimization,"1. The following AI practices shall be prohibited:
+AIA-C08,AI_ACT-Art 10(5),AI_ACT,,Data Minimization,"1. The following AI practices shall be prohibited:
 
 (a)
 
@@ -6336,7 +6336,7 @@ HIGH-RISK AI SYSTEMS
 SECTION 1
 
 Classification of AI systems as high-risk",PROVIDER,ONE_TIME,2,YES,,,,P1,case1,,,,,
-AIA-C09,,AI_ACT,,Audit Logging & Traceability,"1. High-risk AI systems shall technically allow for the automatic recording of events (logs) over the lifetime of the system.
+AIA-C09,AI_ACT-Art 12(1)+(2),AI_ACT,,Audit Logging & Traceability,"1. High-risk AI systems shall technically allow for the automatic recording of events (logs) over the lifetime of the system.
 
 2. In order to ensure a level of traceability of the functioning of a high-risk AI system that is appropriate to the intended purpose of the system, logging capabilities shall enable the recording of events relevant for:
 
@@ -6369,7 +6369,7 @@ the input data for which the search has led to a match;
 (d)
 
 the identification of the natural persons involved in the verification of the results, as referred to in Article 14(5).",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C10,,AI_ACT,,Audit Logging & Traceability,"1. High-risk AI systems shall technically allow for the automatic recording of events (logs) over the lifetime of the system.
+AIA-C10,AI_ACT-Art 12(1)+(2),AI_ACT,,Audit Logging & Traceability,"1. High-risk AI systems shall technically allow for the automatic recording of events (logs) over the lifetime of the system.
 
 2. In order to ensure a level of traceability of the functioning of a high-risk AI system that is appropriate to the intended purpose of the system, logging capabilities shall enable the recording of events relevant for:
 
@@ -6402,14 +6402,14 @@ the input data for which the search has led to a match;
 (d)
 
 the identification of the natural persons involved in the verification of the results, as referred to in Article 14(5).",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C11,,AI_ACT,,Records of Processing,"1. The technical documentation of a high-risk AI system shall be drawn up before that system is placed on the market or put into service and shall be kept up-to date.
+AIA-C11,AI_ACT-Art 19(1),AI_ACT,,Records of Processing,"1. The technical documentation of a high-risk AI system shall be drawn up before that system is placed on the market or put into service and shall be kept up-to date.
 
 The technical documentation shall be drawn up in such a way as to demonstrate that the high-risk AI system complies with the requirements set out in this Section and to provide national competent authorities and notified bodies with the necessary information in a clear and comprehensive form to assess the compliance of the AI system with those requirements. It shall contain, at a minimum, the elements set out in Annex IV. SMEs, including start-ups, may provide the elements of the technical documentation specified in Annex IV in a simplified manner. To that end, the Commission shall establish a simplified technical documentation form targeted at the needs of small and microenterprises. Where an SME, including a start-up, opts to provide the information required in Annex IV in a simplified manner, it shall use the form referred to in this paragraph. Notified bodies shall accept the form for the purposes of the conformity assessment.
 
 2. Where a high-risk AI system related to a product covered by the Union harmonisation legislation listed in Section A of Annex I is placed on the market or put into service, a single set of technical documentation shall be drawn up containing all the information set out in paragraph 1, as well as the information required under those legal acts.
 
 3. The Commission is empowered to adopt delegated acts in accordance with Article 97 in order to amend Annex IV, where necessary, to ensure that, in light of technical progress, the technical documentation provides all the information necessary to assess the compliance of the system with the requirements set out in this Section.",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C12,AI_ACT-Art13,AI_ACT,,Information Security Policies,"1. High-risk AI systems shall be designed and developed in such a way as to ensure that their operation is sufficiently transparent to enable deployers to interpret a system’s output and use it appropriately. An appropriate type and degree of transparency shall be ensured with a view to achieving compliance with the relevant obligations of the provider and deployer set out in Section 3.
+AIA-C12,AI_ACT-Art 13(1),AI_ACT,,Information Security Policies,"1. High-risk AI systems shall be designed and developed in such a way as to ensure that their operation is sufficiently transparent to enable deployers to interpret a system’s output and use it appropriately. An appropriate type and degree of transparency shall be ensured with a view to achieving compliance with the relevant obligations of the provider and deployer set out in Section 3.
 
 2. High-risk AI systems shall be accompanied by instructions for use in an appropriate digital format or otherwise that include concise, complete, correct and clear information that is relevant, accessible and comprehensible to deployers.
 
@@ -6466,7 +6466,7 @@ the computational and hardware resources needed, the expected lifetime of the hi
 (f)
 
 where relevant, a description of the mechanisms included within the high-risk AI system that allows deployers to properly collect, store and interpret the logs in accordance with Article 12.",PROVIDER,ONE_TIME,2,YES,,,,P1,case1,,,,,
-AIA-C13,AI_ACT-Art13,AI_ACT,,Information Security Policies,"1. High-risk AI systems shall be designed and developed in such a way as to ensure that their operation is sufficiently transparent to enable deployers to interpret a system’s output and use it appropriately. An appropriate type and degree of transparency shall be ensured with a view to achieving compliance with the relevant obligations of the provider and deployer set out in Section 3.
+AIA-C13,AI_ACT-Art 13(3),AI_ACT,,Information Security Policies,"1. High-risk AI systems shall be designed and developed in such a way as to ensure that their operation is sufficiently transparent to enable deployers to interpret a system’s output and use it appropriately. An appropriate type and degree of transparency shall be ensured with a view to achieving compliance with the relevant obligations of the provider and deployer set out in Section 3.
 
 2. High-risk AI systems shall be accompanied by instructions for use in an appropriate digital format or otherwise that include concise, complete, correct and clear information that is relevant, accessible and comprehensible to deployers.
 
@@ -6523,7 +6523,7 @@ the computational and hardware resources needed, the expected lifetime of the hi
 (f)
 
 where relevant, a description of the mechanisms included within the high-risk AI system that allows deployers to properly collect, store and interpret the logs in accordance with Article 12.",PROVIDER,ONE_TIME,2,YES,,,,P1,case1,,,,,
-AIA-C14,,AI_ACT,,Role-Specific Competence,"1. High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which they are in use.
+AIA-C14,AI_ACT-Art 14(1),AI_ACT,,Role-Specific Competence,"1. High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which they are in use.
 
 2. Human oversight shall aim to prevent or minimise the risks to health, safety or fundamental rights that may emerge when a high-risk AI system is used in accordance with its intended purpose or under conditions of reasonably foreseeable misuse, in particular where such risks persist despite the application of other requirements set out in this Section.
 
@@ -6562,7 +6562,7 @@ to intervene in the operation of the high-risk AI system or interrupt the system
 5. For high-risk AI systems referred to in point 1(a) of Annex III, the measures referred to in paragraph 3 of this Article shall be such as to ensure that, in addition, no action or decision is taken by the deployer on the basis of the identification resulting from the system unless that identification has been separately verified and confirmed by at least two natural persons with the necessary competence, training and authority.
 
 The requirement for a separate verification by at least two natural persons shall not apply to high-risk AI systems used for the purposes of law enforcement, migration, border control or asylum, where Union or national law considers the application of this requirement to be disproportionate.",PROVIDER,ONE_TIME,2,YES,,,,P1,case1,,,,,
-AIA-C15,,AI_ACT,,Role-Specific Competence,"1. High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which they are in use.
+AIA-C15,AI_ACT-Art 14(4),AI_ACT,,Role-Specific Competence,"1. High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which they are in use.
 
 2. Human oversight shall aim to prevent or minimise the risks to health, safety or fundamental rights that may emerge when a high-risk AI system is used in accordance with its intended purpose or under conditions of reasonably foreseeable misuse, in particular where such risks persist despite the application of other requirements set out in this Section.
 
@@ -6601,7 +6601,7 @@ to intervene in the operation of the high-risk AI system or interrupt the system
 5. For high-risk AI systems referred to in point 1(a) of Annex III, the measures referred to in paragraph 3 of this Article shall be such as to ensure that, in addition, no action or decision is taken by the deployer on the basis of the identification resulting from the system unless that identification has been separately verified and confirmed by at least two natural persons with the necessary competence, training and authority.
 
 The requirement for a separate verification by at least two natural persons shall not apply to high-risk AI systems used for the purposes of law enforcement, migration, border control or asylum, where Union or national law considers the application of this requirement to be disproportionate.",DEPLOYER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C16,AI_ACT-Art5,AI_ACT,,Vulnerability Identification,"1. The following AI practices shall be prohibited:
+AIA-C16,AI_ACT-Art 15(1),AI_ACT,,Vulnerability Identification,"1. The following AI practices shall be prohibited:
 
 (a)
 
@@ -6690,7 +6690,7 @@ HIGH-RISK AI SYSTEMS
 SECTION 1
 
 Classification of AI systems as high-risk",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C17,AI_ACT-Art5,AI_ACT,,Data Integrity Mechanisms,"1. The following AI practices shall be prohibited:
+AIA-C17,AI_ACT-Art 15(3),AI_ACT,,Data Integrity Mechanisms,"1. The following AI practices shall be prohibited:
 
 (a)
 
@@ -6779,7 +6779,7 @@ HIGH-RISK AI SYSTEMS
 SECTION 1
 
 Classification of AI systems as high-risk",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C18,AI_ACT-Art5,AI_ACT,,Data Integrity Mechanisms,"1. The following AI practices shall be prohibited:
+AIA-C18,AI_ACT-Art 15(4)-(5),AI_ACT,,Data Integrity Mechanisms,"1. The following AI practices shall be prohibited:
 
 (a)
 
@@ -6868,7 +6868,7 @@ HIGH-RISK AI SYSTEMS
 SECTION 1
 
 Classification of AI systems as high-risk",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C19,AI_ACT-Art9,AI_ACT,,Audit Logging & Traceability,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+AIA-C19,AI_ACT-Art 19(1),AI_ACT,,Audit Logging & Traceability,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
 
 2. The risk management system shall be understood as a continuous iterative process planned and run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic review and updating. It shall comprise the following steps:
 
@@ -6919,7 +6919,7 @@ With a view to eliminating or reducing risks related to the use of the high-risk
 9. When implementing the risk management system as provided for in paragraphs 1 to 7, providers shall give consideration to whether in view of its intended purpose the high-risk AI system is likely to have an adverse impact on persons under the age of 18 and, as appropriate, other vulnerable groups.
 
 10. For providers of high-risk AI systems that are subject to requirements regarding internal risk management processes under other relevant provisions of Union law, the aspects provided in paragraphs 1 to 9 may be part of, or combined with, the risk management procedures established pursuant to that law.",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C20,,AI_ACT,,Information Security Policies,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+AIA-C20,AI_ACT-Art 17(1),AI_ACT,,Information Security Policies,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
 
 2. The risk management system shall be understood as a continuous iterative process planned and run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic review and updating. It shall comprise the following steps:
 
@@ -6970,7 +6970,7 @@ With a view to eliminating or reducing risks related to the use of the high-risk
 9. When implementing the risk management system as provided for in paragraphs 1 to 7, providers shall give consideration to whether in view of its intended purpose the high-risk AI system is likely to have an adverse impact on persons under the age of 18 and, as appropriate, other vulnerable groups.
 
 10. For providers of high-risk AI systems that are subject to requirements regarding internal risk management processes under other relevant provisions of Union law, the aspects provided in paragraphs 1 to 9 may be part of, or combined with, the risk management procedures established pursuant to that law.",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C21,,AI_ACT,,Compliance Testing,"1. High-risk AI systems shall be designed and developed in such a way that they achieve an appropriate level of accuracy, robustness, and cybersecurity, and that they perform consistently in those respects throughout their lifecycle.
+AIA-C21,AI_ACT-Art 17(1)(c),AI_ACT,,Compliance Testing,"1. High-risk AI systems shall be designed and developed in such a way that they achieve an appropriate level of accuracy, robustness, and cybersecurity, and that they perform consistently in those respects throughout their lifecycle.
 
 2. To address the technical aspects of how to measure the appropriate levels of accuracy and robustness set out in paragraph 1 and any other relevant performance metrics, the Commission shall, in cooperation with relevant stakeholders and organisations such as metrology and benchmarking authorities, encourage, as appropriate, the development of benchmarks and measurement methodologies.
 
@@ -6991,7 +6991,7 @@ The technical solutions to address AI specific vulnerabilities shall include, wh
 SECTION 3
 
 Obligations of providers and deployers of high-risk AI systems and other parties",PROVIDER,PERIODIC,2,YES,,,,P1,case1,,,,,
-AIA-C22,,AI_ACT,,Impact & Risk Assessments,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+AIA-C22,AI_ACT-Art 17(1)(g),AI_ACT,,Impact & Risk Assessments,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
 
 2. The risk management system shall be understood as a continuous iterative process planned and run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic review and updating. It shall comprise the following steps:
 
@@ -7042,7 +7042,7 @@ With a view to eliminating or reducing risks related to the use of the high-risk
 9. When implementing the risk management system as provided for in paragraphs 1 to 7, providers shall give consideration to whether in view of its intended purpose the high-risk AI system is likely to have an adverse impact on persons under the age of 18 and, as appropriate, other vulnerable groups.
 
 10. For providers of high-risk AI systems that are subject to requirements regarding internal risk management processes under other relevant provisions of Union law, the aspects provided in paragraphs 1 to 9 may be part of, or combined with, the risk management procedures established pursuant to that law.",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C23,,AI_ACT,,Information Security Policies,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+AIA-C23,AI_ACT-Art 26(1),AI_ACT,,Information Security Policies,"1. A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
 
 2. The risk management system shall be understood as a continuous iterative process planned and run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic review and updating. It shall comprise the following steps:
 
@@ -7093,7 +7093,7 @@ With a view to eliminating or reducing risks related to the use of the high-risk
 9. When implementing the risk management system as provided for in paragraphs 1 to 7, providers shall give consideration to whether in view of its intended purpose the high-risk AI system is likely to have an adverse impact on persons under the age of 18 and, as appropriate, other vulnerable groups.
 
 10. For providers of high-risk AI systems that are subject to requirements regarding internal risk management processes under other relevant provisions of Union law, the aspects provided in paragraphs 1 to 9 may be part of, or combined with, the risk management procedures established pursuant to that law.",DEPLOYER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C24,,AI_ACT,,Role-Specific Competence,"1. High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which they are in use.
+AIA-C24,AI_ACT-Art 26(2),AI_ACT,,Role-Specific Competence,"1. High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which they are in use.
 
 2. Human oversight shall aim to prevent or minimise the risks to health, safety or fundamental rights that may emerge when a high-risk AI system is used in accordance with its intended purpose or under conditions of reasonably foreseeable misuse, in particular where such risks persist despite the application of other requirements set out in this Section.
 
@@ -7132,7 +7132,7 @@ to intervene in the operation of the high-risk AI system or interrupt the system
 5. For high-risk AI systems referred to in point 1(a) of Annex III, the measures referred to in paragraph 3 of this Article shall be such as to ensure that, in addition, no action or decision is taken by the deployer on the basis of the identification resulting from the system unless that identification has been separately verified and confirmed by at least two natural persons with the necessary competence, training and authority.
 
 The requirement for a separate verification by at least two natural persons shall not apply to high-risk AI systems used for the purposes of law enforcement, migration, border control or asylum, where Union or national law considers the application of this requirement to be disproportionate.",DEPLOYER,ONE_TIME,2,YES,,,,P1,case1,,,,,
-AIA-C25,,AI_ACT,,Continuous Security Monitoring,"1. High-risk AI systems shall be designed and developed in such a way that they achieve an appropriate level of accuracy, robustness, and cybersecurity, and that they perform consistently in those respects throughout their lifecycle.
+AIA-C25,AI_ACT-Art 72(1)-(2) + Art 74(1),AI_ACT,,Continuous Security Monitoring,"1. High-risk AI systems shall be designed and developed in such a way that they achieve an appropriate level of accuracy, robustness, and cybersecurity, and that they perform consistently in those respects throughout their lifecycle.
 
 2. To address the technical aspects of how to measure the appropriate levels of accuracy and robustness set out in paragraph 1 and any other relevant performance metrics, the Commission shall, in cooperation with relevant stakeholders and organisations such as metrology and benchmarking authorities, encourage, as appropriate, the development of benchmarks and measurement methodologies.
 
@@ -7153,7 +7153,7 @@ The technical solutions to address AI specific vulnerabilities shall include, wh
 SECTION 3
 
 Obligations of providers and deployers of high-risk AI systems and other parties",PROVIDER,CONTINUOUS,3,YES,,,,P1,case1,,,,,
-AIA-C26,,AI_ACT,,Regulatory Notification,"1. High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which they are in use.
+AIA-C26,AI_ACT-Art 73(1)-(4),AI_ACT,,Regulatory Notification,"1. High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which they are in use.
 
 2. Human oversight shall aim to prevent or minimise the risks to health, safety or fundamental rights that may emerge when a high-risk AI system is used in accordance with its intended purpose or under conditions of reasonably foreseeable misuse, in particular where such risks persist despite the application of other requirements set out in this Section.
 
@@ -7192,7 +7192,7 @@ to intervene in the operation of the high-risk AI system or interrupt the system
 5. For high-risk AI systems referred to in point 1(a) of Annex III, the measures referred to in paragraph 3 of this Article shall be such as to ensure that, in addition, no action or decision is taken by the deployer on the basis of the identification resulting from the system unless that identification has been separately verified and confirmed by at least two natural persons with the necessary competence, training and authority.
 
 The requirement for a separate verification by at least two natural persons shall not apply to high-risk AI systems used for the purposes of law enforcement, migration, border control or asylum, where Union or national law considers the application of this requirement to be disproportionate.",PROVIDER,TRIGGERED,3,YES,,,,P1,case1,,,,,
-AIA-C27,,AI_ACT,,Compliance Testing,"1. High-risk AI systems shall be designed and developed in such a way that they achieve an appropriate level of accuracy, robustness, and cybersecurity, and that they perform consistently in those respects throughout their lifecycle.
+AIA-C27,AI_ACT-Art 72(1)-(2) + Art 74(1),AI_ACT,,Compliance Testing,"1. High-risk AI systems shall be designed and developed in such a way that they achieve an appropriate level of accuracy, robustness, and cybersecurity, and that they perform consistently in those respects throughout their lifecycle.
 
 2. To address the technical aspects of how to measure the appropriate levels of accuracy and robustness set out in paragraph 1 and any other relevant performance metrics, the Commission shall, in cooperation with relevant stakeholders and organisations such as metrology and benchmarking authorities, encourage, as appropriate, the development of benchmarks and measurement methodologies.
 
@@ -7213,7 +7213,7 @@ The technical solutions to address AI specific vulnerabilities shall include, wh
 SECTION 3
 
 Obligations of providers and deployers of high-risk AI systems and other parties",PROVIDER,PERIODIC,2,YES,,,,P1,case1,,,,,
-AIA-C28,AI_ACT-Art5,AI_ACT,,Impact & Risk Assessments,"1. The following AI practices shall be prohibited:
+AIA-C28,AI_ACT-Art 55(1)(a),AI_ACT,,Impact & Risk Assessments,"1. The following AI practices shall be prohibited:
 
 (a)
 
@@ -7302,7 +7302,7 @@ HIGH-RISK AI SYSTEMS
 SECTION 1
 
 Classification of AI systems as high-risk",PROVIDER,PERIODIC,2,YES,,,,P1,case1,,,,,
-AIA-C29,AI_ACT-Art5,AI_ACT,,Regulatory Notification,"1. The following AI practices shall be prohibited:
+AIA-C29,AI_ACT-Art 55(1)(c),AI_ACT,,Regulatory Notification,"1. The following AI practices shall be prohibited:
 
 (a)
 

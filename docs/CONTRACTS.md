@@ -1143,3 +1143,59 @@ The preprocessor pipeline (`scripts/preprocess/pipeline.py`) prefers `csf2.xlsx`
   is the ground truth).
 - **CORR-025** (reserved) — Switch v2 loaders to read preproc_out
   shards via `--use-sharded` flag.
+
+
+---
+
+## <a name="corr-077"></a>AEGIS-P1-CORR-077 — AI Act case1 CSV audit corrections
+
+**Status:** MERGED (2026-07-30)
+**Branch:** `feature/aegis-p1-corr-077-ai-act-csv-fix`
+**Predecessor:** CORR-073 (data-driven pipeline)
+**Source of truth:** `methodology-00/PREPROCESSING/Regulation/AI_Act/02_SecurityRules_NIST.md`
+
+### Problem
+
+Case1 CSV files (`04_clauses.csv`, `07_clause_subdomain_mapping.csv`) had systematic errors vs the canonical methodology SR mapping:
+- 6 clauses wrongly tagged as `Art 5` (the AI Act's prohibition list — bans, not cybersecurity)
+- 1 clause wrongly tagged as `Art 9` (should be `Art 19(1)` — log retention)
+- 8 clauses with wrong sub-domain attribution
+- 13 clauses with empty `articleId`
+- 6 existing `articleId` values lacked paragraph specifier (`Art9` instead of `Art 9(1)`)
+
+### Scope
+
+- Edits only to case1 CSVs + audit doc
+- Diagnostic doc `docs/AI_ACT_AUDIT.md` written first; corrections applied based on §6 decision matrix
+- Renaming `AIA-C{NN}` → `AI_Act-CL{NN}` (CORR-032 follow-up) and renaming `AIACT` → `AI_Act` deliberately out of scope
+
+### Result
+
+All 12 acceptance criteria pass (Generator + Evaluator, fresh context):
+- **C1:** No more `AI_ACT-Art5` or `AI_ACT-Art9` without paragraph in `04_clauses.csv`
+- **C2:** All 29 AIA clauses have populated `articleId`
+- **C3:** All `articleId` use paragraph specifier
+- **C4:** All 8 sub-domain corrections applied (C04→D-02.4, C07→D-05.1, C11→D-10.2, C18→D-07.2, C21→D-07.1, C22→D-09.1, C27→D-10.1, C28→D-07.3)
+- **C5–C9:** Headers unchanged; 29 clauses preserved; CSV parses cleanly
+- **C10:** `docs/visualization/build.py` still produces valid HTML (150 mapped clauses)
+- **C11:** Audit doc §6 updated with 13 `✓ FIXED` markers; 0 leftover `**Fix**`
+- **C12:** 2763 tests pass; 29 pre-existing environment failures (torch/Ollama not installed) are baseline, **0 new regressions introduced**
+
+### Files
+
+| File | Action | LOC |
+|---|---|---|
+| `cases/case1-tinytask/data/phase1/04_clauses.csv` | MODIFIED (articleId column for 29 rows) | 29 |
+| `cases/case1-tinytask/data/phase1/07_clause_subdomain_mapping.csv` | MODIFIED (subDomainId column for 8 rows) | 8 |
+| `docs/AI_ACT_AUDIT.md` | NEW (diagnosis + §6 decision matrix) | ~170 |
+| `execution/CORR-077.md` | NEW (contract spec) | ~145 |
+| `execution/CORR-077-EVIDENCE.txt` | NEW (Evaluator evidence) | ~70 |
+| `docs/CONTRACTS.md` | MODIFIED (this section) | ~25 |
+
+### Out of scope (follow-ups)
+
+- Rename `AIA-C{NN}` → `AI_Act-CL{NN}` in case1 (CORR-032 follow-up) — separate contract
+- Rename `AIACT` → `AI_Act` in case1 (`regulationId`/`articleId` fields) — separate contract
+- Apply same audit + corrections to case2-secureborder and case3-omnibank — likely needed
+- Same audit methodology for other 4 regulations in case1 (GDPR, CRA, NIS2, DORA) — likely needed
+- Regenerate `docs/visualization/taxonomy_chain.html` after CSV changes — works as-is, but a re-build would reflect the corrected sub-domain attributions

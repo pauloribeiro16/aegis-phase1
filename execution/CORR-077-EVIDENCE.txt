@@ -1,0 +1,63 @@
+=== CORR-077 EVALUATOR REPORT ===
+qui 30 jul 2026 10:40:40 WEST
+Branch: feature/aegis-p1-corr-077-ai-act-csv-fix
+
+--- C1: No AIA- with AI_ACT-Art5 or AI_ACT-Art9 (no paragraph) ---
+(empty = PASS)
+
+--- C2: All AIA-C have populated articleId ---
+(empty = PASS)
+
+--- C3: All AIA-C use paragraph specifier ---
+(empty = PASS)
+
+--- C4: 8 subdomain corrections verified ---
+OK: AIA-C04 -> D-02.4
+OK: AIA-C07 -> D-05.1
+OK: AIA-C11 -> D-10.2
+OK: AIA-C18 -> D-07.2
+OK: AIA-C21 -> D-07.1
+OK: AIA-C22 -> D-09.1
+OK: AIA-C27 -> D-10.1
+OK: AIA-C28 -> D-07.3
+
+--- C5: 04_clauses.csv header preserved ---
+clauseId,articleId,regulationId,number,summary,description,obligatedParty,obligationType,normativeIntensity,applicable,applicabilityReason,sourceReference,crossReferences,phase,case,normativeStrength,isAtomic,parentClauseId,siblingClauseIds,sanctionReference
+
+--- C6: 07 clause subdomain mapping header preserved ---
+case,clauseId,subDomainId,weight,source,phase
+
+--- C7: 29 AIA clauses preserved ---
+AIA clauses count: 29 (expected: 29)
+
+--- C8: 29 AIA mappings preserved ---
+AIA mappings count: 29 (expected: 29)
+
+--- C9: CSV files parse without error ---
+cases/case1-tinytask/data/phase1/04_clauses.csv -> 150 rows
+cases/case1-tinytask/data/phase1/07_clause_subdomain_mapping.csv -> 150 rows
+
+--- C10: Visualization still builds ---
+  Domains: 10
+  Subdomains: 38
+  Mapped clauses: 150
+  CSF subcategories: 106
+  Subdomain->CSF mappings: 76 links
+Exit: 0
+
+--- C11: Audit doc updated ---
+**Fix** left: 0 (expected: 0)
+✓ FIXED count: 13 (expected: ≥ 13)
+
+--- C12 baseline vs current (PASS only if no NEW regressions) ---
+Baseline (stashed) failures:
+29 /tmp/baseline_failed.txt
+Current (with contract applied) failures:
+29 /tmp/current_failed.txt
+Diff (new lines = regressions introduced):
+(empty diff = NO new regressions)
+
+--- Summary ---
+Baseline: 29 failed, 2763 passed, 15 skipped
+Current:  29 failed, 2763 passed, 15 skipped
+Contract introduced: 0 new regressions
