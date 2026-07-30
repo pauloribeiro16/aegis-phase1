@@ -52,6 +52,14 @@ SCAN_PATHS=(
   "README.md"
 )
 
+# Generated build artifacts (CORR-078): visualization HTML embeds preproc_out
+# data verbatim, including raw_md / regulatory_rationale / ambiguity_notes
+# fields that mention non-CSF-2.0 frameworks in analytical (NOT control-
+# selection) contexts. These are build outputs, not source policy — skip.
+SCAN_EXCLUDE_PATHS=(
+  "docs/visualization/"
+)
+
 # Policy-definition files are exempt: their job is to declare the policy,
 # which necessarily mentions the excluded frameworks. They are
 # `docs/NIST_CSF_2.0_ONLY.md` (canonical), `AGENTS.md` §0, and the
@@ -73,9 +81,20 @@ REGEX_ALT=$(printf "%s\n" "${FORBIDDEN_FRAMEWORKS[@]}" | sort -u | paste -sd'|' 
 
 # Use ripgrep if available, else grep -RnE
 if command -v rg >/dev/null 2>&1; then
-  MATCHES=$(rg -n -E "$REGEX_ALT" "${SCAN_PATHS[@]}" 2>/dev/null || true)
+  if [ ${#SCAN_EXCLUDE_PATHS[@]} -gt 0 ]; then
+    EXCLUDE_ARGS=()
+    for p in "${SCAN_EXCLUDE_PATHS[@]}"; do
+      EXCLUDE_ARGS+=("-g" "!${p}**")
+    done
+    MATCHES=$(rg -n -E "$REGEX_ALT" "${SCAN_PATHS[@]}" "${EXCLUDE_ARGS[@]}" 2>/dev/null || true)
+  else
+    MATCHES=$(rg -n -E "$REGEX_ALT" "${SCAN_PATHS[@]}" 2>/dev/null || true)
+  fi
 else
-  MATCHES=$(grep -RnE "$REGEX_ALT" "${SCAN_PATHS[@]}" 2>/dev/null || true)
+  # grep has no native exclude; filter matches after the fact
+  MATCHES=$(grep -RnE "$REGEX_ALT" "${SCAN_PATHS[@]}" 2>/dev/null \
+    | grep -v -E "$(printf '%s|' "${SCAN_EXCLUDE_PATHS[@]}" | sed 's/|$//')" \
+    || true)
 fi
 
 if [ -z "$MATCHES" ]; then
