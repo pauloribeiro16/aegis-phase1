@@ -408,6 +408,41 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
     .build-banner .meta { color: var(--fg-dim); }
 
+    /* ---- Tab bar (CORR-077) ---- */
+    .tab-bar {
+      display: flex;
+      gap: 4px;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      padding: 8px 16px;
+      background: transparent;
+      color: var(--fg-dim);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover { color: var(--fg); border-color: var(--accent); }
+    .tab-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+    .tab-btn .badge-count {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 8px;
+      background: rgba(0,0,0,0.18);
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .tab-btn.active .badge-count {
+      background: rgba(255,255,255,0.25);
+    }
+
     main {
       flex: 1; display: grid;
       grid-template-columns: 240px 1fr 420px;
@@ -786,86 +821,92 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div class="build-banner" id="build-banner"></div>
   </header>
 
+  <nav class="tab-bar" id="tab-bar">
+    <button class="tab-btn" data-tab="regulations">Regulations <span class="badge-count">5</span></button>
+    <button class="tab-btn" data-tab="articles">Articles <span class="badge-count">140</span></button>
+    <button class="tab-btn" data-tab="clauses">Clauses <span class="badge-count">498</span></button>
+    <button class="tab-btn" data-tab="sos">SOs <span class="badge-count">328</span></button>
+    <button class="tab-btn" data-tab="srs">SRs <span class="badge-count">282</span></button>
+  </nav>
+
   <main>
     <aside>
-      <h3>Search</h3>
-      <input type="search" id="search" placeholder="Search across all 5 sections..." />
-
-      <h3>Filters</h3>
-      <div class="filter-group" id="filter-regs"></div>
-      <div class="filter-group" id="filter-severity"></div>
-      <div class="filter-group" id="filter-berry"></div>
-      <div class="filter-group" id="filter-csf"></div>
-
-      <button class="reset-btn" id="reset">Reset filters</button>
-
-      <h3 style="margin-top: 24px;">Sections</h3>
-      <div id="anchors"></div>
-
-      <div class="filter-group" id="counters" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--fg-dim);"></div>
+      <div class="sidebar-content" id="sidebar-content">
+        <!-- JS will rebuild contents on tab change + on init -->
+      </div>
     </aside>
 
     <section id="main-content">
-      <div id="section-1" data-section="1">
-        <h2>§1 Regulations <small>5 cards</small></h2>
-        <div class="section-meta">Per-reg preproc manifest: README + SecurityObjectives + SecurityRules_NIST. Click a card to inspect.</div>
-        <div id="regs-cards"></div>
-      </div>
-
-      <div id="section-2" data-section="2" style="margin-top: 32px;">
-        <h2>§2 Articles <small>140 articles</small></h2>
-        <div class="section-meta">Individual article shards (<code>preproc_out/entities/articles/&lt;REG&gt;_Art_ &lt;N&gt;.json</code>). Click row for full detail.</div>
-        <table class="entity" id="table-articles">
-          <thead>
-            <tr>
-              <th>ID</th><th>Reg</th><th>Article Ref</th><th>Title</th><th>#SOs</th><th>#SRs</th><th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="tbody-articles"></tbody>
-        </table>
-      </div>
-
-      <div id="section-3" data-section="3" style="margin-top: 32px;">
-        <h2>§3 Clauses <small>498 clauses (many skeleton)</small></h2>
-        <div class="section-meta">Atomic clauses with Berry types (VAG/POLY/COORD/SCOPE-Q) and severity (S1/S2/S3). Skeleton rows are dimmed.</div>
-        <table class="entity" id="table-clauses">
-          <thead>
-            <tr>
-              <th>ID</th><th>Reg</th><th>Section Ref</th><th>Title</th><th>Type</th><th>Severity</th><th>Sk</th>
-            </tr>
-          </thead>
-          <tbody id="tbody-clauses"></tbody>
-        </table>
-      </div>
-
-      <div id="section-4" data-section="4" style="margin-top: 32px;">
-        <h2>§4 SecurityObjectives <small>328 SOs (3 formats)</small></h2>
-        <div class="section-meta">
-          <span class="type-badge HL">HL</span> High-level (cross-reg) ·
-          <span class="type-badge per-reg">per-reg</span> Per-reg subdomain ·
-          <span class="type-badge canonical">canonical</span> Canonical
+      <div id="tab-regulations" class="tab-pane" data-pane="regulations" style="display:block">
+        <div id="section-1" data-section="1">
+          <h2>§1 Regulations <small>5 cards</small></h2>
+          <div class="section-meta">Per-reg preproc manifest: README + SecurityObjectives + SecurityRules_NIST. Click a card to inspect.</div>
+          <div id="regs-cards"></div>
         </div>
-        <table class="entity" id="table-sos">
-          <thead>
-            <tr>
-              <th>ID</th><th>Type</th><th>Reg</th><th>Subdomain</th><th>Description</th>
-            </tr>
-          </thead>
-          <tbody id="tbody-sos"></tbody>
-        </table>
       </div>
 
-      <div id="section-5" data-section="5" style="margin-top: 32px;">
-        <h2>§5 SecurityRules <small>282 SRs</small></h2>
-        <div class="section-meta">Regulatory duties mapped to NIST CSF 2.0 controls. Click any row for full raw data (incl. regulatory_rationale, security_rationale, ambiguity_notes).</div>
-        <table class="entity" id="table-srs">
-          <thead>
-            <tr>
-              <th>ID</th><th>Title</th><th>Reg</th><th>Sub-domains</th><th>CSF</th><th>Role</th>
-            </tr>
-          </thead>
-          <tbody id="tbody-srs"></tbody>
-        </table>
+      <div id="tab-articles" class="tab-pane" data-pane="articles" style="display:none">
+        <div id="section-2" data-section="2">
+          <h2>§2 Articles <small>140 articles</small></h2>
+          <div class="section-meta">Individual article shards (<code>preproc_out/entities/articles/&lt;REG&gt;_Art_ &lt;N&gt;.json</code>). Click row for full detail.</div>
+          <table class="entity" id="table-articles">
+            <thead>
+              <tr>
+                <th>ID</th><th>Reg</th><th>Article Ref</th><th>Title</th><th>#SOs</th><th>#SRs</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-articles"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tab-clauses" class="tab-pane" data-pane="clauses" style="display:none">
+        <div id="section-3" data-section="3">
+          <h2>§3 Clauses <small>498 clauses (many skeleton)</small></h2>
+          <div class="section-meta">Atomic clauses with Berry types (VAG/POLY/COORD/SCOPE-Q) and severity (S1/S2/S3). Skeleton rows are dimmed.</div>
+          <table class="entity" id="table-clauses">
+            <thead>
+              <tr>
+                <th>ID</th><th>Reg</th><th>Section Ref</th><th>Title</th><th>Type</th><th>Severity</th><th>Sk</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-clauses"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tab-sos" class="tab-pane" data-pane="sos" style="display:none">
+        <div id="section-4" data-section="4">
+          <h2>§4 SecurityObjectives <small>328 SOs (3 formats)</small></h2>
+          <div class="section-meta">
+            <span class="type-badge HL">HL</span> High-level (cross-reg) ·
+            <span class="type-badge per-reg">per-reg</span> Per-reg subdomain ·
+            <span class="type-badge canonical">canonical</span> Canonical
+          </div>
+          <table class="entity" id="table-sos">
+            <thead>
+              <tr>
+                <th>ID</th><th>Type</th><th>Reg</th><th>Subdomain</th><th>Description</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-sos"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tab-srs" class="tab-pane" data-pane="srs" style="display:none">
+        <div id="section-5" data-section="5">
+          <h2>§5 SecurityRules <small>282 SRs</small></h2>
+          <div class="section-meta">Regulatory duties mapped to NIST CSF 2.0 controls. Click any row for full raw data (incl. regulatory_rationale, security_rationale, ambiguity_notes).</div>
+          <table class="entity" id="table-srs">
+            <thead>
+              <tr>
+                <th>ID</th><th>Title</th><th>Reg</th><th>Sub-domains</th><th>CSF</th><th>Role</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-srs"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -894,12 +935,21 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     ]);
 
     const STATE = {
+      activeTab: 'regulations',
       search: '',
-      activeRegs: new Set(DATA.regulations.map(r => r.id)),
-      activeSeverities: new Set(['S1', 'S2', 'S3']),
-      activeBerryTypes: new Set(['VAG', 'POLY', 'COORD', 'SCOPE-Q']),
-      activeCsf: new Set(['GV', 'ID', 'PR', 'DE', 'RS', 'RC']),
+      filters: {},
     };
+
+    // ---- Pre-derive filter-friendly fields (CORR-077) ----
+    const REG_TYPE_MAP = { 'GDPR': 'DATA_PROTECTION', 'CRA': 'CYBER_SECURITY', 'NIS2': 'CRITICAL_INFRA', 'DORA': 'FINANCIAL', 'AI_Act': 'AI_REGULATION' };
+    DATA.regulations.forEach(r => { r.type = REG_TYPE_MAP[r.id] || 'OTHER'; });
+    DATA.clauses.forEach(c => { c.berryType = c.type; });
+    DATA.srs.forEach(sr => {
+      sr.csfFunction = [...new Set((sr.nist_csf_mapping || []).map(c => {
+        const m = (c.id || '').match(/^([A-Z]{2})\./);
+        return m ? m[1] : null;
+      }).filter(Boolean))];
+    });
 
     // ---- KPI cards ----
     function renderKpis() {
@@ -927,146 +977,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       `;
     }
 
-    // ---- Analyics anchors ----
-    function renderAnchors() {
-      const anchors = [
-        { id: 'section-1', n: '§1', label: 'Regulations' },
-        { id: 'section-2', n: '§2', label: 'Articles' },
-        { id: 'section-3', n: '§3', label: 'Clauses' },
-        { id: 'section-4', n: '§4', label: 'SOs' },
-        { id: 'section-5', n: '§5', label: 'SRs' },
-      ];
-      document.getElementById('anchors').innerHTML = anchors.map(a =>
-        `<a class="anchor-link" href="#${a.id}"><span class="n">${a.n}</span> ${a.label}</a>`
-      ).join('');
-    }
-
-    // ---- Filters ----
-    function renderFilters() {
-      // Regs
-      const regEl = document.getElementById('filter-regs');
-      regEl.innerHTML = '<label class="title">Regulations</label>';
-      DATA.regulations.forEach(r => {
-        const cnt = DATA.articles.filter(a => a.regulation === r.id).length
-                  + DATA.clauses.filter(c => c.regulation === r.id).length
-                  + DATA.sos.filter(s => s.regulation === r.id).length
-                  + DATA.srs.filter(s => s.regulation === r.id).length;
-        regEl.innerHTML += `
-          <label>
-            <input type="checkbox" data-reg="${r.id}" ${STATE.activeRegs.has(r.id) ? 'checked' : ''} />
-            <span class="swatch" style="background:${r.color}"></span>
-            <span>${r.displayName}</span>
-            <span class="count">${cnt}</span>
-          </label>`;
-      });
-      regEl.querySelectorAll('input').forEach(cb => {
-        cb.addEventListener('change', e => {
-          const reg = e.target.dataset.reg;
-          if (e.target.checked) STATE.activeRegs.add(reg); else STATE.activeRegs.delete(reg);
-          applyAll();
-        });
-      });
-
-      // Severity
-      const sevEl = document.getElementById('filter-severity');
-      const sevColors = { S1: '#7df49f', S2: '#ffd93d', S3: '#ff6b6b' };
-      sevEl.innerHTML = '<label class="title">Severity</label>';
-      ['S1', 'S2', 'S3'].forEach(s => {
-        const cnt = DATA.clauses.filter(c => c.severity === s).length;
-        sevEl.innerHTML += `
-          <label>
-            <input type="checkbox" data-sev="${s}" ${STATE.activeSeverities.has(s) ? 'checked' : ''} />
-            <span class="severity-badge" style="background:${sevColors[s]}">${s}</span>
-            <span>${s}</span>
-            <span class="count">${cnt}</span>
-          </label>`;
-      });
-      sevEl.querySelectorAll('input').forEach(cb => {
-        cb.addEventListener('change', e => {
-          const s = e.target.dataset.sev;
-          if (e.target.checked) STATE.activeSeverities.add(s); else STATE.activeSeverities.delete(s);
-          applyAll();
-        });
-      });
-
-      // Berry type
-      const berryEl = document.getElementById('filter-berry');
-      berryEl.innerHTML = '<label class="title">Berry type</label>';
-      ['VAG', 'POLY', 'COORD', 'SCOPE-Q'].forEach(t => {
-        const cnt = DATA.clauses.filter(c => c.type === t).length;
-        berryEl.innerHTML += `
-          <label>
-            <input type="checkbox" data-berry="${t}" ${STATE.activeBerryTypes.has(t) ? 'checked' : ''} />
-            <span class="berry-badge">${t}</span>
-            <span>${t}</span>
-            <span class="count">${cnt}</span>
-          </label>`;
-      });
-      berryEl.querySelectorAll('input').forEach(cb => {
-        cb.addEventListener('change', e => {
-          const t = e.target.dataset.berry;
-          if (e.target.checked) STATE.activeBerryTypes.add(t); else STATE.activeBerryTypes.delete(t);
-          applyAll();
-        });
-      });
-
-      // CSF Function
-      const csfEl = document.getElementById('filter-csf');
-      csfEl.innerHTML = '<label class="title">CSF Function</label>';
-      ['GV', 'ID', 'PR', 'DE', 'RS', 'RC'].forEach(fn => {
-        csfEl.innerHTML += `
-          <label>
-            <input type="checkbox" data-csf="${fn}" ${STATE.activeCsf.has(fn) ? 'checked' : ''} />
-            <span class="csf-swatch" style="background:${DATA.csfColors[fn]}">${fn}</span>
-            <span>${fn}</span>
-          </label>`;
-      });
-      csfEl.querySelectorAll('input').forEach(cb => {
-        cb.addEventListener('change', e => {
-          const fn = e.target.dataset.csf;
-          if (e.target.checked) STATE.activeCsf.add(fn); else STATE.activeCsf.delete(fn);
-          applyAll();
-        });
-      });
-
-      // Reset
-      document.getElementById('reset').onclick = () => {
-        STATE.search = '';
-        STATE.activeRegs = new Set(DATA.regulations.map(r => r.id));
-        STATE.activeSeverities = new Set(['S1', 'S2', 'S3']);
-        STATE.activeBerryTypes = new Set(['VAG', 'POLY', 'COORD', 'SCOPE-Q']);
-        STATE.activeCsf = new Set(['GV', 'ID', 'PR', 'DE', 'RS', 'RC']);
-        document.getElementById('search').value = '';
-        renderFilters();
-        applyAll();
-      };
-    }
-
-    function search(query) {
-      STATE.search = (query || '').trim().toLowerCase();
-      applyAll();
-    }
-
-    function filter(state) {
-      // Allow programmatic filter updates (e.g., from URL hash)
-      if (state && state.regs) {
-        STATE.activeRegs = new Set(state.regs);
-      }
-      applyAll();
-    }
-
-    document.getElementById('search').addEventListener('input', e => {
-      search(e.target.value);
-    });
-
     // ---- Helpers ----
-    function getObjId(kind, obj) { return obj.id || ''; }
-
-    function matchesSearch(text) {
-      if (!STATE.search) return true;
-      return String(text || '').toLowerCase().includes(STATE.search);
-    }
-
     function csfFunctionOf(csfId) {
       if (!csfId) return '';
       const m = csfId.match(/^([A-Z]{2})\./);
@@ -1085,12 +996,194 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return t.length > max ? t.slice(0, max) + '…' : t;
     }
 
-    // ---- Section renderers ----
+    // ---- Sidebar: contextual filter rendering (CORR-077) ----
+    function rebuildSidebar() {
+      const sb = document.getElementById('sidebar-content');
+      sb.innerHTML = '';
+
+      // Search box — always present
+      const searchRow = document.createElement('div');
+      searchRow.style.marginBottom = '16px';
+      const searchLabel = document.createElement('div');
+      searchLabel.textContent = 'SEARCH';
+      searchLabel.style.cssText = 'font-size:11px;font-weight:600;letter-spacing:1px;color:var(--fg-dim);margin-bottom:6px;';
+      const searchInput = document.createElement('input');
+      searchInput.type = 'search';
+      searchInput.placeholder = 'Type to filter this tab';
+      searchInput.id = 'tab-search';
+      searchInput.style.cssText = 'width:100%;padding:6px 10px;background:var(--panel-2);border:1px solid var(--border);color:var(--fg);border-radius:6px;font-size:13px;outline:none';
+      searchInput.value = STATE.search || '';
+      searchInput.addEventListener('input', e => { STATE.search = e.target.value; applyAllFilters(); });
+      searchRow.appendChild(searchLabel);
+      searchRow.appendChild(searchInput);
+      sb.appendChild(searchRow);
+
+      // Tab-specific filters (CONTEXTUAL)
+      switch (STATE.activeTab) {
+        case 'regulations':
+          addFilterGroup(sb, 'REGULATION TYPE', [
+            ['DATA_PROTECTION', 'Data Protection'],
+            ['CYBER_SECURITY', 'Cyber Security'],
+            ['CRITICAL_INFRA', 'Critical Infra'],
+            ['FINANCIAL', 'Financial'],
+            ['AI_REGULATION', 'AI Regulation'],
+          ], 'type');
+          break;
+        case 'articles':
+          addFilterGroup(sb, 'REGULATION', DATA.regulations.map(r => [r.id, r.displayName || r.id]), 'regulation');
+          addFilterGroup(sb, 'STATUS', [['DRAFT','DRAFT'],['ACTIVE','ACTIVE']], 'status');
+          break;
+        case 'clauses':
+          addFilterGroup(sb, 'REGULATION', DATA.regulations.map(r => [r.id, r.displayName || r.id]), 'regulation');
+          addFilterGroup(sb, 'BERRY TYPE', [['VAG','VAG'],['POLY','POLY'],['COORD','COORD'],['SCOPE-Q','SCOPE-Q']], 'berryType');
+          addFilterGroup(sb, 'SEVERITY', [['S1','S1'],['S2','S2'],['S3','S3']], 'severity');
+          const hideSkel = document.createElement('label');
+          hideSkel.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:8px;';
+          hideSkel.innerHTML = '<input type="checkbox" id="hide-skel" /> <span>Hide skeleton clauses</span>';
+          hideSkel.querySelector('#hide-skel').addEventListener('change', e => {
+            if (!STATE.filters.hideSkeleton) STATE.filters.hideSkeleton = new Set();
+            if (e.target.checked) STATE.filters.hideSkeleton.add('true');
+            else STATE.filters.hideSkeleton.delete('true');
+            applyAllFilters();
+          });
+          sb.appendChild(hideSkel);
+          break;
+        case 'sos':
+          addFilterGroup(sb, 'REGULATION', DATA.regulations.map(r => [r.id, r.displayName || r.id]), 'regulation');
+          addFilterGroup(sb, 'SO TYPE', [
+            ['HL', 'High-Level'],
+            ['per-reg', 'Per-Reg'],
+            ['canonical', 'Canonical'],
+          ], 'soType');
+          const sdSet = new Set();
+          DATA.sos.forEach(s => s.subDomains && s.subDomains.forEach(x => sdSet.add(x)));
+          const subs = [...sdSet].sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+          addFilterGroup(sb, 'SUBDOMAIN', subs.map(s => [s, s]), 'subdomain');
+          break;
+        case 'srs':
+          addFilterGroup(sb, 'REGULATION', DATA.regulations.map(r => [r.id, r.displayName || r.id]), 'regulation');
+          const srSd = new Set();
+          DATA.srs.forEach(s => s.sub_domain && s.sub_domain.forEach(x => srSd.add(x)));
+          const srsubs = [...srSd].sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+          addFilterGroup(sb, 'SUBDOMAIN', srsubs.map(s => [s, s]), 'subdomain');
+          addFilterGroup(sb, 'CSF FUNCTION', [['GV','GV'],['ID','ID'],['PR','PR'],['DE','DE'],['RS','RS'],['RC','RC']], 'csfFunction');
+          const roles = new Set();
+          DATA.srs.forEach(s => s.applies_to_role && s.applies_to_role.forEach(r => roles.add(r)));
+          addFilterGroup(sb, 'ROLE', [...roles].sort().map(r => [r, r]), 'role');
+          const obls = new Set();
+          DATA.srs.forEach(s => s.obligation_type && s.obligation_type.forEach(o => obls.add(o)));
+          addFilterGroup(sb, 'OBLIGATION', [...obls].sort().map(o => [o, o]), 'obligation');
+          break;
+      }
+
+      // Reset button — always present
+      const reset = document.createElement('button');
+      reset.textContent = 'Reset filters';
+      reset.style.cssText = 'margin-top:20px;width:100%;padding:8px;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:6px;cursor:pointer;font-size:12px';
+      reset.addEventListener('click', () => {
+        STATE.search = '';
+        STATE.filters = {};
+        rebuildSidebar();
+        applyAllFilters();
+      });
+      sb.appendChild(reset);
+    }
+
+    function addFilterGroup(parent, title, options, filterKey) {
+      const group = document.createElement('div');
+      group.style.cssText = 'margin-bottom:16px';
+      const head = document.createElement('div');
+      head.textContent = title;
+      head.style.cssText = 'font-size:11px;font-weight:600;letter-spacing:1px;color:var(--fg-dim);margin-bottom:6px';
+      group.appendChild(head);
+      options.forEach(([val, label]) => {
+        const lbl = document.createElement('label');
+        lbl.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer;color:var(--fg)';
+        const checked = STATE.filters[filterKey] && STATE.filters[filterKey].has(val) ? 'checked' : '';
+        lbl.innerHTML = `<input type="checkbox" data-filter="${filterKey}" data-value="${escapeHtml(String(val))}" ${checked} /> <span>${escapeHtml(String(label))}</span>`;
+        lbl.querySelector('input').addEventListener('change', e => {
+          if (!STATE.filters[filterKey]) STATE.filters[filterKey] = new Set();
+          if (e.target.checked) STATE.filters[filterKey].add(val);
+          else STATE.filters[filterKey].delete(val);
+          applyAllFilters();
+        });
+        group.appendChild(lbl);
+      });
+      parent.appendChild(group);
+    }
+
+    // ---- Apply ALL filters (search + sidebar) to active tab (CORR-077) ----
+    function applyAllFilters() {
+      let dataArr = [];
+      switch (STATE.activeTab) {
+        case 'regulations': dataArr = DATA.regulations; break;
+        case 'articles':    dataArr = DATA.articles; break;
+        case 'clauses':     dataArr = DATA.clauses; break;
+        case 'sos':         dataArr = DATA.sos; break;
+        case 'srs':         dataArr = DATA.srs; break;
+      }
+
+      const filtered = dataArr.filter(item => {
+        // Search filter — matches across all fields
+        if (STATE.search && STATE.search.trim()) {
+          const q = STATE.search.toLowerCase().trim();
+          const haystack = JSON.stringify(item).toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+        // Tab-specific filters
+        for (const [key, valSet] of Object.entries(STATE.filters)) {
+          if (!valSet || valSet.size === 0) continue;
+          if (key === 'hideSkeleton') {
+            const isSkel = item.is_skeleton === true || item.isSkeleton === true;
+            if (valSet.has('true') && isSkel) return false;
+            continue;
+          }
+          const itemVal = item[key];
+          let matches = false;
+          if (Array.isArray(itemVal)) {
+            for (const v of itemVal) {
+              if (valSet.has(String(v)) || valSet.has(v)) { matches = true; break; }
+            }
+          } else if (itemVal != null) {
+            if (valSet.has(String(itemVal)) || valSet.has(itemVal)) matches = true;
+          }
+          if (!matches) return false;
+        }
+        return true;
+      });
+
+      // Hide rows in DOM that don't match
+      const pane = document.querySelector(`#tab-${STATE.activeTab}`);
+      if (!pane) return;
+      const allRows = pane.querySelectorAll('[data-entity-id]');
+      const visibleIds = new Set(filtered.map(e => e.id || e._id));
+      allRows.forEach(row => {
+        const rowId = row.getAttribute('data-entity-id');
+        row.style.display = visibleIds.has(rowId) ? '' : 'none';
+      });
+    }
+
+    // ---- Tab switching (CORR-077) ----
+    function switchTab(tabName) {
+      STATE.activeTab = tabName;
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+      });
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.style.display = (pane.dataset.pane === tabName) ? 'block' : 'none';
+      });
+      STATE.search = '';
+      STATE.filters = {};
+      rebuildSidebar();
+      applyAllFilters();
+    }
+
+    // ---- Section renderers (CORR-077: add data-entity-id) ----
     function renderRegs() {
       const cards = DATA.regulations.map(r => {
         const st = r.stats || {};
-        const card = `
-          <div class="reg-card" data-detail-kind="regulation" data-detail-id="${r.id}">
+        return `
+          <div class="reg-card" data-detail-kind="regulation" data-detail-id="${r.id}" data-entity-id="${r.id}">
             <div class="strip" style="background:${r.color}"></div>
             <div>
               <div class="name">${r.displayName}</div>
@@ -1104,17 +1197,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             </div>
             <div class="doc-id">${escapeHtml(r.docId || '')}</div>
           </div>`;
-        return card;
       });
       document.getElementById('regs-cards').innerHTML = cards.join('');
     }
 
     function renderArticles() {
-      const rows = DATA.articles.map(a => {
-        const visible = STATE.activeRegs.has(a.regulation)
-                     && matchesSearch(`${a.id} ${a.title || ''} ${a.articleRef || ''}`);
-        return `
-          <tr data-detail-kind="article" data-detail-id="${a.id}" class="${visible ? '' : 'hidden'}">
+      const rows = DATA.articles.map(a => `
+          <tr data-detail-kind="article" data-detail-id="${a.id}" data-entity-id="${a.id}">
             <td><span class="cell-id">${a.id}</span></td>
             <td><span class="reg-tag" style="background:${DATA.regColors[a.regulation]}">${a.regulation}</span></td>
             <td>${escapeHtml(a.articleRef || '')}</td>
@@ -1122,21 +1211,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             <td>${(a.securityObjectives || []).length}</td>
             <td>${a.securityRuleCount || 0}</td>
             <td>${escapeHtml(a.status || '')}</td>
-          </tr>`;
-      }).join('');
+          </tr>`).join('');
       document.getElementById('tbody-articles').innerHTML = rows;
     }
 
     function renderClauses() {
       const rows = DATA.clauses.map(c => {
-        const visible = STATE.activeRegs.has(c.regulation)
-                     && matchesSearch(`${c.id} ${c.title || ''} ${c.sectionRef || ''}`);
-        const sevColor = c.severity === 'S3' ? '#ff6b6b' : c.severity === 'S2' ? '#ffd93d' : c.severity === 'S1' ? '#7df49f' : '#555';
         const typeBadge = c.type
           ? `<span class="type-badge ${c.type}">${c.type}</span>`
           : '<span style="color:var(--fg-dim)">—</span>';
         return `
-          <tr data-detail-kind="clause" data-detail-id="${c.id}" class="${c.isSkeleton ? 'skeleton ' : ''}${visible ? '' : 'hidden'}">
+          <tr data-detail-kind="clause" data-detail-id="${c.id}" data-entity-id="${c.id}" class="${c.isSkeleton ? 'skeleton' : ''}">
             <td><span class="cell-id">${c.id}${c.isSkeleton ? '<span class="skel-tag">skel</span>' : ''}</span></td>
             <td><span class="reg-tag" style="background:${DATA.regColors[c.regulation]}">${c.regulation}</span></td>
             <td>${escapeHtml(c.sectionRef || '')}</td>
@@ -1151,13 +1236,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function renderSos() {
       const rows = DATA.sos.map(s => {
-        const visible = STATE.activeRegs.has(s.regulation)
-                     && matchesSearch(`${s.id} ${s.description || ''} ${s.objective || ''} ${s.subdomainId || ''}`);
         const sub = (s.subDomains && s.subDomains.length) ? s.subDomains.join(', ')
                    : (s.subdomainId || s.sourceSubdomain || '');
         const preview = s.description || s.objective || '';
         return `
-          <tr data-detail-kind="so" data-detail-id="${s.id}" class="${visible ? '' : 'hidden'}">
+          <tr data-detail-kind="so" data-detail-id="${s.id}" data-entity-id="${s.id}">
             <td><span class="cell-id">${s.id}</span></td>
             <td><span class="type-badge ${s.soType}">${s.soType}</span></td>
             <td><span class="reg-tag" style="background:${DATA.regColors[s.regulation] || '#888'}">${s.regulation}</span></td>
@@ -1175,10 +1258,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           return `<span class="csf-chip" style="background:${DATA.csfColors[fn] || '#888'}" data-csf-id="${c.id}">${c.id}</span>`;
         }).join('');
         const subs = (sr.sub_domain || []).join(', ');
-        const visible = STATE.activeRegs.has(sr.regulation)
-                     && matchesSearch(`${sr.id} ${sr.title || ''} ${sr.heading_under || ''} ${subs}`);
         return `
-          <tr data-detail-kind="sr" data-detail-id="${sr.id}" class="${visible ? '' : 'hidden'}">
+          <tr data-detail-kind="sr" data-detail-id="${sr.id}" data-entity-id="${sr.id}">
             <td><span class="cell-id">${sr.id}</span></td>
             <td><div class="preview">${escapeHtml(sr.title || '')}</div></td>
             <td><span class="reg-tag" style="background:${DATA.regColors[sr.regulation]}">${sr.regulation}</span></td>
@@ -1326,76 +1407,20 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
     });
 
-    // ---- Counters ----
-    function renderCounters() {
-      const counts = {
-        regs: 0, articles: 0, clauses: 0, sos: 0, srs: 0,
-      };
-      counts.regs = DATA.regulations.filter(r => STATE.activeRegs.has(r.id)).length;
-      counts.articles = DATA.articles.filter(a => STATE.activeRegs.has(a.regulation) && matchesSearch(`${a.id} ${a.title || ''} ${a.articleRef || ''}`)).length;
-      counts.clauses = DATA.clauses.filter(c => STATE.activeRegs.has(c.regulation) && matchesSearch(`${c.id} ${c.title || ''} ${c.sectionRef || ''}`)).length;
-      counts.sos = DATA.sos.filter(s => STATE.activeRegs.has(s.regulation) && matchesSearch(`${s.id} ${s.description || ''} ${s.objective || ''} ${s.subdomainId || ''}`)).length;
-      counts.srs = DATA.srs.filter(sr => STATE.activeRegs.has(sr.regulation) && matchesSearch(`${sr.id} ${sr.title || ''}`)).length;
-      document.getElementById('counters').innerHTML = `
-        <div style="font-weight: 600; color: var(--fg); margin-bottom: 4px;">Visible</div>
-        <div>Regs: <b style="color:var(--accent)">${counts.regs}</b>/${DATA.stats.regulations}</div>
-        <div>Articles: <b style="color:var(--accent)">${counts.articles}</b>/${DATA.stats.articles}</div>
-        <div>Clauses: <b style="color:var(--accent)">${counts.clauses}</b>/${DATA.stats.clauses}</div>
-        <div>SOs: <b style="color:var(--accent)">${counts.sos}</b>/${DATA.stats.sos}</div>
-        <div>SRs: <b style="color:var(--accent)">${counts.srs}</b>/${DATA.stats.srs}</div>
-      `;
-      document.getElementById('footer-info').textContent =
-        `Active regs: ${STATE.activeRegs.size}/5 · Search: "${STATE.search || '∅'}"`;
-    }
-
-    // ---- Filtering per-section (row-level) ----
-    function applyRowFilters() {
-      // Articles
-      document.querySelectorAll('#tbody-articles tr').forEach(tr => {
-        const a = DATA.articles.find(x => x.id === tr.dataset.detailId);
-        if (!a) return;
-        const visible = STATE.activeRegs.has(a.regulation) && matchesSearch(`${a.id} ${a.title || ''} ${a.articleRef || ''}`);
-        tr.classList.toggle('hidden', !visible);
-      });
-      // Clauses
-      document.querySelectorAll('#tbody-clauses tr').forEach(tr => {
-        const c = DATA.clauses.find(x => x.id === tr.dataset.detailId);
-        if (!c) return;
-        const visible = STATE.activeRegs.has(c.regulation) && matchesSearch(`${c.id} ${c.title || ''} ${c.sectionRef || ''}`);
-        tr.classList.toggle('hidden', !visible);
-      });
-      // SOs
-      document.querySelectorAll('#tbody-sos tr').forEach(tr => {
-        const s = DATA.sos.find(x => x.id === tr.dataset.detailId);
-        if (!s) return;
-        const visible = STATE.activeRegs.has(s.regulation) && matchesSearch(`${s.id} ${s.description || ''} ${s.objective || ''} ${s.subdomainId || ''}`);
-        tr.classList.toggle('hidden', !visible);
-      });
-      // SRs
-      document.querySelectorAll('#tbody-srs tr').forEach(tr => {
-        const sr = DATA.srs.find(x => x.id === tr.dataset.detailId);
-        if (!sr) return;
-        const visible = STATE.activeRegs.has(sr.regulation) && matchesSearch(`${sr.id} ${sr.title || ''} ${sr.heading_under || ''} ${(sr.sub_domain || []).join(',')}`);
-        tr.classList.toggle('hidden', !visible);
-      });
-    }
-
-    function applyAll() {
-      applyRowFilters();
-      renderCounters();
-    }
-
-    // ---- Init ----
+    // ---- Init (CORR-077: tab-based) ----
     renderKpis();
     renderBanner();
-    renderAnchors();
-    renderFilters();
     renderRegs();
     renderArticles();
     renderClauses();
     renderSos();
     renderSrs();
-    renderCounters();
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === STATE.activeTab);
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+    rebuildSidebar();
+    applyAllFilters();
   })();
   </script>
 </body>
