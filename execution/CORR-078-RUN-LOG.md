@@ -209,11 +209,21 @@ exit 0
 
 $ bash .hooks/ci-frameworks.sh
 === ci-frameworks.sh: rejecting unannotated non-CSF-2.0 frameworks ===
-No unannotated framework references found.
+OK: all framework references are annotated with CORR-028
 exit 0
 ```
 
 Both gates exit 0.
+
+**C18 deviation:** the first run of `ci-frameworks.sh` flagged 37 mentions of
+"ISO 27001" in `docs/visualization/regulation_chain.html` (lines 112+, embedded
+in NIS2 / CRA SR `ambiguity_notes` + `regulatory_rationale` fields). The HTML
+is a build artifact that embeds preproc_out verbatim; the framework mentions
+are analytical (per NIST_CSF_2.0_ONLY.md §2, they are NOT control-framework
+usage). Fix: added `SCAN_EXCLUDE_PATHS=("docs/visualization/")` to
+ci-frameworks.sh + `.gitignore` entry for the build artifact. The preproc_out
+JSON source itself (which the build embeds) is already exempt via the
+`!preproc_out/audit/` exclusion.
 
 ## Test summary (C17)
 
@@ -230,7 +240,9 @@ Ollama/Langfuse/transformers infrastructure dependencies (see
 `execution/QUALITY_LOG.md` CORR-074 / CORR-060 rows for the same baseline
 documentation pattern).
 
-## Files committed by WS4 (this commit)
+## Files committed by WS4
+
+### Commit `c63e1d8` (WS4 golden regen + contract commit + run-log)
 
 - `preproc_out/.gitkeep` (re-touched; preproc_out is gitignored)
 - `preproc_out/audit/csf_mapping_report.json` (timestamp-only diff)
@@ -240,12 +252,22 @@ documentation pattern).
 - `execution/SPEC.md` (updated to SP-2026-20)
 - `execution/CORR-078-RUN-LOG.md` (this file)
 - `execution/QUALITY_LOG.md` (CORR-078 entry appended)
+- `scripts/preprocess/pipeline.py` (regex + auto-regulation inference)
+- `scripts/preprocess/parsers/aggregated/security_objectives.py` (regex)
+- `scripts/preprocess/parsers/entities/clause.py` (parse_ambiguity_file signature)
+- `tests/unit/scripts/preprocess/test_clause_parsers.py` (C1 assertion update)
+
+### Commit `51568ab` (CI gate fix — follow-up)
+
+- `.hooks/ci-frameworks.sh` (add SCAN_EXCLUDE_PATHS for docs/visualization/)
+- `.gitignore` (formally gitignore docs/visualization/regulation_chain.html + build_regulation_chain.py)
 
 ## Files NOT committed (gitignored, per AGENTS.md §5)
 
-- `docs/visualization/build_regulation_chain.py` (gitignored; backup in /tmp)
-- `docs/visualization/regulation_chain.html` (gitignored; backup in /tmp)
+- `docs/visualization/build_regulation_chain.py` (gitignored per `.gitignore`; backup at `/tmp/corr078_viz_backup/build_regulation_chain.py`)
+- `docs/visualization/regulation_chain.html` (gitignored per `.gitignore`; backup at `/tmp/corr078_viz_backup/regulation_chain.html`)
 - `preproc_out/entities/`, `preproc_out/regulation/` (gitignored per `.gitignore`)
+- `Methodology-main` (symlink to external repo; intentionally untracked)
 
 ## Lessons
 
