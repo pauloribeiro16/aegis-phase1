@@ -761,20 +761,29 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             .filter(sd => sd.domainId === d.id && sdIds.has(sd.id))
             .slice()
             .sort((a, b) => naturalIdSort(a.id, b.id));
-          if (!sdList.length) return;
-          const domainNode = { name: d.name, children: [] };
-          sdList.forEach(sd => {
-            const srList = rules
-              .filter(r => r.subdomains.includes(sd.id))
-              .filter(r => matchesSearch(r.title) || matchesSearch(r.id))
-              .slice()
-              .sort((a, b) => a.id.localeCompare(b.id));
-            const filtered = srList.length ? srList : [{ id: '—', title: '(no SR mapped)' }];
-            domainNode.children.push({
-              name: `${sd.id} ${sd.name}`,
-              children: filtered.map(sr => ({ name: sr.id, value: sr.title }))
+          const domainNode = { name: `${d.id} ${d.name}`, children: [] };
+          if (sdList.length === 0) {
+            // Domain without active subdomains (filtered) — show as placeholder so
+            // the user always sees all 10 domains in the tree.
+            domainNode.children = [{
+              name: '(no active SRs for current filters)',
+              itemStyle: { color: '#5a6378', borderColor: '#5a6378' },
+              label: { color: '#8b95a7', fontSize: 10, fontStyle: 'italic' },
+            }];
+          } else {
+            sdList.forEach(sd => {
+              const srList = rules
+                .filter(r => r.subdomains.includes(sd.id))
+                .filter(r => matchesSearch(r.title) || matchesSearch(r.id))
+                .slice()
+                .sort((a, b) => a.id.localeCompare(b.id));
+              const filtered = srList.length ? srList : [{ id: '—', title: '(no SR mapped for current search)' }];
+              domainNode.children.push({
+                name: `${sd.id} ${sd.name}`,
+                children: filtered.map(sr => ({ name: sr.id, value: sr.title }))
+              });
             });
-          });
+          }
           tree.push(domainNode);
         });
 
