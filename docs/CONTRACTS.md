@@ -1199,3 +1199,4 @@ All 12 acceptance criteria pass (Generator + Evaluator, fresh context):
 - Apply same audit + corrections to case2-secureborder and case3-omnibank — likely needed
 - Same audit methodology for other 4 regulations in case1 (GDPR, CRA, NIS2, DORA) — likely needed
 - Regenerate `docs/visualization/taxonomy_chain.html` after CSV changes — works as-is, but a re-build would reflect the corrected sub-domain attributions
+- Regenerate visualization — **DONE 2026-07-30**: 13 sub-domains maintained, D-05.3 and D-09.4 correctly removed, D-02.4 + D-07.2 correctly added, D-07.3 now legitimised via C28. 16 distinct CSF controls reachable from AI Act clauses.
