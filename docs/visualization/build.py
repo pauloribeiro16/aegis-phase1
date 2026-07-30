@@ -681,7 +681,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             depth: 3,
             itemStyle: { color, borderColor: color },
             value: csfWeight[s.id] || 0,
-            label: { color: '#0f1419', fontSize: 9, fontWeight: 'bold' },
+            label: {
+              color: '#ffffff',
+              fontSize: 9,
+              fontWeight: 'bold',
+              textBorderColor: '#0f1419',
+              textBorderWidth: 1.5,
+            },
           });
         });
 
