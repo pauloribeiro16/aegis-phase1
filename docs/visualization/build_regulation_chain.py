@@ -643,9 +643,6 @@ def load_all_objectives() -> list[dict]:
                 continue
             md_clean = _strip_frontmatter(md_text)
             ss_id = md_file.stem  # e.g., "D-01.1"
-            # CORR-098: per-file counter to disambiguate phantoms that share
-            # both inherits_from and sectionId (rare; e.g. D-04.3.11 NIS2).
-            phantom_seen: dict[tuple[str, str], int] = {}
             pattern = re.compile(
                 r"^###\s+(D-\d+\.\d+\.\d+)\s*[—\-–]\s*(High-level SecurityObjective|Sub-SO for\s+(.+?))\s*$",
                 re.MULTILINE,
@@ -654,10 +651,12 @@ def load_all_objectives() -> list[dict]:
                 section_id = m.group(1)
                 section_title = m.group(2)
                 is_hl = "High-level" in section_title
-                # CORR-098: detect phantom (CORR-030 propagated) blocks BEFORE
-                # _normalize_reg_label strips the annotation, so we can disambiguate
-                # their id and avoid collisions with the legit sub-SO.
-                is_phantom = "phantom" in section_title.lower()
+                # CORR-098 (revised): phantom (CORR-030 propagated) blocks are
+                # dropped entirely — they duplicate the legit sub-SO and add no
+                # value. Detection happens BEFORE _normalize_reg_label strips the
+                # annotation. ~55 phantoms across 18 SubDomains MD files removed.
+                if "phantom" in section_title.lower():
+                    continue
                 if is_hl:
                     reg = "HL"
                 else:
@@ -685,21 +684,6 @@ def load_all_objectives() -> list[dict]:
                 )
                 considerations = cons_m.group(1).strip() if cons_m else ""
                 so_id = yaml_dict.get("id", f"SO-{section_id}.{reg}")
-                phantom_flag = False
-                if is_phantom:
-                    # CORR-098: phantom blocks share the legit sub-SO's id in YAML.
-                    # Give them a unique id derived from inherits_from + sectionId
-                    # (e.g. SO-CRA-048 under D-09.4.4 → SO-D-09.4.CRA.P048x0944)
-                    # so multiple phantoms inheriting the same SO stay distinct.
-                    phantom_flag = True
-                    inh = yaml_dict.get("inherits_from", "")
-                    inh_m = re.search(r"(\d+)", inh)
-                    inh_num = inh_m.group(1) if inh_m else "0"
-                    sec_suffix = section_id.replace("D-", "").replace(".", "")
-                    key = (inh_num, sec_suffix)
-                    phantom_seen[key] = phantom_seen.get(key, 0) + 1
-                    occ = phantom_seen[key]
-                    so_id = f"SO-{ss_id}.{reg}.P{inh_num}x{sec_suffix}" + (f"#{occ}" if occ > 1 else "")
                 objectives.append({
                     "id": so_id,
                     "kind": "HL" if is_hl else "sub-SO",
@@ -711,7 +695,6 @@ def load_all_objectives() -> list[dict]:
                     "considerations": considerations,
                     "sectionId": section_id,
                     "filename": md_file.name,
-                    "phantom": phantom_flag,
                 })
     print(
         f"load_all_objectives: {len(objectives)} objectives from SubDomains MDs",
@@ -1705,8 +1688,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .type-badge.canonical { background: var(--panel-2); border-color: var(--border); color: var(--fg-dim); }
     .type-badge.VAG { color: var(--warn); }
     .type-badge.POLY { color: var(--accent-2); }
-    /* CORR-098: phantom badge for CORR-030 propagated sub-SO blocks (unique id) */
-    .phantom-badge { margin-left: 4px; padding: 1px 5px; font-size: 9px; border-radius: 3px; background: rgba(255,159,28,0.18); border: 1px solid var(--warn); color: var(--warn); cursor: help; }
     /* CORR-099 Lacuna 1: SO badge for security-objective sections inside methodology */
     .so-badge { margin-left: 4px; padding: 1px 5px; font-size: 9px; border-radius: 3px; background: rgba(108,92,231,0.18); border: 1px solid var(--accent-2); color: var(--accent-2); cursor: help; }
     /* CORR-099 Lacuna 3: H2 wrapper badge + emphasis for top-level sections */
@@ -2494,7 +2475,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         return `
           <tr data-detail-kind="objective" data-detail-id="${s.id}" data-entity-id="${s.id}">
             <td><span class="cell-id">${s.id}</span></td>
-            <td><span class="type-badge ${s.kind === 'HL' ? 'HL' : 'sub-SO'}">${s.kind}</span>${s.phantom ? '<span class="phantom-badge" title="CORR-030 propagated phantom (unique id assigned)">phantom</span>' : ''}</td>
+            <td><span class="type-badge ${s.kind === 'HL' ? 'HL' : 'sub-SO'}">${s.kind}</span></td>
             <td><span class="reg-tag" style="background:${regColor}">${escapeHtml(reg)}</span></td>
             <td><span class="cell-id-sm">${escapeHtml(s.subdomain || '')}</span></td>
             <td><div class="preview">${escapeHtml((preview || '').slice(0, 200))}${(preview || '').length > 200 ? '…' : ''}</div></td>
