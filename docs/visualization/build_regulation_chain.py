@@ -507,6 +507,92 @@ def load_srs():
     return srs
 
 
+def load_security_requirements() -> list[dict]:
+    """Load hierarchical security requirements (HL + sub-reqs) from SubDomains MDs.
+
+    CORR-093: source of truth is SubDomains MDs.
+    Each MD has:
+    - `## High-level requirement` section (1 HL req)
+    - `## Sub-requirements` section (2-5 sub-reqs)
+    Returns flat list with parent_id field for hierarchy.
+    """
+    SUBDOMAINS_DIR = METHODOLOGY_DIR.parent / "SubDomains"
+    requirements: list[dict] = []
+    if not SUBDOMAINS_DIR.exists():
+        return requirements
+    for sub_dir in sorted(SUBDOMAINS_DIR.iterdir()):
+        if not sub_dir.is_dir():
+            continue
+        for md_file in sorted(sub_dir.glob("D-*.md")):
+            if md_file.stem == "index":
+                continue
+            md_text = _read_text(md_file)
+            if not md_text:
+                continue
+            md_clean = _strip_frontmatter(md_text)
+            ss_id = md_file.stem  # e.g., "D-01.1"
+            # Find HL requirement section
+            hl_m = re.search(
+                r"^##\s+High-level requirement\s*\n(.*?)(?=^##\s+|\Z)",
+                md_clean, re.MULTILINE | re.DOTALL
+            )
+            hl_req_id = None
+            hl_yaml = ""
+            if hl_m:
+                hl_yaml_m = re.search(r"```yaml\n(.*?)\n```", hl_m.group(1), re.DOTALL)
+                if hl_yaml_m:
+                    hl_yaml = hl_yaml_m.group(1)
+                    req_id_m = re.search(r"req_id:\s*(\S+)", hl_yaml)
+                    if req_id_m:
+                        hl_req_id = req_id_m.group(1)
+                if hl_req_id:
+                    requirements.append({
+                        "id": f"{ss_id}/{hl_req_id}",
+                        "req_id": hl_req_id,
+                        "subdomain": ss_id,
+                        "level": "HL",
+                        "parent_id": None,
+                        "yaml": hl_yaml,
+                        "raw_md": hl_m.group(0).strip(),
+                    })
+            # Find Sub-requirements section
+            sub_m = re.search(
+                r"^##\s+Sub-requirements\s*\n(.*?)(?=^##\s+|\Z)",
+                md_clean, re.MULTILINE | re.DOTALL
+            )
+            if sub_m and hl_req_id:
+                for sub_section in re.split(
+                    r"(?=^###\s+[0-9]+\.[0-9]+\.[0-9]+\s*[—\-–])",
+                    sub_m.group(1), flags=re.MULTILINE
+                ):
+                    sub_heading_m = re.match(
+                        r"^###\s+([0-9]+\.[0-9]+\.[0-9]+)\s*[—\-–]\s*(.+?)\s*$",
+                        sub_section, re.MULTILINE
+                    )
+                    if not sub_heading_m:
+                        continue
+                    sub_req_id = sub_heading_m.group(1)
+                    sub_yaml_m = re.search(r"```yaml\n(.*?)\n```", sub_section, re.DOTALL)
+                    if not sub_yaml_m:
+                        continue
+                    sub_yaml = sub_yaml_m.group(1)
+                    # Extract title from yaml
+                    title_m = re.search(r"title:\s*\"?([^\"\n]+)\"?", sub_yaml)
+                    sub_title = title_m.group(1).strip() if title_m else sub_heading_m.group(2)
+                    requirements.append({
+                        "id": f"{ss_id}/{sub_req_id}",
+                        "req_id": sub_req_id,
+                        "subdomain": ss_id,
+                        "level": "sub",
+                        "parent_id": hl_req_id,
+                        "title": sub_title,
+                        "yaml": sub_yaml,
+                        "raw_md": sub_section.strip(),
+                    })
+    print(f"load_security_requirements: {len(requirements)} requirements (HL + sub)", flush=True)
+    return requirements
+
+
 def _normalize_reg_label(raw: str) -> str:
     """Normalise a "Sub-SO for <X>" label to a canonical regulation ID.
 
@@ -557,6 +643,9 @@ def load_all_objectives() -> list[dict]:
                 continue
             md_clean = _strip_frontmatter(md_text)
             ss_id = md_file.stem  # e.g., "D-01.1"
+            # CORR-098: per-file counter to disambiguate phantoms that share
+            # both inherits_from and sectionId (rare; e.g. D-04.3.11 NIS2).
+            phantom_seen: dict[tuple[str, str], int] = {}
             pattern = re.compile(
                 r"^###\s+(D-\d+\.\d+\.\d+)\s*[—\-–]\s*(High-level SecurityObjective|Sub-SO for\s+(.+?))\s*$",
                 re.MULTILINE,
@@ -565,6 +654,10 @@ def load_all_objectives() -> list[dict]:
                 section_id = m.group(1)
                 section_title = m.group(2)
                 is_hl = "High-level" in section_title
+                # CORR-098: detect phantom (CORR-030 propagated) blocks BEFORE
+                # _normalize_reg_label strips the annotation, so we can disambiguate
+                # their id and avoid collisions with the legit sub-SO.
+                is_phantom = "phantom" in section_title.lower()
                 if is_hl:
                     reg = "HL"
                 else:
@@ -592,6 +685,21 @@ def load_all_objectives() -> list[dict]:
                 )
                 considerations = cons_m.group(1).strip() if cons_m else ""
                 so_id = yaml_dict.get("id", f"SO-{section_id}.{reg}")
+                phantom_flag = False
+                if is_phantom:
+                    # CORR-098: phantom blocks share the legit sub-SO's id in YAML.
+                    # Give them a unique id derived from inherits_from + sectionId
+                    # (e.g. SO-CRA-048 under D-09.4.4 → SO-D-09.4.CRA.P048x0944)
+                    # so multiple phantoms inheriting the same SO stay distinct.
+                    phantom_flag = True
+                    inh = yaml_dict.get("inherits_from", "")
+                    inh_m = re.search(r"(\d+)", inh)
+                    inh_num = inh_m.group(1) if inh_m else "0"
+                    sec_suffix = section_id.replace("D-", "").replace(".", "")
+                    key = (inh_num, sec_suffix)
+                    phantom_seen[key] = phantom_seen.get(key, 0) + 1
+                    occ = phantom_seen[key]
+                    so_id = f"SO-{ss_id}.{reg}.P{inh_num}x{sec_suffix}" + (f"#{occ}" if occ > 1 else "")
                 objectives.append({
                     "id": so_id,
                     "kind": "HL" if is_hl else "sub-SO",
@@ -603,6 +711,7 @@ def load_all_objectives() -> list[dict]:
                     "considerations": considerations,
                     "sectionId": section_id,
                     "filename": md_file.name,
+                    "phantom": phantom_flag,
                 })
     print(
         f"load_all_objectives: {len(objectives)} objectives from SubDomains MDs",
@@ -650,6 +759,38 @@ def _extract_pair_relationships(md_text: str) -> list[dict]:
             "section_md": section_md,
         })
     return pairs
+
+
+def _parse_da_sections(md_text: str) -> list[dict]:
+    """Split a DomainAnalysis MD into structured ``####`` sections.
+
+    CORR-099 (Lacuna 2): DomainAnalysis MDs follow a fixed template — one ``###``
+    title heading followed by ``####`` blocks (Participants, Pairwise matrix,
+    Emergent tensions, SR cross-validation, Downstream implication, ...). The
+    raw blob is hard to browse, so we split on ``####`` headings and return a
+    list of ``{heading, body_md}`` for rendering as individual toggles.
+
+    Text before the first ``####`` (the ``###`` title + any intro) is returned
+    as a section with heading ``""`` so nothing is silently dropped.
+    """
+    if not md_text:
+        return []
+    h4_re = re.compile(r"^####\s+(.+?)\s*$", re.MULTILINE)
+    sections: list[dict] = []
+    matches = list(h4_re.finditer(md_text))
+    if not matches:
+        return [{"heading": "", "body_md": md_text.strip()}]
+    # Intro: everything before the first #### (the ### title + preamble).
+    pre = md_text[: matches[0].start()].strip()
+    if pre:
+        sections.append({"heading": "", "body_md": pre})
+    for i, m in enumerate(matches):
+        heading = m.group(1).strip()
+        start = m.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(md_text)
+        body = md_text[start:end].strip()
+        sections.append({"heading": heading, "body_md": body})
+    return sections
 
 
 def load_crossregulation_md() -> dict:
@@ -743,6 +884,10 @@ def load_crossregulation_md() -> dict:
                 domain_md_path = DOMAIN_ANALYSIS_DIR / sub_dir.name / md_file.name
                 domain_md_text = _read_text(domain_md_path) if domain_md_path.exists() else ""
                 domain_md_clean = _strip_frontmatter(domain_md_text) if domain_md_text else ""
+                # DATA-DEBT (Part 4): D-05.4.md has a stray "## D-06 Supply Chain"
+                # heading bleed at file end (concatenation artifact in the source
+                # MD under Methodology-main). Not fixed here — Methodology-main is
+                # a separate repo. Surface to the methodology team to trim.
                 bucket["sub_subdomains"][ss_id] = {
                     "md": md_clean,
                     "filename": md_file.name,
@@ -752,6 +897,7 @@ def load_crossregulation_md() -> dict:
                     "summary": summary,
                     "methodology": methodology,   # CORR-088: NEW
                     "domainAnalysisMd": domain_md_clean,
+                    "da_sections": _parse_da_sections(domain_md_clean),  # CORR-099: Lacuna 2
                 }
     print(
         f"load_crossregulation_md: {len(result)} subdomains, "
@@ -863,13 +1009,26 @@ def _parse_subdomain_md(md_text: str) -> tuple[dict, list[dict]]:
     current_section: dict | None = None  # {"kind": "summary"|"methodology", "key"|"heading"}
 
     for line in md_text.split("\n"):
+        # CORR-099 (Lacuna 3): capture ## wrappers + their intro text (previously
+        # dropped). Each ## opens a methodology section; a subsequent ### or ##
+        # naturally supersedes it. Only non-empty intro is retained (filtered
+        # at return) so wrappers that are pure containers add no noise.
+        m_h2 = re.match(r"^##\s+(.+)$", line)
+        if m_h2 and not line.startswith("###"):
+            heading = m_h2.group(1).strip()
+            current_section = {"kind": "methodology", "heading": heading, "is_so": False, "is_h2": True}
+            methodology.append({"heading": heading, "body_md": "", "is_so": False, "is_h2": True})
+            continue
         m = re.match(r"^###\s+(.+)$", line)
         if m:
             heading = m.group(1).strip()
-            # Skip security-objective sections (HL + per-reg sub-SOs)
-            if re.match(r"^D-\d+\.\d+\.\d+\s*[—\-–]\s*(High-level SecurityObjective|Sub-SO for\s+\S+)", heading):
-                current_section = None
-                continue
+            # CORR-099 (Lacuna 1): SO sections (HL + per-reg sub-SOs) are now
+            # INCLUDED in methodology (user decision), flagged via is_so so the
+            # renderer can badge them. Previously skipped (CORR-088).
+            is_so = bool(re.match(
+                r"^D-\d+\.\d+\.\d+\s*[—\-–]\s*(High-level SecurityObjective|Sub-SO for\s+\S+)",
+                heading,
+            ))
             if "Emergent tensions" in heading:
                 current_section = {"kind": "summary", "key": "emergent_tensions_md"}
             elif "Validated relationships" in heading:
@@ -877,8 +1036,8 @@ def _parse_subdomain_md(md_text: str) -> tuple[dict, list[dict]]:
             elif "Downstream implication" in heading:
                 current_section = {"kind": "summary", "key": "downstream_implication_md"}
             else:
-                current_section = {"kind": "methodology", "heading": heading}
-                methodology.append({"heading": heading, "body_md": ""})
+                current_section = {"kind": "methodology", "heading": heading, "is_so": is_so}
+                methodology.append({"heading": heading, "body_md": "", "is_so": is_so})
             continue
         if current_section is None:
             continue
@@ -888,7 +1047,12 @@ def _parse_subdomain_md(md_text: str) -> tuple[dict, list[dict]]:
             methodology[-1]["body_md"] += line + "\n"
 
     return {k: v.strip() for k, v in summary.items()}, [
-        {"heading": m["heading"], "body_md": m["body_md"].rstrip()} for m in methodology
+        {"heading": m["heading"], "body_md": m["body_md"].rstrip(),
+         "is_so": m.get("is_so", False), "is_h2": m.get("is_h2", False)}
+        for m in methodology
+        # CORR-099 (Lacuna 3): drop h2 wrappers that captured only whitespace
+        # (i.e. a ## immediately followed by a ### child — nothing to show).
+        if not (m.get("is_h2") and not m["body_md"].strip())
     ]
 
 
@@ -982,6 +1146,7 @@ def build_html(
     sos: list[dict] | None = None,
     srs: list[dict] | None = None,
     objectives: list[dict] | None = None,
+    security_requirements: list[dict] | None = None,
 ) -> str:
     """Build the full HTML string for the given data slices.
 
@@ -997,9 +1162,16 @@ def build_html(
     the new source of truth for §4. The legacy ``sos`` payload is kept
     under ``DATA.sos`` for backward compatibility with existing detail
     panels / cross-refs (CORR-079).
+
+    CORR-093: ``security_requirements`` (HL + sub-reqs from SubDomains MDs)
+    is the new source of truth for §6. The legacy ``srs`` payload (atomic
+    SRs from preproc_out/entities/srs/) is kept under ``DATA.srs`` empty
+    for backward compatibility.
     """
     if objectives is None:
         objectives = load_all_objectives()
+    if security_requirements is None:
+        security_requirements = load_security_requirements()
     data = {
         "regulations": regulations if regulations is not None else [],
         "articles": articles if articles is not None else [],
@@ -1007,13 +1179,14 @@ def build_html(
         "sos": sos if sos is not None else [],
         "srs": srs if srs is not None else [],
         "objectives": objectives,
+        "securityRequirements": security_requirements,
         "stats": {
             "regulations": len(regulations or []),
             "articles": len(articles or []),
             "clauses": len(clauses or []),
             "sos": len(objectives),
             "objectives": len(objectives),
-            "srs": len(srs or []),
+            "srs": len(security_requirements),
         },
         "regColors": REG_COLORS,
         "csfColors": CSF_COLOR,
@@ -1049,11 +1222,21 @@ def build_html(
     }
 
     html = HTML_TEMPLATE.replace("__DATA_JSON__", json.dumps(data, ensure_ascii=False))
+    # CORR-100: inject live counts into tab badges + section subtitles so they
+    # always match the arrays the renderers iterate (source of truth = the array,
+    # not DATA.stats, to avoid future drift between stats and the array).
+    html = html.replace("__COUNT_REGS__", str(len(regulations or [])))
+    html = html.replace("__COUNT_ARTICLES__", str(len(articles or [])))
+    html = html.replace("__COUNT_CLAUSES__", str(len(clauses or [])))
+    html = html.replace("__COUNT_OBJECTIVES__", str(len(objectives)))
+    html = html.replace("__COUNT_SRS__", str(len(security_requirements)))
+    html = html.replace("__COUNT_PAIRS__", str(data["crossregulation_stats"]["pairs_total"]))
     OUT_HTML.write_text(html, encoding="utf-8")
     size_kb = OUT_HTML.stat().st_size / 1024
     print(f"Wrote {OUT_HTML} ({size_kb:.1f} KB)")
     print(f"  regs={len(regulations or [])} arts={len(articles or [])} "
-          f"clauses={len(clauses or [])} objectives={len(objectives)} srs={len(srs or [])}")
+          f"clauses={len(clauses or [])} objectives={len(objectives)} "
+          f"srs(legacy)={len(srs or [])} srs(hier)={len(security_requirements)}")
     cr_stats = data["crossregulation_stats"]
     print(f"  crossregulation: {cr_stats['subdomains']} subdomains, "
           f"{cr_stats['sub_subdomains']} sub-subdomains, {cr_stats['with_hl']} with HL, "
@@ -1069,6 +1252,7 @@ def main():
     sos = load_sos()
     srs = load_srs()
     objectives = load_all_objectives()
+    security_requirements = load_security_requirements()
     build_html(
         regulations=regs,
         articles=articles,
@@ -1076,6 +1260,7 @@ def main():
         sos=sos,
         srs=srs,
         objectives=objectives,
+        security_requirements=security_requirements,
     )
 
 
@@ -1194,11 +1379,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       background: var(--panel); padding: 14px;
       overflow-y: auto; min-height: 0;
     }
-    .detail-tabs { display: flex; gap: 4px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .detail { display: flex; flex-direction: column; }
+    .detail-tabs { display: flex; gap: 4px; margin-bottom: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
     .detail-tab-btn { background: transparent; border: 1px solid transparent; border-bottom: none; color: var(--fg-dim); padding: 6px 12px; cursor: pointer; font-size: 12px; border-radius: 4px 4px 0 0; transition: background 0.15s, color 0.15s; }
     .detail-tab-btn:hover { background: var(--panel-2); color: var(--fg); }
     .detail-tab-btn.active { background: var(--panel); color: var(--accent); border-color: var(--border); }
-    .detail-tab-body { padding: 0 4px; overflow-y: auto; max-height: calc(100vh - 240px); }
+    .detail-tab-body { padding: 0 4px; flex: 1; overflow-y: auto; min-height: 0; }
     .tab-pane[hidden] { display: none; }
     .raw-json { white-space: pre-wrap; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; background: var(--panel-2); padding: 8px; border-radius: 4px; max-height: 60vh; overflow: auto; }
     /* CORR-090: Unified details card system for §5 Cross-Regulation */
@@ -1304,6 +1490,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       letter-spacing: 0.5px;
     }
     .crossreg-card .pair-scope { color: var(--fg-dim); font-size: 11px; font-style: italic; }
+    .crossreg-card .pair-srs { color: var(--fg-dim); font-size: 11px; font-family: var(--mono, monospace); }
 
     /* Sub-methodology wrapper (outer toggle) */
     details.crossreg-card .crossreg-card + .crossreg-card,
@@ -1518,6 +1705,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .type-badge.canonical { background: var(--panel-2); border-color: var(--border); color: var(--fg-dim); }
     .type-badge.VAG { color: var(--warn); }
     .type-badge.POLY { color: var(--accent-2); }
+    /* CORR-098: phantom badge for CORR-030 propagated sub-SO blocks (unique id) */
+    .phantom-badge { margin-left: 4px; padding: 1px 5px; font-size: 9px; border-radius: 3px; background: rgba(255,159,28,0.18); border: 1px solid var(--warn); color: var(--warn); cursor: help; }
+    /* CORR-099 Lacuna 1: SO badge for security-objective sections inside methodology */
+    .so-badge { margin-left: 4px; padding: 1px 5px; font-size: 9px; border-radius: 3px; background: rgba(108,92,231,0.18); border: 1px solid var(--accent-2); color: var(--accent-2); cursor: help; }
+    /* CORR-099 Lacuna 3: H2 wrapper badge + emphasis for top-level sections */
+    .h2-badge { margin-left: 4px; padding: 1px 5px; font-size: 9px; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--border); color: var(--fg-dim); cursor: help; }
+    .crossreg-card.meth-h2 > summary { font-size: 13px; font-weight: 700; color: var(--accent); }
     .type-badge.COORD { color: var(--accent); }
     .type-badge.SCOPE-Q { color: var(--danger); }
     /* CORR-078 (C11/C12): Berry category indicators in the §3 table */
@@ -1552,6 +1746,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       color: var(--fg-dim);
       border: 1px solid var(--border);
     }
+    /* CORR-093: hierarchical SR rows (HL bold + sub indented/toned-down) */
+    tr[data-level="HL"] { font-weight: 600; }
+    tr.sub-req-row { background: var(--panel-2); }
+    tr.sub-req-row:hover { background: var(--panel); }
+    .type-badge.sub { background: rgba(139,149,167,0.20); border-color: var(--fg-dim); color: var(--fg-dim); }
+    .code-block { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; max-height: 360px; overflow: auto; font-family: ui-monospace, monospace; font-size: 11px; }
     .preview {
       max-width: 380px;
       overflow: hidden;
@@ -1729,12 +1929,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   </header>
 
   <nav class="tab-bar" id="tab-bar">
-    <button class="tab-btn" data-tab="regulations">Regulations <span class="badge-count">5</span></button>
-    <button class="tab-btn" data-tab="articles">Articles <span class="badge-count">140</span></button>
-    <button class="tab-btn" data-tab="clauses">Clauses <span class="badge-count">498</span></button>
-    <button class="tab-btn" data-tab="sos">SOs <span class="badge-count">328</span></button>
-    <button class="tab-btn" data-tab="crossregulation">CrossRegulation <span class="badge-count"></span></button>
-    <button class="tab-btn" data-tab="srs">SRs <span class="badge-count">282</span></button>
+    <button class="tab-btn" data-tab="regulations">Regulations <span class="badge-count">__COUNT_REGS__</span></button>
+    <button class="tab-btn" data-tab="articles">Articles <span class="badge-count">__COUNT_ARTICLES__</span></button>
+    <button class="tab-btn" data-tab="clauses">Clauses <span class="badge-count">__COUNT_CLAUSES__</span></button>
+    <button class="tab-btn" data-tab="sos">SOs <span class="badge-count">__COUNT_OBJECTIVES__</span></button>
+    <button class="tab-btn" data-tab="crossregulation">CrossRegulation <span class="badge-count">__COUNT_PAIRS__</span></button>
+    <button class="tab-btn" data-tab="srs">SRs <span class="badge-count">__COUNT_SRS__</span></button>
   </nav>
 
   <main>
@@ -1747,7 +1947,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <section id="main-content">
       <div id="tab-regulations" class="tab-pane" data-pane="regulations" style="display:block">
         <div id="section-1" data-section="1">
-          <h2>§1 Regulations <small>5 cards</small></h2>
+          <h2>§1 Regulations <small>__COUNT_REGS__ regulations</small></h2>
           <div class="section-meta">Per-reg preproc manifest: README + SecurityObjectives + SecurityRules_NIST. Click a card to inspect.</div>
           <div id="regs-cards"></div>
         </div>
@@ -1755,7 +1955,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
       <div id="tab-articles" class="tab-pane" data-pane="articles" style="display:none">
         <div id="section-2" data-section="2">
-          <h2>§2 Articles <small>140 articles</small></h2>
+          <h2>§2 Articles <small>__COUNT_ARTICLES__ articles</small></h2>
           <div class="section-meta">Individual article shards (<code>preproc_out/entities/articles/&lt;REG&gt;_Art_ &lt;N&gt;.json</code>). Click row for full detail.</div>
           <table class="entity" id="table-articles">
             <thead>
@@ -1770,7 +1970,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
       <div id="tab-clauses" class="tab-pane" data-pane="clauses" style="display:none">
         <div id="section-3" data-section="3">
-          <h2>§3 Clauses <small>498 clauses (many skeleton)</small></h2>
+          <h2>§3 Clauses <small>__COUNT_CLAUSES__ clauses (many skeleton)</small></h2>
           <div class="section-meta">Atomic clauses with Berry types (VAG/POLY/COORD/SCOPE-Q) and severity (S1/S2/S3). Skeleton rows are dimmed.</div>
           <table class="entity" id="table-clauses">
             <thead>
@@ -1813,12 +2013,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
       <div id="tab-srs" class="tab-pane" data-pane="srs" style="display:none">
         <div id="section-6" data-section="6">
-          <h2>§6 SecurityRules <small>282 SRs</small></h2>
-          <div class="section-meta">Regulatory duties mapped to NIST CSF 2.0 controls. Click any row for full raw data (incl. regulatory_rationale, security_rationale, ambiguity_notes).</div>
+          <h2>§6 SecurityRequirements <small>__COUNT_SRS__ reqs (HL + sub)</small></h2>
+          <div class="section-meta">Hierarchical security requirements derived from SubDomains MDs. Each High-Level (HL) row aggregates 2-5 sub-requirements. Click any row for full YAML + description + considerations.</div>
           <table class="entity" id="table-srs">
             <thead>
               <tr>
-                <th>ID</th><th>Title</th><th>Reg</th><th>Sub-domains</th><th>CSF</th><th>Role</th>
+                <th>Req ID</th><th>Level</th><th>Subdomain</th><th>Title</th><th>NIST CSF</th><th>Priority</th><th>Sub</th>
               </tr>
             </thead>
             <tbody id="tbody-srs"></tbody>
@@ -2012,18 +2212,28 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             'subdomain');
           break;
         case 'srs':
-          addFilterGroup(sb, 'REGULATION', DATA.regulations.map(r => [r.id, r.displayName || r.id]), 'regulation');
-          const srSd = new Set();
-          DATA.srs.forEach(s => s.sub_domain && s.sub_domain.forEach(x => srSd.add(x)));
-          const srsubs = [...srSd].sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
-          addFilterGroup(sb, 'SUBDOMAIN', srsubs.map(s => [s, s]), 'subdomain');
-          addFilterGroup(sb, 'CSF FUNCTION', [['GV','GV'],['ID','ID'],['PR','PR'],['DE','DE'],['RS','RS'],['RC','RC']], 'csfFunction');
-          const roles = new Set();
-          DATA.srs.forEach(s => s.applies_to_role && s.applies_to_role.forEach(r => roles.add(r)));
-          addFilterGroup(sb, 'ROLE', [...roles].sort().map(r => [r, r]), 'role');
-          const obls = new Set();
-          DATA.srs.forEach(s => s.obligation_type && s.obligation_type.forEach(o => obls.add(o)));
-          addFilterGroup(sb, 'OBLIGATION', [...obls].sort().map(o => [o, o]), 'obligation');
+          // CORR-093: source = DATA.securityRequirements
+          // DOMAIN filter
+          const srDomains = new Set();
+          (DATA.securityRequirements || []).forEach(r => {
+            if (r.subdomain) srDomains.add(r.subdomain.split('.')[0]);
+          });
+          addFilterGroup(sb, 'DOMAIN',
+            [...srDomains].sort().map(d => [d, d]),
+            'domain');
+          // SUBDOMAIN filter
+          const srSubs = new Set();
+          (DATA.securityRequirements || []).forEach(r => {
+            if (r.subdomain) srSubs.add(r.subdomain);
+          });
+          addFilterGroup(sb, 'SUBDOMAIN',
+            [...srSubs].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(s => [s, s]),
+            'subdomain');
+          // LEVEL filter
+          addFilterGroup(sb, 'LEVEL', [
+            ['HL', 'High-Level'],
+            ['sub', 'Sub-Req'],
+          ], 'level');
           break;
         case 'crossregulation':
           // CORR-092: DOMAIN filter (D-01..D-10)
@@ -2123,6 +2333,24 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           const matchesDomain = !domainFilter.size || domainFilter.has(ssDomain);
           const matchesSubdomain = !subdomainFilter.size || subdomainFilter.has(ssId);
           ss.style.display = (matchesDomain && matchesSubdomain) ? '' : 'none';
+        });
+        return;
+      }
+
+      if (STATE.activeTab === 'srs') {
+        const trs = document.querySelectorAll('#tab-srs [data-entity-id]');
+        const domainFilter = STATE.filters.domain || new Set();
+        const subdomainFilter = STATE.filters.subdomain || new Set();
+        const levelFilter = STATE.filters.level || new Set();
+        trs.forEach(row => {
+          const id = row.getAttribute('data-entity-id');
+          const req = (DATA.securityRequirements || []).find(r => r.id === id);
+          if (!req) { row.style.display = 'none'; return; }
+          const ssDomain = (req.subdomain || '').split('.')[0];
+          const matchesDomain = !domainFilter.size || domainFilter.has(ssDomain);
+          const matchesSub = !subdomainFilter.size || subdomainFilter.has(req.subdomain);
+          const matchesLevel = !levelFilter.size || levelFilter.has(req.level);
+          row.style.display = (matchesDomain && matchesSub && matchesLevel) ? '' : 'none';
         });
         return;
       }
@@ -2266,7 +2494,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         return `
           <tr data-detail-kind="objective" data-detail-id="${s.id}" data-entity-id="${s.id}">
             <td><span class="cell-id">${s.id}</span></td>
-            <td><span class="type-badge ${s.kind === 'HL' ? 'HL' : 'sub-SO'}">${s.kind}</span></td>
+            <td><span class="type-badge ${s.kind === 'HL' ? 'HL' : 'sub-SO'}">${s.kind}</span>${s.phantom ? '<span class="phantom-badge" title="CORR-030 propagated phantom (unique id assigned)">phantom</span>' : ''}</td>
             <td><span class="reg-tag" style="background:${regColor}">${escapeHtml(reg)}</span></td>
             <td><span class="cell-id-sm">${escapeHtml(s.subdomain || '')}</span></td>
             <td><div class="preview">${escapeHtml((preview || '').slice(0, 200))}${(preview || '').length > 200 ? '…' : ''}</div></td>
@@ -2326,30 +2554,52 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         return 'purple';
       };
 
+      // CORR-099 (Part 3): global-only-once methodology headings. The SubDomains
+      // MDs copy-paste certain boilerplate (e.g. "Verbatim OJ text sourcing")
+      // across sub-subdomains; render it just once across the whole §5 panel.
+      const GLOBAL_ONCE = new Set(['Verbatim OJ text sourcing']);
+      const _globalSeen = new Set();
+      const isGlobalDuplicate = (heading) => {
+        if (!GLOBAL_ONCE.has(heading)) return false;
+        if (_globalSeen.has(heading)) return true;
+        _globalSeen.add(heading);
+        return false;
+      };
+
       const html = Object.entries(data).map(([subId, sub]) => {
         const subsHtml = Object.entries(sub.sub_subdomains || {}).map(([ssId, ss]) => {
           const parsed = ss.parsed || { intro_md: '', pairs: [], notes_md: '' };
           const lineCount = (ss.md || '').split('\n').length;
-          // CORR-090: pair as a unified .crossreg-card with accent variant
+          // CORR-097: pair shows ONLY its own body_md (no shared sub-subdomain DA).
+          // SR mention count via regex on body_md (clauses are not present in pair bodies).
+          const SR_MENTION_RE = /SR-[A-Z_]+-\d+/g;
           const pairBlocks = (parsed.pairs || []).map((p, idx) => {
             const color = pairRelColor(p.verified_relationship);
             const accent = pairRelAccent(p.verified_relationship);
+            const srCount = ((p.body_md || '').match(SR_MENTION_RE) || []).length;
             return `
               <details class="crossreg-card accent-${accent}">
                 <summary class="pair-header">
                   <span class="pair-pair">${escapeHtml(p.reg_a)} ↔ ${escapeHtml(p.reg_b)}</span>
                   <span class="pair-rel" style="background:${color}; color:#0f1419">${escapeHtml(p.verified_relationship || '?')}</span>
                   ${p.scope_overlap && p.scope_overlap !== '?' ? `<span class="pair-scope">scope ${escapeHtml(p.scope_overlap)}</span>` : ''}
+                  ${srCount > 0 ? `<span class="pair-srs">SRs:${srCount}</span>` : ''}
                 </summary>
-                <div class="card-content">
-                  ${ss.domainAnalysisMd ? `<div>${mdToHtml(ss.domainAnalysisMd)}</div>` : ''}
-                  <details class="crossreg-card">
-                    <summary>DeepAnalysis (per-pair detail)</summary>
-                    <div class="card-content">${mdToHtml(p.body_md)}</div>
-                  </details>
-                </div>
+                <div class="card-content">${mdToHtml(p.body_md)}</div>
               </details>`;
           }).join('');
+          // CORR-097: hoist DomainAnalysis out of the pair loop — render ONCE per sub-subdomain.
+          // CORR-099 (Lacuna 2): render DA as structured #### toggles when available.
+          const daSections = ss.da_sections || [];
+          const daInner = daSections.length
+            ? daSections.map(ds => ds.heading
+                ? `<details class="crossreg-card"><summary>${escapeHtml(ds.heading)}</summary><div class="card-content">${mdToHtml(ds.body_md)}</div></details>`
+                : `<div class="card-content">${mdToHtml(ds.body_md)}</div>`
+              ).join('')
+            : (ss.domainAnalysisMd ? mdToHtml(ss.domainAnalysisMd) : '');
+          const domainAnalysisSection = daInner
+            ? `<details class="crossreg-card"><summary>DomainAnalysis</summary><div class="card-content">${daInner}</div></details>`
+            : '';
            const introSection = parsed.intro_md
              ? `<div class="crossreg-intro">${mdToHtml(parsed.intro_md)}</div>`
              : '';
@@ -2373,12 +2623,18 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
              ? `<div class="sub-summary"><h4>Sub-domain summary</h4>${summaryCardsHtml}</div>`
              : '';
            // CORR-090: render Sub-domain methodology as nested .crossreg-card toggles
-           const methodologyHtml = (ss.methodology || []).map(m => `
-             <details class="crossreg-card">
-               <summary>${escapeHtml(m.heading)}</summary>
+           const methodologyHtml = (ss.methodology || [])
+             .filter(m => !isGlobalDuplicate(m.heading))
+             .map(m => {
+             const h2cls = m.is_h2 ? ' meth-h2' : '';
+             const soBadge = m.is_so ? '<span class="so-badge" title="Security Objective section">SO</span>' : '';
+             const h2Badge = m.is_h2 ? '<span class="h2-badge" title="Top-level wrapper section">H2</span>' : '';
+             return `
+             <details class="crossreg-card${h2cls}">
+               <summary>${escapeHtml(m.heading)}${soBadge}${h2Badge}</summary>
                <div class="card-content">${mdToHtml(m.body_md)}</div>
-             </details>
-           `).join('');
+             </details>`;
+           }).join('');
            const methodologySection = methodologyHtml
               ? `<details class="crossreg-card">
                 <summary>Sub-domain methodology (${(ss.methodology || []).length} sections)</summary>
@@ -2391,6 +2647,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                  <summary><strong>${escapeHtml(ssId)}</strong> — ${escapeHtml(ss.title || '')} <span class="meta">(${parsed.pairs?.length || 0} pairs · ${lineCount} lines · source: <code>${escapeHtml(ss.filename || '')}</code>)</span></summary>
                  <div class="card-content">
                    ${introSection}
+                   ${domainAnalysisSection}
                    <div class="pair-grid">${pairBlocks || '<p style="color:var(--fg-dim); font-size:11px">No pairs extracted.</p>'}</div>
                    ${summarySection}
                    ${methodologySection}
@@ -2411,23 +2668,60 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function renderSrs() {
-      const rows = DATA.srs.map(sr => {
-        const csfChips = (sr.nist_csf_mapping || []).map(c => {
-          const fn = csfFunctionOf(c.id);
-          return `<span class="csf-chip" style="background:${DATA.csfColors[fn] || '#888'}" data-csf-id="${c.id}">${c.id}</span>`;
-        }).join('');
-        const subs = (sr.sub_domain || []).join(', ');
-        return `
-          <tr data-detail-kind="sr" data-detail-id="${sr.id}" data-entity-id="${sr.id}">
-            <td><span class="cell-id">${sr.id}</span></td>
-            <td><div class="preview">${escapeHtml(sr.title || '')}</div></td>
-            <td><span class="reg-tag" style="background:${DATA.regColors[sr.regulation]}">${sr.regulation}</span></td>
-            <td>${escapeHtml(subs)}</td>
-            <td><div class="chip-list">${csfChips}</div></td>
-            <td>${escapeHtml((sr.applies_to_role || []).join(', '))}</td>
+      const reqs = DATA.securityRequirements || [];
+      // Group by HL parent
+      const byParent = {};
+      reqs.forEach(r => {
+        const key = r.level === 'HL' ? r.id : `${r.subdomain}/${r.parent_id}`;
+        if (!byParent[key]) byParent[key] = { hl: null, subs: [] };
+        if (r.level === 'HL') byParent[key].hl = r;
+        else byParent[key].subs.push(r);
+      });
+      // Sort by subdomain then req_id
+      const sortedKeys = Object.keys(byParent).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+      const rows = sortedKeys.map(parentKey => {
+        const { hl, subs } = byParent[parentKey];
+        if (!hl) return '';
+        // Extract title from yaml
+        const titleM = hl.yaml.match(/title:\s*"?([^"\n]+)"?/);
+        const title = titleM ? titleM[1].trim() : (hl.req_id);
+        // Extract nist_csf
+        const nistM = hl.yaml.match(/nist_csf:\s*\[([^\]]+)\]/);
+        const nist = nistM ? nistM[1].replace(/[\[\]"]/g, '').split(',').map(s => s.trim()).join(' ') : '—';
+        // Extract priority
+        const prioM = hl.yaml.match(/priority:\s*(\S+)/);
+        const priority = prioM ? prioM[1] : '—';
+        const hlRow = `
+          <tr data-detail-kind="requirement" data-detail-id="${hl.id}" data-entity-id="${hl.id}" data-level="HL">
+            <td><span class="cell-id">${escapeHtml(hl.req_id)}</span></td>
+            <td><span class="type-badge HL">HL</span></td>
+            <td><span class="reg-tag" style="background:#a8e6cf; color:#0f1419">${escapeHtml(hl.subdomain)}</span></td>
+            <td><div class="preview">${escapeHtml(title)}</div></td>
+            <td><div class="meta">${escapeHtml(nist)}</div></td>
+            <td>${escapeHtml(priority)}</td>
+            <td><div class="meta">${subs.length} sub</div></td>
           </tr>`;
+        const subRows = subs.map(s => {
+          const subTitleM = s.yaml.match(/title:\s*"?([^"\n]+)"?/);
+          const subTitle = subTitleM ? subTitleM[1].trim() : s.title;
+          const subNistM = s.yaml.match(/nist_csf:\s*\[([^\]]+)\]/);
+          const subNist = subNistM ? subNistM[1].replace(/[\[\]"]/g, '').split(',').map(x => x.trim()).join(' ') : '—';
+          const subPrioM = s.yaml.match(/priority:\s*(\S+)/);
+          const subPriority = subPrioM ? subPrioM[1] : '—';
+          return `
+            <tr data-detail-kind="requirement" data-detail-id="${s.id}" data-entity-id="${s.id}" data-level="sub" class="sub-req-row">
+              <td><span class="cell-id-sm">↳ ${escapeHtml(s.req_id)}</span></td>
+              <td><span class="type-badge sub">sub</span></td>
+              <td><span class="cell-id-sm">${escapeHtml(s.subdomain)}</span></td>
+              <td><div class="preview">${escapeHtml(subTitle)}</div></td>
+              <td><div class="meta">${escapeHtml(subNist)}</div></td>
+              <td>${escapeHtml(subPriority)}</td>
+              <td>—</td>
+            </tr>`;
+        }).join('');
+        return hlRow + subRows;
       }).join('');
-      document.getElementById('tbody-srs').innerHTML = rows;
+      document.getElementById('tbody-srs').innerHTML = rows || '<tr><td colspan="7" style="color:var(--fg-dim)">No security requirements loaded.</td></tr>';
     }
 
     // ---- Detail panel: render arbitrary object as dl grid ----
@@ -2582,8 +2876,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       } else if (kind === 'objective' || kind === 'so') {
         const list = DATA.objectives || DATA.sos || [];
         obj = list.find(s => s.id === id);
-      } else if (kind === 'sr') {
-        obj = DATA.srs.find(s => s.id === id);
+      } else if (kind === 'requirement' || kind === 'sr') {
+        obj = (DATA.securityRequirements || DATA.srs || []).find(s => s.id === id);
       } else if (kind === 'csf') {
         obj = { id: id, kind: 'csf', title: 'NIST CSF 2.0 subcategory', csfColors: DATA.csfColors, csfId: id, function: csfFunctionOf(id) };
       }
@@ -2603,6 +2897,34 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="meta">${renderMetaPills(kind, obj)}</div>
         <dl>${renderFields(obj)}</dl>
       `;
+
+      // CORR-093: rich rendered tab for hierarchical security requirements
+      if (kind === 'requirement') {
+        const yamlHtml = obj.yaml
+          ? `<pre class="code-block"><code class="language-yaml">${escapeHtml(obj.yaml)}</code></pre>`
+          : '';
+        const descM = obj.yaml.match(/description:\s*\|?\s*\n([\s\S]+?)(?=\n[a-z_]+:|\Z)/);
+        const desc = descM ? descM[1].replace(/^  /gm, '').trim() : '';
+        const considerationsM = obj.yaml.match(/considerations:\s*\|?\s*\n([\s\S]+?)(?=\n[a-z_]+:|\Z)/);
+        const considerations = considerationsM ? considerationsM[1].replace(/^  /gm, '').trim() : '';
+        renderedPane.innerHTML = `
+          <h2><span class="kind">Requirement</span>${escapeHtml(obj.id)}</h2>
+          <div class="meta">
+            <span class="pill">${escapeHtml(obj.level)}</span>
+            <span class="pill">${escapeHtml(obj.subdomain)}</span>
+            ${obj.parent_id ? `<span class="pill">parent: ${escapeHtml(obj.parent_id)}</span>` : ''}
+          </div>
+          <h4>YAML</h4>
+          ${yamlHtml}
+          ${desc ? `<h4>Description</h4><pre>${escapeHtml(desc)}</pre>` : ''}
+          ${considerations ? `<h4>Considerations</h4><pre>${escapeHtml(considerations)}</pre>` : ''}
+          <hr>
+          <details><summary>Raw MD</summary><pre>${escapeHtml(obj.raw_md || '')}</pre></details>
+        `;
+        mdPane.innerHTML = obj.raw_md ? mdToHtml(obj.raw_md) : '<p style="color:var(--fg-dim)">No markdown.</p>';
+        ctxPane.innerHTML = renderContext(obj);
+        return;
+      }
 
       jsonPane.innerHTML = `<pre class="raw-json">${escapeHtml(JSON.stringify(obj, null, 2))}</pre>`;
 
