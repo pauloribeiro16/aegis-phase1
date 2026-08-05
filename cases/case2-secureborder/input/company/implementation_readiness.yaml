@@ -1,0 +1,20 @@
+# AEGIS Phase 1 — Implementation Readiness (Case 02 — SecureBorder Solutions B.V.)
+# 12 readiness areas (IR-01..IR-12), per methodology §6.
+# This file feeds Doc 04b (Security Posture) capability matrix.
+# Values are PLACEHOLDERS — verify with company before applying.
+#
+# IMPORTANT: NO / YES / PARTIAL are YAML-reserved as booleans, so
+# they MUST be quoted (otherwise PyYAML parses them as bool, which
+# then fails Pydantic Enum coercion).
+ciso: "YES"                       # IR-01: dedicated CISO for 450-employee org
+dpo: "YES"                        # IR-02: required under GDPR Art. 37
+information_security_policy: "YES"  # IR-03: ISO 27001 certified
+risk_assessment: "YES"            # IR-04: formal methodology, quarterly reviews
+incident_response: "YES"          # IR-05: 24h SOC, runbooks for GDPR/CRA/AI Act
+business_continuity: "YES"        # IR-06: ISO 22301 certified
+backup: "YES"                     # IR-07: 3-2-1 strategy, daily + off-site
+access_control: "YES"             # IR-08: IAM + RBAC + quarterly access reviews
+vulnerability_management: "YES"   # IR-09: SBOM, dependabot, manual pen-tests
+third_party_risk: "PARTIAL"       # IR-10: supplier register, contracts need refresh
+security_awareness: "PARTIAL"     # IR-11: annual training, no phishing simulation
+audit_logging: "YES"              # IR-12: full SIEM with retention

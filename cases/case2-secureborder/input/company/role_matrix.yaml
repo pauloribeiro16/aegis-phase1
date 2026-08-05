@@ -1,0 +1,42 @@
+# AEGIS Phase 1 — Role Matrix (5 regulations × role)
+# Captures the company's role per regulation + native compliance
+# status + inherited obligations + notes.
+gdpr:
+  role: controller
+  native_compliance: true
+  inherited_obligations:
+    - Article 30 records of processing
+    - Article 32 security of processing
+    - Article 33 breach notification (72h)
+    - Article 35 DPIA (high-risk biometric processing)
+  notes: "Controller for biometric + passport data of EU data subjects"
+cra:
+  role: manufacturer
+  native_compliance: true
+  inherited_obligations:
+    - Annex I essential cybersecurity requirements
+    - Annex VII conformity assessment
+    - Annex VIII CE marking + technical documentation
+    - Article 14 vulnerability handling (24h SLA)
+  notes: "Placing critical digital products on EU market as manufacturer"
+nis2:
+  role: essential_entity
+  native_compliance: true
+  inherited_obligations:
+    - Article 21 risk management measures
+    - Article 23 incident reporting (24h early warning + 72h notification)
+    - Article 24 supply chain security
+  notes: "Border control operator = Annex I essential entity"
+dora:
+  role: not_applicable
+  native_compliance: false
+  inherited_obligations: []
+  notes: "Not a financial entity; DORA obligations do not apply"
+ai_act:
+  role: deployer
+  native_compliance: true
+  inherited_obligations:
+    - Article 26 deployer obligations
+    - Article 27 fundamental rights impact assessment (FRIA)
+    - Article 29 logging and monitoring
+  notes: "Deploying high-risk biometric identification system per Annex III §1"

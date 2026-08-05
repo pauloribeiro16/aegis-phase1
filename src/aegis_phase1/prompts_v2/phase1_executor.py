@@ -32,6 +32,54 @@ from aegis_phase1.prompts_v2.validator import Phase1Validator
 
 logger = logging.getLogger(__name__)
 
+
+# CORR-102: preflight check exception types. Raised BEFORE any LLM
+# call when the executor's inputs are empty — prevents silently
+# consuming budget on no-op calls.
+class Phase1BEmptyApplicabilityError(RuntimeError):
+    """CORR-102: raised when ``run_phase_1b`` is called with empty applicable_regs.
+
+    The Phase 1B per-regulation lanes would have nothing to iterate
+    over. Calling P1B-LLM-01/02 with 0 lanes is a contract violation
+    that previously fell through silently (per-reg loop with empty
+    list returned an empty per_reg dict).
+    """
+
+    pass
+
+
+class Phase1BEmptyLayer0Error(RuntimeError):
+    """CORR-102: raised when ``run_phase_1b`` has no ``layer0_subdomain_refs``.
+
+    Each per-regulation lane needs at least 1 sub-domain ref to be
+    meaningful. An empty refs list indicates the PreprocCatalogLoader
+    produced no subdomains (path issue, post-CORR-099-prep regression).
+    """
+
+    pass
+
+
+class Phase1CMapEmptyDomainListError(RuntimeError):
+    """CORR-102: raised when ``run_phase_1c_map`` is called with empty inputs.
+
+    Either ``applicable_regs`` is empty (no lanes) or
+    ``layer0_subdomain_refs`` is empty (no refs to filter into per-
+    domain lanes). Both indicate a loader failure.
+    """
+
+    pass
+
+
+class Phase1CReduceEmptyAggregationsError(RuntimeError):
+    """CORR-102: raised when ``run_phase_1c_reduce`` has no activations to reduce.
+
+    The P1C-LLM-03/02 calls expect aggregated_activations from the
+    map stage. If every lane produced no activations, calling the
+    reduce LLMs is wasteful and obscures the map-stage failure.
+    """
+
+    pass
+
 # The 10 sub-domain lanes of Phase 1 v1.2. Source of truth:
 # 00_METHODOLOGY/PREPROCESSING/SubDomains/{D-XX_Folder}/D-XX.Y.md
 DOMAINS: list[str] = [f"D-{i:02d}" for i in range(1, 11)]  # D-01..D-10
@@ -201,7 +249,23 @@ class Phase1Executor:
         all_synth: dict[str, dict[str, Any]] = {}
         statuses: list[str] = []
 
+        # CORR-102: preflight checks BEFORE any LLM call. Empty inputs
+        # previously fell through silently; promote to hard errors so
+        # loader failures are investigated loudly.
+        if not applicable_regs:
+            raise Phase1BEmptyApplicabilityError(
+                f"case_id={case_id}: applicable_regs is empty; refusing "
+                f"to call P1B-LLM-01/02 with 0 lanes. Check "
+                f"CaseProfileLoader and classification.yaml."
+            )
         all_refs = inputs.get("layer0_subdomain_refs") or []
+        if not all_refs:
+            raise Phase1BEmptyLayer0Error(
+                f"case_id={case_id}: layer0_subdomain_refs is empty before "
+                f"per-reg filter; P1B-LLM-01 needs at least 1 sub-domain "
+                f"per regulation lane. Check PreprocCatalogLoader "
+                f"(post-CORR-099-prep paths)."
+            )
         for reg in applicable_regs:
             # CORR-071: per-reg filter (same pattern as CORR-045
             # per-domain in run_phase_1c_map). A ref is a dict
@@ -301,10 +365,18 @@ class Phase1Executor:
         Returns list of 10 lane outputs (one per domain):
             {"lane_id": "D-XX", "status": ..., "sub_domain_activations": [...], ...}
         """
-        # Take a snapshot of layer0_subdomain_refs once; each lane
-        # gets a filtered copy. If absent (legacy caller), pass empty
-        # list — lane will still run, prompt will be thin.
+        # CORR-102: preflight checks BEFORE any LLM call.
+        if not applicable_regs:
+            raise Phase1CMapEmptyDomainListError(
+                f"case_id={case_id}: applicable_regs is empty; refusing "
+                f"to run P1C-LLM-01 with 0 lanes."
+            )
         all_refs = inputs.get("layer0_subdomain_refs") or []
+        if not all_refs:
+            raise Phase1CMapEmptyDomainListError(
+                f"case_id={case_id}: layer0_subdomain_refs is empty; "
+                f"P1C-LLM-01 needs at least 1 sub-domain per domain lane."
+            )
         lane_outputs: list[dict[str, Any]] = []
         for domain_id in DOMAINS:
             # CORR-045: per-lane filter. A ref is a dict
@@ -445,6 +517,17 @@ class Phase1Executor:
             "aggregated_activations": flat list of sub_domain_activations
             "conflicts_count": number of cross-lane conflicts surfaced
         """
+        # CORR-102: preflight check on aggregated activations. If
+        # every lane produced no activations, calling the reduce LLMs
+        # is wasteful and obscures the map-stage failure.
+        has_activations = any(
+            lane.get("sub_domain_activations") for lane in lane_outputs
+        )
+        if not has_activations:
+            raise Phase1CReduceEmptyAggregationsError(
+                f"case_id={case_id}: aggregated_activations is empty "
+                f"across all lanes; P1C-LLM-03/02 have nothing to reduce."
+            )
         # Flatten all sub_domain_activations across the 10 lanes.
         aggregated_activations: list[dict[str, Any]] = []
         for lane in lane_outputs:

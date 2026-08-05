@@ -54,6 +54,29 @@ from pydantic import BaseModel, ConfigDict, Field
 logger = logging.getLogger(__name__)
 
 
+# CORR-102: fail-loud exception for malformed entity files. Pre-CORR-102
+# the bulk loaders (load_subdomains / load_srs / load_sos / load_csfs /
+# load_clauses / load_pairs) silently skipped malformed files with a
+# WARNING log, hiding data corruption. CORR-102 promotes this to a hard
+# error so the orchestrator cannot run with partial / corrupted data.
+class MalformedEntityError(RuntimeError):
+    """Raised when a preproc entity file fails to parse.
+
+    Attributes:
+        path: The filesystem path of the malformed file.
+        reason: The underlying exception's message.
+    """
+
+    def __init__(self, path: Path, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        super().__init__(
+            f"CORR-102: malformed entity file {path}: {reason}. "
+            "Refusing to silently skip — re-run scripts/preprocess/pipeline.py "
+            "to regenerate preproc_out/."
+        )
+
+
 # ---------------------------------------------------------------------------
 # Pydantic models — mirror the actual JSON in preproc_out/entities/.
 # Kept minimal: only the fields needed by the orchestrator + tests.
@@ -352,14 +375,24 @@ class PreprocCatalogLoader:
 
     @functools_cache  # noqa: B019
     def load_subdomains(self) -> list[Subdomain]:
-        """Load all 38 subdomains from entities/subdomains/D-{XX}/D-{XX.Y}.json."""
+        """Load all 38 subdomains from entities/subdomains/D-{XX}/D-{XX.Y}.json.
+
+        CORR-102: fail-loud on malformed entities. Previously this
+        loader silently skipped files that failed to parse, hiding
+        data corruption. Now the first malformed file raises
+        :class:`MalformedEntityError` and aborts the load.
+        """
         files = self._list_json_files(self._subdomains_dir)
         out: list[Subdomain] = []
         for path in files:
             try:
                 out.append(Subdomain.model_validate(self._read_json(path)))
             except Exception as e:
-                logger.warning("Skipping malformed subdomain %s: %s", path, e)
+                logger.error(
+                    "CORR-102: malformed subdomain %s — raising (was: silent skip): %s",
+                    path, e,
+                )
+                raise MalformedEntityError(path, str(e)) from e
         return out
 
     @functools_cache  # noqa: B019
@@ -372,6 +405,8 @@ class PreprocCatalogLoader:
         """Load SRs. Optional filters:
         - sub_domain: keep only SRs whose `sub_domain` contains this id (e.g. "D-01.1")
         - regulation: keep only SRs whose `regulation` matches (e.g. "GDPR")
+
+        CORR-102: fail-loud on malformed SR files (was: silent skip + WARNING).
         """
         files = self._list_json_files(self._srs_dir)
         out: list[SR] = []
@@ -380,8 +415,11 @@ class PreprocCatalogLoader:
                 raw = self._read_json(path)
                 sr = SR.model_validate(raw)
             except Exception as e:
-                logger.warning("Skipping malformed SR %s: %s", path, e)
-                continue
+                logger.error(
+                    "CORR-102: malformed SR %s — raising (was: silent skip): %s",
+                    path, e,
+                )
+                raise MalformedEntityError(path, str(e)) from e
             if sub_domain is not None and sub_domain not in sr.sub_domain:
                 continue
             if regulation is not None and sr.regulation != regulation:
@@ -396,7 +434,10 @@ class PreprocCatalogLoader:
         sub_domain: str | None = None,
         regulation: str | None = None,
     ) -> list[SO]:
-        """Load SOs. Optional filters on `sub_domains` (note plural) or `regulation`."""
+        """Load SOs. Optional filters on `sub_domains` (note plural) or `regulation`.
+
+        CORR-102: fail-loud on malformed SO files (was: silent skip + WARNING).
+        """
         files = self._list_json_files(self._sos_dir)
         out: list[SO] = []
         for path in files:
@@ -404,8 +445,11 @@ class PreprocCatalogLoader:
                 raw = self._read_json(path)
                 so = SO.model_validate(raw)
             except Exception as e:
-                logger.warning("Skipping malformed SO %s: %s", path, e)
-                continue
+                logger.error(
+                    "CORR-102: malformed SO %s — raising (was: silent skip): %s",
+                    path, e,
+                )
+                raise MalformedEntityError(path, str(e)) from e
             if sub_domain is not None and sub_domain not in so.sub_domains:
                 continue
             if regulation is not None and so.regulation != regulation:
@@ -415,14 +459,21 @@ class PreprocCatalogLoader:
 
     @functools_cache  # noqa: B019
     def load_csfs(self) -> list[CSFSubcat]:
-        """Load all 106 ACTIVE CSF subcategories. Withdrawn/archived are not on disk."""
+        """Load all 106 ACTIVE CSF subcategories. Withdrawn/archived are not on disk.
+
+        CORR-102: fail-loud on malformed CSF files (was: silent skip + WARNING).
+        """
         files = self._list_json_files(self._csfs_dir, skip_subdirs=("_meta",))
         out: list[CSFSubcat] = []
         for path in files:
             try:
                 out.append(CSFSubcat.model_validate(self._read_json(path)))
             except Exception as e:
-                logger.warning("Skipping malformed CSF %s: %s", path, e)
+                logger.error(
+                    "CORR-102: malformed CSF %s — raising (was: silent skip): %s",
+                    path, e,
+                )
+                raise MalformedEntityError(path, str(e)) from e
         return out
 
     @functools_cache  # noqa: B019
@@ -430,6 +481,8 @@ class PreprocCatalogLoader:
         """Load all 498 clauses from entities/clauses/_root/{REG}/{REG}_CLnn.json.
 
         DORA may have `-{M}` suffix in filenames; the loader tolerates both forms.
+
+        CORR-102: fail-loud on malformed clause files (was: silent skip + WARNING).
         """
         files = self._list_json_files(self._clauses_dir)
         out: list[Clause] = []
@@ -438,8 +491,11 @@ class PreprocCatalogLoader:
                 raw = self._read_json(path)
                 clause = Clause.model_validate(raw)
             except Exception as e:
-                logger.warning("Skipping malformed clause %s: %s", path, e)
-                continue
+                logger.error(
+                    "CORR-102: malformed clause %s — raising (was: silent skip): %s",
+                    path, e,
+                )
+                raise MalformedEntityError(path, str(e)) from e
             if regulation is not None and clause.regulation != regulation:
                 continue
             out.append(clause)
@@ -451,7 +507,10 @@ class PreprocCatalogLoader:
         *,
         sub_domain: str | None = None,
     ) -> list[Pair]:
-        """Load all 196 pairs from entities/pairs/D-{XX}/D-{XX.Y}_{A}-{B}.json."""
+        """Load all 196 pairs from entities/pairs/D-{XX}/D-{XX.Y}_{A}-{B}.json.
+
+        CORR-102: fail-loud on malformed pair files (was: silent skip + WARNING).
+        """
         files = self._list_json_files(self._pairs_dir)
         out: list[Pair] = []
         for path in files:
@@ -459,8 +518,11 @@ class PreprocCatalogLoader:
                 raw = self._read_json(path)
                 pair = Pair.model_validate(raw)
             except Exception as e:
-                logger.warning("Skipping malformed pair %s: %s", path, e)
-                continue
+                logger.error(
+                    "CORR-102: malformed pair %s — raising (was: silent skip): %s",
+                    path, e,
+                )
+                raise MalformedEntityError(path, str(e)) from e
             if sub_domain is not None and pair.subdomain_id != sub_domain:
                 continue
             out.append(pair)
@@ -568,6 +630,7 @@ __all__ = [
     "EntitiesIndex",
     "HSOHighLevel",
     "HSOPerReg",
+    "MalformedEntityError",
     "Pair",
     "PreprocCatalogLoader",
     "SourceClauseRef",

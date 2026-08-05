@@ -429,14 +429,21 @@ def test_run_does_not_break_without_track_b_args():
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
         # Phase 1B: rationale
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
-        # Phase 1C Map (D-01..D-10) -> 10 invocations
-        *[{"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1}] * 10,
+        # Phase 1C Map (D-01..D-10) -> 10 invocations. CORR-102:
+        # first lane produces an activation so the reduce preflight check passes.
+        {"status": "OK", "parsed_output": {"sub_domain_activations": [{"sub_domain_id": "D-01.1"}]}, "total_latency_ms": 1, "retry_count": 1},
+        *[{"status": "OK", "parsed_output": {"sub_domain_activations": []}, "total_latency_ms": 1, "retry_count": 1}] * 9,
         # Phase 1C Reduce: LLM-03
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
         # Phase 1C Reduce: LLM-02
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
     ]
-    result = ex.run("Case_01", applicable_regs=["GDPR"])
+    # CORR-102: provide non-empty refs.
+    result = ex.run(
+        "Case_01",
+        applicable_regs=["GDPR"],
+        layer0_subdomain_refs=[{"sub_domain_id": "D-01.1", "participating_regulations": ["GDPR"]}],
+    )
     assert "case_id" in result
     assert "track_b" not in result  # not computed unless params supplied
 
@@ -461,8 +468,9 @@ def test_run_with_track_b_args_computes_profile():
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
         # Phase 1B: rationale
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
-        # Phase 1C Map (D-01..D-10) -> 10 invocations
-        *[{"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1}] * 10,
+        # Phase 1C Map (D-01..D-10). CORR-102: first lane produces an activation.
+        {"status": "OK", "parsed_output": {"sub_domain_activations": [{"sub_domain_id": "D-01.1"}]}, "total_latency_ms": 1, "retry_count": 1},
+        *[{"status": "OK", "parsed_output": {"sub_domain_activations": []}, "total_latency_ms": 1, "retry_count": 1}] * 9,
         # Phase 1C Reduce: LLM-03
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
         # Phase 1C Reduce: LLM-02
@@ -472,12 +480,14 @@ def test_run_with_track_b_args_computes_profile():
         "D-A": {"inheritability": "BUILD_REQUIRED", "priority": "MUST"},
         "D-B": {"inheritability": "INHERITABLE", "priority": "MUST"},
     }
+    # CORR-102: provide non-empty refs.
     result = ex.run(
         "Case_01",
         applicable_regs=["GDPR"],
         track_b_scale="MICRO",
         track_b_fte=0.85,
         track_b_per_subdomain=per_sd,
+        layer0_subdomain_refs=[{"sub_domain_id": "D-01.1", "participating_regulations": ["GDPR"]}],
     )
     assert "track_b" in result
     assert result["track_b"]["summary"]["tier_distribution"]["LIGHTWEIGHT"] == 1
@@ -508,12 +518,15 @@ def test_run_precomputed_track_b_profile_takes_precedence():
     ex.invoker.invoke.side_effect = [
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
-        *[{"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1}] * 10,
+        # CORR-102: first lane produces an activation so reduce preflight passes.
+        {"status": "OK", "parsed_output": {"sub_domain_activations": [{"sub_domain_id": "D-01.1"}]}, "total_latency_ms": 1, "retry_count": 1},
+        *[{"status": "OK", "parsed_output": {"sub_domain_activations": []}, "total_latency_ms": 1, "retry_count": 1}] * 9,
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
         {"status": "OK", "parsed_output": {}, "total_latency_ms": 1, "retry_count": 1},
     ]
     # Pass BOTH a precomputed profile and (scale/fte/per_sd).
     # The precomputed profile should win (no track_b key in result).
+    # CORR-102: provide non-empty refs.
     result = ex.run(
         "Case_01",
         applicable_regs=["GDPR"],
@@ -521,5 +534,6 @@ def test_run_precomputed_track_b_profile_takes_precedence():
         track_b_scale="MICRO",
         track_b_fte=0.85,
         track_b_per_subdomain={"D-Y": {"inheritability": "BUILD_REQUIRED", "priority": "MUST"}},
+        layer0_subdomain_refs=[{"sub_domain_id": "D-01.1", "participating_regulations": ["GDPR"]}],
     )
     assert "track_b" not in result

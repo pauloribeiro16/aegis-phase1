@@ -38,6 +38,27 @@ from pydantic import BaseModel, ConfigDict, Field
 logger = logging.getLogger(__name__)
 
 
+# CORR-102: fail-loud exception for missing required case-input files.
+# Pre-CORR-102 the 4 CORR-047 categories (implementation_readiness,
+# regulatory_classification, role_matrix, regulatory_interactions) silently
+# returned None when the YAML file was missing or malformed, with a WARNING
+# log. That hid contract gaps. CORR-102 promotes these to hard errors.
+class MissingRequiredFileError(RuntimeError):
+    """Raised when a required case-input YAML file is missing or malformed.
+
+    Attributes:
+        filename: The relative path of the missing/malformed file
+            (e.g. ``"company/implementation_readiness.yaml"``).
+    """
+
+    def __init__(self, filename: str) -> None:
+        self.filename = filename
+        super().__init__(
+            f"CORR-102: required case-input file missing or malformed: {filename}. "
+            "Refusing to silently default — fix the case YAML or remove the load call."
+        )
+
+
 # ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
@@ -454,83 +475,99 @@ class CaseProfileLoader:
     def _load_implementation_readiness(self) -> Any:
         """CORR-047: load implementation_readiness.yaml → ImplementationReadiness.
 
-        Tolerates missing file (WARNING + None) and parse errors
-        (WARNING + None) so other categories can still load.
+        CORR-102: fail-loud. Required for Doc 04b capability matrix.
+        Missing or malformed file → :class:`MissingRequiredFileError`.
         """
         from aegis_phase1.v2.state import ImplementationReadiness
 
         path = self.input_dir / "company" / "implementation_readiness.yaml"
         if not path.exists():
-            logger.warning(
-                "_load_implementation_readiness: missing %s; "
-                "implementation_readiness will be None (Doc 04b renders empty capability matrix)",
+            logger.error(
+                "CORR-102: _load_implementation_readiness: missing required %s — raising",
                 path,
             )
-            return None
+            raise MissingRequiredFileError("company/implementation_readiness.yaml")
         try:
             return ImplementationReadiness.model_validate(self._read_yaml(path))
         except Exception as e:
-            logger.warning(
-                "_load_implementation_readiness: failed to parse %s: %s; returning None",
+            logger.error(
+                "CORR-102: _load_implementation_readiness: failed to parse %s: %s — raising",
                 path, e,
             )
-            return None
+            raise MissingRequiredFileError("company/implementation_readiness.yaml") from e
 
     def _load_regulatory_classification(self) -> Any:
-        """CORR-047: load regulatory_classification.yaml → RegulatoryClassification."""
+        """CORR-047: load regulatory_classification.yaml → RegulatoryClassification.
+
+        CORR-102: fail-loud. Required for Doc 05/07 per-regulation state.
+        Missing or malformed file → :class:`MissingRequiredFileError`.
+        """
         from aegis_phase1.v2.state import RegulatoryClassification
 
         path = self.input_dir / "company" / "regulatory_classification.yaml"
         if not path.exists():
-            logger.warning(
-                "_load_regulatory_classification: missing %s; returning None",
+            logger.error(
+                "CORR-102: _load_regulatory_classification: missing required %s — raising",
                 path,
             )
-            return None
+            raise MissingRequiredFileError("company/regulatory_classification.yaml")
         try:
             return RegulatoryClassification.model_validate(self._read_yaml(path))
         except Exception as e:
-            logger.warning(
-                "_load_regulatory_classification: failed to parse %s: %s; returning None",
+            logger.error(
+                "CORR-102: _load_regulatory_classification: failed to parse %s: %s — raising",
                 path, e,
             )
-            return None
+            raise MissingRequiredFileError("company/regulatory_classification.yaml") from e
 
     def _load_role_matrix(self) -> Any:
-        """CORR-047: load role_matrix.yaml → RoleMatrix."""
+        """CORR-047: load role_matrix.yaml → RoleMatrix.
+
+        CORR-102: fail-loud. Required for Doc 05 + Layer 3 analyses.
+        Missing or malformed file → :class:`MissingRequiredFileError`.
+        """
         from aegis_phase1.v2.state import RoleMatrix
 
         path = self.input_dir / "company" / "role_matrix.yaml"
         if not path.exists():
-            logger.warning("_load_role_matrix: missing %s; returning None", path)
-            return None
+            logger.error(
+                "CORR-102: _load_role_matrix: missing required %s — raising",
+                path,
+            )
+            raise MissingRequiredFileError("company/role_matrix.yaml")
         try:
             return RoleMatrix.model_validate(self._read_yaml(path))
         except Exception as e:
-            logger.warning(
-                "_load_role_matrix: failed to parse %s: %s; returning None", path, e,
+            logger.error(
+                "CORR-102: _load_role_matrix: failed to parse %s: %s — raising",
+                path, e,
             )
-            return None
+            raise MissingRequiredFileError("company/role_matrix.yaml") from e
 
     def _load_regulatory_interactions(self) -> Any:
-        """CORR-047: load interactions.yaml → RegulatoryInteractions (Layer 3 scans)."""
+        """CORR-047: load interactions.yaml → RegulatoryInteractions (Layer 3 scans).
+
+        CORR-102: fail-loud. Required for Layer 3 temporal/requirement/
+        trigger conflict scans. Missing or malformed file →
+        :class:`MissingRequiredFileError`.
+        """
         from aegis_phase1.v2.state import RegulatoryInteractions
 
         path = self.input_dir / "regulatory" / "interactions.yaml"
         if not path.exists():
-            logger.warning(
-                "_load_regulatory_interactions: missing %s; returning None",
+            logger.error(
+                "CORR-102: _load_regulatory_interactions: missing required %s — raising",
                 path,
             )
-            return None
+            raise MissingRequiredFileError("regulatory/interactions.yaml")
         try:
             return RegulatoryInteractions.model_validate(self._read_yaml(path))
         except Exception as e:
-            logger.warning(
-                "_load_regulatory_interactions: failed to parse %s: %s; returning None",
+            logger.error(
+                "CORR-102: _load_regulatory_interactions: failed to parse %s: %s — raising",
                 path, e,
             )
-            return None
+            raise MissingRequiredFileError("regulatory/interactions.yaml") from e
 
     # -- CORR-073: Personal Data Categories (GDPR Art. 30) -----------
 
@@ -633,6 +670,7 @@ __all__ = [
     "CompanyProfile",
     "CompanyFacts",
     "DeclaredRegulation",
+    "MissingRequiredFileError",
     "RegulatoryFacts",
     "Stakeholder",
 ]

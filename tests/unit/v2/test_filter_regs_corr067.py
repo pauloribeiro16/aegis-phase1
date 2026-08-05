@@ -32,6 +32,8 @@ import logging
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -234,40 +236,19 @@ def test_filter_regs_fallback_intersects_with_participating_in_domain():
     assert sorted(result) == ["CRA", "GDPR"], f"got {result!r}"
 
 
-def test_filter_regs_fallback_returns_empty_when_no_data_sources():
-    """CORR-101: BOTH ontology and state['subdomains'] empty → return [] + ERROR log."""
-    import io
-    import logging
-
-    from aegis_phase1.v2.domain.filters.regs import filter_regs
+def test_filter_regs_fallback_raises_when_no_data_sources():
+    """CORR-102: BOTH ontology and state['subdomains'] empty → raise NoRegsForDomainError."""
+    from aegis_phase1.v2.domain.filters.regs import NoRegsForDomainError, filter_regs
 
     state = {
         "company_context": {"applicable_regs": ["GDPR", "CRA"]},
         "ontology": {},  # Empty
         "subdomains": {},  # Empty — no data at all
     }
-    # Capture ERROR-level logs from regs logger
-    log_stream = io.StringIO()
-    handler = logging.StreamHandler(log_stream)
-    handler.setLevel(logging.ERROR)
-    regs_logger = logging.getLogger("aegis_phase1.v2.domain.filters.regs")
-    regs_logger.addHandler(handler)
-    try:
-        result = filter_regs(state, "D-05")
-    finally:
-        regs_logger.removeHandler(handler)
-
-    assert result == [], (
-        f"fallback with no data should return [] not {result!r}. "
-        f"Was: silent return of all applicable_regs."
-    )
-    log_output = log_stream.getvalue()
-    assert "filter_regs(D-05)" in log_output, (
-        f"ERROR log not emitted for empty-data fallback; got:\n{log_output}"
-    )
-    assert "ERROR" in log_output or "BOTH ontology" in log_output, (
-        f"Expected ERROR-level log; got:\n{log_output}"
-    )
+    with pytest.raises(NoRegsForDomainError) as exc_info:
+        filter_regs(state, "D-05")
+    assert exc_info.value.domain_id == "D-05"
+    assert "D-05" in str(exc_info.value)
 
 
 def test_filter_regs_fallback_handles_dirty_reg_strings():

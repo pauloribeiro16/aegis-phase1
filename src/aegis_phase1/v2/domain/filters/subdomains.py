@@ -50,6 +50,27 @@ _REG_PATTERN = re.compile(
 )
 
 
+class NoSubdomainsForDomainError(RuntimeError):
+    """CORR-102: raised when ``state["subdomains"]`` is missing or empty.
+
+    Previously :func:`filter_subdomains` silently returned ``[]`` when
+    the state had no subdomains, allowing downstream consumers to
+    render empty per-domain sections without surfacing the loader
+    failure. CORR-102 promotes this to a hard exception.
+
+    Attributes:
+        domain_id: The requested domain identifier (e.g. ``"D-01"``).
+    """
+
+    def __init__(self, domain_id: str) -> None:
+        self.domain_id = domain_id
+        super().__init__(
+            f"CORR-102: filter_subdomains({domain_id}): state['subdomains'] "
+            "is missing or empty. Refusing to silently fall through — "
+            "check PreprocCatalogLoader output and orchestrator.load() ordering."
+        )
+
+
 def _extract_regulation(text: str) -> str | None:
     """Return the canonical regulation code found in ``text``, or ``None``.
 
@@ -104,13 +125,23 @@ def filter_subdomains(state: V2State, domain_id: str) -> list[dict[str, Any]]:
 
     Returns:
         Sorted list of ``SubdomainSummary`` dicts, ordered by sub-id.
-        Returns ``[]`` when no matching sub-domain exists or when
-        ``state["subdomains"]`` is missing.
+        Returns ``[]`` when no matching sub-domain exists in
+        ``state["subdomains"]``.
+
+    Raises:
+        NoSubdomainsForDomainError: CORR-102 fail-loud. Raised when
+            ``state["subdomains"]`` is missing or empty (the loader
+            produced no subdomains). Previously this returned ``[]``
+            silently, hiding the loader failure.
     """
     subs: dict[str, Any] = state.get("subdomains") or {}
     if not subs:
-        logger.debug("filter_subdomains(%s): no subdomains in state", domain_id)
-        return []
+        logger.error(
+            "CORR-102: filter_subdomains(%s): state['subdomains'] is missing "
+            "or empty — raising NoSubdomainsForDomainError",
+            domain_id,
+        )
+        raise NoSubdomainsForDomainError(domain_id)
 
     prefix = domain_id + "."
     source_regs_by_sub = _build_source_regs_index(state.get("ontology") or {})
@@ -465,4 +496,4 @@ def _build_source_regs_index(ontology: dict) -> dict[str, list[str]]:
     return index
 
 
-__all__ = ["filter_subdomains"]
+__all__ = ["NoSubdomainsForDomainError", "filter_subdomains"]
