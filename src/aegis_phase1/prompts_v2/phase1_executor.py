@@ -279,6 +279,39 @@ class Phase1Executor:
                         pr = ref.get("participating_regulations") or []
                         if reg in pr:
                             lane_refs.append(ref)
+            # CORR-103: lane-specific filter on hso_per_reg + pairs.
+            # Without this filter, every lane carries HSO entries and
+            # pairs for ALL participating regulations of every ref
+            # (54.7% of payload is hso_per_reg, 27.8% is pairs). With
+            # this filter, each lane only sees entries where the
+            # current ``reg`` is the matching regulation — reduces the
+            # P1B-LLM-01/02 prompt payload from 127K-133K tokens to
+            # well under the 100K BASE cap.
+            #
+            # Mutates the ref dicts in-place; safe because lane_refs is
+            # freshly built per lane and the underlying ref dicts are
+            # owned by this executor (not shared with other lanes).
+            for ref in lane_refs:
+                if isinstance(ref, dict):
+                    ref["hso_per_reg"] = [
+                        e
+                        for e in (ref.get("hso_per_reg") or [])
+                        if isinstance(e, dict)
+                        and (e.get("regulation") or "").strip() == reg
+                    ]
+                    ref["pairs"] = [
+                        p
+                        for p in (ref.get("pairs") or [])
+                        if isinstance(p, dict)
+                        and (
+                            (p.get("reg_a") or "").strip() == reg
+                            or (p.get("reg_b") or "").strip() == reg
+                        )
+                    ]
+            logger.debug(
+                "run_phase_1b lane=%s: filtered hso_per_reg and pairs to lane",
+                reg,
+            )
             lane_inputs = {**inputs, "layer0_subdomain_refs": lane_refs}
             out_01 = self.invoker.invoke(
                 SPEC_INTERPRETATION,
