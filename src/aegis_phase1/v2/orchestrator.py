@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from aegis_phase1.prompts_v2.catalog import CatalogLoader
     from aegis_phase1.prompts_v2.phase1_executor import Phase1Executor
     from aegis_phase1.v2.loader.case_profile import CaseProfileLoader
+    from aegis_phase1.v2.loader.manifest_loader import ManifestLoader
     from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ class Phase1Orchestrator:
         preproc_catalog: "PreprocCatalogLoader | None" = None,
         case_profile_loader: "CaseProfileLoader | None" = None,
         catalog_loader: "CatalogLoader | None" = None,
+        manifest_loader: "ManifestLoader | None" = None,
         run_id: str | None = None,
     ):
         """Initialize the orchestrator.
@@ -79,6 +81,15 @@ class Phase1Orchestrator:
                 Optional. When provided, ``_load_v2_catalog`` populates
                 ``state["v2_catalog_tipo2"]`` and ``state["v2_catalog_tipo3"]``
                 for use by P1B-LLM-01 in Phase 1B (CORR-039-T4).
+            manifest_loader: CORR-101 Gap 2 typed loader for the per-domain
+                ``D-XX.manifest.json`` files under
+                ``Methodology-main/00_METHODOLOGY/PREPROCESSING_by_domain/domains/``.
+                When provided, ``_build_layer0_subdomain_refs`` enriches
+                each ref with ``manifest_ai_act`` and ``manifest_nist_controls``,
+                and ``assemble_inputs`` populates the ``manifest_summary``
+                block of the per-domain inputs dict. Optional — absence
+                falls back gracefully (no enrichment, no error).
+            run_id: Optional run identifier forwarded to Langfuse.
         """
         self.state: V2State = self._init_state()
         self.work_dir = Path(work_dir)
@@ -89,6 +100,16 @@ class Phase1Orchestrator:
         self.case_profile_loader = case_profile_loader
         # CORR-039-T1: catalog loader for tipo2/tipo3 YAMLs
         self.catalog_loader = catalog_loader
+        # CORR-101 Gap 2: manifest loader (opt-in). When set,
+        # _build_layer0_subdomain_refs adds manifest_ai_act + nist_controls
+        # fields, and assemble_inputs adds manifest_summary to the per-domain
+        # inputs dict.
+        self.manifest_loader = manifest_loader
+        if manifest_loader is not None:
+            # Expose the loader reference to assemble_inputs via state so
+            # the per-domain prompt context can include the manifest summary
+            # without needing to thread the loader through every call.
+            self.state["manifest_loader_ref"] = manifest_loader  # type: ignore[typeddict-unknown-key]
         # Stash the preproc_catalog reference in state so the T2
         # ClauseMappingContext builder can call load_clauses() lazily.
         # Set in _load_v2_catalog — see T1 branch below.
@@ -100,6 +121,7 @@ class Phase1Orchestrator:
         # <work_dir>/logs/... . Falls back to legacy <work_dir>/logs/...
         # when AEGIS_LOG_DIR is unset.
         import os as _os
+
         _log_base = _os.environ.get("AEGIS_LOG_DIR")
         if _log_base:
             self.log_dir = Path(_log_base) / "v2" / "map"
@@ -118,7 +140,7 @@ class Phase1Orchestrator:
                 if self._langfuse_handler and hasattr(self._langfuse_handler, "trace_context")
                 else None
             )
-        except Exception:  # noqa: BLE001 — tracing is optional
+        except Exception:
             self._langfuse_handler = None
             self.run_id = run_id
 
@@ -129,7 +151,7 @@ class Phase1Orchestrator:
         ):
             try:
                 self.llm_invoker._langfuse_handler = self._langfuse_handler
-            except Exception:  # noqa: BLE001 — handler attachment is best-effort
+            except Exception:
                 logger.debug(
                     "Could not attach langfuse_handler to %s",
                     type(self.llm_invoker).__name__,
@@ -172,8 +194,12 @@ class Phase1Orchestrator:
                 # CORR-038-T2/T3: surface rationale + clause_count so
                 # build_applicability_context can read them directly
                 # without re-parsing the YAML.
-                self.state["v2_regulatory_rationale"] = dict(profile.regulatory.applicability_rationale)
-                self.state["v2_clause_count_per_reg"] = dict(profile.regulatory.clause_count_per_reg)
+                self.state["v2_regulatory_rationale"] = dict(
+                    profile.regulatory.applicability_rationale
+                )
+                self.state["v2_clause_count_per_reg"] = dict(
+                    profile.regulatory.clause_count_per_reg
+                )
                 # CORR-073: GDPR Art. 30 personal-data inventory
                 self.state["v2_personal_data_categories"] = list(
                     profile.personal_data_categories or []
@@ -222,12 +248,8 @@ class Phase1Orchestrator:
         # CORR-039-T1: load tipo2 + tipo3 catalogs (filter for P1B-LLM-01)
         if self.catalog_loader is not None:
             try:
-                self.state["v2_catalog_tipo2"] = self.catalog_loader.load(
-                    "tipo2_interpretations"
-                )
-                self.state["v2_catalog_tipo3"] = self.catalog_loader.load(
-                    "tipo3_derogations"
-                )
+                self.state["v2_catalog_tipo2"] = self.catalog_loader.load("tipo2_interpretations")
+                self.state["v2_catalog_tipo3"] = self.catalog_loader.load("tipo3_derogations")
                 logger.debug(
                     "T1: catalogs loaded — tipo2=%d entries, tipo3=%d entries",
                     len(self.state["v2_catalog_tipo2"]),
@@ -352,11 +374,7 @@ class Phase1Orchestrator:
             ):
                 value = getattr(profile, field, None)
                 if value is not None:
-                    base[field] = (
-                        value.model_dump()
-                        if hasattr(value, "model_dump")
-                        else value
-                    )
+                    base[field] = value.model_dump() if hasattr(value, "model_dump") else value
             # CORR-073: surface personal_data_categories (GDPR Art. 30)
             # on the v1 company_context shim so doc_04a + future
             # consumers can read it.
@@ -428,9 +446,7 @@ class Phase1Orchestrator:
                             }
                         )
             except Exception as exc:
-                logger.warning(
-                    "CORR-060 T3: clause_mappings backfill failed: %s", exc
-                )
+                logger.warning("CORR-060 T3: clause_mappings backfill failed: %s", exc)
 
         return {
             "regulations": list(self.state.get("v2_applicable_regs", [])),
@@ -439,9 +455,7 @@ class Phase1Orchestrator:
             "source_regulations": {},
             "stacks": [],
             "company": {
-                "data_types": list(
-                    self.state.get("v2_personal_data_categories") or []
-                ),
+                "data_types": list(self.state.get("v2_personal_data_categories") or []),
             },
         }
 
@@ -577,8 +591,8 @@ class Phase1Orchestrator:
 
         from aegis_phase1.v2.domain.processor import (
             DomainProcessor,
-            MapPartialFailure,
             LLMUnreachable,
+            MapPartialFailure,
         )
 
         # CORR-040-T2: try the canonical P1C-LLM-01 path first
@@ -710,9 +724,7 @@ class Phase1Orchestrator:
             cc = dict(cc_raw)
         else:
             cc = {}
-        applicable_regs = [
-            str(r) for r in (cc.get("applicable_regs") or []) if r
-        ]
+        applicable_regs = [str(r) for r in (cc.get("applicable_regs") or []) if r]
 
         case_id = Path(self.state.get("case_path") or "case").name
         lane_outputs = executor.run_phase_1c_map(
@@ -720,9 +732,7 @@ class Phase1Orchestrator:
             applicable_regs=applicable_regs,
             state=self.state,
             company_facts=cc,
-            p1b_outputs_by_reg=(
-                self.state.get("aggregated_data", {}).get("rationale_by_reg", {})
-            ),
+            p1b_outputs_by_reg=(self.state.get("aggregated_data", {}).get("rationale_by_reg", {})),
             layer0_subdomain_refs=self._build_layer0_subdomain_refs(
                 list((self.state.get("subdomains") or {}).keys())
             ),
@@ -1827,11 +1837,7 @@ class Phase1Orchestrator:
         out: dict[str, list[dict[str, Any]]] = {"tipo2": [], "tipo3": []}
         if self.catalog_loader is None:
             return out
-        tier = str(
-            company_context.get("complexity_tier")
-            or company_context.get("tier")
-            or "LOW"
-        )
+        tier = str(company_context.get("complexity_tier") or company_context.get("tier") or "LOW")
         try:
             tipo2_all = self.state.get("v2_catalog_tipo2", []) or []
             tipo3_all = self.state.get("v2_catalog_tipo3", []) or []
@@ -1843,12 +1849,9 @@ class Phase1Orchestrator:
             )
             # Enrich tipo3 with predicate verdicts (best-effort)
             try:
-                evaluated = self.catalog_loader.evaluate_predicates(
-                    tipo3_filtered, company_context
-                )
+                evaluated = self.catalog_loader.evaluate_predicates(tipo3_filtered, company_context)
                 out["tipo3"] = [
-                    {**entry, "predicate_verdict": verdict}
-                    for entry, verdict in evaluated
+                    {**entry, "predicate_verdict": verdict} for entry, verdict in evaluated
                 ]
             except Exception as exc:
                 logger.debug(
@@ -1865,9 +1868,7 @@ class Phase1Orchestrator:
                 len(out["tipo3"]),
             )
         except Exception as exc:
-            logger.warning(
-                "T4: catalog filter failed for %s: %s — using empty lists", reg_id, exc
-            )
+            logger.warning("T4: catalog filter failed for %s: %s — using empty lists", reg_id, exc)
         return out
 
     def _init_state(self) -> V2State:
@@ -1951,6 +1952,7 @@ class Phase1Orchestrator:
     def _build_layer0_subdomain_refs(
         self,
         subdomain_ids: list[str],
+        manifest_loader: "ManifestLoader | None" = None,
     ) -> list[dict[str, Any]]:
         """Build rich ``layer0_subdomain_refs`` from subdomain IDs.
 
@@ -1961,9 +1963,26 @@ class Phase1Orchestrator:
         the metadata the P1C-LLM-01 spec requires (objective, pairs,
         participating_regulations, anchors, csf).
 
+        CORR-100: enriched with ``hso_per_reg`` and ``security_requirements``.
+
+        CORR-101 Gap 2: when ``manifest_loader`` is provided (or
+        ``self.manifest_loader`` is set), each ref is enriched with:
+
+          - ``manifest_ai_act`` — one of ``"absent" | "partial" | "present"``
+            (from ``D-XX.manifest.json`` → ``subdomain_summaries[]``)
+          - ``manifest_nist_controls`` — list of NIST CSF control IDs
+            applicable to the regulation in the domain
+            (``manifest.applicable_nist_controls_by_regulation[reg]``
+            intersected with regs in ``participating_regulations``).
+            Empty list when no reg has NIST controls in this domain.
+
         Args:
             subdomain_ids: list of subdomain IDs (e.g. ``["D-01.1",
                 "D-01.2"]``).
+            manifest_loader: Optional override for the constructor-set
+                ``self.manifest_loader``. When ``None``, falls back to
+                ``self.manifest_loader``; when both are ``None``, no
+                manifest enrichment is performed.
 
         Returns:
             list[dict] with one entry per subdomain_id, ordered by ID.
@@ -1971,15 +1990,17 @@ class Phase1Orchestrator:
             ``preproc_catalog`` loader is missing, returns bare ID
             dicts (P1C-LLM-01 may produce thin output).
         """
-        if (
-            not hasattr(self, "preproc_catalog")
-            or self.preproc_catalog is None
-        ):
+        if not hasattr(self, "preproc_catalog") or self.preproc_catalog is None:
             logger.warning(
                 "_build_layer0_subdomain_refs: preproc_catalog not loaded; "
                 "returning bare ID dicts (P1C-LLM-01 may produce thin output)"
             )
             return [{"sub_domain_id": sid, "title": sid} for sid in subdomain_ids]
+
+        # CORR-101 Gap 2: prefer the explicit parameter, fall back to
+        # the constructor-injected loader. When neither is set, manifest
+        # enrichment is skipped (existing behavior preserved).
+        ml = manifest_loader or getattr(self, "manifest_loader", None)
 
         all_subdomains = self.preproc_catalog.load_subdomains()
         by_id: dict[str, Any] = {s.id: s for s in all_subdomains}
@@ -1987,40 +2008,54 @@ class Phase1Orchestrator:
         for sid in subdomain_ids:
             sd = by_id.get(sid)
             if sd is None:
-                logger.debug(
-                    "subdomain %s not found in preproc_catalog; skipping", sid
-                )
+                logger.debug("subdomain %s not found in preproc_catalog; skipping", sid)
                 continue
             anchors: list[str] = []
-            for sr in (sd.security_requirements or []):
+            for sr in sd.security_requirements or []:
                 anchors.extend(sr.anchors or [])
             objective = sd.hso_hl.objective if sd.hso_hl else None
-            refs.append(
-                {
-                    "sub_domain_id": sd.id,
-                    "title": sd.title,
-                    "domain_id": sd.domain_id,
-                    "participating_regulations": list(
-                        sd.participating_regulations or []
-                    ),
-                    "hso_hl_objective": objective,
-                    "objective": objective,
-                    "hso_per_reg": [
-                        h.model_dump() if hasattr(h, "model_dump") else h
-                        for h in (sd.hso_per_reg or [])
-                    ],
-                    "security_requirements": [
-                        sr.model_dump() if hasattr(sr, "model_dump") else sr
-                        for sr in (sd.security_requirements or [])
-                    ],
-                    "pairs": [
-                        p.model_dump() if hasattr(p, "model_dump") else p
-                        for p in (sd.pairs or [])
-                    ],
-                    "anchors": sorted(set(anchors)),
-                    "csf": list(sd.csf_hint or []),
-                }
-            )
+            participating = list(sd.participating_regulations or [])
+            ref: dict[str, Any] = {
+                "sub_domain_id": sd.id,
+                "title": sd.title,
+                "domain_id": sd.domain_id,
+                "participating_regulations": participating,
+                "hso_hl_objective": objective,
+                "objective": objective,
+                "hso_per_reg": [
+                    h.model_dump() if hasattr(h, "model_dump") else h
+                    for h in (sd.hso_per_reg or [])
+                ],
+                "security_requirements": [
+                    sr.model_dump() if hasattr(sr, "model_dump") else sr
+                    for sr in (sd.security_requirements or [])
+                ],
+                "pairs": [
+                    p.model_dump() if hasattr(p, "model_dump") else p for p in (sd.pairs or [])
+                ],
+                "anchors": sorted(set(anchors)),
+                "csf": list(sd.csf_hint or []),
+            }
+            # CORR-101 Gap 2: manifest enrichment (opt-in via
+            # manifest_loader). Use canonical reg names so dirty strings
+            # like "AI_Act (partial)" / "CRA (sole authority)" match
+            # against the manifest's NIST controls keys.
+            if ml is not None:
+                from aegis_phase1.v2.domain.filters.regs import _canonical_reg_name
+
+                ai_act = ml.ai_act_for_subdomain(sd.id)
+                # Intersect manifest_nist_controls with the participating
+                # regulations (canonical form). The union across all
+                # participating regs gives the ref-level NIST set the
+                # prompt consumer needs.
+                canon_participating = {_canonical_reg_name(r) for r in participating if r}
+                d_id = (sd.domain_id or "").strip()
+                nist_set: set[str] = set()
+                for reg in sorted(canon_participating):
+                    nist_set.update(ml.nist_controls_for_reg_in_domain(d_id, reg))
+                ref["manifest_ai_act"] = ai_act
+                ref["manifest_nist_controls"] = sorted(nist_set)
+            refs.append(ref)
         return refs
 
 
