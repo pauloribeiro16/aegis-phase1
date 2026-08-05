@@ -131,6 +131,19 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
         "track_b_suggestion": track_b_suggestion,
     }
 
+    # CORR-101 Gap 2: when a ManifestLoader was injected into the
+    # orchestrator, add a top-level ``manifest_summary`` block to the
+    # inputs dict. The summary aggregates the per-subdomain ai_act
+    # states + the per-regulation NIST control sets for this domain.
+    # Gracefully skipped when the loader was not injected (back-compat).
+    manifest_loader = state.get("manifest_loader_ref")
+    if manifest_loader is not None:
+        inputs["manifest_summary"] = _build_manifest_summary(
+            manifest_loader=manifest_loader,
+            domain_id=domain_id,
+            applicable_regs=applicable_regs,
+        )
+
     logger.debug(
         "assemble_inputs(%s): subs=%d regs=%d cr=%d impls=%d (articles/ambiguities empty post-T4)",
         domain_id,
@@ -151,6 +164,57 @@ def _case_id(state: V2State) -> str:
     if not case_path:
         return ""
     return Path(case_path).name
+
+
+def _build_manifest_summary(
+    *,
+    manifest_loader: Any,
+    domain_id: str,
+    applicable_regs: list[str],
+) -> dict[str, Any]:
+    """Build the ``manifest_summary`` block for the per-domain inputs.
+
+    Reads the per-domain ``D-XX.manifest.json`` via the injected
+    ``manifest_loader`` (CORR-101 Gap 2). Aggregates:
+
+      * ``ai_act_present_count`` / ``_partial_count`` / ``_absent_count``
+        — tallies of subdomains in this domain by ai_act state.
+      * ``nist_controls_by_reg`` — dict ``{reg: [list of NIST ids]}``
+        for every reg in ``applicable_regs``. When the reg has no
+        NIST controls in the domain, the value is ``[]``.
+
+    Args:
+        manifest_loader: A ``ManifestLoader`` instance.
+        domain_id: Domain identifier (e.g. ``"D-01"``).
+        applicable_regs: The company-level regulations applicable to
+            this domain (from :func:`filter_regs`).
+
+    Returns:
+        Dict suitable for inclusion in the per-domain inputs under
+        the key ``"manifest_summary"``. The shape is documented in
+        CORR-101 §Gap 2 §3.
+    """
+    manifest = manifest_loader.manifest_for_domain(domain_id)
+    summary: dict[str, Any] = {
+        "domain_id": domain_id,
+        "ai_act_present_count": 0,
+        "ai_act_partial_count": 0,
+        "ai_act_absent_count": 0,
+        "nist_controls_by_reg": {},
+    }
+    for s in manifest.subdomain_summaries:
+        state = (s.ai_act or "").strip().lower()
+        if state == "present":
+            summary["ai_act_present_count"] += 1
+        elif state == "partial":
+            summary["ai_act_partial_count"] += 1
+        else:
+            summary["ai_act_absent_count"] += 1
+    for reg in applicable_regs:
+        summary["nist_controls_by_reg"][reg] = manifest_loader.nist_controls_for_reg_in_domain(
+            domain_id, reg
+        )
+    return summary
 
 
 def _project_company_context(ctx: Any) -> dict[str, Any]:
@@ -241,11 +305,8 @@ def _extract_corr047_fields(ctx: Any) -> dict[str, Any]:
         # Serialise Pydantic model
         if hasattr(value, "model_dump"):
             value = value.model_dump()
-        elif hasattr(value, "__dict__") and not isinstance(value, (str, int, float, bool, list, dict)):
-            value = {
-                k: v for k, v in value.__dict__.items()
-                if not k.startswith("_")
-            }
+        elif hasattr(value, "__dict__") and not isinstance(value, str | int | float | bool | list | dict):
+            value = {k: v for k, v in value.__dict__.items() if not k.startswith("_")}
         out[field] = value
     return out
 
@@ -290,14 +351,16 @@ def _build_track_b_suggestion(
             sid = sub.get("id", "")
             inheritability = "INHERITABLE" if sid in covered_adeq else "BUILD_REQUIRED"
             per_sub.append((sid, inheritability))
-        inheritability = "INHERITABLE" if all(i == "INHERITABLE" for _, i in per_sub) else "BUILD_REQUIRED"
+        inheritability = (
+            "INHERITABLE" if all(i == "INHERITABLE" for _, i in per_sub) else "BUILD_REQUIRED"
+        )
 
     # CORR-042 inline fix: ctx may be dict (v1-compat shim) or Pydantic.
     # Handle both so the legacy MAP path (assemble_inputs) doesn't crash.
     if isinstance(ctx, dict):
-        scale_raw = ctx.get('scale') or ctx.get('complexity_tier') or 'LOW'
-        employees_raw = ctx.get('employees') or 0
-        fte_raw = ctx.get('security_fte') or 0.0
+        scale_raw = ctx.get("scale") or ctx.get("complexity_tier") or "LOW"
+        employees_raw = ctx.get("employees") or 0
+        fte_raw = ctx.get("security_fte") or 0.0
     else:
         scale_raw = ctx.scale
         employees_raw = ctx.employees

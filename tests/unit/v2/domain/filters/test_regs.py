@@ -42,16 +42,44 @@ def test_returns_all_when_no_company_context(mock_state: V2State) -> None:
     assert result == ["CRA", "GDPR"]
 
 
-def test_unknown_domain_falls_back_to_company_applicability(mock_state: V2State) -> None:
-    """Unknown domain: ontology has no source_regulations, but company context does.
+def test_unknown_domain_returns_empty_with_error_log(mock_state: V2State) -> None:
+    """CORR-101 Gap 1: unknown domain with no participating subdomains → [] + ERROR.
 
-    Behaviour change (intentional): when the ontology lacks
-    ``source_regulations`` for the requested domain but the company
-    context declares ``applicable_regs``, fall back to the company
-    context rather than returning ``[]``. This is documented in
-    ``regs.filter_regs``.
+    Before CORR-101, ``filter_regs`` fell back to returning the full
+    ``company_context.applicable_regs`` when the ontology and
+    ``state['subdomains']`` lacked source_regs for the requested
+    domain. This silently included regulations that had zero
+    participating subdomains in the requested domain — a correctness
+    issue.
+
+    After CORR-101: when neither data source corroborates ANY
+    regulation for the domain, return ``[]`` and log at ERROR so the
+    loader failure / schema drift is investigated.
     """
-    assert filter_regs(mock_state, "D-99") == ["CRA", "GDPR"]
+    import io
+    import logging
+
+    log_stream = io.StringIO()
+    handler = logging.StreamHandler(log_stream)
+    handler.setLevel(logging.ERROR)
+    regs_logger = logging.getLogger("aegis_phase1.v2.domain.filters.regs")
+    regs_logger.addHandler(handler)
+    try:
+        result = filter_regs(mock_state, "D-99")
+    finally:
+        regs_logger.removeHandler(handler)
+
+    assert result == [], (
+        f"unknown domain D-99 should return [] (was: return all "
+        f"applicable_regs). Got: {result!r}"
+    )
+    log_output = log_stream.getvalue()
+    assert "filter_regs(D-99)" in log_output, (
+        f"ERROR log mentioning filter_regs(D-99) expected; got:\n{log_output}"
+    )
+    assert "BOTH ontology" in log_output, (
+        f"Expected ERROR message about both data sources being empty; got:\n{log_output}"
+    )
 
 
 def test_returns_empty_when_ontology_missing() -> None:
