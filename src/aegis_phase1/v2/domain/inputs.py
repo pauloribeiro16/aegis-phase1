@@ -106,13 +106,61 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
 
     subdomains = filter_subdomains(state, domain_id)
     applicable_regs = filter_regs(state, domain_id)
-    # CORR-037-T4: filter_articles/filter_ambiguities removed (v1 ambiguity/
-    # article loaders deprecated). For now, leave the keys in the inputs
-    # dict as empty lists so consumers don't KeyError. New consumers (SP-B/C)
-    # should use preproc_catalog.load_pairs() for cross-regulation analysis
-    # and read the regulatory OJ text directly from preproc_out/entities/clauses/.
+    # CORR-103: populate applicable_articles + ambiguities from preproc.
+    # Pre-CORR-103 these were hard-coded empty lists (post-T4 TODO);
+    # P1C-LLM-01 needs clause-level info to do ambiguity analysis. We
+    # now read from preproc_catalog (load_clauses + the preloaded
+    # v2_pairs) and fall back to [] when the catalog is unavailable.
     applicable_articles: list[dict] = []
     ambiguities: list[dict] = []
+    subdomain_ids_for_domain = [s.get("id") for s in subdomains if isinstance(s, dict) and s.get("id")]
+    try:
+        preproc = state.get("v2_preproc_catalog_ref")
+        if preproc is not None and subdomain_ids_for_domain:
+            # Articles: load clauses, filter by regulation ∩ applicable_regs.
+            all_clauses = preproc.load_clauses()
+            if isinstance(all_clauses, list) and applicable_regs:
+                seen_clause_ids: set[str] = set()
+                for clause in all_clauses:
+                    cid = (
+                        getattr(clause, "id", None)
+                        if not isinstance(clause, dict)
+                        else clause.get("id")
+                    )
+                    if not cid or cid in seen_clause_ids:
+                        continue
+                    creg = (
+                        getattr(clause, "regulation", None)
+                        if not isinstance(clause, dict)
+                        else clause.get("regulation")
+                    )
+                    if creg in applicable_regs:
+                        if hasattr(clause, "model_dump"):
+                            applicable_articles.append(clause.model_dump())
+                        elif isinstance(clause, dict):
+                            applicable_articles.append(dict(clause))
+                        seen_clause_ids.add(cid)
+            # Ambiguities: pairs from state (already preloaded by orchestrator).
+            all_pairs = list(state.get("v2_pairs", []) or [])
+            if all_pairs:
+                subdomain_set = set(subdomain_ids_for_domain)
+                for pair in all_pairs:
+                    if hasattr(pair, "model_dump"):
+                        p = pair.model_dump()
+                    elif isinstance(pair, dict):
+                        p = dict(pair)
+                    else:
+                        continue
+                    if p.get("subdomain_id") in subdomain_set:
+                        ambiguities.append(p)
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.warning(
+            "CORR-103: failed to populate applicable_articles/ambiguities "
+            "(falling back to empty): %s",
+            exc,
+        )
+        applicable_articles = []
+        ambiguities = []
     cross_reg_analysis = filter_cross_reg(state, domain_id)
     existing_implementations = filter_implementations(state, domain_id)
 
@@ -145,12 +193,14 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
         )
 
     logger.debug(
-        "assemble_inputs(%s): subs=%d regs=%d cr=%d impls=%d (articles/ambiguities empty post-T4)",
+        "assemble_inputs(%s): subs=%d regs=%d cr=%d impls=%d articles=%d ambiguities=%d",
         domain_id,
         len(subdomains),
         len(applicable_regs),
         len(cross_reg_analysis),
         len(existing_implementations),
+        len(applicable_articles),
+        len(ambiguities),
     )
     return inputs
 
