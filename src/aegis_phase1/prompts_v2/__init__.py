@@ -28,7 +28,13 @@ from aegis_phase1.prompts_v2.factory import (
     get_regulatory_baseline_root,
     get_validator,
 )
-from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
+from aegis_phase1.prompts_v2.invoker import (
+    MAX_PROMPT_TOKENS,
+    MODEL_TOKEN_CAPS,
+    Phase1LLMInvoker,
+    PromptTooLargeError,
+    _effective_token_cap,
+)
 from aegis_phase1.prompts_v2.llm_inventory import (
     LLM_SPECS,
     get_invocation_pattern,
@@ -53,6 +59,9 @@ from aegis_phase1.prompts_v2.validator import Phase1Validator
 __all__ = [
     "DOMAINS",
     "LLM_SPECS",
+    "MAX_PROMPT_TOKENS",
+    "MODEL_TOKEN_CAPS",
+    "PromptTooLargeError",
     "SPEC_COMPOUND",
     "SPEC_INTERPRETATION",
     "SPEC_OVERLAP",
@@ -66,6 +75,7 @@ __all__ = [
     "PromptLoader",
     "RobustParser",
     "TrackB",
+    "_effective_token_cap",
     "get_invocation_pattern",
     "get_invoker",
     "get_layer0_root",

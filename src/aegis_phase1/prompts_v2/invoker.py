@@ -31,6 +31,7 @@ from langchain_ollama import ChatOllama
 from langchain_core.runnables.config import RunnableConfig
 
 from aegis_phase1.config.defaults import RAW_OUTPUT_DIR
+from aegis_phase1.llm.token_counter import TokenCounter
 from aegis_phase1.prompts_v2.catalog import CatalogLoader
 from aegis_phase1.prompts_v2.llm_inventory import (
     get_invocation_pattern,
@@ -46,6 +47,73 @@ from aegis_phase1.llm.unified import LLMUnreachableError, probe_ollama
 # CORR-048: module-level logger. Required for the prompt truncation
 # warning (line ~250) and any other logger calls in this file.
 logger = logging.getLogger(__name__)
+
+
+# CORR-102: universal 124K token cap. Hard fail (raise PromptTooLargeError)
+# if exceeded. Replaces the legacy CORR-049 byte-based silent truncation
+# at 512KB — silent truncation was hiding contract violations and
+# degrading model output. The new policy is fail-loud so the caller
+# can fix the prompt budget before retrying.
+MAX_PROMPT_TOKENS = 124000
+
+# Per-model cap (the smaller of MAX_PROMPT_TOKENS and the model's
+# native context window). gemma4:e4b has an 8K context server-side
+# (Ollama); llama3.1:8b is 8K; the minimax models can do 200K but we
+# cap at 124K to align with MAX_PROMPT_TOKENS.
+MODEL_TOKEN_CAPS: dict[str, int] = {
+    "gemma4:e4b": 8000,
+    "llama3.1:8b": 8000,
+    "MiniMax-M3": 124000,
+    "MiniMax-M2.7": 124000,
+    "MiniMax-M2.7-highspeed": 124000,
+}
+
+
+def _effective_token_cap(model: str) -> int:
+    """Return the effective token cap for ``model``.
+
+    Falls back to :data:`MAX_PROMPT_TOKENS` when the model is not in
+    :data:`MODEL_TOKEN_CAPS` (defensive default for newly added
+    models).
+    """
+    return min(MAX_PROMPT_TOKENS, MODEL_TOKEN_CAPS.get(model, MAX_PROMPT_TOKENS))
+
+
+class PromptTooLargeError(RuntimeError):
+    """Raised when a rendered prompt exceeds the model's effective token cap.
+
+    Replaces the legacy CORR-049 byte-based silent truncation. The
+    orchestrator / runner / invoker must propagate this exception
+    upward; never silently truncate to fit the cap.
+
+    Attributes:
+        spec_id: The canonical spec ID (e.g. ``P1B-LLM-01-INTERPRETATION``).
+        model: The model tag (e.g. ``gemma4:e4b``).
+        sys_tokens: Token estimate of the system prompt.
+        user_tokens: Token estimate of the user prompt.
+        cap: The effective cap (the smaller of ``MAX_PROMPT_TOKENS``
+            and the model's native cap).
+    """
+
+    def __init__(
+        self,
+        spec_id: str,
+        model: str,
+        sys_tokens: int,
+        user_tokens: int,
+        cap: int,
+    ) -> None:
+        self.spec_id = spec_id
+        self.model = model
+        self.sys_tokens = sys_tokens
+        self.user_tokens = user_tokens
+        self.cap = cap
+        super().__init__(
+            f"CORR-102: prompt too large for {model} "
+            f"(sys={sys_tokens} + user={user_tokens} = "
+            f"{sys_tokens + user_tokens} tokens > cap={cap}). "
+            f"spec_id={spec_id}. Refusing to send to LLM."
+        )
 
 
 # CORR-042-T3: Specs that require deterministic catalogs.
@@ -326,58 +394,47 @@ class Phase1LLMInvoker:
         attempt: int,
         config: RunnableConfig | None = None,
     ) -> dict[str, Any]:
-        """Single attempt at invoking the LLM."""
+        """Single attempt at invoking the LLM.
+
+        Raises:
+            PromptTooLargeError: CORR-102 hard cap. Raised when the
+                rendered prompt exceeds ``_effective_token_cap(self.model)``.
+                Replaces the legacy CORR-049 byte-based silent
+                truncation. Callers must propagate this upward.
+        """
         try:
             # 1. Load + render prompt
             prompt = self.prompts.render(spec_id, inputs)
-            # CORR-049-T7.1: cap at 512KB (524288 bytes). Prompts
-            # P1C-LLM-01 are ~211K tokens ≈ 850KB; the practical
-            # ceiling before gemma4:e4b degrades is ~512KB. The
-            # 048 value (10KB) was a 50x underestimate that caused
-            # 57% FORMAT_ERROR rate (truncated 86KB → 4KB → JSON
-            # schema fails to parse).
-            MAX_PROMPT_BYTES = 524288  # 512KB — CORR-049 sweet spot
-            sys_len = len(prompt["system"])
-            user_len = len(prompt["user"])
-            if sys_len + user_len > MAX_PROMPT_BYTES:
-                # Leave room for system + a 200-byte marker. The user
-                # head gets the remaining budget. If system alone is
-                # already over the budget, truncate the system to 60%
-                # of the cap and put the rest in user (this is the
-                # pathological case the cap is meant to catch).
-                user_budget = max(0, MAX_PROMPT_BYTES - sys_len - 200)
-                if user_budget == 0:
-                    # Pathological: system alone is too large. Truncate
-                    # system to 60% and rebuild user with the original.
-                    system_cap = int(MAX_PROMPT_BYTES * 0.6)
-                    prompt = {
-                        **prompt,
-                        "system": prompt["system"][:system_cap],
-                        "user": prompt["user"][: MAX_PROMPT_BYTES - system_cap - 200]
-                        + "\n\n[CORR-049 truncated: input exceeded 512KB]",
-                    }
-                else:
-                    head = prompt["user"][:user_budget]
-                    prompt = {
-                        **prompt,
-                        "user": head + "\n\n[CORR-049 truncated: input exceeded 512KB]",
-                    }
-                # CORR-049-T7.1: log INFO (not WARNING) when truncating,
-                # and emit Langfuse flag for trace metadata.
-                logger.info(
-                    "CORR-049-T7: prompt truncated %dB → %dB (spec=%s, cap=%dB)",
-                    sys_len + user_len, MAX_PROMPT_BYTES, spec_id, MAX_PROMPT_BYTES,
+            # CORR-102: token-based hard cap (replaces the CORR-049
+            # byte-based silent truncation at 512KB). If the prompt
+            # exceeds the effective token cap for the model, raise
+            # PromptTooLargeError — do NOT silently truncate. The
+            # caller must fix the prompt budget.
+            sys_t, user_t, total_t = TokenCounter.count_pair(
+                prompt["system"], prompt["user"],
+            )
+            effective_cap = _effective_token_cap(self.model)
+            if total_t > effective_cap:
+                logger.error(
+                    "CORR-102: prompt exceeds token cap "
+                    "(sys=%d + user=%d = %d tokens > cap=%d, model=%s, spec=%s)",
+                    sys_t, user_t, total_t, effective_cap, self.model, spec_id,
                 )
-                # Langfuse flag (best-effort, swallow errors)
-                if self._langfuse_handler is not None:
-                    try:
-                        handler_meta = getattr(self._langfuse_handler, "metadata", None)
-                        if isinstance(handler_meta, dict):
-                            handler_meta["truncated"] = True
-                            handler_meta["original_size_bytes"] = sys_len + user_len
-                            handler_meta["truncated_to_bytes"] = MAX_PROMPT_BYTES
-                    except Exception:
-                        pass
+                raise PromptTooLargeError(
+                    spec_id=spec_id,
+                    model=self.model,
+                    sys_tokens=sys_t,
+                    user_tokens=user_t,
+                    cap=effective_cap,
+                )
+            # Visibility log: byte sizes for backward-compat tooling
+            # that greps for prompt sizes. DEBUG-level — not a
+            # truncation event anymore.
+            logger.debug(
+                "CORR-102: prompt within budget "
+                "(sys=%d + user=%d = %d tokens, cap=%d, model=%s, spec=%s)",
+                sys_t, user_t, total_t, effective_cap, self.model, spec_id,
+            )
             schema = self.prompts.load(spec_id).get("schema") or {}
 
             # 2. Build the chat client. CORR-062 S2: provider-aware —
