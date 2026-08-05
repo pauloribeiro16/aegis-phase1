@@ -189,34 +189,23 @@ def test_assemble_inputs_handles_empty_ontology() -> None:
         assemble_inputs(state, "D-04")
 
 
-def test_assemble_inputs_returns_empty_lists_when_no_data(mock_state: V2State) -> None:
-    """A domain with no sub-domains/regs returns empty lists — does not raise.
+def test_assemble_inputs_raises_when_no_data(mock_state: V2State) -> None:
+    """CORR-102: a domain with NO participating subdomains raises
+    :class:`NoRegsForDomainError`.
 
-    Implementations depend on tech_stack (not sub-domain presence), so
-    they may still be returned; we verify the per-subdomain fields are
-    empty.
+    ``mock_state`` has subdomains D-04.* and D-05.1 — but D-99 has
+    no subdomains at all. The previous behaviour returned ``[]``;
+    CORR-102 promotes this to a hard exception.
 
-    CORR-101 Gap 1: ``applicable_regs`` for an unknown domain (no
-    participating subdomains anywhere) is now ``[]`` rather than the
-    full company-level ``applicable_regs``. The previous fallback
-    silently included regulations with zero participating subdomains
-    in the requested domain; the defense-in-depth cross-check now
-    refuses to claim a regulation is applicable when no subdomain in
-    the domain carries it.
+    Domains like D-04 (subdomains exist but no participating regs)
+    are NOT affected by the raise — they keep the CORR-101
+    ``[]`` behaviour so contract tests stay green.
     """
-    result = assemble_inputs(mock_state, "D-99")
-    assert result["subdomains"] == []
-    assert result["applicable_regs"] == [], (
-        f"D-99 has no participating subdomains; applicable_regs must "
-        f"be [] (CORR-101 defense-in-depth), got {result['applicable_regs']!r}"
-    )
-    assert result["applicable_articles"] == []
-    # CORR-037-T4: ambiguities is empty (v1 ambiguity_loader removed).
-    assert result["ambiguities"] == []
-    assert result["cross_reg_analysis"] == []
-    # Implementations are tech-stack driven, not subdomain-driven,
-    # so they may still be present for any domain the company uses.
-    assert isinstance(result["existing_implementations"], list)
+    from aegis_phase1.v2.domain.filters.regs import NoRegsForDomainError
+
+    with pytest.raises(NoRegsForDomainError) as exc_info:
+        assemble_inputs(mock_state, "D-99")
+    assert exc_info.value.domain_id == "D-99"
 
 
 # ─── Internal helpers ──────────────────────────────────────────────────

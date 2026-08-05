@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 from aegis_phase1.v2.domain.filters.subdomains import (
+    NoSubdomainsForDomainError,
     _extract_regulation,
     filter_subdomains,
 )
@@ -67,8 +70,12 @@ def test_returns_empty_list_when_no_match(mock_state: V2State) -> None:
 
 
 def test_returns_empty_list_when_subdomains_missing() -> None:
+    """CORR-102: state['subdomains'] missing → raise NoSubdomainsForDomainError
+    (was: silently return [])."""
     state = make_empty_state()
-    assert filter_subdomains(state, "D-04") == []
+    with pytest.raises(NoSubdomainsForDomainError) as exc_info:
+        filter_subdomains(state, "D-04")
+    assert exc_info.value.domain_id == "D-04"
 
 
 def test_falls_back_to_id_extraction_when_ontology_missing(mock_state: V2State) -> None:

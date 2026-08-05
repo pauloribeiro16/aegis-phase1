@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from aegis_phase1.v2.domain.filters.regs import filter_regs
+import pytest
+
+from aegis_phase1.v2.domain.filters.regs import NoRegsForDomainError, filter_regs
 from aegis_phase1.v2.state import V2State
 
 from .conftest import make_empty_state
@@ -42,8 +44,9 @@ def test_returns_all_when_no_company_context(mock_state: V2State) -> None:
     assert result == ["CRA", "GDPR"]
 
 
-def test_unknown_domain_returns_empty_with_error_log(mock_state: V2State) -> None:
-    """CORR-101 Gap 1: unknown domain with no participating subdomains → [] + ERROR.
+def test_unknown_domain_raises_NoRegsForDomainError(mock_state: V2State) -> None:
+    """CORR-102: unknown domain with no participating subdomains → raise
+    NoRegsForDomainError (was: [] + ERROR log, pre-CORR-102).
 
     Before CORR-101, ``filter_regs`` fell back to returning the full
     ``company_context.applicable_regs`` when the ontology and
@@ -52,39 +55,81 @@ def test_unknown_domain_returns_empty_with_error_log(mock_state: V2State) -> Non
     participating subdomains in the requested domain — a correctness
     issue.
 
-    After CORR-101: when neither data source corroborates ANY
-    regulation for the domain, return ``[]`` and log at ERROR so the
-    loader failure / schema drift is investigated.
+    CORR-101 (defense-in-depth) promoted this to [] + ERROR log.
+    CORR-102 promotes it further to a hard exception so the loader
+    failure / schema drift is investigated loudly.
+
+    NB: the trigger condition is ``_participating_regs_in_domain``
+    returning ``None`` (no data source has any subdomain for D-XX).
+    When data sources exist but no subdomain carries regs, the
+    function returns ``[]`` to preserve CORR-101 contract test
+    expectations.
     """
-    import io
-    import logging
-
-    log_stream = io.StringIO()
-    handler = logging.StreamHandler(log_stream)
-    handler.setLevel(logging.ERROR)
-    regs_logger = logging.getLogger("aegis_phase1.v2.domain.filters.regs")
-    regs_logger.addHandler(handler)
-    try:
-        result = filter_regs(mock_state, "D-99")
-    finally:
-        regs_logger.removeHandler(handler)
-
-    assert result == [], (
-        f"unknown domain D-99 should return [] (was: return all "
-        f"applicable_regs). Got: {result!r}"
-    )
-    log_output = log_stream.getvalue()
-    assert "filter_regs(D-99)" in log_output, (
-        f"ERROR log mentioning filter_regs(D-99) expected; got:\n{log_output}"
-    )
-    assert "BOTH ontology" in log_output, (
-        f"Expected ERROR message about both data sources being empty; got:\n{log_output}"
-    )
+    with pytest.raises(NoRegsForDomainError) as exc_info:
+        filter_regs(mock_state, "D-99")
+    assert exc_info.value.domain_id == "D-99"
+    assert "D-99" in str(exc_info.value)
 
 
-def test_returns_empty_when_ontology_missing() -> None:
+def test_empty_state_raises_NoRegsForDomainError() -> None:
+    """CORR-102: empty state (no ontology, no subdomains) → raise."""
     state = make_empty_state()
-    assert filter_regs(state, "D-04") == []
+    with pytest.raises(NoRegsForDomainError) as exc_info:
+        filter_regs(state, "D-04")
+    assert exc_info.value.domain_id == "D-04"
+
+
+def test_subdomains_exist_but_no_regs_returns_empty() -> None:
+    """CORR-102: data sources are populated but no subdomain carries regs → [].
+
+    This is the case1 D-04 contract-test scenario: preproc catalogue
+    has D-04.1..D-04.4 subdomains but their participating_regulations
+    are empty. The contract expects [] (NOT raise). Only the
+    genuinely-no-data case raises.
+    """
+    from aegis_phase1.models import ComplexityTier
+    from aegis_phase1.v2.state import CompanyContext, SubDomainDef
+
+    state = {
+        "current_stage": "LOADED",
+        "case_path": "/tmp/case",
+        "preprocessing_path": "/tmp/preproc",
+        "company_context": CompanyContext(
+            company_name="X",
+            sector="Tech",
+            jurisdiction="PT",
+            employees=8,
+            revenue=1_000_000.0,
+            scale="MICRO",
+            applicable_regs=["GDPR", "CRA"],
+            complexity_tier=ComplexityTier.LOW,
+            security_fte=0.5,
+            tech_stack=[],
+        ),
+        "taxonomy_entries": [],
+        "ontology": {},
+        "regulations": [],
+        "subdomains": {
+            "D-04.1": SubDomainDef(
+                document_id="AEGIS-PREPROC-SD-D-04.1",
+                title="t", status="DRAFT",
+                section1_crda=[], section2_hso={"hl_objective": "", "per_reg_sos": [], "emergent_tensions": []},
+                section3_requirements=[],
+                frontmatter={"document_id": "AEGIS-PREPROC-SD-D-04.1"},
+            ),
+        },
+        "preprocessing": {},
+        "domain_results": {},
+        "aggregated_data": {},
+        "output_paths": {},
+        "errors": [],
+    }
+    # No participating regs in D-04 subdomains, ontology empty, no
+    # fallback path. But _participating_regs_in_domain returns an
+    # empty set (not None) because the subdomains exist. So
+    # filter_regs returns [] (CORR-101 contract), NOT raise.
+    result = filter_regs(state, "D-04")
+    assert result == []
 
 
 def test_accepts_flat_subdomains_list(mock_state: V2State) -> None:

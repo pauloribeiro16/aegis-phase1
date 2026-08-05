@@ -1,0 +1,83 @@
+# AEGIS Phase 1 — Regulatory Interactions (Layer 3 scans)
+# Required when ≥2 regulations apply (Case 02: AI_Act + CRA + GDPR + NIS2).
+# Captures temporal/requirement conflicts, trigger mismatches,
+# and negative analyses (what SHOULD apply but doesn't).
+temporal_conflicts:
+  - id: TI-01
+    type: TEMPORAL
+    regulations: [GDPR, CRA]
+    sub_domains: [D-04.3]
+    description: >
+      GDPR Art. 33 requires 72h breach notification to the DPA;
+      CRA Art. 14 requires 24h for actively exploited vulnerabilities.
+      Single incident may need parallel reporting under both regimes.
+    resolution: >
+      Adopt the maximum-SLA workflow (24h internal escalation) so
+      both regimes are satisfied from the same detection pipeline.
+  - id: TI-02
+    type: TEMPORAL
+    regulations: [NIS2, GDPR]
+    sub_domains: [D-04.3]
+    description: >
+      NIS2 Art. 23 requires 24h early warning + 72h notification;
+      GDPR Art. 33 requires 72h DPA notification. NIS2 obligation
+      is stricter on the early-warning phase.
+    resolution: >
+      NIS2 24h early warning is the binding SLA; GDPR 72h DPA
+      notification runs in parallel from the same incident record.
+  - id: TI-03
+    type: TEMPORAL
+    regulations: [AI_Act, NIS2]
+    sub_domains: [D-08.1]
+    description: >
+      AI Act Art. 73 serious incident reporting (15d) vs NIS2 24h
+      early warning. Different regimes apply to different aspects
+      of the same biometric AI incident.
+    resolution: >
+      NIS2 24h SLA governs the security incident timeline; AI Act
+      15d report runs separately on the AI-system specific data.
+requirement_conflicts: []
+trigger_mismatches:
+  - id: TM-01
+    type: TRIGGER
+    regulations: [GDPR, CRA]
+    sub_domains: [D-04.3]
+    description: >
+      CRA Art. 14 trigger = "actively exploited vulnerability";
+      GDPR Art. 33 trigger = "personal data breach". Same incident
+      may satisfy one but not the other — classification differs.
+    resolution: >
+      Default to reporting under both regimes whenever an incident
+      involves biometric data AND a known CVE with active
+      exploitation.
+negative_analyses:
+  - id: NA-01
+    description: >
+      No Fundamental Rights Impact Assessment (FRIA) on file
+      despite high-risk biometric identification per AI Act Annex III §1.
+    expected_regulations: [AI_Act]
+    severity: HIGH
+  - id: NA-02
+    description: >
+      No Article 27 FRIA evidence in compliance register despite
+      public-sector deployment of biometric identification system.
+    expected_regulations: [AI_Act]
+    severity: HIGH
+  - id: NA-03
+    description: >
+      NIS2 supply-chain security (Art. 24) lacks formal sub-processor
+      register for biometric matching vendor (3rd-party processor).
+    expected_regulations: [NIS2]
+    severity: MEDIUM
+  - id: NA-04
+    description: >
+      CRA Annex VII conformity assessment on file but Annex VIII
+      technical documentation is incomplete for CLASS_I products.
+    expected_regulations: [CRA]
+    severity: MEDIUM
+  - id: NA-05
+    description: >
+      GDPR Art. 35 DPIA exists for biometric processing but lacks
+      the AI-specific risk factors required when AI Act also applies.
+    expected_regulations: [GDPR, AI_Act]
+    severity: MEDIUM

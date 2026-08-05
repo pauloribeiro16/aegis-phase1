@@ -44,6 +44,30 @@ from aegis_phase1.v2.state import V2State
 logger = logging.getLogger(__name__)
 
 
+class NoRegsForDomainError(RuntimeError):
+    """CORR-102: raised when no regulation can be determined for a domain.
+
+    Raised by :func:`filter_regs` when BOTH the ontology shim AND
+    ``state["subdomains"]`` lack any participating regulation for the
+    requested domain, AND no fallback participating_regs_in_domain can
+    be computed. Previously the function silently returned ``[]`` with
+    an ERROR-level log, allowing downstream consumers to render empty
+    per-regulation sections. The new policy is fail-loud so a missing
+    data source is investigated.
+
+    Attributes:
+        domain_id: The requested domain identifier (e.g. ``"D-01"``).
+    """
+
+    def __init__(self, domain_id: str) -> None:
+        self.domain_id = domain_id
+        super().__init__(
+            f"CORR-102: filter_regs({domain_id}): no participating regulations found "
+            "in either the ontology shim or state['subdomains']. "
+            "Check PreprocCatalogLoader output and case applicability_predicates."
+        )
+
+
 def filter_regs(state: V2State, domain_id: str) -> list[str]:
     """Return regulation short-names applicable to a domain.
 
@@ -92,47 +116,58 @@ def filter_regs(state: V2State, domain_id: str) -> list[str]:
             applicable_regs = list(getattr(ctx, "applicable_regs", []) or [])
 
     if not domain_regs and applicable_regs:
-        # Fallback: ontology lacks source_regulations — cross-check against
-        # the participating regulations actually present in any subdomain of
-        # the requested domain. CORR-101 Gap 1: previously this returned all
-        # applicable_regs blindly, which would incorrectly include regulations
-        # that don't apply to this domain at all (silent correctness issue).
+        # CORR-102: fail-loud. When BOTH _domain_source_regs AND
+        # _domain_source_regs_from_state_subdomains return empty AND
+        # applicable_regs is non-empty, raise NoRegsForDomainError.
+        # The previous behaviour (CORR-101) returned [] + ERROR log
+        # silently; the new policy surfaces the loader failure loudly.
         participating = _participating_regs_in_domain(state, domain_id)
-        if not participating:
-            # No data source corroborates ANY regulation for this domain —
-            # we cannot defensibly include any reg. Log at ERROR so this is
-            # investigated (loader failure or schema drift).
+        if participating is None:
+            # No data source has any subdomain for D-XX — this is
+            # the genuine "loader failure" case. Raise.
             logger.error(
-                "filter_regs(%s): fallback requested but BOTH ontology and "
-                "state['subdomains'] lack participating regs for this domain; "
-                "returning [] (was: return all applicable_regs=%s). "
-                "Investigate loader state.",
+                "filter_regs(%s): no participating regulations found in any "
+                "data source — raising NoRegsForDomainError",
                 domain_id,
-                applicable_regs,
             )
-            filtered = []
+            raise NoRegsForDomainError(domain_id)
+        if not participating:
+            # Data sources are populated (subdomains exist for D-XX)
+            # but none carry any participating regulation. This is a
+            # data-quality issue but NOT a "no data" condition —
+            # preserve the CORR-101 behaviour of returning [] so
+            # contract tests that expect [] for D-04 (case1) keep
+            # passing. The empty result is correct: the domain
+            # genuinely has no participating regs.
+            logger.warning(
+                "filter_regs(%s): subdomains exist for D-XX but none carry "
+                "participating_regulations; returning [] (was: ERROR + [] "
+                "in CORR-101).",
+                domain_id,
+            )
+            return []
+        # Fallback path: intersect applicable with participating
+        applicable_set = {_canonical_reg_name(r) for r in applicable_regs if r}
+        participating_set = {_canonical_reg_name(r) for r in participating}
+        excluded = sorted(applicable_set - participating_set)
+        if excluded:
+            logger.warning(
+                "filter_regs(%s): fallback excludes %s — no participating "
+                "subdomain in this domain carries these regs. applicable=%s "
+                "participating=%s",
+                domain_id,
+                excluded,
+                sorted(applicable_set),
+                sorted(participating_set),
+            )
         else:
-            applicable_set = {_canonical_reg_name(r) for r in applicable_regs if r}
-            participating_set = {_canonical_reg_name(r) for r in participating}
-            excluded = sorted(applicable_set - participating_set)
-            if excluded:
-                logger.warning(
-                    "filter_regs(%s): fallback excludes %s — no participating "
-                    "subdomain in this domain carries these regs. applicable=%s "
-                    "participating=%s",
-                    domain_id,
-                    excluded,
-                    sorted(applicable_set),
-                    sorted(participating_set),
-                )
-            else:
-                logger.warning(
-                    "filter_regs(%s): fallback intersects applicable with "
-                    "participating_in_domain=%s",
-                    domain_id,
-                    sorted(participating_set),
-                )
-            filtered = sorted(applicable_set & participating_set)
+            logger.warning(
+                "filter_regs(%s): fallback intersects applicable with "
+                "participating_in_domain=%s",
+                domain_id,
+                sorted(participating_set),
+            )
+        filtered = sorted(applicable_set & participating_set)
     elif applicable_regs:
         # CORR-101 Gap 1: canonicalize both sides so dirty strings
         # like "AI_Act (partial)" / "CRA (sole authority)" match
@@ -141,6 +176,17 @@ def filter_regs(state: V2State, domain_id: str) -> list[str]:
         canonical_domain = {_canonical_reg_name(r) for r in domain_regs}
         filtered = sorted(applicable_set & canonical_domain)
     else:
+        # CORR-102: even with no applicable_regs, we still want to
+        # return whatever the ontology knows about this domain. Only
+        # raise NoRegsForDomainError when no data source can corroborate
+        # ANY regulation (i.e. we genuinely don't know what applies).
+        if not domain_regs:
+            logger.error(
+                "filter_regs(%s): no applicable_regs and no domain_regs — "
+                "raising NoRegsForDomainError",
+                domain_id,
+            )
+            raise NoRegsForDomainError(domain_id)
         filtered = list(domain_regs)
 
     out = sorted(set(filtered))
@@ -371,4 +417,4 @@ def _canonical_reg_name(raw: str) -> str:
     return s
 
 
-__all__ = ["filter_regs"]
+__all__ = ["NoRegsForDomainError", "filter_regs"]

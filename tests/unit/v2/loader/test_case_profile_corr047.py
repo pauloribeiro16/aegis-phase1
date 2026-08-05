@@ -149,12 +149,15 @@ def test_regulatory_interactions_loaded(ctx: CompanyProfile) -> None:
 # ──────────────────────────────────────────────────────────────────
 
 
-def test_loader_tolerates_missing_yaml(tmp_path: Path) -> None:
-    """When the 4 new YAMLs are absent, the loader returns None for each
-    field and logs WARNING (does not crash)."""
+def test_loader_raises_MissingRequiredFileError_on_missing_yaml(tmp_path: Path) -> None:
+    """CORR-102: the 4 CORR-047 YAMLs are now REQUIRED. Missing file →
+    :class:`MissingRequiredFileError` (was: silent None + WARNING)."""
+    from aegis_phase1.v2.loader.case_profile import MissingRequiredFileError
+
     # Build a tmp case with only the 3 ORIGINAL company YAMLs
     # (classification, business_goals, stakeholders) and 1 regulatory
-    # YAML (applicability). No 4 new YAMLs.
+    # YAML (applicability). No 4 new YAMLs — first loader to hit a
+    # missing file raises.
     (tmp_path / "input" / "company").mkdir(parents=True)
     (tmp_path / "input" / "regulatory").mkdir(parents=True)
 
@@ -174,44 +177,8 @@ def test_loader_tolerates_missing_yaml(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    # CORR-059: use stdlib logging capture instead of pytest caplog —
-    # caplog's at_level()/set_level() hit a stash KeyError bug in pytest
-    # 8.x/9.x (handler property accesses caplog_handler_key before init).
-    import logging as _logging
+    with pytest.raises(MissingRequiredFileError) as exc_info:
+        CaseProfileLoader(case_path=tmp_path).load()
 
-    class _ListHandler(_logging.Handler):
-        def __init__(self):
-            super().__init__(_logging.WARNING)
-            self.records: list[_logging.LogRecord] = []
-
-        def emit(self, record: _logging.LogRecord) -> None:
-            self.records.append(record)
-
-    handler = _ListHandler()
-    logger = _logging.getLogger("aegis_phase1.v2.loader.case_profile")
-    logger.addHandler(handler)
-    try:
-        profile = CaseProfileLoader(case_path=tmp_path).load()
-    finally:
-        logger.removeHandler(handler)
-
-    # 4 new fields are None
-    assert profile.implementation_readiness is None
-    assert profile.regulatory_classification is None
-    assert profile.role_matrix is None
-    assert profile.regulatory_interactions is None
-
-    # 4 WARNINGs about missing files
-    warning_msgs = [r.getMessage() for r in handler.records]
-    assert any("implementation_readiness" in m for m in warning_msgs), (
-        f"missing impl_readiness WARNING; got: {warning_msgs}"
-    )
-    assert any("regulatory_classification" in m for m in warning_msgs), (
-        f"missing reg_class WARNING; got: {warning_msgs}"
-    )
-    assert any("role_matrix" in m for m in warning_msgs), (
-        f"missing role_matrix WARNING; got: {warning_msgs}"
-    )
-    assert any("regulatory_interactions" in m for m in warning_msgs), (
-        f"missing reg_interactions WARNING; got: {warning_msgs}"
-    )
+    # The first missing file reported is implementation_readiness
+    assert "implementation_readiness" in exc_info.value.filename

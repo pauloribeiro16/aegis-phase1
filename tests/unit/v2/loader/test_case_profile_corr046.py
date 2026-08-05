@@ -186,6 +186,22 @@ def test_load_company_handles_csv_string_tech_stack(tmp_path: Path) -> None:
         "applicable_regulations: []\nnon_applicable_regulations: []\n",
         encoding="utf-8",
     )
+    # CORR-102: the 4 CORR-047 files are now required. Provide empty
+    # stubs so the loader does not raise MissingRequiredFileError before
+    # we can assert on tech_stack parsing. Quote the YES/NO/PARTIAL
+    # values so YAML parses them as strings, not booleans.
+    (tmp_path / "input" / "company" / "implementation_readiness.yaml").write_text(
+        "ciso: 'NO'\nbackup: 'NO'\n", encoding="utf-8",
+    )
+    (tmp_path / "input" / "company" / "regulatory_classification.yaml").write_text(
+        "cra_product_class: 'CLASS_I'\n", encoding="utf-8",
+    )
+    (tmp_path / "input" / "company" / "role_matrix.yaml").write_text(
+        "gdpr:\n  role: 'controller'\n", encoding="utf-8",
+    )
+    (tmp_path / "input" / "regulatory" / "interactions.yaml").write_text(
+        "temporal_conflicts: []\n", encoding="utf-8",
+    )
     loader = CaseProfileLoader(case_path=tmp_path)
     profile = loader.load()
     assert profile.company.tech_stack == ["AWS", "Django", "PostgreSQL"]

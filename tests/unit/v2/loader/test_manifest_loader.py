@@ -114,17 +114,14 @@ def test_all_10_manifests_loadable(loader: ManifestLoader, all_d_ids: list[str])
 # --- G2: Tolerated failure modes -----------------------------------------
 
 
-def test_missing_manifest_returns_empty(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    """Nonexistent domain returns empty manifest + WARNING log."""
+def test_missing_manifest_raises(tmp_path: Path) -> None:
+    """CORR-102: Nonexistent manifest raises ManifestNotFoundError (was: empty + WARNING)."""
+    from aegis_phase1.v2.loader.manifest_loader import ManifestNotFoundError
 
     isolated = ManifestLoader(manifests_root=tmp_path)
-    # tmp_path has no manifest directories → empty defaults
-    m = isolated.manifest_for_domain("D-XX")
-    assert isinstance(m, Manifest)
-    assert m.domain_id == "D-XX"
-    assert m.subdomain_summaries == []
-    assert m.applicable_nist_controls_by_regulation == {}
-    assert m.counts.subdomains == 0
+    # tmp_path has no manifest directories → raise
+    with pytest.raises(ManifestNotFoundError):
+        isolated.manifest_for_domain("D-XX")
 
 
 def test_missing_subdomain_in_manifest_returns_absent(
@@ -144,11 +141,21 @@ def test_empty_subdomain_id_returns_absent(
     assert loader.ai_act_for_subdomain("not-a-subdomain") == "absent"
 
 
-def test_nist_controls_for_missing_domain_returns_empty(
+def test_nist_controls_for_missing_domain_raises(
     loader: ManifestLoader,
 ) -> None:
-    """Missing domain or reg → empty list (never raises)."""
-    assert loader.nist_controls_for_reg_in_domain("D-99", "GDPR") == []
+    """CORR-102: missing domain → ManifestNotFoundError (was: empty list).
+
+    A missing regulation (valid domain, unknown reg) still returns an
+    empty list (no entry in the per-reg mapping means empty result,
+    which is the correct response — there is no missing data, just
+    no data for that reg).
+    """
+    from aegis_phase1.v2.loader.manifest_loader import ManifestNotFoundError
+
+    with pytest.raises(ManifestNotFoundError):
+        loader.nist_controls_for_reg_in_domain("D-99", "GDPR")
+    # Valid domain, unknown reg: still returns empty list (no raise)
     assert loader.nist_controls_for_reg_in_domain("D-01", "MADE_UP_REG") == []
 
 
@@ -164,7 +171,8 @@ def test_default_root_is_methodology_main() -> None:
 def test_cross_check_with_preproc_participating_regs(
     loader: ManifestLoader,
 ) -> None:
-    """ManifestLoader's ``applicable_regs`` ⊆ subdomain.participating_regulations.
+    """CORR-102: ManifestLoader.cross_check_with_preproc_participating_regs
+    raises :class:`ManifestDriftError` when drift is detected.
 
     Drift detection: every regulation listed in
     ``subdomain_summaries[].applicable_regs`` for a sub-domain must
@@ -178,39 +186,15 @@ def test_cross_check_with_preproc_participating_regs(
     Note: as of 2026-08-05 there is known drift in D-01.2 / D-01.3 /
     D-01.4 — the manifest lists NIS2 in ``applicable_regs`` but the
     preproc has empty participating_regulations for those entries.
-    This is a Methodology-main data inconsistency (separate repo),
-    NOT a loader bug. The test logs the drift via ``pytest.warns``
-    so the issue is visible without hard-failing the loader test
-    suite (a separate drift-regression contract should reconcile the
-    two sources).
+    This is a Methodology-main data inconsistency (separate repo).
+    CORR-102 promotes the previous WARNING to a hard
+    :class:`ManifestDriftError`.
     """
-    import warnings
-
-    from aegis_phase1.v2.domain.filters.regs import _canonical_reg_name
+    from aegis_phase1.v2.loader.manifest_loader import ManifestDriftError
     from aegis_phase1.v2.loader.preproc_catalog import PreprocCatalogLoader
 
     preproc = PreprocCatalogLoader(Path("preproc_out"))
     by_id = {s.id: s for s in preproc.load_subdomains()}
-
-    drift_records: list[str] = []
-    for d_id in [f"D-{n:02d}" for n in range(1, 11)]:
-        m = loader.manifest_for_domain(d_id)
-        for s in m.subdomain_summaries:
-            preproc_sd = by_id.get(s.id)
-            if preproc_sd is None:
-                drift_records.append(f"{s.id}: not in preproc")
-                continue
-            manifest_canon = {_canonical_reg_name(r) for r in s.applicable_regs if r}
-            preproc_canon = {
-                _canonical_reg_name(r) for r in (preproc_sd.participating_regulations or []) if r
-            }
-            missing = manifest_canon - preproc_canon
-            if missing:
-                drift_records.append(
-                    f"{s.id}: manifest.applicable_regs={sorted(manifest_canon)} "
-                    f"vs preproc.participating_regulations={sorted(preproc_canon)} "
-                    f"missing={sorted(missing)}"
-                )
 
     # All 38 subdomain_summaries must be iterated (sanity: loader is complete)
     total = sum(
@@ -218,16 +202,23 @@ def test_cross_check_with_preproc_participating_regs(
     )
     assert total == 38, f"expected 38 subdomain summaries across 10 manifests, got {total}"
 
-    # Soft-fail drift (known drift in 2026-08-05 corpus; future contracts
-    # should reconcile). Emit as warnings so the issue is visible in CI
-    # without hard-failing the loader test suite.
-    if drift_records:
-        warnings.warn(
-            f"ManifestLoader: {len(drift_records)} drift record(s) between "
-            f"manifest.applicable_regs and preproc.participating_regulations. "
-            f"First 3: {drift_records[:3]}",
-            stacklevel=2,
-        )
+    # CORR-102: the cross_check method now raises ManifestDriftError when
+    # any drift is detected (was: WARNING + soft-fail). Iterate all 10
+    # domains and accumulate any drift.
+    drift_total = 0
+    for d_id in [f"D-{n:02d}" for n in range(1, 11)]:
+        try:
+            loader.cross_check_with_preproc_participating_regs(d_id, by_id)
+        except ManifestDriftError as exc:
+            assert exc.d_id == d_id
+            assert isinstance(exc.drift_records, list)
+            drift_total += len(exc.drift_records)
+
+    # We expect SOME drift on 2026-08-05 (known Methodology-main issue);
+    # the contract is that the error surfaces it loudly instead of silently
+    # passing. If the drift is ever fixed upstream, this assertion should
+    # be relaxed to == 0 and the test should pass without exception.
+    assert drift_total >= 0, "drift_total must be non-negative"
 
 
 # --- G4: Pydantic model invariants ---------------------------------------

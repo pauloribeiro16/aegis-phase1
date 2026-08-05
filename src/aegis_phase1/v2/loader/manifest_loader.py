@@ -48,6 +48,50 @@ from pydantic import BaseModel, ConfigDict, Field
 logger = logging.getLogger(__name__)
 
 
+# CORR-102: fail-loud exceptions for missing manifest files and
+# manifest/preproc drift. Previously these were WARNING logs that
+# silently degraded the prompt context.
+class ManifestNotFoundError(RuntimeError):
+    """Raised when no ``D-XX.manifest.json`` exists for a requested domain.
+
+    Attributes:
+        d_id: The requested domain identifier (e.g. ``"D-01"``).
+    """
+
+    def __init__(self, d_id: str) -> None:
+        self.d_id = d_id
+        super().__init__(
+            f"CORR-102: no manifest file found for domain {d_id}. "
+            "Refusing to silently fall back to empty defaults — regenerate "
+            "Methodology-main manifests or fix the domain_id."
+        )
+
+
+class ManifestDriftError(RuntimeError):
+    """Raised when a manifest's applicable_regs drifts from preproc.
+
+    Each manifest entry's ``applicable_regs`` must be a subset of the
+    preproc catalog's ``Subdomain.participating_regulations`` for the
+    same sub-domain. Drift indicates Methodology-main / preproc
+    catalogue are out of sync.
+
+    Attributes:
+        d_id: The domain identifier.
+        drift_records: List of human-readable drift strings, one per
+            affected sub-domain.
+    """
+
+    def __init__(self, d_id: str, drift_records: list[str]) -> None:
+        self.d_id = d_id
+        self.drift_records = list(drift_records)
+        super().__init__(
+            f"CORR-102: manifest/preproc drift for {d_id} "
+            f"({len(drift_records)} record(s)): "
+            f"{drift_records[:3]}{'...' if len(drift_records) > 3 else ''}. "
+            "Reconcile Methodology-main and preproc_out."
+        )
+
+
 # Default root (relative to the repo root). Tests can inject a
 # different path via ``ManifestLoader(manifests_root=...)``.
 DEFAULT_MANIFESTS_ROOT = Path("Methodology-main/00_METHODOLOGY/PREPROCESSING_by_domain/domains")
@@ -200,14 +244,19 @@ class ManifestLoader:
 
     @lru_cache(maxsize=16)  # noqa: B019 — module-level cache acceptable
     def _manifest_for_domain_cached(self, d_id: str) -> Manifest:
-        """Internal cached read. Public API is :meth:`manifest_for_domain`."""
+        """Internal cached read. Public API is :meth:`manifest_for_domain`.
+
+        CORR-102: fail-loud. Raises :class:`ManifestNotFoundError`
+        when no manifest file exists for ``d_id``. Previously this
+        returned an empty ``Manifest`` with a WARNING log, hiding the
+        missing data from downstream consumers.
+        """
         if not self.manifests_root.exists():
-            logger.warning(
-                "ManifestLoader: manifests_root %s missing; returning " "empty Manifest for %s",
+            logger.error(
+                "CORR-102: ManifestLoader: manifests_root %s missing — raising",
                 self.manifests_root,
-                d_id,
             )
-            return _empty_manifest(d_id)
+            raise ManifestNotFoundError(d_id or "")
         # Find D-XX_<Name> directory that starts with d_id
         for path in sorted(self.manifests_root.iterdir()):
             if not path.is_dir():
@@ -216,41 +265,37 @@ class ManifestLoader:
                 continue
             manifest_path = path / f"{d_id}.manifest.json"
             if not manifest_path.exists():
-                logger.warning(
-                    "ManifestLoader: directory %s exists but %s is missing; "
-                    "returning empty Manifest for %s",
+                logger.error(
+                    "CORR-102: directory %s exists but %s is missing — raising",
                     path,
                     manifest_path.name,
-                    d_id,
                 )
-                return _empty_manifest(d_id)
+                raise ManifestNotFoundError(d_id)
             try:
                 raw = json.loads(manifest_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
-                logger.warning(
-                    "ManifestLoader: failed to read %s: %s; " "returning empty Manifest for %s",
+                logger.error(
+                    "CORR-102: failed to read %s: %s — raising",
                     manifest_path,
                     exc,
-                    d_id,
                 )
-                return _empty_manifest(d_id)
+                raise ManifestNotFoundError(d_id) from exc
             try:
                 m = Manifest.model_validate(raw)
             except Exception as exc:
-                logger.warning(
-                    "ManifestLoader: failed to validate %s: %s; " "returning empty Manifest for %s",
+                logger.error(
+                    "CORR-102: failed to validate %s: %s — raising",
                     manifest_path,
                     exc,
-                    d_id,
                 )
-                return _empty_manifest(d_id)
+                raise ManifestNotFoundError(d_id) from exc
             return m
-        logger.warning(
-            "ManifestLoader: no directory for %s under %s; " "returning empty Manifest",
+        logger.error(
+            "CORR-102: no directory for %s under %s — raising",
             d_id,
             self.manifests_root,
         )
-        return _empty_manifest(d_id)
+        raise ManifestNotFoundError(d_id)
 
     def manifest_for_domain(self, d_id: str) -> Manifest:
         """Return the ``Manifest`` for a domain (e.g. ``"D-01"``).
@@ -259,9 +304,12 @@ class ManifestLoader:
             d_id: Domain identifier (e.g. ``"D-01"``, ``"D-10"``).
 
         Returns:
-            Typed ``Manifest``. Returns an empty ``Manifest`` with
-            WARNING log when the manifest file is missing or
-            malformed.
+            Typed ``Manifest``.
+
+        Raises:
+            ManifestNotFoundError: CORR-102 fail-loud. Raised when
+                the manifest file is missing or malformed (was: empty
+                ``Manifest`` + WARNING).
         """
         d_id = (d_id or "").strip()
         return self._manifest_for_domain_cached(d_id)
@@ -320,6 +368,60 @@ class ManifestLoader:
         controls = manifest.applicable_nist_controls_by_regulation.get(reg, [])
         return sorted({str(c) for c in controls if c})
 
+    def cross_check_with_preproc_participating_regs(
+        self,
+        d_id: str,
+        preproc_by_id: dict[str, Any],
+    ) -> list[str]:
+        """Cross-check a manifest against the preproc catalogue (CORR-102).
+
+        For each ``subdomain_summary`` in the manifest, verify that the
+        manifest's ``applicable_regs`` is a subset of the preproc
+        catalog's ``Subdomain.participating_regulations`` for the same
+        sub-domain. Drift is collected as a list of human-readable
+        strings.
+
+        CORR-102: fail-loud. If any drift is detected, this method
+        raises :class:`ManifestDriftError` listing the drift records
+        (was: WARNING + silent soft-fail).
+
+        Args:
+            d_id: Domain identifier (e.g. ``"D-01"``).
+            preproc_by_id: Mapping ``subdomain_id -> Subdomain`` (the
+                typed ``Subdomain`` from :class:`PreprocCatalogLoader`).
+
+        Returns:
+            Empty list when no drift was detected (and does NOT raise).
+
+        Raises:
+            ManifestDriftError: When at least one manifest entry drifts.
+        """
+        from aegis_phase1.v2.domain.filters.regs import _canonical_reg_name
+
+        manifest = self.manifest_for_domain(d_id)
+        drift_records: list[str] = []
+        for s in manifest.subdomain_summaries:
+            preproc_sd = preproc_by_id.get(s.id)
+            if preproc_sd is None:
+                drift_records.append(f"{s.id}: not in preproc")
+                continue
+            manifest_canon = {_canonical_reg_name(r) for r in s.applicable_regs if r}
+            preproc_canon = {
+                _canonical_reg_name(r)
+                for r in (getattr(preproc_sd, "participating_regulations", []) or [])
+                if r
+            }
+            missing = manifest_canon - preproc_canon
+            if missing:
+                drift_records.append(
+                    f"{s.id}: manifest.applicable_regs={sorted(manifest_canon)} "
+                    f"vs preproc.participating_regulations={sorted(preproc_canon)} "
+                    f"missing={sorted(missing)}"
+                )
+        if drift_records:
+            raise ManifestDriftError(d_id, drift_records)
+        return []
+
 
 def _empty_manifest(d_id: str) -> Manifest:
     """Return an empty Manifest for ``d_id`` (used on missing/malformed)."""
@@ -330,6 +432,8 @@ __all__ = [
     "DEFAULT_MANIFESTS_ROOT",
     "Counts",
     "Manifest",
+    "ManifestDriftError",
     "ManifestLoader",
+    "ManifestNotFoundError",
     "SubdomainSummary",
 ]

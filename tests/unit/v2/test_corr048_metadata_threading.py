@@ -194,15 +194,25 @@ def test_extract_corr047_fields_dict_direct_keys() -> None:
 # ──────────────────────────────────────────────────────────────────
 
 
-def test_invoker_truncates_large_prompts() -> None:
-    """When prompt.system + prompt.user > 10KB, _attempt() truncates
-    the user message head and logs a WARNING.
+def test_invoker_raises_PromptTooLargeError_on_large_prompt() -> None:
+    """CORR-102: when the rendered prompt exceeds the model's effective
+    token cap, ``_attempt()`` raises :class:`PromptTooLargeError` instead
+    of silently truncating (CORR-049 byte-based silent truncation is
+    GONE).
 
-    Calls _attempt() directly (bypassing invoke()'s post-loop that
-    has a pre-existing AttributeError on validation=None — out of
-    CORR-048 scope).
+    Calls ``_attempt()`` directly (bypassing ``invoke()``'s post-loop
+    that has a pre-existing AttributeError on ``validation=None`` —
+    out of CORR-102 scope).
+
+    The test renders a 56K-token prompt (well above gemma4:e4b's
+    8K-token native cap) and asserts the hard fail instead of any
+    truncation. The exception carries the spec_id, model, sys/user
+    tokens, and cap for downstream diagnosis.
     """
-    from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
+    from aegis_phase1.prompts_v2.invoker import (
+        Phase1LLMInvoker,
+        PromptTooLargeError,
+    )
     from aegis_phase1.prompts_v2.loader import PromptLoader
     from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
     from aegis_phase1.prompts_v2.llm_inventory import (
@@ -216,7 +226,7 @@ def test_invoker_truncates_large_prompts() -> None:
         catalog_loader=MagicMock(),
         llm_logger=MagicMock(spec=JSONLLogger),
         format_logger=MagicMock(spec=JSONLLogger),
-        model="gemma4:e4b",
+        model="gemma4:e4b",  # 8K token native cap
         base_url="http://localhost:11434",
     )
 
@@ -226,23 +236,11 @@ def test_invoker_truncates_large_prompts() -> None:
         "applicable_regs": ["GDPR", "CRA"],
     }
 
-    captured: dict = {}
-
-    def fake_invoke(msgs, **kwargs):
-        for m in msgs:
-            if "INPUTS" in m.content:
-                captured["user_len"] = len(m.content)
-        from langchain_core.messages import AIMessage
-        return AIMessage(content='{"status": "OK"}')
-
+    # CORR-059: caplog fixture removed — has stash KeyError bug in
+    # pytest 8.x/9.x. We don't need to assert on logs anyway; the
+    # exception is the assertion target.
     with patch("aegis_phase1.prompts_v2.invoker.probe_ollama", return_value=True):
-        with patch("aegis_phase1.prompts_v2.invoker.ChatOllama") as mock_chat:
-            llm_inst = MagicMock()
-            llm_inst.invoke = fake_invoke
-            mock_chat.return_value = llm_inst
-
-            # CORR-059: caplog fixture removed — has stash KeyError bug in
-            # pytest 8.x/9.x. This test doesn't assert on logs anyway.
+        with pytest.raises(PromptTooLargeError) as exc_info:
             invoker._attempt(
                 spec_id="P1C-LLM-01-OVERLAP-CLASSIFICATION",
                 inputs=huge_inputs,
@@ -253,19 +251,15 @@ def test_invoker_truncates_large_prompts() -> None:
                 attempt=1,
             )
 
-    user_len = captured.get("user_len", 0)
-    # CORR-049-T7.1: cap raised from 10KB (CORR-048) to 512KB. A
-    # 210KB prompt no longer triggers truncation. This test now
-    # asserts that the prompt is forwarded WITHOUT truncation
-    # (under the 512KB cap). A new test in test_corr049_otel_hybrid
-    # covers the >512KB truncation path explicitly.
-    assert user_len > 100000, (
-        f"CORR-049-T7.1: expected prompt NOT to be truncated "
-        f"(210KB < 512KB cap); got user_len={user_len}"
-    )
-    assert user_len < 524288, (
-        f"CORR-049-T7.1: prompt exceeds 512KB cap; got {user_len}"
-    )
+    # Error carries diagnostic context
+    assert exc_info.value.spec_id == "P1C-LLM-01-OVERLAP-CLASSIFICATION"
+    assert exc_info.value.model == "gemma4:e4b"
+    assert exc_info.value.cap == 8000
+    assert exc_info.value.sys_tokens > 0
+    assert exc_info.value.user_tokens > 0
+    assert exc_info.value.sys_tokens + exc_info.value.user_tokens > 8000
+    assert "gemma4:e4b" in str(exc_info.value)
+    assert "P1C-LLM-01-OVERLAP-CLASSIFICATION" in str(exc_info.value)
 
 
 # ──────────────────────────────────────────────────────────────────
