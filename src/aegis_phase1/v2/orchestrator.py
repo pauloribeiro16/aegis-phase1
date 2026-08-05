@@ -2005,6 +2005,14 @@ class Phase1Orchestrator:
                     ),
                     "hso_hl_objective": objective,
                     "objective": objective,
+                    "hso_per_reg": [
+                        h.model_dump() if hasattr(h, "model_dump") else h
+                        for h in (sd.hso_per_reg or [])
+                    ],
+                    "security_requirements": [
+                        sr.model_dump() if hasattr(sr, "model_dump") else sr
+                        for sr in (sd.security_requirements or [])
+                    ],
                     "pairs": [
                         p.model_dump() if hasattr(p, "model_dump") else p
                         for p in (sd.pairs or [])
