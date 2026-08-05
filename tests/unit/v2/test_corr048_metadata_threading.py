@@ -19,7 +19,6 @@ These 5 tests cover the contract:
 """
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -36,7 +35,6 @@ from aegis_phase1.v2.state import (
     RoleMatrix,
     RoleMatrixEntry,
 )
-
 
 # ──────────────────────────────────────────────────────────────────
 # (a) Runner metadata: no corr-XXX tags
@@ -62,7 +60,7 @@ def test_runner_metadata_has_no_corr_xxx_tags() -> None:
     assert "tags=[f\"phase:phase1\", f\"case:{case_name}\"]" in src or \
            "tags=['phase:phase1', 'case:" in src or \
            'tags=[\n        f"phase:phase1",\n        f"case:' in src, \
-           f"CORR-048: expected phase+case tags in runner.py cmd_run_all_traced"
+           "CORR-048: expected phase+case tags in runner.py cmd_run_all_traced"
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -209,17 +207,17 @@ def test_invoker_raises_PromptTooLargeError_on_large_prompt() -> None:
     truncation. The exception carries the spec_id, model, sys/user
     tokens, and cap for downstream diagnosis.
     """
+    from aegis_phase1.prompts_v2.factory import get_prompts_root
     from aegis_phase1.prompts_v2.invoker import (
         Phase1LLMInvoker,
         PromptTooLargeError,
     )
+    from aegis_phase1.prompts_v2.llm_inventory import (
+        get_invocation_pattern,
+        get_stage,
+    )
     from aegis_phase1.prompts_v2.loader import PromptLoader
     from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
-    from aegis_phase1.prompts_v2.llm_inventory import (
-        get_invocation_pattern, get_stage,
-    )
-
-    from aegis_phase1.prompts_v2.factory import get_prompts_root
     prompt_loader = PromptLoader(root=get_prompts_root())
     invoker = Phase1LLMInvoker(
         prompt_loader=prompt_loader,
@@ -232,32 +230,35 @@ def test_invoker_raises_PromptTooLargeError_on_large_prompt() -> None:
 
     huge_inputs = {
         "case_id": "case1-tinytask",
-        "tech_stack": [f"tech_{i:08d}" for i in range(10000)],
+        "tech_stack": [f"tech_{i:08d}" for i in range(60000)],
         "applicable_regs": ["GDPR", "CRA"],
     }
 
     # CORR-059: caplog fixture removed — has stash KeyError bug in
     # pytest 8.x/9.x. We don't need to assert on logs anyway; the
     # exception is the assertion target.
-    with patch("aegis_phase1.prompts_v2.invoker.probe_ollama", return_value=True):
-        with pytest.raises(PromptTooLargeError) as exc_info:
-            invoker._attempt(
-                spec_id="P1C-LLM-01-OVERLAP-CLASSIFICATION",
-                inputs=huge_inputs,
-                invocation_pattern=get_invocation_pattern(
-                    "P1C-LLM-01-OVERLAP-CLASSIFICATION"
-                ),
-                stage=get_stage("P1C-LLM-01-OVERLAP-CLASSIFICATION"),
-                attempt=1,
-            )
+    with (
+        patch("aegis_phase1.prompts_v2.invoker.probe_ollama", return_value=True),
+        pytest.raises(PromptTooLargeError) as exc_info,
+    ):
+        invoker._attempt(
+            spec_id="P1C-LLM-01-OVERLAP-CLASSIFICATION",
+            inputs=huge_inputs,
+            invocation_pattern=get_invocation_pattern(
+                "P1C-LLM-01-OVERLAP-CLASSIFICATION"
+            ),
+            stage=get_stage("P1C-LLM-01-OVERLAP-CLASSIFICATION"),
+            attempt=1,
+        )
 
     # Error carries diagnostic context
     assert exc_info.value.spec_id == "P1C-LLM-01-OVERLAP-CLASSIFICATION"
     assert exc_info.value.model == "gemma4:e4b"
-    assert exc_info.value.cap == 8000
+    # CORR-102: BASE is 100K tokens for all models (incl. gemma4:e4b).
+    assert exc_info.value.cap == 100000
     assert exc_info.value.sys_tokens > 0
     assert exc_info.value.user_tokens > 0
-    assert exc_info.value.sys_tokens + exc_info.value.user_tokens > 8000
+    assert exc_info.value.sys_tokens + exc_info.value.user_tokens > 100000
     assert "gemma4:e4b" in str(exc_info.value)
     assert "P1C-LLM-01-OVERLAP-CLASSIFICATION" in str(exc_info.value)
 

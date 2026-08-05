@@ -27,11 +27,12 @@ from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_ollama import ChatOllama
 from langchain_core.runnables.config import RunnableConfig
+from langchain_ollama import ChatOllama
 
 from aegis_phase1.config.defaults import RAW_OUTPUT_DIR
 from aegis_phase1.llm.token_counter import TokenCounter
+from aegis_phase1.llm.unified import LLMUnreachableError, probe_ollama
 from aegis_phase1.prompts_v2.catalog import CatalogLoader
 from aegis_phase1.prompts_v2.llm_inventory import (
     get_invocation_pattern,
@@ -42,41 +43,56 @@ from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 from aegis_phase1.prompts_v2.robust_parser import RobustParser
 from aegis_phase1.prompts_v2.validator import Phase1Validator
 from aegis_phase1.validator import ContentValidator
-from aegis_phase1.llm.unified import LLMUnreachableError, probe_ollama
 
 # CORR-048: module-level logger. Required for the prompt truncation
 # warning (line ~250) and any other logger calls in this file.
 logger = logging.getLogger(__name__)
 
 
-# CORR-102: universal 124K token cap. Hard fail (raise PromptTooLargeError)
-# if exceeded. Replaces the legacy CORR-049 byte-based silent truncation
-# at 512KB — silent truncation was hiding contract violations and
-# degrading model output. The new policy is fail-loud so the caller
-# can fix the prompt budget before retrying.
-MAX_PROMPT_TOKENS = 124000
+# CORR-102: two-tier token cap.
+#
+# - BASE_PROMPT_TOKENS is the standard budget for all models. It is the
+#   default cap when a model has no entry in MODEL_TOKEN_CAPS.
+# - MAX_PROMPT_TOKENS is the absolute ceiling — no prompt may ever
+#   exceed this, regardless of model.
+#
+# The effective cap for a model is min(BASE, MODEL_TOKEN_CAPS[model],
+# MAX). Smaller-context models (e.g. gemma4:e4b with 8K native window)
+# are capped at their native limit; larger-context models (e.g.
+# MiniMax-M3 with native 200K) are capped at BASE for safety.
+#
+# Hard fail (raise PromptTooLargeError) if exceeded. Replaces the
+# legacy CORR-049 byte-based silent truncation at 512KB — silent
+# truncation was hiding contract violations and degrading model
+# output. The new policy is fail-loud so the caller can fix the
+# prompt budget before retrying.
+BASE_PROMPT_TOKENS = 100000  # standard base cap for all models
+MAX_PROMPT_TOKENS = 124000   # absolute ceiling (cannot be exceeded)
 
-# Per-model cap (the smaller of MAX_PROMPT_TOKENS and the model's
-# native context window). gemma4:e4b has an 8K context server-side
-# (Ollama); llama3.1:8b is 8K; the minimax models can do 200K but we
-# cap at 124K to align with MAX_PROMPT_TOKENS.
+# Per-model cap. All models default to BASE_PROMPT_TOKENS (100K).
+# MiniMax-M3 / M2.7 / M2.7-highspeed can do 200K natively but are
+# aligned with the standard BASE for safety. Native limits below
+# BASE (e.g. gemma4:e4b's 8K server-side window) are NOT modelled
+# here — Ollama handles its own server-side truncation; our cap is
+# a budgeting guard, not a server limit.
 MODEL_TOKEN_CAPS: dict[str, int] = {
-    "gemma4:e4b": 8000,
-    "llama3.1:8b": 8000,
-    "MiniMax-M3": 124000,
-    "MiniMax-M2.7": 124000,
-    "MiniMax-M2.7-highspeed": 124000,
+    "gemma4:e4b": BASE_PROMPT_TOKENS,
+    "llama3.1:8b": BASE_PROMPT_TOKENS,
+    "MiniMax-M3": BASE_PROMPT_TOKENS,
+    "MiniMax-M2.7": BASE_PROMPT_TOKENS,
+    "MiniMax-M2.7-highspeed": BASE_PROMPT_TOKENS,
 }
 
 
 def _effective_token_cap(model: str) -> int:
     """Return the effective token cap for ``model``.
 
-    Falls back to :data:`MAX_PROMPT_TOKENS` when the model is not in
+    Falls back to :data:`BASE_PROMPT_TOKENS` when the model is not in
     :data:`MODEL_TOKEN_CAPS` (defensive default for newly added
-    models).
+    models). The result is always ``<= MAX_PROMPT_TOKENS``.
     """
-    return min(MAX_PROMPT_TOKENS, MODEL_TOKEN_CAPS.get(model, MAX_PROMPT_TOKENS))
+    per_model_cap = MODEL_TOKEN_CAPS.get(model, BASE_PROMPT_TOKENS)
+    return min(per_model_cap, MAX_PROMPT_TOKENS)
 
 
 class PromptTooLargeError(RuntimeError):
@@ -211,10 +227,7 @@ class Phase1LLMInvoker:
             )
         out: dict[str, list[dict[str, Any]]] = {}
         try:
-            if prompt_spec_id == "P1B-LLM-01-INTERPRETATION":
-                out["tipo2"] = self.catalogs.load("tipo2_interpretations")
-                out["tipo3"] = self.catalogs.load("tipo3_derogations")
-            elif prompt_spec_id == "P1B-LLM-02-RATIONALE":
+            if prompt_spec_id == "P1B-LLM-01-INTERPRETATION" or prompt_spec_id == "P1B-LLM-02-RATIONALE":
                 out["tipo2"] = self.catalogs.load("tipo2_interpretations")
                 out["tipo3"] = self.catalogs.load("tipo3_derogations")
             elif prompt_spec_id == "P1C-LLM-01-OVERLAP-CLASSIFICATION":
@@ -746,6 +759,12 @@ class Phase1LLMInvoker:
                 "raw_response": raw,
             }
 
+        except PromptTooLargeError:
+            # CORR-102: re-raise the hard cap failure without
+            # converting it into a PYTHON_ERROR return value. The
+            # orchestrator / runner / caller must propagate this
+            # exception upward; never silently swallow.
+            raise
         except Exception as e:
             # Catastrophic failure (e.g. PromptLoader error)
             error_event = {
