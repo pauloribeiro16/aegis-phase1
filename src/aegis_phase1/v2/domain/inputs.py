@@ -305,9 +305,7 @@ def _extract_corr047_fields(ctx: Any) -> dict[str, Any]:
         # Serialise Pydantic model
         if hasattr(value, "model_dump"):
             value = value.model_dump()
-        elif hasattr(value, "__dict__") and not isinstance(
-            value, (str, int, float, bool, list, dict)
-        ):
+        elif hasattr(value, "__dict__") and not isinstance(value, str | int | float | bool | list | dict):
             value = {k: v for k, v in value.__dict__.items() if not k.startswith("_")}
         out[field] = value
     return out

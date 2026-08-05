@@ -1701,7 +1701,7 @@ class Phase1Orchestrator:
         *,
         config: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
-        """Single Phase1B call: one spec × one regulation.
+        """Single Phase1B call: one spec x one regulation.
 
         Granular method extracted from :meth:`run_phase_1b` (CORR-018a S1).
         Computes the per-call inputs from ``self.state``, invokes
