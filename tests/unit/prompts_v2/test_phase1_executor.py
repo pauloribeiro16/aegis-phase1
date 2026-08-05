@@ -155,8 +155,12 @@ def test_run_phase_1b_success_two_regs() -> None:
         # P1B-LLM-02 for CRA
         _ok_response(parsed={"synthesis": {"rationale": "r2"}}, latency=250.0),
     ]
-
-    result = executor.run_phase_1b("Case_01", ["GDPR", "CRA"])
+    # CORR-102: provide non-empty refs so the preflight check passes.
+    refs = [
+        {"sub_domain_id": "D-01.1", "participating_regulations": ["GDPR", "CRA"]},
+        {"sub_domain_id": "D-04.1", "participating_regulations": ["GDPR"]},
+    ]
+    result = executor.run_phase_1b("Case_01", ["GDPR", "CRA"], layer0_subdomain_refs=refs)
 
     assert result["status"] == "OK"
     assert set(result["per_reg"].keys()) == {"GDPR", "CRA"}
@@ -175,17 +179,33 @@ def test_run_phase_1b_success_two_regs() -> None:
     assert spec_ids_called[3] == SPEC_RATIONALE
 
 
-def test_run_phase_1b_empty_applicable() -> None:
-    """No regulations → no LLM calls, all aggregates empty, status OK."""
+def test_run_phase_1b_raises_on_empty_applicable() -> None:
+    """CORR-102: empty applicable_regs → Phase1BEmptyApplicabilityError.
+
+    Pre-CORR-102: no regulations → no LLM calls, all aggregates empty.
+    Post-CORR-102: hard fail so loader failures are investigated.
+    """
+    from aegis_phase1.prompts_v2.phase1_executor import (
+        Phase1BEmptyApplicabilityError,
+    )
+
     executor, _, _, _, _, _ = _make_executor()
     executor.invoker = MagicMock()
-    result = executor.run_phase_1b("Case_01", [])
-    assert result["per_reg"] == {}
-    assert result["aggregated_interpretations"] == []
-    assert result["aggregated_derogations"] == []
-    assert result["aggregated_synthesis"] == {}
-    assert result["status"] == "OK"
-    assert executor.invoker.invoke.call_count == 0
+    with pytest.raises(Phase1BEmptyApplicabilityError) as exc_info:
+        executor.run_phase_1b("Case_01", [])
+    assert "Case_01" in str(exc_info.value)
+    assert "empty" in str(exc_info.value).lower()
+
+
+def test_run_phase_1b_raises_on_empty_refs() -> None:
+    """CORR-102: empty layer0_subdomain_refs → Phase1BEmptyLayer0Error."""
+    from aegis_phase1.prompts_v2.phase1_executor import Phase1BEmptyLayer0Error
+
+    executor, _, _, _, _, _ = _make_executor()
+    executor.invoker = MagicMock()
+    with pytest.raises(Phase1BEmptyLayer0Error) as exc_info:
+        executor.run_phase_1b("Case_01", ["GDPR", "CRA"], layer0_subdomain_refs=[])
+    assert "layer0_subdomain_refs" in str(exc_info.value)
 
 
 def test_run_phase_1b_failure_aggregation_mixed() -> None:
@@ -198,7 +218,11 @@ def test_run_phase_1b_failure_aggregation_mixed() -> None:
         _ok_response(parsed={}, latency=100.0),
         _ok_response(parsed={}, latency=100.0),
     ]
-    result = executor.run_phase_1b("Case_01", ["GDPR", "CRA"])
+    # CORR-102: provide non-empty refs (preflight check).
+    refs = [
+        {"sub_domain_id": "D-01.1", "participating_regulations": ["GDPR", "CRA"]},
+    ]
+    result = executor.run_phase_1b("Case_01", ["GDPR", "CRA"], layer0_subdomain_refs=refs)
     assert result["status"] == "MIXED"
 
 
@@ -210,7 +234,9 @@ def test_run_phase_1b_failure_aggregation_all_failed() -> None:
         _fail_response("FAILED_AFTER_RETRIES"),
         _fail_response("FAILED_AFTER_RETRIES"),
     ]
-    result = executor.run_phase_1b("Case_01", ["GDPR"])
+    # CORR-102: provide non-empty refs.
+    refs = [{"sub_domain_id": "D-01.1", "participating_regulations": ["GDPR"]}]
+    result = executor.run_phase_1b("Case_01", ["GDPR"], layer0_subdomain_refs=refs)
     assert result["status"] == "FAILED"
 
 
@@ -224,7 +250,11 @@ def test_run_phase_1b_passes_lane_id_per_reg() -> None:
         _ok_response(),
         _ok_response(),
     ]
-    executor.run_phase_1b("Case_01", ["GDPR", "CRA"])
+    # CORR-102: provide non-empty refs so the preflight check passes.
+    refs = [
+        {"sub_domain_id": "D-01.1", "participating_regulations": ["GDPR", "CRA"]},
+    ]
+    executor.run_phase_1b("Case_01", ["GDPR", "CRA"], layer0_subdomain_refs=refs)
     for call in executor.invoker.invoke.call_args_list:
         assert call.args[1]["lane_id"] in {"GDPR", "CRA"}
         assert call.args[1]["applicable_regs"] == [call.args[1]["lane_id"]]
@@ -256,7 +286,11 @@ def test_run_phase_1c_map_emits_10_lanes() -> None:
         )
     executor.invoker.invoke.side_effect = side_effects
 
-    result = executor.run_phase_1c_map("Case_01", ["GDPR", "CRA"])
+    # CORR-102: provide non-empty refs so the preflight check passes.
+    refs = [
+        {"sub_domain_id": f"{d}.1"} for d in DOMAINS
+    ]
+    result = executor.run_phase_1c_map("Case_01", ["GDPR", "CRA"], layer0_subdomain_refs=refs)
 
     assert len(result) == 10
     assert result[0]["lane_id"] == "D-01"
@@ -279,7 +313,8 @@ def test_run_phase_1c_map_handles_missing_activations() -> None:
         _ok_response(parsed={"sub_domain_activations": "not-a-list"}),  # D-03: bad type
     ] + [_ok_response(parsed={"sub_domain_activations": []}) for _ in range(7)]
     executor.invoker.invoke.side_effect = side_effects
-    result = executor.run_phase_1c_map("Case_01", ["GDPR"])
+    refs = [{"sub_domain_id": f"{d}.1"} for d in DOMAINS]
+    result = executor.run_phase_1c_map("Case_01", ["GDPR"], layer0_subdomain_refs=refs)
     assert len(result) == 10
     for lane in result[:3]:
         assert lane["sub_domain_activations"] == []
@@ -293,7 +328,8 @@ def test_run_phase_1c_map_handles_failure_lane() -> None:
         _ok_response(parsed={"sub_domain_activations": []}) for _ in range(9)
     ]
     executor.invoker.invoke.side_effect = side_effects
-    result = executor.run_phase_1c_map("Case_01", ["GDPR"])
+    refs = [{"sub_domain_id": f"{d}.1"} for d in DOMAINS]
+    result = executor.run_phase_1c_map("Case_01", ["GDPR"], layer0_subdomain_refs=refs)
     assert result[0]["status"] == "FAILED_AFTER_RETRIES"
     assert result[0]["sub_domain_activations"] == []
     assert result[1]["status"] == "OK"
@@ -506,6 +542,23 @@ def test_run_sync_skips_malformed_pair_entries() -> None:
 # ─── Phase 1C Reduce ──────────────────────────────────────────────────
 
 
+def test_run_phase_1c_reduce_raises_on_empty_lanes() -> None:
+    """CORR-102: empty aggregated_activations → Phase1CReduceEmptyAggregationsError."""
+    from aegis_phase1.prompts_v2.phase1_executor import (
+        Phase1CReduceEmptyAggregationsError,
+    )
+
+    executor, _, _, _, _, _ = _make_executor()
+    executor.invoker = MagicMock()
+    with pytest.raises(Phase1CReduceEmptyAggregationsError) as exc_info:
+        executor.run_phase_1c_reduce(
+            "Case_01",
+            [{"lane_id": "D-01", "sub_domain_activations": []}],
+            {"status": "OK", "conflicts": []},
+        )
+    assert "Case_01" in str(exc_info.value)
+
+
 def test_run_phase_1c_reduce_llm03_before_llm02() -> None:
     """Per contract: LLM-03 (STRATEGIC) runs before LLM-02 (COMPOUND)."""
     executor, _, _, _, _, _ = _make_executor()
@@ -523,7 +576,14 @@ def test_run_phase_1c_reduce_llm03_before_llm02() -> None:
         ),
     ]
 
-    lane_outputs = [{"lane_id": "D-01", "sub_domain_activations": []}]
+    # CORR-102: lane_outputs must have at least one activation so
+    # the preflight check (has_activations) passes.
+    lane_outputs = [
+        {
+            "lane_id": "D-01",
+            "sub_domain_activations": [{"sub_domain_id": "D-01.1", "applicable": True}],
+        }
+    ]
     sync_result = {"status": "OK", "conflicts": []}
 
     result = executor.run_phase_1c_reduce(
@@ -546,9 +606,10 @@ def test_run_phase_1c_reduce_passes_track_b_to_llm03() -> None:
         _ok_response(parsed={"implications": []}, latency=100.0),
         _ok_response(parsed={"positive_events": [], "negative_events": []}, latency=100.0),
     ]
+    # CORR-102: provide at least one activation.
     executor.run_phase_1c_reduce(
         "Case_01",
-        [{"lane_id": "D-01", "sub_domain_activations": []}],
+        [{"lane_id": "D-01", "sub_domain_activations": [{"sub_domain_id": "D-01.1"}]}],
         {"status": "OK", "conflicts": []},
         track_b_profile={"tier": "MEDIUM", "headcount_band": "11-50"},
     )
@@ -564,9 +625,10 @@ def test_run_phase_1c_reduce_default_track_b_empty() -> None:
         _ok_response(parsed={}, latency=100.0),
         _ok_response(parsed={}, latency=100.0),
     ]
+    # CORR-102: provide at least one activation.
     executor.run_phase_1c_reduce(
         "Case_01",
-        [{"lane_id": "D-01", "sub_domain_activations": []}],
+        [{"lane_id": "D-01", "sub_domain_activations": [{"sub_domain_id": "D-01.1"}]}],
         {"status": "OK", "conflicts": []},
         track_b_profile=None,
     )
@@ -585,9 +647,10 @@ def test_run_phase_1c_reduce_passes_llm03_output_to_llm02() -> None:
         ),
         _ok_response(parsed={}, latency=100.0),
     ]
+    # CORR-102: provide at least one activation.
     executor.run_phase_1c_reduce(
         "Case_01",
-        [{"lane_id": "D-01", "sub_domain_activations": []}],
+        [{"lane_id": "D-01", "sub_domain_activations": [{"sub_domain_id": "D-01.1"}]}],
         {"status": "OK", "conflicts": []},
     )
     second_call = executor.invoker.invoke.call_args_list[1]
@@ -605,9 +668,10 @@ def test_run_phase_1c_reduce_mix_status_when_one_fails() -> None:
         _fail_response("FAILED_AFTER_RETRIES"),
         _ok_response(parsed={}, latency=100.0),
     ]
+    # CORR-102: provide at least one activation.
     result = executor.run_phase_1c_reduce(
         "Case_01",
-        [{"lane_id": "D-01", "sub_domain_activations": []}],
+        [{"lane_id": "D-01", "sub_domain_activations": [{"sub_domain_id": "D-01.1"}]}],
         {"status": "OK", "conflicts": []},
     )
     assert result["status"] == "MIXED"
@@ -625,9 +689,10 @@ def test_run_phase_1c_reduce_surfaces_conflict_count() -> None:
         "status": "CONFLICTS_DETECTED",
         "conflicts": [{"sub_domain": "D-04.3"}, {"sub_domain": "D-09.1"}],
     }
+    # CORR-102: provide at least one activation.
     result = executor.run_phase_1c_reduce(
         "Case_01",
-        [{"lane_id": "D-01", "sub_domain_activations": []}],
+        [{"lane_id": "D-01", "sub_domain_activations": [{"sub_domain_id": "D-01.1"}]}],
         sync_result,
     )
     assert result["conflicts_count"] == 2
@@ -706,11 +771,14 @@ def test_run_end_to_end_shape() -> None:
     side_effects.append(_ok_response(parsed={"positive_events": [], "negative_events": []}, latency=100.0))
     executor.invoker.invoke.side_effect = side_effects
 
+    # CORR-102: provide non-empty refs so the preflight checks pass.
+    refs = [{"sub_domain_id": f"{d}.1"} for d in DOMAINS]
     result = executor.run(
         "Case_01",
         ["GDPR", "CRA"],
         track_b_profile={"tier": "LOW"},
         classification={"role": "Controller", "tier": "LOW"},
+        layer0_subdomain_refs=refs,
     )
 
     assert result["case_id"] == "Case_01"
@@ -738,13 +806,25 @@ def test_run_end_to_end_propagates_failure() -> None:
         _fail_response("FAILED_AFTER_RETRIES"),
         _ok_response(parsed={"synthesis": {}}, latency=100.0),
     ]
-    for _ in range(10):
-        side_effects.append(_ok_response(parsed={"sub_domain_activations": []}, latency=100.0))
+    # CORR-102: map stage must produce ≥1 activation so the reduce
+    # preflight check passes.
+    for i in range(10):
+        if i == 0:
+            side_effects.append(
+                _ok_response(
+                    parsed={"sub_domain_activations": [{"sub_domain_id": f"{DOMAINS[i]}.1", "applicable": True}]},
+                    latency=100.0,
+                )
+            )
+        else:
+            side_effects.append(_ok_response(parsed={"sub_domain_activations": []}, latency=100.0))
     side_effects.append(_ok_response(parsed={}, latency=100.0))
     side_effects.append(_ok_response(parsed={}, latency=100.0))
     executor.invoker.invoke.side_effect = side_effects
 
-    result = executor.run("Case_01", ["GDPR"])
+    # CORR-102: provide non-empty refs.
+    refs = [{"sub_domain_id": f"{d}.1"} for d in DOMAINS]
+    result = executor.run("Case_01", ["GDPR"], layer0_subdomain_refs=refs)
     assert result["phase_1b"]["status"] == "MIXED"
 
 
@@ -790,7 +870,9 @@ def test_run_does_not_block_on_conflicts() -> None:
     side_effects.append(_ok_response(parsed={}, latency=10.0))  # LLM-02
     executor.invoker.invoke.side_effect = side_effects
 
-    result = executor.run("Case_01", ["GDPR", "CRA"])
+    # CORR-102: provide non-empty refs.
+    refs = [{"sub_domain_id": f"{d}.1"} for d in DOMAINS]
+    result = executor.run("Case_01", ["GDPR", "CRA"], layer0_subdomain_refs=refs)
     assert result["sync"]["status"] == "CONFLICTS_DETECTED"
     assert len(result["sync"]["conflicts"]) >= 1
     # Reduce still ran (LLM-03 + LLM-02 = 2 calls past map)

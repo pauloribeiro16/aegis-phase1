@@ -10,11 +10,31 @@ provide fake per-regulation and per-domain responses, then verify:
   - Phase 1C Map runs 10 lanes
   - Sync detects cross-lane conflicts (when set up)
   - Reduce stage runs LLM-03 before LLM-02
+
+CORR-102: each test below provides a non-empty ``layer0_subdomain_refs``
+list so the preflight checks in :func:`run_phase_1b`,
+:func:`run_phase_1c_map`, and :func:`run_phase_1c_reduce` pass.
 """
 from unittest.mock import MagicMock
 
 from aegis_phase1.prompts_v2.phase1_executor import DOMAINS, Phase1Executor
 from aegis_phase1.prompts_v2.track_b import TrackB
+
+
+def _fake_refs() -> list[dict]:
+    """CORR-102 helper: produce 38 fake subdomain refs so preflight
+    checks pass. Each ref has ``sub_domain_id`` + ``participating_regulations``
+    covering the 3 main regs (GDPR, CRA, NIS2).
+    """
+    refs: list[dict] = []
+    for d in DOMAINS:
+        for i in range(1, 5):  # 4 subdomains per domain = 40 (close to 38)
+            sid = f"{d}.{i}"
+            regs = ["GDPR", "CRA", "NIS2"]
+            refs.append(
+                {"sub_domain_id": sid, "participating_regulations": regs}
+            )
+    return refs
 
 
 def _make_executor_mocked():
@@ -76,7 +96,12 @@ def test_case_01_e2e_mocked():
     ex.invoker = MagicMock()
     ex.invoker.invoke.side_effect = side_effects
 
-    result = ex.run("Case_01_TinyTask_SaaS", ["GDPR", "CRA"])
+    # CORR-102: provide non-empty refs so preflight checks pass.
+    result = ex.run(
+        "Case_01_TinyTask_SaaS",
+        ["GDPR", "CRA"],
+        layer0_subdomain_refs=_fake_refs(),
+    )
 
     assert result["case_id"] == "Case_01_TinyTask_SaaS"
     assert result["phase_1b"]["status"] == "OK"
@@ -93,13 +118,29 @@ def test_case_01_e2e_mocked():
 def test_case_02_e2e_mocked():
     """Case 02: 4 regs (GDPR, CRA, NIS2, AI_Act) -> 8 + 10 + 2 = 20 calls."""
     ex = _make_executor_mocked()
+    # CORR-102: at least one map lane must produce an activation so
+    # the reduce preflight check passes.
     side_effects = [{"status": "OK", "parsed_output": {}, "total_latency_ms": 100, "retry_count": 1}] * 8
-    side_effects += [{"status": "OK", "parsed_output": {"sub_domain_activations": []}, "total_latency_ms": 100, "retry_count": 1}] * 10
+    for i in range(10):
+        if i == 0:
+            side_effects.append({
+                "status": "OK",
+                "parsed_output": {"sub_domain_activations": [{"sub_domain_id": f"{DOMAINS[i]}.1"}]},
+                "total_latency_ms": 100,
+                "retry_count": 1,
+            })
+        else:
+            side_effects.append({"status": "OK", "parsed_output": {"sub_domain_activations": []}, "total_latency_ms": 100, "retry_count": 1})
     side_effects += [{"status": "OK", "parsed_output": {}, "total_latency_ms": 200, "retry_count": 1}] * 2
     ex.invoker = MagicMock()
     ex.invoker.invoke.side_effect = side_effects
 
-    result = ex.run("Case_02_SecureBorder_Solutions", ["GDPR", "CRA", "NIS2", "AI_Act"])
+    # CORR-102: provide non-empty refs.
+    result = ex.run(
+        "Case_02_SecureBorder_Solutions",
+        ["GDPR", "CRA", "NIS2", "AI_Act"],
+        layer0_subdomain_refs=_fake_refs(),
+    )
     assert result["phase_1b"]["status"] == "OK"
     assert len(result["phase_1c_map"]) == 10
     assert ex.invoker.invoke.call_count == 20  # 4 regs x 2 + 10 + 2
@@ -109,12 +150,27 @@ def test_case_03_e2e_mocked():
     """Case 03: 5 regs (GDPR, CRA, NIS2, DORA, AI_Act) -> 10 + 10 + 2 = 22 calls."""
     ex = _make_executor_mocked()
     side_effects = [{"status": "OK", "parsed_output": {}, "total_latency_ms": 100, "retry_count": 1}] * 10
-    side_effects += [{"status": "OK", "parsed_output": {"sub_domain_activations": []}, "total_latency_ms": 100, "retry_count": 1}] * 10
+    # CORR-102: at least one map lane must produce an activation.
+    for i in range(10):
+        if i == 0:
+            side_effects.append({
+                "status": "OK",
+                "parsed_output": {"sub_domain_activations": [{"sub_domain_id": f"{DOMAINS[i]}.1"}]},
+                "total_latency_ms": 100,
+                "retry_count": 1,
+            })
+        else:
+            side_effects.append({"status": "OK", "parsed_output": {"sub_domain_activations": []}, "total_latency_ms": 100, "retry_count": 1})
     side_effects += [{"status": "OK", "parsed_output": {}, "total_latency_ms": 200, "retry_count": 1}] * 2
     ex.invoker = MagicMock()
     ex.invoker.invoke.side_effect = side_effects
 
-    ex.run("Case_03_OmniBank_Financial", ["GDPR", "CRA", "NIS2", "DORA", "AI_Act"])
+    # CORR-102: provide non-empty refs.
+    ex.run(
+        "Case_03_OmniBank_Financial",
+        ["GDPR", "CRA", "NIS2", "DORA", "AI_Act"],
+        layer0_subdomain_refs=_fake_refs(),
+    )
     assert ex.invoker.invoke.call_count == 22  # 5 regs x 2 + 10 + 2
 
 
@@ -163,7 +219,8 @@ def test_e2e_with_sync_conflict():
     ex.invoker = MagicMock()
     ex.invoker.invoke.side_effect = side_effects
 
-    result = ex.run("Case_01", ["GDPR", "CRA"])
+    # CORR-102: provide non-empty refs.
+    result = ex.run("Case_01", ["GDPR", "CRA"], layer0_subdomain_refs=_fake_refs())
     assert result["sync"]["status"] == "CONFLICTS_DETECTED"
     assert len(result["sync"]["conflicts"]) == 1
     assert result["sync"]["conflicts"][0]["sub_domain"] == "D-04.3"
@@ -180,8 +237,16 @@ def test_e2e_with_track_b_integration():
     tb = TrackB()
     ex = Phase1Executor(pl, cl, val, ll, fl, track_b=tb)
     ex.invoker = MagicMock()
-    # Mock to return OK with empty outputs (just verify executor handles track_b)
-    side_effects = [{"status": "OK", "parsed_output": {}, "total_latency_ms": 100, "retry_count": 1}] * 16
+    # CORR-102: at least one map lane must produce an activation.
+    side_effects = [{"status": "OK", "parsed_output": {}, "total_latency_ms": 100, "retry_count": 1}] * 4
+    side_effects.append({
+        "status": "OK",
+        "parsed_output": {"sub_domain_activations": [{"sub_domain_id": "D-01.1"}]},
+        "total_latency_ms": 100,
+        "retry_count": 1,
+    })
+    side_effects += [{"status": "OK", "parsed_output": {"sub_domain_activations": []}, "total_latency_ms": 100, "retry_count": 1}] * 9
+    side_effects += [{"status": "OK", "parsed_output": {}, "total_latency_ms": 200, "retry_count": 1}] * 2
     ex.invoker.invoke.side_effect = side_effects
 
     # Build per_subdomain_input matching Case 01 distribution
