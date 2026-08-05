@@ -1,0 +1,487 @@
+{
+  "_schema_version": "1.0",
+  "_generated": "2026-08-05T10:52:25.068508+00:00",
+  "_generator": "scripts/dev/capture_prompt_filtering_golden.py",
+  "case1-tinytask": {
+    "company_name": "TinyTask Lda.",
+    "scale": "MICRO",
+    "applicable_regs_computed": [
+      "CRA",
+      "GDPR"
+    ],
+    "applicable_regs_declared": [
+      "GDPR",
+      "CRA"
+    ],
+    "declaration_gaps": [],
+    "tier": "LOW",
+    "expected_p1b_lanes": [
+      "CRA",
+      "GDPR"
+    ],
+    "expected_p1b_refs_per_reg": {
+      "CRA": [
+        "D-01.1",
+        "D-01.2",
+        "D-01.3",
+        "D-01.4",
+        "D-02.1",
+        "D-02.2",
+        "D-02.3",
+        "D-02.4",
+        "D-05.1",
+        "D-05.2",
+        "D-05.3",
+        "D-06.1",
+        "D-06.3",
+        "D-06.4",
+        "D-07.1",
+        "D-07.2",
+        "D-07.3",
+        "D-07.4",
+        "D-08.1",
+        "D-08.2",
+        "D-09.1",
+        "D-09.2",
+        "D-09.3",
+        "D-09.4",
+        "D-10.1",
+        "D-10.2",
+        "D-10.3"
+      ],
+      "GDPR": [
+        "D-01.1",
+        "D-01.2",
+        "D-01.3",
+        "D-01.4",
+        "D-02.1",
+        "D-05.1",
+        "D-05.2",
+        "D-05.3",
+        "D-06.1",
+        "D-06.3",
+        "D-06.4",
+        "D-07.1",
+        "D-08.1",
+        "D-08.2",
+        "D-09.1",
+        "D-09.2",
+        "D-09.4",
+        "D-10.1",
+        "D-10.2",
+        "D-10.3"
+      ]
+    },
+    "expected_p1c_filter_sample": {
+      "D-01": {
+        "applicable_regs": [
+          "CRA",
+          "GDPR"
+        ],
+        "subdomain_ids": [
+          "D-01.1",
+          "D-01.2",
+          "D-01.3",
+          "D-01.4"
+        ]
+      },
+      "D-04": {
+        "applicable_regs": [
+          "CRA",
+          "GDPR"
+        ],
+        "subdomain_ids": [
+          "D-04.1",
+          "D-04.2",
+          "D-04.3",
+          "D-04.4"
+        ]
+      },
+      "D-07": {
+        "applicable_regs": [
+          "CRA",
+          "GDPR"
+        ],
+        "subdomain_ids": [
+          "D-07.1",
+          "D-07.2",
+          "D-07.3",
+          "D-07.4"
+        ]
+      },
+      "D-10": {
+        "applicable_regs": [
+          "CRA",
+          "GDPR"
+        ],
+        "subdomain_ids": [
+          "D-10.1",
+          "D-10.2",
+          "D-10.3"
+        ]
+      }
+    }
+  },
+  "case2-secureborder": {
+    "company_name": "SecureBorder Solutions B.V.",
+    "scale": "LARGE",
+    "applicable_regs_computed": [
+      "AI_Act",
+      "CRA",
+      "GDPR",
+      "NIS2"
+    ],
+    "applicable_regs_declared": [
+      "GDPR",
+      "CRA",
+      "NIS2",
+      "AI_Act"
+    ],
+    "declaration_gaps": [],
+    "tier": "HIGH",
+    "expected_p1b_lanes": [
+      "AI_Act",
+      "CRA",
+      "GDPR",
+      "NIS2"
+    ],
+    "expected_p1b_refs_per_reg": {
+      "AI_Act": [
+        "D-02.1",
+        "D-05.1",
+        "D-05.2",
+        "D-07.1",
+        "D-07.2",
+        "D-08.2",
+        "D-09.1",
+        "D-09.2",
+        "D-09.4",
+        "D-10.1",
+        "D-10.2",
+        "D-10.3"
+      ],
+      "CRA": [
+        "D-01.1",
+        "D-01.2",
+        "D-01.3",
+        "D-01.4",
+        "D-02.1",
+        "D-02.2",
+        "D-02.3",
+        "D-02.4",
+        "D-05.1",
+        "D-05.2",
+        "D-05.3",
+        "D-06.1",
+        "D-06.3",
+        "D-06.4",
+        "D-07.1",
+        "D-07.2",
+        "D-07.3",
+        "D-07.4",
+        "D-08.1",
+        "D-08.2",
+        "D-09.1",
+        "D-09.2",
+        "D-09.3",
+        "D-09.4",
+        "D-10.1",
+        "D-10.2",
+        "D-10.3"
+      ],
+      "GDPR": [
+        "D-01.1",
+        "D-01.2",
+        "D-01.3",
+        "D-01.4",
+        "D-02.1",
+        "D-05.1",
+        "D-05.2",
+        "D-05.3",
+        "D-06.1",
+        "D-06.3",
+        "D-06.4",
+        "D-07.1",
+        "D-08.1",
+        "D-08.2",
+        "D-09.1",
+        "D-09.2",
+        "D-09.4",
+        "D-10.1",
+        "D-10.2",
+        "D-10.3"
+      ],
+      "NIS2": [
+        "D-01.1",
+        "D-02.1",
+        "D-06.1",
+        "D-06.3",
+        "D-06.4",
+        "D-07.1",
+        "D-07.3",
+        "D-08.1",
+        "D-08.2",
+        "D-08.3",
+        "D-09.1",
+        "D-09.2",
+        "D-09.3",
+        "D-09.4",
+        "D-10.1",
+        "D-10.3"
+      ]
+    },
+    "expected_p1c_filter_sample": {
+      "D-01": {
+        "applicable_regs": [
+          "CRA",
+          "GDPR",
+          "NIS2"
+        ],
+        "subdomain_ids": [
+          "D-01.1",
+          "D-01.2",
+          "D-01.3",
+          "D-01.4"
+        ]
+      },
+      "D-04": {
+        "applicable_regs": [
+          "AI_Act",
+          "CRA",
+          "GDPR",
+          "NIS2"
+        ],
+        "subdomain_ids": [
+          "D-04.1",
+          "D-04.2",
+          "D-04.3",
+          "D-04.4"
+        ]
+      },
+      "D-07": {
+        "applicable_regs": [
+          "AI_Act",
+          "CRA",
+          "GDPR",
+          "NIS2"
+        ],
+        "subdomain_ids": [
+          "D-07.1",
+          "D-07.2",
+          "D-07.3",
+          "D-07.4"
+        ]
+      },
+      "D-10": {
+        "applicable_regs": [
+          "AI_Act",
+          "CRA",
+          "GDPR",
+          "NIS2"
+        ],
+        "subdomain_ids": [
+          "D-10.1",
+          "D-10.2",
+          "D-10.3"
+        ]
+      }
+    }
+  },
+  "case3-omnibank": {
+    "company_name": "OmniBank Financial Systems S.A.",
+    "scale": "LARGE",
+    "applicable_regs_computed": [
+      "AI_Act",
+      "CRA",
+      "DORA",
+      "GDPR",
+      "NIS2"
+    ],
+    "applicable_regs_declared": [
+      "GDPR",
+      "CRA",
+      "NIS2",
+      "DORA",
+      "AI_Act"
+    ],
+    "declaration_gaps": [],
+    "tier": "HIGH",
+    "expected_p1b_lanes": [
+      "AI_Act",
+      "CRA",
+      "DORA",
+      "GDPR",
+      "NIS2"
+    ],
+    "expected_p1b_refs_per_reg": {
+      "AI_Act": [
+        "D-02.1",
+        "D-05.1",
+        "D-05.2",
+        "D-07.1",
+        "D-07.2",
+        "D-08.2",
+        "D-09.1",
+        "D-09.2",
+        "D-09.4",
+        "D-10.1",
+        "D-10.2",
+        "D-10.3"
+      ],
+      "CRA": [
+        "D-01.1",
+        "D-01.2",
+        "D-01.3",
+        "D-01.4",
+        "D-02.1",
+        "D-02.2",
+        "D-02.3",
+        "D-02.4",
+        "D-05.1",
+        "D-05.2",
+        "D-05.3",
+        "D-06.1",
+        "D-06.3",
+        "D-06.4",
+        "D-07.1",
+        "D-07.2",
+        "D-07.3",
+        "D-07.4",
+        "D-08.1",
+        "D-08.2",
+        "D-09.1",
+        "D-09.2",
+        "D-09.3",
+        "D-09.4",
+        "D-10.1",
+        "D-10.2",
+        "D-10.3"
+      ],
+      "DORA": [
+        "D-01.1",
+        "D-01.2",
+        "D-01.3",
+        "D-01.4",
+        "D-02.1",
+        "D-02.2",
+        "D-02.4",
+        "D-06.1",
+        "D-06.3",
+        "D-06.4",
+        "D-07.1",
+        "D-07.2",
+        "D-07.4",
+        "D-08.1",
+        "D-08.2",
+        "D-08.3",
+        "D-09.1",
+        "D-09.2",
+        "D-09.3",
+        "D-09.4",
+        "D-10.1",
+        "D-10.2",
+        "D-10.3"
+      ],
+      "GDPR": [
+        "D-01.1",
+        "D-01.2",
+        "D-01.3",
+        "D-01.4",
+        "D-02.1",
+        "D-05.1",
+        "D-05.2",
+        "D-05.3",
+        "D-06.1",
+        "D-06.3",
+        "D-06.4",
+        "D-07.1",
+        "D-08.1",
+        "D-08.2",
+        "D-09.1",
+        "D-09.2",
+        "D-09.4",
+        "D-10.1",
+        "D-10.2",
+        "D-10.3"
+      ],
+      "NIS2": [
+        "D-01.1",
+        "D-02.1",
+        "D-06.1",
+        "D-06.3",
+        "D-06.4",
+        "D-07.1",
+        "D-07.3",
+        "D-08.1",
+        "D-08.2",
+        "D-08.3",
+        "D-09.1",
+        "D-09.2",
+        "D-09.3",
+        "D-09.4",
+        "D-10.1",
+        "D-10.3"
+      ]
+    },
+    "expected_p1c_filter_sample": {
+      "D-01": {
+        "applicable_regs": [
+          "CRA",
+          "DORA",
+          "GDPR",
+          "NIS2"
+        ],
+        "subdomain_ids": [
+          "D-01.1",
+          "D-01.2",
+          "D-01.3",
+          "D-01.4"
+        ]
+      },
+      "D-04": {
+        "applicable_regs": [
+          "AI_Act",
+          "CRA",
+          "DORA",
+          "GDPR",
+          "NIS2"
+        ],
+        "subdomain_ids": [
+          "D-04.1",
+          "D-04.2",
+          "D-04.3",
+          "D-04.4"
+        ]
+      },
+      "D-07": {
+        "applicable_regs": [
+          "AI_Act",
+          "CRA",
+          "DORA",
+          "GDPR",
+          "NIS2"
+        ],
+        "subdomain_ids": [
+          "D-07.1",
+          "D-07.2",
+          "D-07.3",
+          "D-07.4"
+        ]
+      },
+      "D-10": {
+        "applicable_regs": [
+          "AI_Act",
+          "CRA",
+          "DORA",
+          "GDPR",
+          "NIS2"
+        ],
+        "subdomain_ids": [
+          "D-10.1",
+          "D-10.2",
+          "D-10.3"
+        ]
+      }
+    }
+  }
+}
