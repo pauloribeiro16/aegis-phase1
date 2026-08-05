@@ -185,9 +185,13 @@ def test_build_layer0_subdomain_refs_returns_dicts() -> None:
         assert "pairs" in ref
         assert "anchors" in ref
         assert "csf" in ref
-        # objective is None if hso_hl absent, but key is always present
-        assert "objective" in ref
+        # CORR-103: removed duplicate ``objective`` field. Only
+        # ``hso_hl_objective`` is the canonical HL objective carrier.
         assert "hso_hl_objective" in ref
+        assert "objective" not in ref, (
+            "CORR-103: ref must NOT carry duplicate 'objective' field; "
+            "use 'hso_hl_objective' instead."
+        )
 
 
 def test_build_layer0_subdomain_refs_missing_silently_skipped() -> None:

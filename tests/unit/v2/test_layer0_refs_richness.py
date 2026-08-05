@@ -111,13 +111,14 @@ def test_enriched_ref_payload_size_within_budget(
 def test_existing_keys_still_present(orch: Phase1Orchestrator) -> None:
     refs = orch._build_layer0_subdomain_refs(["D-01.1"])
     ref = refs[0]
+    # CORR-103: removed duplicate ``objective`` field. ``hso_hl_objective``
+    # is the canonical HL objective carrier (8 keys total, was 9).
     expected_original_keys = {
         "sub_domain_id",
         "title",
         "domain_id",
         "participating_regulations",
         "hso_hl_objective",
-        "objective",
         "pairs",
         "anchors",
         "csf",

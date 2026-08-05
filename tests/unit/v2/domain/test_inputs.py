@@ -76,12 +76,18 @@ def test_assemble_inputs_returns_applicable_regs_intersected(mock_state: V2State
 def test_assemble_inputs_includes_verbatim_articles(mock_state: V2State) -> None:
     """CORR-037-T4: applicable_articles is now empty (v1 article_loader removed).
 
-    Future contract (T4b or SP-B) will populate this from preproc_catalog
-    clause data. For now, the key exists in inputs but is an empty list.
+    CORR-103: applicable_articles is populated from
+    ``state["v2_preproc_catalog_ref"]`` when available. With the
+    ``mock_state`` fixture (no preproc ref) it falls back to ``[]``,
+    matching the legacy T4 behaviour. New tests in
+    ``test_ref_fidelity_corr103.py`` cover the populated path.
     """
     result = assemble_inputs(mock_state, "D-04")
     arts = result["applicable_articles"]
-    assert arts == [], "expected empty list (T4 removed v1 article_loader)"
+    assert arts == [], (
+        "expected empty list (mock_state has no v2_preproc_catalog_ref; "
+        "CORR-103 fallback path)"
+    )
     # Key still exists in the inputs dict (backwards compat for consumers)
     assert "applicable_articles" in result
 
@@ -89,8 +95,11 @@ def test_assemble_inputs_includes_verbatim_articles(mock_state: V2State) -> None
 def test_assemble_inputs_returns_regulation_ambiguities(mock_state: V2State) -> None:
     """CORR-037-T4: ambiguities is now empty (v1 ambiguity_loader removed).
 
-    Future contract will populate this from preproc_catalog.load_pairs().
-    For now, the key exists in inputs but is an empty list.
+    CORR-103: ambiguities is populated from
+    ``state["v2_pairs"]`` (already preloaded by orchestrator T3a) when
+    available. With the ``mock_state`` fixture (no v2_pairs) it falls
+    back to ``[]``. New tests in ``test_ref_fidelity_corr103.py`` cover
+    the populated path.
     """
     mock_state["company_context"].applicable_regs = ["GDPR"]
 
@@ -103,7 +112,12 @@ def test_assemble_inputs_returns_regulation_ambiguities(mock_state: V2State) -> 
 def test_assemble_inputs_excludes_non_applicable_regulation_ambiguities(
     mock_state: V2State,
 ) -> None:
-    """T4 placeholder: trivially true since ambiguities is empty."""
+    """T4 placeholder: trivially true since ambiguities is empty (mock_state).
+
+    CORR-103: with a real preproc catalog ref, ambiguities carry
+    ``reg_a``/``reg_b`` (not a single ``regulation`` field). The
+    populated path is covered by ``test_ref_fidelity_corr103.py``.
+    """
     mock_state["company_context"].applicable_regs = ["GDPR"]
 
     result = assemble_inputs(mock_state, "D-04")

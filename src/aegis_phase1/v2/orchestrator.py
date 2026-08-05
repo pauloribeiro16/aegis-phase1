@@ -1960,10 +1960,15 @@ class Phase1Orchestrator:
         ``list((state["subdomains"] or {}).keys())`` pattern that passed
         bare string IDs (crashed the canonical P1C-LLM-01 path with
         ``'str' object has no attribute 'get'``). Each entry now carries
-        the metadata the P1C-LLM-01 spec requires (objective, pairs,
-        participating_regulations, anchors, csf).
+        the metadata the P1C-LLM-01 spec requires (hso_hl_objective,
+        pairs, participating_regulations, anchors, csf).
 
         CORR-100: enriched with ``hso_per_reg`` and ``security_requirements``.
+
+        CORR-103: removed the duplicate ``objective`` field. Previously
+        the ref carried both ``hso_hl_objective`` and ``objective`` with
+        the same value (273 chars x 27 refs ~ 7KB per lane x ~5 lanes ~
+        36KB wasted per P1B run). Only ``hso_hl_objective`` is retained.
 
         CORR-101 Gap 2: when ``manifest_loader`` is provided (or
         ``self.manifest_loader`` is set), each ref is enriched with:
@@ -2021,7 +2026,6 @@ class Phase1Orchestrator:
                 "domain_id": sd.domain_id,
                 "participating_regulations": participating,
                 "hso_hl_objective": objective,
-                "objective": objective,
                 "hso_per_reg": [
                     h.model_dump() if hasattr(h, "model_dump") else h
                     for h in (sd.hso_per_reg or [])
