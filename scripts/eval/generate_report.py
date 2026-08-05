@@ -51,7 +51,7 @@ def load_jsonl(path: Path) -> list[dict]:
 def load_canonical_refs(preproc: Path) -> set[str]:
     """Load all canonical legal references from preproc clauses."""
     refs: set[str] = set()
-    clauses_root = preproc / "3-entities" / "clauses" / "_root"
+    clauses_root = preproc / "entities" / "clauses" / "_root"
     if not clauses_root.exists():
         return refs
     for reg_dir in clauses_root.iterdir():

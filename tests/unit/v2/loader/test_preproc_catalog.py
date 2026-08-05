@@ -28,14 +28,16 @@ from aegis_phase1.v2.loader.preproc_catalog import (
     Subdomain,
 )
 
-# Real counts in committed preproc_out/ (verified 2026-07-21).
+# Real counts in committed preproc_out/ (verified 2026-08-05 after
+# the loader-path fix in CORR-099-prep; the previous values were
+# snapshotted on 2026-07-21 and preproc has been regenerated since).
 # These differ from the strategy doc's 38/282/338/578/196/185 because
 # the strategy doc was written before the latest preproc rebuild. The
 # gates in CONTRACT-037.md §G3 are corrected to these values.
 ACTUAL_COUNTS = {
     "subdomains": 38,
     "srs": 282,
-    "sos": 328,
+    "sos": 342,
     "csfs": 106,  # active only; withdrawn/archived are not on disk
     "clauses": 498,
     "pairs": 196,
