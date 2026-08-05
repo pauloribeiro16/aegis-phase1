@@ -110,7 +110,7 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
     # article loaders deprecated). For now, leave the keys in the inputs
     # dict as empty lists so consumers don't KeyError. New consumers (SP-B/C)
     # should use preproc_catalog.load_pairs() for cross-regulation analysis
-    # and read the regulatory OJ text directly from preproc_out/3-entities/clauses/.
+    # and read the regulatory OJ text directly from preproc_out/entities/clauses/.
     applicable_articles: list[dict] = []
     ambiguities: list[dict] = []
     cross_reg_analysis = filter_cross_reg(state, domain_id)
