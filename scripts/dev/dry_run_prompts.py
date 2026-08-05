@@ -83,13 +83,47 @@ MODELS_TO_TEST = ["gemma4:e4b", "MiniMax-M3"]
 OUTPUT_PATH = Path("tests/fixtures/dry_run/prompts_dump.json")
 
 
+def _filter_refs_per_lane(refs: list[dict], reg: str) -> list[dict]:
+    """CORR-103: per-lane filter on hso_per_reg + pairs.
+
+    Mirrors the in-place filter applied by
+    :func:`Phase1Executor.run_phase_1b`. Returns the same refs dicts
+    mutated in-place. Safe because the caller passes a fresh list.
+    """
+    for ref in refs:
+        if isinstance(ref, dict):
+            ref["hso_per_reg"] = [
+                e
+                for e in (ref.get("hso_per_reg") or [])
+                if isinstance(e, dict)
+                and (e.get("regulation") or "").strip() == reg
+            ]
+            ref["pairs"] = [
+                p
+                for p in (ref.get("pairs") or [])
+                if isinstance(p, dict)
+                and (
+                    (p.get("reg_a") or "").strip() == reg
+                    or (p.get("reg_b") or "").strip() == reg
+                )
+            ]
+    return refs
+
+
 def build_inputs_for_p1b(profile: CaseProfileLoader, subdomains_by_reg: dict, reg: str) -> dict:
-    """Build inputs for P1B-LLM-01/02 (per-reg lane)."""
+    """Build inputs for P1B-LLM-01/02 (per-reg lane).
+
+    CORR-103: applies the per-lane filter on hso_per_reg + pairs
+    (mirrors what ``run_phase_1b`` does) so the rendered prompt
+    reflects what the LLM will actually see.
+    """
+    lane_refs = subdomains_by_reg.get(reg, [])
+    lane_refs = _filter_refs_per_lane(list(lane_refs), reg)
     return {
         "case_id": Path(profile.case_path).name,
         "lane_id": reg,
         "applicable_regs": [reg],
-        "layer0_subdomain_refs": subdomains_by_reg.get(reg, []),
+        "layer0_subdomain_refs": lane_refs,
     }
 
 
