@@ -196,15 +196,20 @@ def test_assemble_inputs_returns_empty_lists_when_no_data(mock_state: V2State) -
     they may still be returned; we verify the per-subdomain fields are
     empty.
 
-    Note: ``applicable_regs`` now reflects the fallback in
-    ``filter_regs`` — when the ontology has no ``source_regulations``
-    for the requested domain, ``filter_regs`` returns the company
-    context's ``applicable_regs`` rather than ``[]`` (intentional
-    behaviour change documented in ``regs.filter_regs``).
+    CORR-101 Gap 1: ``applicable_regs`` for an unknown domain (no
+    participating subdomains anywhere) is now ``[]`` rather than the
+    full company-level ``applicable_regs``. The previous fallback
+    silently included regulations with zero participating subdomains
+    in the requested domain; the defense-in-depth cross-check now
+    refuses to claim a regulation is applicable when no subdomain in
+    the domain carries it.
     """
     result = assemble_inputs(mock_state, "D-99")
     assert result["subdomains"] == []
-    assert result["applicable_regs"] == ["CRA", "GDPR"]
+    assert result["applicable_regs"] == [], (
+        f"D-99 has no participating subdomains; applicable_regs must "
+        f"be [] (CORR-101 defense-in-depth), got {result['applicable_regs']!r}"
+    )
     assert result["applicable_articles"] == []
     # CORR-037-T4: ambiguities is empty (v1 ambiguity_loader removed).
     assert result["ambiguities"] == []

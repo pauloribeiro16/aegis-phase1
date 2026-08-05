@@ -5,12 +5,28 @@ Before fix:
   - getattr(dict, "applicable_regs", []) returns [] (NOT the dict key)
   - filter_regs saw applicable_regs=[] and fell through to fallback
   - even the fallback returned [] because _build_ontology_shim
-    doesn't populate ontology["subdomains"]["covered"]
+    doesn't populate subdomains.covered today
 
 After fix:
   - isinstance(ctx, dict) branch uses ctx.get("applicable_regs", [])
   - when ontology shim is empty, fallback to state["subdomains"]
     (the preproc_catalog dict of Subdomain objects)
+
+CORR-101 Gap 1: hardened the fallback with a defense-in-depth
+cross-check against participating_regs_in_domain. Previously, when
+BOTH ontology and state['subdomains'] lacked source_regs for the
+requested domain, the fallback blindly returned ALL applicable_regs,
+even for regulations that had zero participating subdomains in the
+domain. New behaviour:
+
+  - When participating_regs_in_domain can be computed, the fallback
+    returns ``applicable_regs ∩ participating_regs_in_domain`` (NOT
+    all applicable_regs).
+  - When participating_regs_in_domain cannot be computed (both data
+    sources empty for D-XX), the fallback returns ``[]`` and logs at
+    ERROR level.
+  - The fallback always logs at WARNING (was: INFO) so this path is
+    visibly suspicious and investigated.
 """
 import logging
 import sys
@@ -21,6 +37,8 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 logger = logging.getLogger(__name__)
 
+# ────────────────────────────────────────────────────────────────────
+# Bug 2 reproduction: getattr on dict returns []
 # ────────────────────────────────────────────────────────────────────
 # Bug 2 reproduction: getattr on dict returns []
 # ────────────────────────────────────────────────────────────────────
@@ -49,8 +67,9 @@ def test_filter_regs_dict_ctx_uses_get_not_getattr():
 
 def test_filter_regs_object_ctx_still_works():
     """Legacy object ctx (Pydantic model instance) still works."""
-    from aegis_phase1.v2.domain.filters.regs import filter_regs
     from types import SimpleNamespace
+
+    from aegis_phase1.v2.domain.filters.regs import filter_regs
 
     ctx = SimpleNamespace(applicable_regs=["GDPR", "CRA"])
     state = {
@@ -164,3 +183,126 @@ def _fake_subdomain(sid: str, domain_id: str, source_regs: list[str]):
         source_regulations=source_regs,         # alias for legacy
         applies_to=source_regs,                 # alias for legacy
     )
+
+
+# ────────────────────────────────────────────────────────────────────
+# CORR-101 Gap 1: defense-in-depth cross-check in the fallback path.
+#
+# Was: when domain_regs was empty and applicable_regs non-empty, the
+# fallback returned ALL of applicable_regs (silent correctness issue:
+# DORA might be in applicable_regs but never participate in D-10).
+# Now: fallback intersects with participating_regs_in_domain, OR
+# returns [] + ERROR if no data source corroborates any reg.
+# ────────────────────────────────────────────────────────────────────
+
+
+def test_filter_regs_fallback_excludes_regs_with_no_participating_subdomain():
+    """CORR-101: DORA in applicable_regs but no D-XX subdomain has DORA → DORA excluded."""
+    from aegis_phase1.v2.domain.filters.regs import filter_regs
+
+    state = {
+        "company_context": {
+            "applicable_regs": ["GDPR", "CRA", "DORA"],  # DORA applicable company-wide
+        },
+        "ontology": {"subdomains": {"covered": []}},  # Empty ontology
+        "subdomains": {
+            # D-01 subdomains: GDPR + CRA only (NO DORA)
+            "D-01.1": _fake_subdomain("D-01.1", "D-01", ["GDPR", "CRA"]),
+            "D-01.2": _fake_subdomain("D-01.2", "D-01", ["GDPR"]),
+        },
+    }
+    # DORA is in applicable but no D-01 subdomain carries DORA → must be excluded
+    result = filter_regs(state, "D-01")
+    assert "DORA" not in result, f"DORA leaked into D-01 fallback: {result!r}"
+    assert sorted(result) == ["CRA", "GDPR"], f"got {result!r}"
+
+
+def test_filter_regs_fallback_intersects_with_participating_in_domain():
+    """CORR-101: fallback result == applicable ∩ participating_in_domain."""
+    from aegis_phase1.v2.domain.filters.regs import filter_regs
+
+    state = {
+        "company_context": {"applicable_regs": ["GDPR", "CRA", "NIS2"]},
+        "ontology": {"subdomains": {"covered": []}},
+        "subdomains": {
+            # D-04 has GDPR + CRA only
+            "D-04.1": _fake_subdomain("D-04.1", "D-04", ["GDPR"]),
+            "D-04.2": _fake_subdomain("D-04.2", "D-04", ["CRA"]),
+        },
+    }
+    result = filter_regs(state, "D-04")
+    assert sorted(result) == ["CRA", "GDPR"], f"got {result!r}"
+
+
+def test_filter_regs_fallback_returns_empty_when_no_data_sources():
+    """CORR-101: BOTH ontology and state['subdomains'] empty → return [] + ERROR log."""
+    import io
+    import logging
+
+    from aegis_phase1.v2.domain.filters.regs import filter_regs
+
+    state = {
+        "company_context": {"applicable_regs": ["GDPR", "CRA"]},
+        "ontology": {},  # Empty
+        "subdomains": {},  # Empty — no data at all
+    }
+    # Capture ERROR-level logs from regs logger
+    log_stream = io.StringIO()
+    handler = logging.StreamHandler(log_stream)
+    handler.setLevel(logging.ERROR)
+    regs_logger = logging.getLogger("aegis_phase1.v2.domain.filters.regs")
+    regs_logger.addHandler(handler)
+    try:
+        result = filter_regs(state, "D-05")
+    finally:
+        regs_logger.removeHandler(handler)
+
+    assert result == [], (
+        f"fallback with no data should return [] not {result!r}. "
+        f"Was: silent return of all applicable_regs."
+    )
+    log_output = log_stream.getvalue()
+    assert "filter_regs(D-05)" in log_output, (
+        f"ERROR log not emitted for empty-data fallback; got:\n{log_output}"
+    )
+    assert "ERROR" in log_output or "BOTH ontology" in log_output, (
+        f"Expected ERROR-level log; got:\n{log_output}"
+    )
+
+
+def test_filter_regs_fallback_handles_dirty_reg_strings():
+    """CORR-101: 'AI_Act (partial)' / 'CRA (sole authority)' → canonical 'AI_Act'/'CRA'."""
+    from aegis_phase1.v2.domain.filters.regs import filter_regs
+
+    state = {
+        "company_context": {"applicable_regs": ["AI_Act", "CRA", "GDPR"]},
+        "ontology": {"subdomains": {"covered": []}},
+        "subdomains": {
+            # D-08 has dirty participating_regulations strings (with annotations)
+            "D-08.1": _fake_subdomain(
+                "D-08.1", "D-08", ["CRA (sole authority)", "GDPR"]
+            ),
+            "D-08.2": _fake_subdomain(
+                "D-08.2", "D-08", ["AI_Act (partial)", "GDPR"]
+            ),
+        },
+    }
+    result = filter_regs(state, "D-08")
+    # AI_Act must appear (because participating has 'AI_Act (partial)')
+    assert "AI_Act" in result, f"AI_Act dropped due to dirty string: {result!r}"
+    # CRA must appear (because participating has 'CRA (sole authority)')
+    assert "CRA" in result, f"CRA dropped due to dirty string: {result!r}"
+    assert sorted(result) == ["AI_Act", "CRA", "GDPR"], f"got {result!r}"
+
+
+def test_canonical_reg_name_strips_annotations():
+    """Unit test for the _canonical_reg_name helper."""
+    from aegis_phase1.v2.domain.filters.regs import _canonical_reg_name
+
+    assert _canonical_reg_name("AI_Act (partial)") == "AI_Act"
+    assert _canonical_reg_name("CRA (sole authority)") == "CRA"
+    assert _canonical_reg_name("GDPR (sole authority)") == "GDPR"
+    assert _canonical_reg_name("NIS2 partial") == "NIS2"
+    assert _canonical_reg_name("GDPR") == "GDPR"
+    assert _canonical_reg_name("  CRA  ") == "CRA"
+    assert _canonical_reg_name("") == ""
