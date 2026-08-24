@@ -352,9 +352,27 @@ class Phase1Executor:
 
             parsed_02 = out_02.get("parsed_output") or {}
             if isinstance(parsed_02, dict):
+                # CORR-074 integration fix (found via the Deucalion
+                # qwen3.5:27b scout, 2026-08-24): P1BLLM02Output has a
+                # top-level ``rationale`` string — the legacy
+                # ``synthesis`` nested dict no longer exists, so the old
+                # read silently dropped every regulation from
+                # ``aggregated_synthesis`` (rationale_by_reg stayed
+                # empty on all real-LLM runs). Build the per-reg synth
+                # dict from the new schema; keep the legacy nested
+                # ``synthesis`` read for older callers.
                 synth = parsed_02.get("synthesis")
                 if isinstance(synth, dict):
                     all_synth[reg] = synth
+                elif "rationale" in parsed_02:
+                    all_synth[reg] = {
+                        "rationale": parsed_02.get("rationale", ""),
+                        "implications": parsed_02.get("implications", []),
+                        "gaps": parsed_02.get("gaps", []),
+                        "status": parsed_02.get("status", "OK"),
+                        "confidence": parsed_02.get("confidence", "MEDIUM"),
+                        "notes": parsed_02.get("notes", ""),
+                    }
 
         return {
             "per_reg": per_reg,
