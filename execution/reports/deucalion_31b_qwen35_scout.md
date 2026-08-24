@@ -216,7 +216,40 @@ generous.
 
 ---
 
-## 3. Implications for corr044 / Phase-3 model decision
+### 2.7 JOB 1847659 — full `--run-all` with qwen3.5:27b
+
+| Stage | Result |
+|-------|--------|
+| LOAD | ✅ 38 sub-domains, 2 regs (8.8s) |
+| Phase 1B | ✅ 4 LLM calls OK, **2 regs in rationale_by_reg** (executor fix live), ≈17.5 min |
+| MAP (P1C-01 ×10) | ✅ 10/10 lanes `OK` (1805s ≈ 30 min; 41.5k tok/domain) — **but 0 sub_domain_activations parsed** |
+| REDUCE | ⚠️ deterministic merge ran on empty inputs; **REDUCE-LLM skipped** ("aggregated_activations is empty across all lanes") |
+| OUTPUT | ✅ 6 deterministic artefacts + xlsx + enhanced docs (04b/04c) rendered |
+
+**P1C-01 root cause (raw pulled from `work/state.json`, 39.3 KB):**
+qwen3.5 emits a `## Pair classifications` section with
+`- D-XX.Y : REG ↔ REG (VERDICT): …` bullets — a completely different
+shape from the contract's `## Sub-domain Activations` + `### D-XX.Y`
+subsections. The content is substantive (per-pair verdicts with
+evaluated predicates) but `P1CLLM01Parser` extracts 0 activations, so
+`domain_results` ends with 10 domains × 0 activations and REDUCE has
+nothing to reduce.
+
+### 2.8 Final model matrix (P1 pipeline, case1-tinytask)
+
+| Spec | M3 (gold) | gemma4:e2b (local) | qwen3.5:27b (Deucalion) |
+|------|:---------:|:------------------:|:-----------------------:|
+| P1B-01 | ✓ | ✓ | ✓ (bullet format; tolerant parser accepts) |
+| P1B-02 | ✓ | ✓ | ⚠️ rationale solid (2.1k chars/reg); implications/gaps empty |
+| P1C-01 | ✓ | ✗ (JSON drift) | ✗ ("Pair classifications" bullets → 0 activations) |
+| P1C-02/03 | ✓ | ✗ (JSON drift) | — (skipped: empty REDUCE input) |
+
+**Conclusion:** P1C-01 is the template-following bottleneck for every
+non-M3 model tested. The 27B tier does NOT clear it — model scale is
+not the fix; either the P1C-01 spec/prompt needs stronger format
+anchoring, or the parser needs a bullet-tolerant path (analogous to
+what P1B-01 already tolerates). Until then, M3 remains the only model
+that completes the full 5-spec pipeline.
 
 - **The Phase-3 decision (`gemma4:e2b` canonical for P1B, M3-only for P1C) is unchanged** by this scout. The Deucalion 31B run was a stress test, not a Phase-3 candidate. The data we wanted (large-model compliance structure) was already measured by corr044.
 - **The Ollama-cluster scout for qwen3.5:27b completes the matrix** on the Ollama side (5B / 9B / 12B / 27B tiers). If the scout succeeds, we will run `--run-all` (8h) to measure end-to-end timing and parser behavior for a 27B model.
