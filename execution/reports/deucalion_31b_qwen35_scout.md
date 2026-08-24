@@ -113,13 +113,56 @@ Cluster Ollama binary is **0.31.1** — below the minimum. The
 `qwen3.8` family was added to Ollama in version 0.32.12 (Sep/2025);
 the cluster binary is from Jun/2025.
 
-### 2.3 JOB 1846944 — qwen3.5:27b scout (in progress)
+### 2.5 ROOT CAUSE found: executor/CORR-074 integration bug (fixed in a7dfb35)
+
+Although the scout's 4 LLM calls all reported `status: OK` with
+`valid: True`, the orchestrator logged `rationale_by_reg has 0
+entries`. Diagnosis (raws pulled from `work/state.json` +
+`logs/phase1/qwen3.5_27b/llm-calls.jsonl` and re-parsed locally):
+
+- The local **MarkdownParsers parse all 4 qwen3.5 raws cleanly**
+  (P1B-01 CRA: 2 interpretations + 2 derogations; the parse itself
+  was never the problem).
+- The bug is in `phase1_executor.run_phase_1b`: it extracted
+  `parsed_02["synthesis"]` — a nested dict from the **pre-CORR-074
+  schema**. The new `P1BLLM02Output` has a top-level `rationale`
+  string and no `synthesis` key, so the read returned `None` for
+  every regulation and `aggregated_synthesis` stayed empty.
+- Impact: **every real-LLM run since CORR-074 produced an empty
+  `rationale_by_reg`**. Doc 05 §6.1b kept rendering via the
+  `per_spec_markdown` fallback (CORR-061 S3b), which masked the bug
+  locally — but the MAP stage input (`p1b_outputs_by_reg`) was
+  silently empty. The identical pattern is visible in the
+  2026-08-13 `aegis_qwen35_big_2x80` cluster job, so this predates
+  today's runs.
+- Fix (commit `a7dfb35`): when `synthesis` is absent but `rationale`
+  is present, build the per-reg synth dict from the new schema
+  fields. Legacy callers keep working. Validated with a FakeInvoker
+  unit test; re-scout submitted as JOB 1847634.
+
+### 2.6 qwen3.5:27b format compliance (from the captured raws)
+
+The model does not follow the CORR-074 markdown template verbatim:
+
+- P1B-01: emits `- ENTRY (VERDICT): text` bullets instead of
+  `### ENTRY — VERDICT` subsections. The tolerant parser accepts it.
+- P1B-02: emits `## Findings` with loose bullets instead of the
+  5-section Status/Rationale/Implications/Gaps/Notes contract;
+  `implications`/`gaps` end up empty (the rationale prose itself is
+  high quality — 2.1k chars of grounded analysis per regulation).
+
+Even with the executor fix, P1B-02's empty implications/gaps may fail
+downstream `minItems` expectations — flagged as a known limitation of
+this model for template-following; the M3 gold remains the reference
+for full contract compliance.
+
+### 2.3 JOB 1846944 — qwen3.5:27b scout
 
 | Field | Value |
 |-------|-------|
 | Partition | `dev-a100-80` |
 | Walltime | 30 min |
-| Elapsed | (pending) |
+| Elapsed | 18:33+ (in flight at report write) |
 | GPU | 1×A100-80GB, model loaded 34 GB (Q4_K_M + KV cache) |
 
 ```
@@ -127,12 +170,29 @@ warm-up OK on attempt 1
 {"model":"qwen3.5:27b","response":"","thinking":"Okay","done":true, ...}
 ollama ps: qwen3.5:27b   7653528ba5cb   34 GB   100% GPU   262144
 2026-08-24 13:22:56 | INFO    | === STAGE 0: LOAD ===
+2026-08-24 13:23:05 | LOAD complete: 38 sub-domains, 2 regs (8.76s)
+2026-08-24 13:23:05 | INFO    | === STAGE 1.5: PHASE 1B RATIONALE ===
+[13:28:27] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (318355ms, 125744 tok)
+[13:32:48] [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (260074ms, 125095 tok)
+[13:36:15] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (206997ms, 93508 tok)
 ```
 
 `qwen3.5:27b` is the previous-generation model — Ollama 0.31.1 knows
 its renderer. We use it as a **proxy** for `qwen3.8:27b` (same family,
 similar capability class; the corr044 family matrix gets a 27B-tier
 data point regardless of which sub-version).
+
+**Initial timing profile (per LLM call):**
+- P1B-01: 318s (125.7k tokens) on first reg, 207s (93.5k tokens) on second reg
+- P1B-02: 260s (125.1k tokens)
+- Average token throughput: ~395 tok/s
+- 2 regulations × 2 specs = 4 calls; remaining time per scout ≈ 6-9 min
+
+For the full 8h run (case1-tinytask): P1B (4 calls ≈ 20 min) + MAP
+(10 domains × P1C-01 ≈ 30 min) + REDUCE (2 calls ≈ 8 min). Token
+volume per call is large because the prompts carry the inlined
+catalogs + per-subdomain refs after CORR-103. The 8h walltime is
+generous.
 
 ### 2.4 Parse success matrix (extended)
 
