@@ -139,6 +139,16 @@ entries`. Diagnosis (raws pulled from `work/state.json` +
   is present, build the per-reg synth dict from the new schema
   fields. Legacy callers keep working. Validated with a FakeInvoker
   unit test; re-scout submitted as JOB 1847634.
+- **Re-scout JOB 1847634 CONFIRMS THE FIX** (23:29 elapsed): same 4
+  LLM_CALL OK, but now
+  `Phase 1B RATIONALE complete for 2 regulation(s)` and
+  `rationale_by_reg has 2 entries`. Timings are near-identical to the
+  first scout (temperature=0 determinism): P1B-01 318s/125.7k tok,
+  P1B-02 260s/125.1k tok, P1B-01 208s/93.5k tok, P1B-02 263s/95.7k
+  tok — ≈ 17.5 min of LLM time for Phase 1B alone.
+- Follow-up: full `--run-all` (8h walltime, JOB 1847659,
+  `run_qwen35_full.sh`) submitted 2026-08-24 to measure MAP (10
+  domains × P1C-01) + REDUCE end-to-end with the 27B model.
 
 ### 2.6 qwen3.5:27b format compliance (from the captured raws)
 
