@@ -1,0 +1,179 @@
+{
+  "contract_id": "SC-2026-22",
+  "feature": "Article_ref join + regex fix in reorg_by_domain_md.py",
+  "date": "2026-08-04",
+  "planner": "opencode (MiniMax-M3)",
+  "spec_file": "scripts/preprocess/HANDOFF_merge_and_ambiguity.md",
+  "contract_md": "execution/CONTRACT-077.md",
+  "status": "DRAFT",
+  "phase": "1 of 1",
+  "depends_on": null,
+  "parallel_group": "G0",
+  "parent_goal": "execution/CONTRACT-077.md",
+  "trials": 1,
+  "pass_threshold": "1/1",
+  "scope": "Add article_ref-based fallback join in scripts/preprocess/reorg_by_domain_md.py. Parser A: fix clause_id regex (accept digits in prefix like NIS2), also extract article_refs from YAML to build secondary index article_to_subs. Parser B: after clause_id match attempt, extract article_refs from section header and try exact + prefix match against article_to_subs. Add coverage report at methodology-00/PREPROCESSING_by_domain/audit/coverage_by_reg.md with per-reg stats and known limitations. No regression in the merged D-XX.Y.md structure (Parts 1-4). methodology-00/PREPROCESSING/ remains READ-ONLY.",
+  "criteria": [
+    {
+      "id": "C1",
+      "description": "Parser A regex fix: clause_to_subs contains NIS2 clause_ids (e.g., NIS2-CL01, NIS2-CL17). Baseline was 0 NIS2 entries due to regex [A-Za-z_]+ not accepting digit '2' in 'NIS2'.",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys; sys.path.insert(0, 'scripts/preprocess')\nimport reorg_by_domain_md as m\nclause_to_subs, article_to_subs = m.parse_clause_to_subs(m.Path('methodology-00/PREPROCESSING'))\nnis2_keys = [k for k in clause_to_subs if k.startswith('NIS2')]\nassert len(nis2_keys) >= 30, f'NIS2 keys: {len(nis2_keys)} (expected >=30)'\nassert 'NIS2-CL17' in clause_to_subs, 'NIS2-CL17 missing'\nprint(f'OK: NIS2 keys={len(nis2_keys)}, sample={nis2_keys[:5]}')\n\"",
+      "expected": "OK: NIS2 keys >= 30, includes NIS2-CL17",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C2",
+      "description": "Parser A also builds article_to_subs index (>=100 normalized keys across 5 regulations).",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys; sys.path.insert(0, 'scripts/preprocess')\nimport reorg_by_domain_md as m\nclause_to_subs, article_to_subs = m.parse_clause_to_subs(m.Path('methodology-00/PREPROCESSING'))\nassert len(article_to_subs) >= 100, f'article_to_subs keys: {len(article_to_subs)} (expected >=100)'\nsample_keys = sorted(article_to_subs.keys())[:5]\nprint(f'OK: article_to_subs={len(article_to_subs)} keys, sample={sample_keys}')\n\"",
+      "expected": "OK: article_to_subs >= 100 keys",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C3",
+      "description": "Parser B article_ref fallback: DORA matched sections > 0 (baseline was 0). Use Parser A indexes and a smoke test that runs the parser on DORA Ambiguity files.",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys; sys.path.insert(0, 'scripts/preprocess')\nimport reorg_by_domain_md as m\nclause_to_subs, article_to_subs = m.parse_clause_to_subs(m.Path('methodology-00/PREPROCESSING'))\nsections = m.parse_ambiguity_sections(m.Path('methodology-00/PREPROCESSING'), clause_to_subs, article_to_subs)\ndora_matched = [s for s in sections if s['reg'] == 'DORA']\nassert len(dora_matched) > 0, f'DORA matched: {len(dora_matched)} (expected >0)'\narticle_matched = [s for s in dora_matched if s.get('match_strategy') == 'article_ref']\nassert len(article_matched) > 0, f'DORA matched by article_ref: {len(article_matched)} (expected >0)'\nprint(f'OK: DORA matched={len(dora_matched)}, by article_ref={len(article_matched)}')\n\"",
+      "expected": "OK: DORA matched > 0, all via article_ref strategy (no clause_id matches)",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C4",
+      "description": "Total matched sections >= 300 across all 5 regulations (baseline was 145).",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys; sys.path.insert(0, 'scripts/preprocess')\nimport reorg_by_domain_md as m\nclause_to_subs, article_to_subs = m.parse_clause_to_subs(m.Path('methodology-00/PREPROCESSING'))\nsections = m.parse_ambiguity_sections(m.Path('methodology-00/PREPROCESSING'), clause_to_subs, article_to_subs)\ntotal = len(sections)\nassert total >= 300, f'Total matched: {total} (expected >=300)'\nprint(f'OK: Total matched={total}')\n\"",
+      "expected": "OK: Total matched >= 300",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C5",
+      "description": "NIS2 matched >= 70 sections (baseline was 0). After regex fix, NIS2 clause_ids work in clause_to_subs.",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"\nimport sys; sys.path.insert(0, 'scripts/preprocess')\nimport reorg_by_domain_md as m\nclause_to_subs, article_to_subs = m.parse_clause_to_subs(m.Path('methodology-00/PREPROCESSING'))\nsections = m.parse_ambiguity_sections(m.Path('methodology-00/PREPROCESSING'), clause_to_subs, article_to_subs)\nnis2_matched = [s for s in sections if s['reg'] == 'NIS2']\nassert len(nis2_matched) >= 70, f'NIS2 matched: {len(nis2_matched)} (expected >=70)'\nprint(f'OK: NIS2 matched={len(nis2_matched)}')\n\"",
+      "expected": "OK: NIS2 matched >= 70",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C6",
+      "description": "Coverage report exists at methodology-00/PREPROCESSING_by_domain/audit/coverage_by_reg.md with required sections (per-reg table, 5 known limitations, total stats).",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && ../shared-venv-root/bin/python -c \"\nfrom pathlib import Path\np = Path('methodology-00/PREPROCESSING_by_domain/audit/coverage_by_reg.md')\nassert p.exists(), f'Missing: {p}'\ntext = p.read_text()\nrequired = ['GDPR', 'CRA', 'NIS2', 'DORA', 'AI_Act', 'clause_id', 'article_ref', 'Limitation', 'NIS2 short-form', 'DORA articles']\nfor r in required:\n    assert r in text, f'Missing required section/text: {r}'\nprint(f'OK: coverage report exists, has all required sections')\n\"",
+      "expected": "OK: coverage report exists with all required sections + 5 limitations",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C7",
+      "description": "methodology-00/PREPROCESSING/ is unmodified after --clean run (git status --short returns empty for that path).",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && git status --short methodology-00/PREPROCESSING/ | wc -l | awk '{ if ($1 == 0) print \"OK: 0 modified files in PREPROCESSING/\"; else { print \"FAIL: \" $1 \" files modified\"; exit 1 } }'",
+      "expected": "OK: 0 modified files in PREPROCESSING/",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C8",
+      "description": "38 merged D-XX.Y.md files all contain '# Part 1', '# Part 2', '# Part 3', '# Part 4' headers (baseline already verified; ensure no regression).",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && ../shared-venv-root/bin/python -c \"\nfrom pathlib import Path\nbase = Path('methodology-00/PREPROCESSING_by_domain/domains')\nfiles = list(base.glob('D-*/D-*.?/D-*.?.md'))\nassert len(files) == 38, f'Got {len(files)} merged files (expected 38)'\nok = sum(1 for f in files if all(p in f.read_text() for p in ['# Part 1', '# Part 2', '# Part 3', '# Part 4']))\nassert ok == 38, f'Only {ok}/38 have all 4 parts'\nprint(f'OK: 38/38 merged files with all 4 parts')\n\"",
+      "expected": "OK: 38/38 merged files with 4 parts",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C9",
+      "description": "Ruff check and format are clean on reorg_by_domain_md.py (no errors, already formatted).",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && ../shared-venv-root/bin/ruff check scripts/preprocess/reorg_by_domain_md.py && ../shared-venv-root/bin/ruff format --check scripts/preprocess/reorg_by_domain_md.py",
+      "expected": "exit 0 — All checks passed + file already formatted",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C10",
+      "description": "Idempotency: re-running with --clean produces same total MD file count (allowing for any audit/ additions which should be stable across runs).",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python scripts/preprocess/reorg_by_domain_md.py --clean > /dev/null && C1=$(find methodology-00/PREPROCESSING_by_domain -name '*.md' | wc -l) && PYTHONPATH=src ../shared-venv-root/bin/python scripts/preprocess/reorg_by_domain_md.py --clean > /dev/null && C2=$(find methodology-00/PREPROCESSING_by_domain -name '*.md' | wc -l) && [ \"$C1\" = \"$C2\" ] && echo \"OK: idempotent ($C1 == $C2 md files)\" || (echo \"FAIL: $C1 != $C2\" && exit 1)",
+      "expected": "OK: count stable across two --clean runs",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C11",
+      "description": "Script log shows per-reg breakdown with strategy distinction (clause_id vs article_ref matched counts).",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python scripts/preprocess/reorg_by_domain_md.py --clean 2>&1 | tee /tmp/corr077_run.log | grep -qE 'clause_ids mapped.*[0-9]+' && grep -qE 'article_refs mapped.*[0-9]+' /tmp/corr077_run.log && for reg in GDPR CRA NIS2 DORA AI_Act; do grep -qE \"$reg:.*clause_id=.*article_ref=\" /tmp/corr077_run.log || (echo \"FAIL: missing per-reg breakdown for $reg\" && exit 1); done && echo \"OK: log shows clause_ids mapped, article_refs mapped, and per-reg clause_id/article_ref breakdown\"",
+      "expected": "OK: log has all required line patterns",
+      "passed": false,
+      "verdict": "PENDING",
+      "evidence": null,
+      "attempts": 0
+    }
+  ],
+  "quality_dimensions": [
+    {"name": "Correctness", "threshold": "11/11 MUST", "result": null},
+    {"name": "Match rate recovery", "threshold": "Total >= 300 (baseline 145)", "result": null},
+    {"name": "No regressions", "threshold": "38 merged files unchanged structure", "result": null},
+    {"name": "Data integrity", "threshold": "PREPROCESSING/ untouched", "result": null},
+    {"name": "Code hygiene", "threshold": "Ruff clean", "result": null}
+  ],
+  "risks": [
+    "DORA match rate ceiling ~50% due to corpus gaps (77 articles in Ambiguity with no SecurityRule) — documented as known limitation",
+    "NIS2 short-form 'NIS2-CNN' (T3 narrative references) cannot be mapped without manual table — documented",
+    "CRA 'CRA-DNN' definitions (Ambiguity-only, no SecurityRule equivalent) cannot be mapped — documented",
+    "Many-to-many via article_ref: header 'Art. 9(2)' may match multiple SRs (3 DORA-SRs share it) — union of sub_domains is the intended behaviour, no duplication within a single merged file",
+    "If article_ref extraction breaks (regex change in YAML format), fallback produces 0 matches silently — mitigated by per-reg logging showing clause_id vs article_ref split"
+  ],
+  "files_to_change": [
+    {"file": "scripts/preprocess/reorg_by_domain_md.py", "action": "modify", "why": "Parser A regex fix + article_to_subs index + Parser B article_ref fallback + coverage report generation + main() wiring"},
+    {"file": "methodology-00/PREPROCESSING_by_domain/", "action": "regenerate", "why": "Re-run with --clean produces updated merged files + new audit/ directory"},
+    {"file": "methodology-00/PREPROCESSING_by_domain/audit/coverage_by_reg.md", "action": "create", "why": "New coverage report documenting per-reg match stats + 5 known limitations"}
+  ],
+  "correction_loop": {
+    "max_cycles": 3,
+    "current_cycle": 0
+  },
+  "sign_off": {
+    "user_approved": false,
+    "generator_implemented": false,
+    "evaluator_verified": false,
+    "quality_log_updated": false
+  }
+}
