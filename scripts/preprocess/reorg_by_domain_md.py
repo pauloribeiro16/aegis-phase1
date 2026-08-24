@@ -177,6 +177,12 @@ def parse_clause_to_subs(
 
 def _ambiguity_parts(src: Path) -> list[tuple[str, str, str]]:
     parts_by_reg = []
+    # CORR-077 fix: legacy monolith pattern is `NN_<REG>.md` where REG is
+    # a single-word regulation name. ``06_AI_Act.md`` matches the old
+    # permissive pattern but is NOT a v0.1 monolith — it is the only
+    # AI Act Ambiguity file and contains the 29 AIA-C* clauses. Restrict
+    # the legacy exclusion to the four single-word reg codes.
+    legacy_re = re.compile(r"^\d{2}_(?:GDPR|CRA|NIS2|DORA)\.md$")
     for reg in REGULATIONS:
         amb_dir = src / "Regulation" / reg / "Ambiguity"
         if not amb_dir.exists():
@@ -184,7 +190,7 @@ def _ambiguity_parts(src: Path) -> list[tuple[str, str, str]]:
         for md_file in sorted(amb_dir.glob("*.md")):
             if re.match(r"^(00_|99_)", md_file.name):
                 continue
-            if re.match(r"^\d{2}_[A-Za-z_]+\.md$", md_file.name):
+            if legacy_re.match(md_file.name):
                 continue
             text = md_file.read_text(encoding="utf-8")
             parts = re.split(r"(?=^####\s)", text, flags=re.MULTILINE)
@@ -329,12 +335,13 @@ def stage_globals(src: Path, dst: Path, dry_run: bool, plan: list[str]) -> None:
     cr_archive = src / "CrossRegulation" / "_archive"
     if cr_archive.exists():
         copy_tree(cr_archive, arcdir / "CrossRegulation", dry_run, plan)
-    # Legacy ambiguity NN_<REG>.md (v0.1, superseded per AMBIGUITY_ANALYSIS/00_Index.md)
+    # Legacy ambiguity NN_<REG>.md (v0.1, superseded per AMBIGUITY_ANALYSIS/00_Index.md).
+    # CORR-077: restrict to single-word reg codes — ``06_AI_Act.md`` is
+    # NOT legacy (it's AI_Act's only Ambiguity file).
     legacy_dir = arcdir / "legacy"
     for reg in REGULATIONS:
         for p in (src / "Regulation" / reg / "Ambiguity").glob("*.md"):
-            # Legacy files are the bare NN_<REG>.md (no topic suffix).
-            if re.match(r"^\d{2}_[A-Za-z_]+\.md$", p.name):
+            if re.match(r"^\d{2}_(?:GDPR|CRA|NIS2|DORA)\.md$", p.name):
                 copy_file(p, legacy_dir / f"{reg}_{p.name}", dry_run, plan)
 
 
@@ -359,11 +366,14 @@ def stage_by_regulation(src: Path, dst: Path, dry_run: bool, plan: list[str]) ->
                 copy_file(p, reg_dst / "Articles" / p.name, dry_run, plan)
 
         # Ambiguity/ — verbatim copy (topic files + index + synthesis;
-        # legacy NN_<REG>.md excluded — goes to _archive/legacy/ instead)
+        # legacy NN_<REG>.md excluded — goes to _archive/legacy/ instead).
+        # CORR-077: the legacy pattern is restricted to single-word reg
+        # codes so that ``06_AI_Act.md`` (AI_Act's only Ambiguity file)
+        # is included.
         amb_src = reg_src / "Ambiguity"
         if amb_src.exists():
             for p in sorted(amb_src.glob("*.md")):
-                if re.match(r"^\d{2}_[A-Za-z_]+\.md$", p.name):
+                if re.match(r"^\d{2}_(?:GDPR|CRA|NIS2|DORA)\.md$", p.name):
                     continue  # legacy → _archive/legacy/
                 copy_file(p, reg_dst / "Ambiguity" / p.name, dry_run, plan)
 
@@ -530,7 +540,7 @@ def write_unmatched_index(dst: Path, unmatched: list[dict], dry_run: bool) -> No
             key = (reg, md_file.name)
             if re.match(r"^(00_|99_)", md_file.name):
                 filtered.append((reg, md_file.name, "Index/Synthesis"))
-            elif re.match(r"^\d{2}_[A-Za-z_]+\.md$", md_file.name):
+            elif re.match(r"^\d{2}_(?:GDPR|CRA|NIS2|DORA)\.md$", md_file.name):
                 filtered.append((reg, md_file.name, "Legacy NN_<REG>.md"))
             elif key in unmatched_grouped:
                 cats = sorted({s["category"] for s in unmatched_grouped[key]})
