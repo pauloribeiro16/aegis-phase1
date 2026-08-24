@@ -1,0 +1,10 @@
+{
+  "model": "gemma4:e2b",
+  "spec": "p1c03",
+  "latency_s": 14.65,
+  "raw_len": 1587,
+  "input_tokens": 4485,
+  "output_tokens": 1249,
+  "parser_success": false,
+  "parse_error": ""
+}

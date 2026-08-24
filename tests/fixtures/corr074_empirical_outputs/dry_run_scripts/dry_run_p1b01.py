@@ -17,7 +17,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 SPEC_ID = "P1B-LLM-01-INTERPRETATION"
 LANE = "CRA"
 CASE = "case1-tinytask"
-OLLAMA_BASE_URL = "http://localhost:11434"
+OLLAMA_BASE_URL = "http://127.0.0.1:11435"
 CATALOG_BASE = "/home/epmq-cyber/Área de Trabalho/projects/Methodology-main/00_METHODOLOGY/PROMPTS/catalogs"
 
 

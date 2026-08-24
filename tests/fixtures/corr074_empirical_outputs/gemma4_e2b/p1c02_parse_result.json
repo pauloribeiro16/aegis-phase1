@@ -1,0 +1,10 @@
+{
+  "model": "gemma4:e2b",
+  "spec": "p1c02",
+  "latency_s": 9.82,
+  "raw_len": 237,
+  "input_tokens": 4213,
+  "output_tokens": 803,
+  "parser_success": false,
+  "parse_error": "P1C-LLM-02 markdown extraction did not match template"
+}
