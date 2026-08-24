@@ -59,3 +59,6 @@ docs/visualization/__pycache__/
 docs/visualization/build_regulation_chain.py
 docs/visualization/regulation_chain.html
 docs/visualization/taxonomy_chain.html
+
+# CORR-074: sibling Methodology repo clone (read-only reference; not part of this tree)
+Methodology-main/
