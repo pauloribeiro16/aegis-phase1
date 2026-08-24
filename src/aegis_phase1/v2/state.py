@@ -8,6 +8,8 @@ References:
     - src/aegis_phase1/models.py (existing enums)
 """
 
+from __future__ import annotations
+
 import logging
 from enum import Enum
 from typing import NotRequired, TypedDict
@@ -330,6 +332,98 @@ class RegulatoryInteractions(_TolerantModel):
 
 
 # =============================================================================
+# CORR-074: P1B-LLM-02-RATIONALE output models (markdown+regex parsing)
+#
+# Mirrors the P1B-LLM-01 contract — the spec is a 5-section markdown
+# document (Status / Rationale / Implications / Gaps / Notes). The
+# parser at src/aegis_phase1/prompts_v2/markdown_parser.py
+# (re-exports the implementation archived at
+#  src/aegis_phase1/_archive/corr061/markdown_parser.py)
+# extracts the structured fields via regex + Pydantic.
+#
+# Envelope fields (prompt_spec_id, schema_version, case_id,
+# invocation_pattern) are injected by the invoker post-parse — the
+# LLM never emits them.
+# =============================================================================
+
+
+class P1BLLM02EffortEstimate(str, Enum):
+    """CORR-074: canonical effort estimate enum (8 values, tier-aware)."""
+
+    HOURS = "hours"
+    DAYS = "days"
+    WEEKS_1 = "weeks_1"
+    WEEKS_2_4 = "weeks_2_4"
+    MONTHS_1_3 = "months_1_3"
+    MONTHS_3_6 = "months_3_6"
+    FTE_QUARTER = "fte_quarter"
+    FTE_PERMANENT = "fte_permanent"
+
+
+class P1BLLM02CoverageLevel(str, Enum):
+    """CORR-074: gap coverage_level enum (canonical tokens)."""
+
+    NOT_ADDRESSED = "NOT_ADDRESSED"
+    PARTIAL = "PARTIAL"
+
+
+class P1BLLM02Priority(str, Enum):
+    """CORR-074: gap priority enum (canonical tokens)."""
+
+    P1 = "P1"
+    P2 = "P2"
+    P3 = "P3"
+
+
+class P1BLLM02Implication(BaseModel):
+    """One activated sub-domain's implication (parsed from `### IMP-D-XX.Y-N` block)."""
+
+    id: str
+    description: str
+    effort_estimate: P1BLLM02EffortEstimate
+    dependencies: list[str] = Field(default_factory=list)
+    layer0_refs: list[str] = Field(default_factory=list)
+    company_fact_refs: list[str] = Field(default_factory=list)
+
+
+class P1BLLM02Gap(BaseModel):
+    """One gap entry (parsed from `### GAP-D-XX.Y` block)."""
+
+    gap_id: str
+    sub_domain_id: str
+    coverage_level: P1BLLM02CoverageLevel
+    risk_description: str
+    covered_by_other_reg: list[str] = Field(default_factory=list)
+    recommendation: str = ""
+    priority: P1BLLM02Priority
+    layer0_refs: list[str] = Field(default_factory=list)
+
+
+class P1BLLM02Output(BaseModel):
+    """Parsed + validated output of P1B-LLM-02-RATIONALE.
+
+    Envelope fields (prompt_spec_id, schema_version, case_id,
+    invocation_pattern) are injected by the invoker post-parse.
+    """
+
+    # Envelope (invoker-injected; LLM never emits)
+    prompt_spec_id: str = "P1B-LLM-02-RATIONALE"
+    schema_version: str = "1.0.0"
+    case_id: str = ""
+    invocation_pattern: str = "per_regulation"
+
+    # Content (LLM-emitted, parser-extracted from markdown)
+    status: P1BLLM01Status
+    confidence: P1BLLM01Confidence
+    rationale: str = ""
+    implications: list[P1BLLM02Implication] = Field(default_factory=list)
+    gaps: list[P1BLLM02Gap] = Field(default_factory=list)
+    notes: str = ""
+
+    model_config = {"extra": "ignore"}
+
+
+# =============================================================================
 # CORR-050: P1B-LLM-01-INTERPRETATION output models (markdown+regex parsing)
 #
 # Replaces the JSON Schema in output_schemas.yaml as the source of truth
@@ -363,17 +457,18 @@ class P1BLLM01Confidence(str, Enum):
 
 
 class P1BLLM01Applicable(str, Enum):
-    """CORR-050: applicable values for P1BLLM01Interpretation."""
+    """CORR-050: applicable values for P1BLLM01Interpretation.
+
+    Canonical taxonomy (CORR-074 user decision 2026-08-05):
+    ``YES / NO / INDETERMINATE``. The LLM may emit legacy tokens
+    ``APPLIES`` or ``DOES_NOT_APPLY`` — the parser's
+    ``_normalise_verdict`` maps those to ``YES`` / ``NO``. This keeps
+    the enum minimal (no synonym members) and the canonical value
+    stable for downstream renderers and tests.
+    """
 
     YES = "YES"
     NO = "NO"
-    # CORR-065: added INDETERMINATE so the parser can accept models
-    # (like MiniMax-M3) that emit bullet-style `## Interpretations`
-    # lists with `(INDETERMINATE)` for catalog entries whose
-    # activation_predicate does not match the company's facts. This
-    # was previously a hard parse error; the enum now matches
-    # P1BLLM01Status and P1BLLM01DerogationVerdict which already
-    # allow INDETERMINATE.
     INDETERMINATE = "INDETERMINATE"
 
 
@@ -427,6 +522,7 @@ class P1BLLM01Output(BaseModel):
     confidence: P1BLLM01Confidence
     interpretations: list[P1BLLM01Interpretation] = Field(default_factory=list)
     derogations: list[P1BLLM01Derogation] = Field(default_factory=list)
+    notes: str = ""
 
     model_config = {"extra": "ignore"}
 
@@ -467,6 +563,326 @@ class GenericMarkdownOutput(BaseModel):
     model_config = {"extra": "ignore"}
 
 
+# =============================================================================
+# CORR-074 propagation: P1C-LLM-02-COMPOUND-EVENT output models
+# (markdown+regex parsing — mirrors the CORR-050 / CORR-074 P1B-LLM-01 pattern).
+#
+# Replaces the JSON Schema in output_schemas.yaml as the source of truth
+# for this spec. Envelope fields (prompt_spec_id, schema_version, case_id,
+# invocation_pattern) are injected by the invoker post-parse — the LLM
+# never emits them. Pydantic replaces JSON Schema as the only validator.
+# =============================================================================
+
+
+class P1CLLM02TensionType(str, Enum):
+    """CORR-074 propagation: tension_type values for P1CLLM02PositiveEvent.
+
+    Canonical taxonomy (mirrors Regulatory Baseline event_templates.yaml):
+      - TEMPORAL_CONFLICT: notification timelines differ across regs
+      - REQUIREMENT_CONFLICT: obligation content conflicts across regs
+      - FREQUENCY_MISMATCH: periodic-vs-event-driven reporting mismatch
+      - TRIGGER_MISMATCH: trigger event definitions differ across regs
+      - INTENSITY_GAP: rigour level of obligations differs across regs
+    """
+
+    TEMPORAL_CONFLICT = "TEMPORAL_CONFLICT"
+    REQUIREMENT_CONFLICT = "REQUIREMENT_CONFLICT"
+    FREQUENCY_MISMATCH = "FREQUENCY_MISMATCH"
+    TRIGGER_MISMATCH = "TRIGGER_MISMATCH"
+    INTENSITY_GAP = "INTENSITY_GAP"
+
+
+class P1CLLM02Severity(str, Enum):
+    """CORR-074 propagation: severity values for P1CLLM02PositiveEvent."""
+
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class P1CLLM02PositiveEvent(BaseModel):
+    """One confirmed compound event (parsed from `### EVT-NN` block).
+
+    CORR-074 propagation: cross-domain compound event (≥2 sub_domains from
+    ≥2 different domains; ≥2 regulations_triggered). Resolution design
+    deliberately excluded — Phase 2B territory.
+    """
+
+    event_id: str
+    description: str
+    sub_domains: list[str] = Field(default_factory=list, min_length=2)
+    regulations_triggered: list[str] = Field(default_factory=list, min_length=2)
+    tension_type: P1CLLM02TensionType
+    severity: P1CLLM02Severity
+    layer0_refs: list[str] = Field(default_factory=list)
+
+
+class P1CLLM02NegativeEvent(BaseModel):
+    """One apparent-but-not-actually-compound event (parsed from `### NEG-NN`).
+
+    CORR-074 propagation: calibration entry. The LLM surfaced something
+    that looked like a compound event but failed one of the 3 criteria
+    (single factual event / 2+ reg triggers / incompatible obligations).
+    """
+
+    scenario: str
+    regulations_checked: list[str] = Field(default_factory=list)
+    why_not_compound: str
+
+
+class P1CLLM02Output(BaseModel):
+    """Parsed + validated output of P1C-LLM-02-COMPOUND-EVENT.
+
+    CORR-074 propagation: envelope fields (prompt_spec_id, schema_version,
+    case_id, invocation_pattern) are injected by the invoker post-parse —
+    the LLM never emits them. Pydantic replaces JSON Schema as the
+    single source of truth for validation (mirrors CORR-050 P1B-LLM-01
+    pattern).
+
+    `status` / `confidence` are reused from P1BLLM01Status / P1BLLM01Confidence
+    (canonical top-level enum: OK / INSUFFICIENT_EVIDENCE / INDETERMINATE,
+    HIGH / MEDIUM / LOW) — no new enums needed.
+    """
+
+    # Envelope (invoker-injected; LLM never emits)
+    prompt_spec_id: str = "P1C-LLM-02-COMPOUND-EVENT"
+    schema_version: str = "1.0.0"
+    case_id: str = ""
+    invocation_pattern: str = "global_reduce"
+
+    # Content (LLM-emitted, parser-extracted from markdown)
+    status: P1BLLM01Status
+    confidence: P1BLLM01Confidence
+    positive_events: list[P1CLLM02PositiveEvent] = Field(default_factory=list)
+    negative_events: list[P1CLLM02NegativeEvent] = Field(default_factory=list)
+    notes: str = ""
+
+    model_config = {"extra": "ignore"}
+
+
+# =============================================================================
+# CORR-074 propagation: P1C-LLM-01-OVERLAP-CLASSIFICATION output models
+# (markdown+regex parsing — mirrors the CORR-050 / CORR-074 P1B-LLM-01 pattern).
+#
+# Replaces the JSON Schema in output_schemas.yaml as the source of truth
+# for this spec. Envelope fields (prompt_spec_id, schema_version, case_id,
+# invocation_pattern) are injected by the invoker post-parse — the LLM
+# never emits them. Pydantic replaces JSON Schema as the only validator.
+# =============================================================================
+
+
+class P1CLLM01CompanyScopeVerdict(str, Enum):
+    """CORR-074 propagation: company_scope_verdict values for P1CLLM01Pair.
+
+    Canonical taxonomy for the company-side overlap verdict
+    (derived from the activation predicate evaluation):
+      - OVERLAP_CONFIRMED: predicate is met against company facts
+      - OVERLAP_NOT_TRIGGERED: predicate is not met
+      - SCOPE_DISJOINT: parties fall outside the predicate scope
+      - INDETERMINATE: predicate requires missing facts
+    """
+
+    OVERLAP_CONFIRMED = "OVERLAP_CONFIRMED"
+    OVERLAP_NOT_TRIGGERED = "OVERLAP_NOT_TRIGGERED"
+    SCOPE_DISJOINT = "SCOPE_DISJOINT"
+    INDETERMINATE = "INDETERMINATE"
+
+
+class P1CLLM01ScopeOverlap(str, Enum):
+    """CORR-074 propagation: scope_overlap values for P1CLLM01SubDomainActivation.
+
+    Canonical taxonomy for the sub-domain-level scope overlap summary:
+      - Y: at least one reg pair is OVERLAP_CONFIRMED
+      - CONDITIONAL: only CONDITIONAL pairs with INDETERMINATE verdicts
+      - N: no reg pair overlaps the company's scope
+    """
+
+    Y = "Y"
+    CONDITIONAL = "CONDITIONAL"
+    N = "N"
+
+
+class P1CLLM01Layer0Relationship(str, Enum):
+    """CORR-074 propagation: layer0_relationship values for P1CLLM01Pair.
+
+    FROZEN taxonomy propagated verbatim from the Regulatory Baseline
+    (the LLM must NOT re-classify these):
+      - SAME: pairwise relationship is identity-equivalent
+      - COMPLEMENTARY: pairwise relationship is additive
+      - CONTRADICTORY: pairwise relationship conflicts
+      - SCOPE_DISJOINT: pairwise relationship operates on different scopes
+      - CONDITIONAL: pairwise relationship requires predicate evaluation
+    """
+
+    SAME = "SAME"
+    COMPLEMENTARY = "COMPLEMENTARY"
+    CONTRADICTORY = "CONTRADICTORY"
+    SCOPE_DISJOINT = "SCOPE_DISJOINT"
+    CONDITIONAL = "CONDITIONAL"
+
+
+class P1CLLM01Pair(BaseModel):
+    """One verified pair within a sub-domain activation.
+
+    CORR-074 propagation: parsed from a `#### REG-A ↔ REG-B` nested
+    block under `### D-XX.Y`. The `layer0_relationship` is READ-ONLY
+    from the Regulatory Baseline; the parser must not normalise it.
+    """
+
+    reg_a: str
+    reg_b: str
+    layer0_relationship: P1CLLM01Layer0Relationship
+    company_scope_verdict: P1CLLM01CompanyScopeVerdict
+    rationale: str = ""
+    layer0_refs: list[str] = Field(default_factory=list)
+
+
+class P1CLLM01SubDomainActivation(BaseModel):
+    """One sub-domain's activation record (parsed from `### D-XX.Y`).
+
+    CORR-074 propagation: aggregates the body fields plus the nested
+    `#### Verified relationships` blocks (one per reg pair).
+    """
+
+    sub_domain_id: str
+    applicable: bool
+    scope_overlap: P1CLLM01ScopeOverlap
+    applicable_regulations: list[str] = Field(default_factory=list)
+    layer0_refs: list[str] = Field(default_factory=list)
+    verified_relationship_per_pair: list[P1CLLM01Pair] = Field(default_factory=list)
+
+
+class P1CLLM01DomainSummary(BaseModel):
+    """Domain-level summary (parsed from `## Domain Summary`)."""
+
+    total_sub_domains: int = 0
+    active_sub_domains: int = 0
+    pairwise_relationships: int = 0
+
+
+class P1CLLM01Output(BaseModel):
+    """Parsed + validated output of P1C-LLM-01-OVERLAP-CLASSIFICATION.
+
+    CORR-074 propagation: envelope fields (prompt_spec_id, schema_version,
+    case_id, invocation_pattern) are injected by the invoker post-parse —
+    the LLM never emits them. Pydantic replaces JSON Schema as the
+    single source of truth for validation (mirrors CORR-050 P1B-LLM-01
+    pattern).
+
+    `status` / `confidence` are reused from P1BLLM01Status /
+    P1BLLM01Confidence (canonical top-level enum: OK /
+    INSUFFICIENT_EVIDENCE / INDETERMINATE, HIGH / MEDIUM / LOW) — no
+    new enums needed.
+    """
+
+    # Envelope (invoker-injected; LLM never emits)
+    prompt_spec_id: str = "P1C-LLM-01-OVERLAP-CLASSIFICATION"
+    schema_version: str = "1.0.0"
+    case_id: str = ""
+    invocation_pattern: str = "per_domain_lane"
+
+    # Content (LLM-emitted, parser-extracted from markdown)
+    status: P1BLLM01Status
+    confidence: P1BLLM01Confidence
+    domain_summary: P1CLLM01DomainSummary = Field(default_factory=P1CLLM01DomainSummary)
+    sub_domain_activations: list[P1CLLM01SubDomainActivation] = Field(
+        default_factory=list
+    )
+    notes: str = ""
+
+    model_config = {"extra": "ignore"}
+
+
+# =============================================================================
+# CORR-074 propagation: P1C-LLM-03-STRATEGIC-SYNTHESIS output models
+# (markdown+regex parsing — mirrors the CORR-050 / CORR-074 P1B-LLM-01
+# pattern and the P1C-LLM-02 propagation shape).
+#
+# Replaces the JSON Schema in output_schemas.yaml as the source of truth
+# for this spec. Envelope fields (prompt_spec_id, schema_version, case_id,
+# invocation_pattern) are injected by the invoker post-parse — the LLM
+# never emits them. Pydantic replaces JSON Schema as the only validator.
+#
+# Cross-lane (affected_sub_domains ≥ 2) and cross-regulation
+# (regulations ≥ 2) enforcement is done at the Pydantic level via
+# min_length=2 — any implication spanning a single sub-domain or
+# a single regulation surfaces a clear ValidationError.
+# =============================================================================
+
+
+class P1CLLM03RiskLevel(str, Enum):
+    """CORR-074 propagation: risk_level values for P1CLLM03Implication.
+
+    Canonical taxonomy for the strategic implication risk-level:
+      - LOW: minimal cross-lane risk
+      - MEDIUM: moderate cross-lane risk
+      - HIGH: significant cross-lane risk requiring escalation
+    """
+
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+class P1CLLM03Implication(BaseModel):
+    """One strategic implication (parsed from a `### IMP-NN` block).
+
+    CORR-074 propagation: the LLM emits each implication as a markdown
+    subsection under `## Implications` with body fields. The parser
+    extracts the id from the heading and the structured fields from
+    the body. `confidence` is reused from P1BLLM01Confidence so the
+    per-implication confidence uses the canonical HIGH/MEDIUM/LOW
+    enum.
+
+    Cross-lane (`affected_sub_domains ≥ 2`) and cross-regulation
+    (`regulations ≥ 2`) enforcement is at the Pydantic level.
+    """
+
+    id: str
+    description: str
+    affected_sub_domains: list[str] = Field(default_factory=list, min_length=2)
+    regulations: list[str] = Field(default_factory=list, min_length=2)
+    architectural_impact: str = ""
+    business_goal_alignment: str = ""
+    risk_level: P1CLLM03RiskLevel
+    assumptions: list[str] = Field(default_factory=list)
+    layer0_refs: list[str] = Field(default_factory=list)
+    doc07b_refs: list[str] = Field(default_factory=list)
+    confidence: P1BLLM01Confidence
+
+
+class P1CLLM03Output(BaseModel):
+    """Parsed + validated output of P1C-LLM-03-STRATEGIC-SYNTHESIS.
+
+    CORR-074 propagation: envelope fields (prompt_spec_id, schema_version,
+    case_id, invocation_pattern) are injected by the invoker post-parse —
+    the LLM never emits them. Pydantic replaces JSON Schema as the
+    single source of truth for validation (mirrors the P1B-LLM-01,
+    P1B-LLM-02 and P1C-LLM-02 propagation patterns).
+
+    `status` / `confidence` are reused from P1BLLM01Status /
+    P1BLLM01Confidence (canonical top-level enum: OK /
+    INSUFFICIENT_EVIDENCE / INDETERMINATE, HIGH / MEDIUM / LOW) — no
+    new enums needed. The default empty implications list mirrors
+    the spec's "1-2 acknowledging mostly settled" edge case.
+    """
+
+    # Envelope (invoker-injected; LLM never emits)
+    prompt_spec_id: str = "P1C-LLM-03-STRATEGIC-SYNTHESIS"
+    schema_version: str = "1.0.0"
+    case_id: str = ""
+    invocation_pattern: str = "global_reduce"
+
+    # Content (LLM-emitted, parser-extracted from markdown)
+    status: P1BLLM01Status
+    confidence: P1BLLM01Confidence
+    implications: list[P1CLLM03Implication] = Field(default_factory=list)
+    notes: str = ""
+
+    model_config = {"extra": "ignore"}
+
+
 __all__ = [
     "AISystemClass",
     "CRAProductClass",
@@ -484,6 +900,27 @@ __all__ = [
     "P1BLLM01Interpretation",
     "P1BLLM01Output",
     "P1BLLM01Status",
+    "P1BLLM02CoverageLevel",
+    "P1BLLM02EffortEstimate",
+    "P1BLLM02Gap",
+    "P1BLLM02Implication",
+    "P1BLLM02Output",
+    "P1BLLM02Priority",
+    "P1CLLM01CompanyScopeVerdict",
+    "P1CLLM01DomainSummary",
+    "P1CLLM01Layer0Relationship",
+    "P1CLLM01Output",
+    "P1CLLM01Pair",
+    "P1CLLM01ScopeOverlap",
+    "P1CLLM01SubDomainActivation",
+    "P1CLLM02NegativeEvent",
+    "P1CLLM02Output",
+    "P1CLLM02PositiveEvent",
+    "P1CLLM02Severity",
+    "P1CLLM02TensionType",
+    "P1CLLM03Implication",
+    "P1CLLM03Output",
+    "P1CLLM03RiskLevel",
     "ReadinessState",
     "RegulatoryClassification",
     "RegulatoryConflictType",

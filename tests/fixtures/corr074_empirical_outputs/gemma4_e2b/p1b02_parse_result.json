@@ -1,0 +1,28 @@
+{
+  "model": "gemma4:e2b",
+  "input_version": "v2_inlined_p1b01_outputs",
+  "latency_s": 23.14,
+  "raw_len": 2788,
+  "input_tokens": 6271,
+  "output_tokens": 1484,
+  "parser_success": true,
+  "status": "OK",
+  "confidence": "LOW",
+  "rationale_len": 1129,
+  "implications_count": 2,
+  "gaps_count": 0,
+  "notes_len": 277,
+  "implications": [
+    {
+      "id": "IMP-D-02.3-1",
+      "effort": "days",
+      "description_len": 200
+    },
+    {
+      "id": "IMP-D-07.1-1",
+      "effort": "weeks_1",
+      "description_len": 230
+    }
+  ],
+  "gaps": []
+}

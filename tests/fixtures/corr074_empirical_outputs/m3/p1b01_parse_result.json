@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "status": "OK",
+  "confidence": "HIGH",
+  "interpretations": [
+    {
+      "entry_id": "TIPO2-CRA-ART14-DUAL-FLOW",
+      "applicable": "YES",
+      "rationale_len": 531,
+      "legal_refs": [
+        "CRA Art. 14(1); CRA Art. 14(2)"
+      ],
+      "layer0_refs": [
+        "SubDomains/D-02_Vulnerability-Management/D-02.3.md §2 HSO; SubDomains/D-04_Incident-Response/D-04.3.md §1 CRDA CRA"
+      ],
+      "company_fact_refs_count": 0
+    },
+    {
+      "entry_id": "TIPO2-CRA-ART15-VOLUNTARY",
+      "applicable": "YES",
+      "rationale_len": 517,
+      "legal_refs": [
+        "CRA Art. 15"
+      ],
+      "layer0_refs": [
+        "SubDomains/D-02_Vulnerability-Management/D-02.3.md §2 HSO"
+      ],
+      "company_fact_refs_count": 0
+    }
+  ],
+  "derogations": [
+    {
+      "entry_id": "TIPO3-CRA-NON-PLACED",
+      "activation_verdict": "NOT_ACTIVATED",
+      "rationale_len": 326
+    },
+    {
+      "entry_id": "TIPO3-CRA-OPEN-SOURCE",
+      "activation_verdict": "NOT_ACTIVATED",
+      "rationale_len": 344
+    }
+  ],
+  "notes_len": 614,
+  "notes_preview": "Both derogation predicates fail on factual grounds (company is commercial and proprietary, product is placed/made-available in EU), so CRA scope is preserved with full manufacturer obligations. For TI"
+}

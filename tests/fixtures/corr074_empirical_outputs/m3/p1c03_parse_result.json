@@ -1,0 +1,11 @@
+{
+  "latency_s": 23.369634891976602,
+  "input_tokens": 5086,
+  "output_tokens": 1444,
+  "raw_len": 6442,
+  "parser_success": true,
+  "status": "OK",
+  "confidence": "HIGH",
+  "implications_count": 4,
+  "notes_len": 428
+}

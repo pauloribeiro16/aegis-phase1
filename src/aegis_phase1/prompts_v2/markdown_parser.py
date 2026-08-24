@@ -1,31 +1,37 @@
-"""CORR-061 S3a: Backward-compat re-export shim for ``MarkdownParser``.
+"""Re-export shim for the markdown parsers (CORR-050 / CORR-053 / CORR-061 / CORR-074).
 
-The canonical implementation was archived to
-``aegis_phase1._archive.corr061.markdown_parser`` in S0 (alongside
-``robust_parser.py`` and ``validator.py``) as part of the
-markdown-only Phase 1 contract. The active code path will consume
-raw markdown directly (S3b) and skip the JSON-wrapper parsing
-dance this module was designed for.
+The full implementation lives in ``aegis_phase1._archive.corr061.markdown_parser``
+(archived during the markdown-only Phase 1 contract). This module exposes the
+public surface — ``MARKDOWN_PARSERS``, ``MarkdownParser``, ``GenericMarkdownParser``,
+and the per-spec parsers ``P1BLLM01Parser`` / ``P1BLLM02Parser`` /
+``P1CLLM01Parser`` / ``P1CLLM02Parser`` / ``P1CLLM03Parser`` — so callers can
+import from the canonical ``prompts_v2.markdown_parser`` path.
 
-This shim preserves the legacy import path
-``aegis_phase1.prompts_v2.markdown_parser`` so that:
-
-  - existing test modules (``tests/unit/prompts_v2/test_markdown_parser_corr050.py``,
-    ``test_markdown_parser_corr053.py``) can collect without changes to
-    their import statements;
-  - the invoker's lazy imports of ``MARKDOWN_PARSERS`` at runtime still
-    resolve to a valid submodule (defense-in-depth — those imports are
-    inside methods, so they don't fail collection, but they would still
-    fail at runtime if called).
+CORR-074 propagated the markdown + tolerant regex parser pattern to all five
+Phase 1 prompt specs (P1B-LLM-01/02, P1C-LLM-01/02/03). New code should import
+the per-spec parsers from here, not from the archived submodule.
 
 No new logic lives here — this file is a pure re-export.
 """
 
-from aegis_phase1._archive.corr061.markdown_parser import (  # noqa: F401
+from aegis_phase1._archive.corr061.markdown_parser import (
     MARKDOWN_PARSERS,
     GenericMarkdownParser,
     MarkdownParser,
     P1BLLM01Parser,
+    P1BLLM02Parser,
+    P1CLLM01Parser,
+    P1CLLM02Parser,
+    P1CLLM03Parser,
 )
 
-__all__ = ["MARKDOWN_PARSERS", "GenericMarkdownParser", "MarkdownParser", "P1BLLM01Parser"]
+__all__ = [
+    "MARKDOWN_PARSERS",
+    "GenericMarkdownParser",
+    "MarkdownParser",
+    "P1BLLM01Parser",
+    "P1BLLM02Parser",
+    "P1CLLM01Parser",
+    "P1CLLM02Parser",
+    "P1CLLM03Parser",
+]

@@ -1,0 +1,34 @@
+{
+  "model": "gemma4:e4b",
+  "input_version": "v2_inlined_catalog",
+  "latency_s": 88.53,
+  "raw_len": 2660,
+  "input_tokens": 5873,
+  "output_tokens": 1853,
+  "parser_success": true,
+  "status": "OK",
+  "confidence": "HIGH",
+  "interpretations_count": 2,
+  "derogations_count": 2,
+  "notes_len": 401,
+  "interp_entries": [
+    {
+      "entry_id": "TIPO2-CRA-ART14-DUAL-FLOW",
+      "applicable": "YES"
+    },
+    {
+      "entry_id": "TIPO2-CRA-ART15-VOLUNTARY",
+      "applicable": "YES"
+    }
+  ],
+  "derog_entries": [
+    {
+      "entry_id": "TIPO3-CRA-NON-PLACED",
+      "verdict": "INDETERMINATE"
+    },
+    {
+      "entry_id": "TIPO3-CRA-OPEN-SOURCE",
+      "verdict": "INDETERMINATE"
+    }
+  ]
+}

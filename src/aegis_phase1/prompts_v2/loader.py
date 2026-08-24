@@ -171,11 +171,26 @@ class PromptLoader:
         import json
         inputs_json = json.dumps(inputs, indent=2, default=str, ensure_ascii=False)
         system = loaded["system"]
+        body = loaded.get("body", "")
+        # CORR-074: if the spec declares a "## Output Format (mandatory)"
+        # section, instruct the LLM to follow that markdown contract instead
+        # of the legacy JSON Schema. Without this, models like gemma4:e4b
+        # revert to JSON because the loader's hardcoded `# TASK` references
+        # `output_schemas.yaml` regardless of the spec body.
+        if "## Output Format (mandatory)" in body or "## Output Format" in body:
+            task_tail = (
+                f"Return output as **markdown** following the `## Output Format (mandatory)` "
+                f"section in the system prompt. Do NOT wrap output in ```json``` or any code fence."
+            )
+        else:
+            task_tail = (
+                f"Return output matching the JSON Schema in "
+                f"`output_schemas.yaml#{spec_id}`."
+            )
         user = (
             f"# INPUTS for {spec_id}\n\n"
             f"```json\n{inputs_json}\n```\n\n"
-            f"# TASK\n\nExecute the task defined in the system prompt. "
-            f"Return output matching the JSON Schema in `output_schemas.yaml#{spec_id}`."
+            f"# TASK\n\nExecute the task defined in the system prompt. {task_tail}"
         )
         return {"system": system, "user": user}
 

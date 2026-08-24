@@ -1,0 +1,12 @@
+{
+  "latency_s": 5.415473916102201,
+  "input_tokens": 37,
+  "output_tokens": 655,
+  "raw_len": 3200,
+  "parser_success": true,
+  "status": "INSUFFICIENT_EVIDENCE",
+  "confidence": "MEDIUM",
+  "positive_events_count": 0,
+  "negative_events_count": 2,
+  "notes_len": 1304
+}

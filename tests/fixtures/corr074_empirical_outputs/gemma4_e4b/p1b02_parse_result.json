@@ -1,0 +1,17 @@
+{
+  "model": "gemma4:e4b",
+  "input_version": "v2_inlined_p1b01_outputs",
+  "latency_s": 91.53,
+  "raw_len": 3274,
+  "input_tokens": 6271,
+  "output_tokens": 1900,
+  "parser_success": true,
+  "status": "OK",
+  "confidence": "HIGH",
+  "rationale_len": 2529,
+  "implications_count": 0,
+  "gaps_count": 0,
+  "notes_len": 447,
+  "implications": [],
+  "gaps": []
+}

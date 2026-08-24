@@ -1,0 +1,16 @@
+{
+  "latency_s": 6.6552765120286494,
+  "input_tokens": 4882,
+  "output_tokens": 680,
+  "raw_len": 2635,
+  "parser_success": true,
+  "status": "OK",
+  "confidence": "HIGH",
+  "domain_summary": {
+    "total": 2,
+    "active": 2,
+    "pairwise": 1
+  },
+  "activations_count": 2,
+  "notes_len": 766
+}
