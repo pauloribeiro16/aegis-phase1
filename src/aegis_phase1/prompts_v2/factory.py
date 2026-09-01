@@ -160,7 +160,6 @@ def get_invoker(
     from aegis_phase1.llm.tracing import get_langfuse_callback
     from aegis_phase1.llm.unified import UnifiedInvoker
     from aegis_phase1.prompts_v2.catalog import CatalogLoader
-    from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
     from aegis_phase1.prompts_v2.loader import PromptLoader
     from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 
@@ -188,6 +187,34 @@ def get_invoker(
         # honour explicit overrides only
         model = model or M3_DEFAULT_MODEL
         base_url = base_url
+    elif provider == "transformers":
+        # CORR-106: transformers path is HF, not Ollama — there is no
+        # Ollama server. Skip the Ollama env vars and let the
+        # TransformersInvoker / TransformersChat shim handle the model.
+        from aegis_phase1.llm.transformers_invoker import TransformersInvoker
+
+        if not model:
+            raise ValueError(
+                "get_invoker(provider='transformers') requires an explicit "
+                "`model` kwarg (HF model id or 'hf:<id>'). The Ollama "
+                "defaults do not apply to the HF path."
+            )
+        # Honour the env var override for max_new_tokens (qwen3.8
+        # produced 122 599-token outputs; the TransformersInvoker default
+        # of 1024 would truncate every rationale).
+        max_new_tokens_env = os.getenv("AEGIS_MAX_NEW_TOKENS")
+        if max_new_tokens_env and max_new_tokens_env.strip().isdigit():
+            transformers_invoker = TransformersInvoker(
+                model_id=model,
+                max_new_tokens=int(max_new_tokens_env),
+            )
+        else:
+            transformers_invoker = TransformersInvoker(model_id=model)
+        logger.info(
+            "get_invoker(provider='transformers'): TransformersInvoker(model_id=%s)",
+            model,
+        )
+        return transformers_invoker
     else:
         model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
         base_url = base_url or os.getenv(

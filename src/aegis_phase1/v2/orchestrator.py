@@ -1246,12 +1246,32 @@ class Phase1Orchestrator:
             model_source = "llm_invoker"
 
         try:
+            provider = getattr(self.llm_invoker, "provider", "ollama")
+
+            # CORR-106: the transformers path is Phase 1B-only today —
+            # the REDUCE-LLM (P1C-02/03) needs a Phase1Executor which
+            # in turn needs an invoker with .prompts / .catalogs / etc.
+            # TransformersInvoker doesn't expose those, and the parser
+            # shape failure we documented in CORR-105 means REDUCE has
+            # nothing to reduce anyway (aggregated_activations is empty
+            # until the parser-side fix lands). Skip REDUCE on the
+            # transformers path to avoid the `'TransformersInvoker'
+            # object has no attribute 'invoke'` traceback surfaced by
+            # JOB 1866640 (2026-09-01).
+            if provider == "transformers":
+                logger.info(
+                    "REDUCE-LLM skipped: transformers path is Phase 1B-only "
+                    "(no Phase1Executor for HF models yet); "
+                    "P1C-02/03 cascade by design (see CORR-105 + CORR-106)."
+                )
+                return None
+
             from aegis_phase1.prompts_v2.factory import get_invoker
             from aegis_phase1.prompts_v2.phase1_executor import invoker_to_executor
 
             p1_invoker = get_invoker(
                 model=configured_model,
-                provider=getattr(self.llm_invoker, "provider", "ollama"),
+                provider=provider,
             )
             executor = invoker_to_executor(p1_invoker)
             self._phase1_executor_cached = executor

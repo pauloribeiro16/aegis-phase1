@@ -217,3 +217,42 @@ def test_aegis_max_new_tokens_default_when_no_env(monkeypatch):
     monkeypatch.delenv("AEGIS_MAX_NEW_TOKENS", raising=False)
     inv = TransformersInvoker(model_id="fake/model")
     assert inv.max_new_tokens == TransformersInvoker.DEFAULT_MAX_NEW_TOKENS
+
+
+# ────────────────────────────────────────────────────────────────────
+# 6. factory.get_invoker(provider="transformers") — CORR-106 follow-up
+# ────────────────────────────────────────────────────────────────────
+
+
+def test_factory_transformers_returns_transformers_invoker(monkeypatch):
+    """The factory used to ignore provider='transformers' and always
+    return a UnifiedInvoker with ChatOllama — this caused the
+    'TransformersInvoker has no attribute invoke' traceback when the
+    orchestrator tried to wrap it via invoker_to_executor (JOB 1866640).
+
+    Post-fix: factory returns a TransformersInvoker directly. The
+    orchestrator short-circuits the REDUCE-LLM wrapping for the
+    transformers path (see test_orchestrator_skip_reduce_for_transformers).
+    """
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+
+    from aegis_phase1.prompts_v2.factory import get_invoker
+
+    inv = get_invoker(model="fake/model", provider="transformers")
+    assert isinstance(inv, TransformersInvoker)
+    assert inv.provider == "transformers"
+    assert inv.model_id == "fake/model"
+
+
+def test_factory_transformers_requires_explicit_model(monkeypatch):
+    """Without an explicit model kwarg, factory raises (Ollama defaults
+    do not apply to HF path)."""
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+
+    from aegis_phase1.prompts_v2.factory import get_invoker
+
+    with pytest.raises(ValueError, match="explicit `model` kwarg"):
+        get_invoker(provider="transformers")
