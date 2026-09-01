@@ -188,33 +188,15 @@ def get_invoker(
         model = model or M3_DEFAULT_MODEL
         base_url = base_url
     elif provider == "transformers":
-        # CORR-106: transformers path is HF, not Ollama — there is no
-        # Ollama server. Skip the Ollama env vars and let the
-        # TransformersInvoker / TransformersChat shim handle the model.
-        from aegis_phase1.llm.transformers_invoker import TransformersInvoker
-
+        # CORR-106: transformers path is HF, not Ollama. There is no
+        # Ollama default model — require an explicit HF model id.
         if not model:
             raise ValueError(
                 "get_invoker(provider='transformers') requires an explicit "
                 "`model` kwarg (HF model id or 'hf:<id>'). The Ollama "
                 "defaults do not apply to the HF path."
             )
-        # Honour the env var override for max_new_tokens (qwen3.8
-        # produced 122 599-token outputs; the TransformersInvoker default
-        # of 1024 would truncate every rationale).
-        max_new_tokens_env = os.getenv("AEGIS_MAX_NEW_TOKENS")
-        if max_new_tokens_env and max_new_tokens_env.strip().isdigit():
-            transformers_invoker = TransformersInvoker(
-                model_id=model,
-                max_new_tokens=int(max_new_tokens_env),
-            )
-        else:
-            transformers_invoker = TransformersInvoker(model_id=model)
-        logger.info(
-            "get_invoker(provider='transformers'): TransformersInvoker(model_id=%s)",
-            model,
-        )
-        return transformers_invoker
+        base_url = ""  # not used by the transformers path
     else:
         model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
         base_url = base_url or os.getenv(
@@ -228,6 +210,29 @@ def get_invoker(
     format_logger = JSONLLogger(logs / "format-errors.jsonl")
 
     _langfuse_client, _langfuse_handler = get_langfuse_callback()
+
+    if provider == "transformers":
+        # CORR-106: must build a full Phase1LLMInvoker with loaders so
+        # invoker_to_executor() works (it needs .prompts / .catalogs /
+        # .validator). Returning a bare TransformersInvoker surfaced as
+        # the JOB 1867060 "missing required dependencies" traceback.
+        from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
+
+        phase1_invoker = Phase1LLMInvoker(
+            prompt_loader=prompt_loader,
+            catalog_loader=catalog_loader,
+            validator=validator,
+            llm_logger=llm_logger,
+            format_logger=format_logger,
+            model=model,
+            langfuse_handler=_langfuse_handler,
+            provider="transformers",
+        )
+        logger.info(
+            "get_invoker(provider='transformers'): Phase1LLMInvoker(model=%s, transformers backend)",
+            model,
+        )
+        return phase1_invoker
 
     invoker = UnifiedInvoker(
         prompt_loader=prompt_loader,

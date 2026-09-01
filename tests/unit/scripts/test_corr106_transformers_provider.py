@@ -224,15 +224,17 @@ def test_aegis_max_new_tokens_default_when_no_env(monkeypatch):
 # ────────────────────────────────────────────────────────────────────
 
 
-def test_factory_transformers_returns_transformers_invoker(monkeypatch):
-    """The factory used to ignore provider='transformers' and always
-    return a UnifiedInvoker with ChatOllama — this caused the
-    'TransformersInvoker has no attribute invoke' traceback when the
-    orchestrator tried to wrap it via invoker_to_executor (JOB 1866640).
+def test_factory_transformers_returns_phase1_invoker(monkeypatch):
+    """Post-CORR-106 (JOB 1867060 fix): factory must return a full
+    Phase1LLMInvoker with loaders, not a bare TransformersInvoker.
+    The previous version returned a bare TransformersInvoker, which
+    made invoker_to_executor() fail with 'Invoker is missing required
+    dependencies: [prompt_loader, catalog_loader, validator,
+    llm_logger, format_logger]'.
 
-    Post-fix: factory returns a TransformersInvoker directly. The
-    orchestrator short-circuits the REDUCE-LLM wrapping for the
-    transformers path (see test_orchestrator_skip_reduce_for_transformers).
+    Verification: the returned object has the loaders AND a
+    transformers provider; its heavy-path (Phase1LLMInvoker.invoke_spec)
+    then routes through TransformersChat.
     """
     monkeypatch.setenv("HF_HUB_OFFLINE", "1")
     monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
@@ -240,9 +242,13 @@ def test_factory_transformers_returns_transformers_invoker(monkeypatch):
     from aegis_phase1.prompts_v2.factory import get_invoker
 
     inv = get_invoker(model="fake/model", provider="transformers")
-    assert isinstance(inv, TransformersInvoker)
+    # Must have the loaders that invoker_to_executor() needs.
+    for attr in ("prompts", "catalogs", "validator", "llm_logger", "format_logger"):
+        assert getattr(inv, attr, None) is not None, (
+            f"factory transformers result missing required loader: {attr}"
+        )
     assert inv.provider == "transformers"
-    assert inv.model_id == "fake/model"
+    assert inv.model == "fake/model"
 
 
 def test_factory_transformers_requires_explicit_model(monkeypatch):
