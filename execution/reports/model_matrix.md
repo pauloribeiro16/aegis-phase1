@@ -102,11 +102,19 @@ grounding .25, coverage .20, precision .15, specificity .10.
 | Criterion | qwen3.5 (JOB 1847659) | qwen3.8 | M3 gold |
 |---|---|---|---|
 | Template (.30) | **1** — emitted `## Pair classifications` with `- D-XX.Y : REG ↔ REG (VERDICT): …` bullets; completely different shape from the contract; parser extracted 0 activations. | PENDING | 5 |
-| Grounding (.25) | **3** — pair verdicts came with evaluated predicates (substantive content per scout report §2.7) but unverifiable at scale because nothing was extracted. | PENDING | 5 |
+| Grounding (.25) | **4** — pair verdicts came with evaluated predicates (substantive content per scout report §2.7) but unverifiable at scale because nothing was extracted. | PENDING | 5 |
 | Coverage (.20) | **1** — 0 of 38 sub-domains with an activation; REDUCE had nothing. | PENDING | 5 |
 | Precision (.15) | **3** — verdicts plausible but unvalidated (nothing reached validation). | PENDING | 5 |
 | Specificity (.10) | **3** — 27–53k tok/lane spent; unusable density without structure. | PENDING | 5 |
 | **Weighted total** | **2.0 / 5 → FAIL (blocks REDUCE)** | **PENDING** | 5 |
+
+**F2 update (2026-09-01, post-counter fix):** the markdown-shape
+counter now reveals that qwen3.5 **did** emit `- applicable: YES`
+in 10 of 10 lanes (`Activations YES = 10, total = 10`). The field is
+there; the parser is what cannot extract it because the surrounding
+shape is `## Pair classifications`. Coverage 1 stays — the parser still
+gets 0 — but Grounding rises from 3 to **4** (the model emitted the
+right predicate result, just in the wrong section). Total 2.0 → **2.2 / 5**.
 
 **Evidence anchors:** scout report §2.7 (root cause + raw shape);
 run log JOB 1847659 line `MAP complete … statuses={'OK': 10}` followed by
@@ -183,7 +191,12 @@ zero = sinal de alarme). qwen3.8 scout: só Fase 1B, não aplicável.
 
 ## Changelog
 
-- 2026-09-01 — rubric v1 locked; matrix rewritten in verbose
+- 2026-09-01 (16:00) — rubric v1 locked; matrix rewritten in verbose
   per-criterion format; qwen3.5 runall + qwen3.8 scout scored (judge =
   GLM-5.3-Flash via ZCode, commit `a710efd…` branch
   `feature/aegis-p1-corr-105-eval-framework`). JOB 1862843 pending.
+- 2026-09-01 (16:30) — F2 fix: markdown-shape activation counter (regex)
+  reveals qwen3.5 emits `- applicable: YES` in 10/10 lanes (was hidden
+  by dict-only counter). P1C-01 Grounding 3 → 4; weighted 2.0 → 2.2.
+  Critical insight: failure is parser/template mismatch, not zero
+  emissions. Commits `2e36a30` (docs v1) and `0f2d64a` (F2 fix).
