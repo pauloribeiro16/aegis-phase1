@@ -256,3 +256,48 @@ def test_factory_transformers_requires_explicit_model(monkeypatch):
 
     with pytest.raises(ValueError, match="explicit `model` kwarg"):
         get_invoker(provider="transformers")
+
+
+def test_orchestrator_phase1b_executor_supports_transformers(monkeypatch):
+    """CORR-106 follow-up: when ``for_phase_1b=True`` the orchestrator
+    must NOT short-circuit the transformers provider. Pre-fix, the
+    transformers short-circuit ran unconditionally, so ``run_phase_1b``
+    saw ``Phase 1B RATIONALE skipped`` (JOB 1866845 symptom).
+
+    We assert this by patching the factory to return a real
+    Phase1LLMInvoker and verifying the executor is built (not None).
+    """
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    monkeypatch.setenv("TRANSFORMERS_OFFLINE", "1")
+
+    from aegis_phase1.llm.transformers_invoker import TransformersInvoker
+    from aegis_phase1.prompts_v2.phase1_executor import Phase1Executor
+    from aegis_phase1.v2.orchestrator import Phase1Orchestrator
+
+    orch = Phase1Orchestrator(
+        llm_invoker=TransformersInvoker(model_id="fake/model"),
+    )
+    # Sanity: without for_phase_1b, transformers short-circuits (None).
+    assert orch._get_phase1_executor() is None
+
+    # Patch the factory to return a stub invoker and the
+    # invoker_to_executor helper to return a sentinel executor. The
+    # point is to confirm the orchestrator's transformers guard is
+    # bypassed when for_phase_1b=True.
+    from aegis_phase1.prompts_v2 import factory as factory_mod
+    from aegis_phase1.prompts_v2 import phase1_executor as exec_mod
+
+    sentinel_executor = Phase1Executor.__new__(Phase1Executor)
+    sentinel_executor.invoker = None  # not used; we only assert identity
+
+    class _StubInv:
+        pass
+
+    monkeypatch.setattr(factory_mod, "get_invoker", lambda **kw: _StubInv())
+    monkeypatch.setattr(exec_mod, "invoker_to_executor", lambda inv: sentinel_executor)
+
+    result = orch._get_phase1_executor(for_phase_1b=True)
+    assert result is sentinel_executor, (
+        f"for_phase_1b=True should NOT short-circuit on transformers; "
+        f"got {result!r} (None = the guard fired, sentinel = path executed)"
+    )
