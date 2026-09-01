@@ -47,6 +47,61 @@ Each cell produces a value: `PASS / WARN / FAIL / N/A` for L1/L2/L4;
 
 ---
 
+## 2b. Rubric v1 — per-criterion scoring (LOCKED 2026-09-01, grill)
+
+Every L3 score is broken into **5 criteria, each scored 1–5 with its own
+justification and evidence quote**. The per-spec total is the weighted
+sum. Weights are **fixed** and only change with a rubric version bump.
+
+### Weights — P1B specs (P1B-LLM-01, P1B-LLM-02)
+
+| Criterion | Weight | What the judge asks |
+|---|---|---|
+| Grounding | 0.30 | Is every claim anchored in a real company fact (DOC04:*) or catalogue entry, and is the fact quoted? |
+| Regulatory precision | 0.25 | Are articles/annex references correct (checked against preproc)? Are verdicts (YES/NO/NOT_ACTIVATED) the right call given the predicate? |
+| Actionability | 0.20 | Do outputs carry effort estimates, dependencies, priorities — can a DPO/CISO act on them? |
+| Template compliance | 0.15 | Does the model follow the CORR-074 markdown contract natively (sections, field names), without needing tolerant parsing? |
+| Specificity (anti-verbosity) | 0.10 | Facts per 100 chars. Explicitly penalises padding — length never earns points. |
+
+### Weights — P1C specs (P1C-LLM-01/02/03)
+
+| Criterion | Weight | What the judge asks |
+|---|---|---|
+| Template compliance | 0.30 | Does the output use `## Sub-domain Activations` + `### D-XX.Y` (or the spec's contract shape)? **Weighted highest — format, not intelligence, is the observed bottleneck.** |
+| Grounding | 0.25 | Are activation verdicts tied to evaluated predicates and catalogue IDs? |
+| Coverage | 0.20 | How many required sub-domains/pairs got a verdict (extracted, not just emitted)? |
+| Regulatory precision | 0.15 | Same as P1B. |
+| Specificity (anti-verbosity) | 0.10 | Same as P1B. |
+
+### Judge protocol (LOCKED)
+
+1. **Rubric vs gold**: each output is scored 1–5 per criterion against
+   the M3 gold (gold = 5 by construction).
+2. **Pairwise tie-break only**: if two models end within ≤0.5 on the
+   same spec, a blind pairwise comparison runs **with both position
+   orders**, and the average decides. No pairwise otherwise (cost
+   control).
+3. **L2 faithfulness sample**: per spec, the judge verifies ~5 refs on
+   the decision-bearing items (GAPs/IMPs/activations): does the cited
+   source actually support the claim? Output per check: SUPPORTED /
+   NOT_SUPPORTED / NO EVIDENCE, with quote.
+4. **Spot-check flags**: the judge marks the **2–3 lowest-confidence
+   verdicts** of each run; the user reviews only those (~10 min/run).
+5. **Language**: report bodies in English (repo policy) + a **PT TL;DR
+   (3–4 lines) at the top of each spec section** in the matrix.
+
+### Digest & matrix rules (LOCKED)
+
+- Every score cell must carry **what** is evaluated, **how** it was
+  measured, the **measured numbers**, and the **why** (justification +
+  evidence quote with location). A bare PASS/FAIL without these blocks
+  is not an acceptable cell.
+- `model_matrix.md` shows the **current state only**; score transitions
+  go to a **Changelog** section at the bottom (`P1C-01 qwen3.8: n/a →
+  4/5 after JOB 1862843`). Full history lives in git.
+
+---
+
 ## 3. Anti-bias rules
 
 | Bias | Risk in AEGIS | Mitigation |
