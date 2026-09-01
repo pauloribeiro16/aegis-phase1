@@ -166,17 +166,26 @@ qwen3.8 ganhou **5 gaps ranqueados com remediações concretas**
 
 ## Cross-model summary
 
-| | M3 gold | qwen3.5 (runall) | qwen3.8 (runall) |
-|---|---|---|---|
-| P1B-01 | 5 | 3.5 | 4.7 |
-| P1B-02 | 5 | 3.3 | 4.9 |
-| P1C-01 | 5 | 2.2 (parser FAIL) | 2.2 (parser FAIL — same root cause) |
-| P1C-02/03 | 5 | n/a cascade | n/a cascade |
-| Full pipeline | **YES** | **NO** (parser blocker) | **NO** (parser blocker, same) |
+| | M3 gold | qwen3.5 (runall) | qwen3.8 (runall) | ornith:9b (scout) |
+|---|---|---|---|---|
+| P1B-01 | 5 | 3.5 | 4.7 | 4.4 |
+| P1B-02 | 5 | 3.3 | 4.9 | 4.1 |
+| P1C-01 | 5 | 2.2 (parser FAIL) | 2.2 (parser FAIL — same root cause) | not run (scout) |
+| P1C-02/03 | 5 | n/a cascade | n/a cascade | not run |
+| P1B LLM time | — | 17.5 min | 12.6 min | **4.2 min** |
+| Full pipeline | **YES** | **NO** (parser blocker) | **NO** (parser blocker, same) | pending run-all |
+
+**Pending (queued on Deucalion, chain 1867429→30→31, 60 min each,
+normal-a100-80; cluster queue backlog ≈2 days at submission):**
+granite4.2:30b, nemotron-3.5-lightning:30b, muse-glimmer:30b.
 
 **Comparative verdict:**
 - **P1B**: qwen3.8 wins clearly (+1.2 / +1.6 vs qwen3.5); 52% faster.
-- **P1C-01**: **identical score (2.2)** — not a model issue; parser is the gate.
+- **ornith:9b**: near-qwen3.8 P1B quality (4.4/4.1) at **3× the speed and
+  1/3 the blob size** — best quality-per-second measured. Placeholders in
+  fact-refs (`DOC04:SEC-NN`) and one doubtful Art. 36 citation are the
+  deltas; see its digest spot-checks.
+- **P1C-01**: qwen3.5 and qwen3.8 identical (2.2) — not a model issue; parser is the gate.
 - **P1C-02/03**: cascade, not measured.
 - **Pipeline**: both blocked by the same architecture issue.
 
@@ -191,6 +200,10 @@ qwen3.8 ganhou **5 gaps ranqueados com remediações concretas**
    of two runs / two models. Would be disproven only if a future contract
    defines a parser that accepts the `## Pair classifications` shape
    (currently out of scope for CORR-105).
+4. **ornith:9b "DOC04:SEC-NN" placeholder fact-refs** and **"Art. 36 =
+   technical documentation"** citation (conflicts with qwen3.8's
+   Art. 13 + Annex VII) — see its digest; if confirmed, P1B-02 drops
+   4.1 → ~3.8.
 
 ---
 
@@ -213,3 +226,11 @@ qwen3.8 ganhou **5 gaps ranqueados com remediações concretas**
   the parser, not the model family, is the gate for non-M3 runs.**
   Comparator added to matrix; qwen3.5 L4 maturity variance now
   confirmed scorer issue (qwen3.8 also flat). Commits pending.
+- 2026-09-01 (18:45) — ornith:9b scout (JOB 1867097) judged: P1B-01
+  4.4, P1B-02 4.1 at 4.2 min LLM time (3× faster than qwen3.8, 1/3 blob).
+  Added to cross-model summary; spot-check items 4 (SEC-NN placeholders,
+  Art. 36 citation). Benchmark chain for granite4.2/nemotron-3.5/
+  muse-glimmer (30B, 60 min each) queued on normal-a100-80
+  (1867429→30→31); cluster backlog ≈2 days at submission.
+  Ollama on cluster upgraded in place: $BD/bin now 0.32.13
+  (0.31.1 kept as ollama-0.31.1.bak).
