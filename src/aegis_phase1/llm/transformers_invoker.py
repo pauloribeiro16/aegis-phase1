@@ -112,6 +112,13 @@ class TransformersInvoker:
     DEFAULT_DEVICE_MAP = "auto"
     DEFAULT_DTYPE = "auto"
 
+    # CORR-106: explicit provider tag. The v2 orchestrator discovers the
+    # provider of ``self.llm_invoker`` via ``getattr(invoker, "provider",
+    # "ollama")`` — without this attribute, ``--provider transformers``
+    # silently fell back to the Ollama path downstream (JOB 1846584
+    # failure mode).
+    provider = "transformers"
+
     def __init__(
         self,
         model_id: str,
@@ -399,8 +406,75 @@ class TransformersInvoker:
         return {"raw": raw, "status": "OK", "usage": usage}
 
 
+class TransformersChat:
+    """LangChain-compatible shim that wraps a :class:`TransformersInvoker`.
+
+    CORR-106: lets ``Phase1LLMInvoker`` (which instantiates
+    ``ChatOllama`` or ``ChatMinimax`` and calls ``.invoke(messages, ...)``)
+    work with HF transformers — without rewriting the heavy invoker.
+
+    The shim exposes the minimal interface the pipeline uses:
+      - ``.invoke([SystemMessage(...), HumanMessage(...)]) -> AIMessage``
+      - ``.model`` (str) — used by logs
+      - ``.base_url`` (str, synthetic) — for log compatibility
+
+    Args:
+        invoker: The owning :class:`TransformersInvoker` (model already
+            loaded or lazy-loaded on first call).
+    """
+
+    def __init__(self, invoker: "TransformersInvoker") -> None:
+        self._invoker = invoker
+        self.model = invoker.model_id
+        self.base_url = f"hf://{invoker.model_id}"
+
+    def invoke(
+        self,
+        messages: list[Any],
+        config: dict[str, Any] | None = None,
+    ) -> Any:
+        # Concatenate system + user into one prompt (transformers is
+        # text-only; LangChain's role separation happens at chat-template
+        # time inside the invoker). Order: system first, then user.
+        system_text = ""
+        user_text = ""
+        for m in messages:
+            content = getattr(m, "content", str(m))
+            # Cheap role detection — LangChain messages expose ``type``
+            # ("system" / "human" / "ai"); legacy msgs use class names.
+            role = getattr(m, "type", "") or type(m).__name__.lower()
+            if "system" in role:
+                system_text = content
+            else:
+                user_text = (user_text + "\n\n" + content).strip() if user_text else content
+
+        # If the invoker was built without a system role, fall back to
+        # the legacy user-only path. Otherwise the system message is
+        # routed via apply_chat_template in the invoker.
+        result = self._invoker.invoke(
+            user_text,
+            feedback="",
+            system_prompt=system_text or None,
+        )
+        raw = result.get("raw", "")
+        # Lazy import — langchain_core may not be installed in test envs.
+        try:
+            from langchain_core.messages import AIMessage
+
+            return AIMessage(content=raw)
+        except Exception:
+            # Fallback duck-typed object with `.content` (matches what
+            # Phase1LLMInvoker reads via ``response.content``).
+            class _Shim:
+                def __init__(self, content: str) -> None:
+                    self.content = content
+
+            return _Shim(raw)
+
+
 __all__ = [
     "TransformersInvoker",
+    "TransformersChat",
     "_strip_hf_prefix",
     "_detect_provider",
 ]

@@ -485,7 +485,11 @@ class UnifiedInvoker:
         # equivalent — skip the probe. The first real call will surface
         # any network / auth / model errors as HTTPStatusError, which
         # invoke_raw / invoke_spec already handle.
-        if self.provider == "minimax":
+        # CORR-106: same exemption for the transformers path — no HTTP
+        # server is involved; if the model fails to load, the first
+        # ``.invoke()`` raises and the invoker wraps it as a soft
+        # ``FAILED_AFTER_RETRIES`` like any other backend error.
+        if self.provider != "ollama":
             return
 
         now = time.time()
