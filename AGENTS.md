@@ -177,18 +177,24 @@ PYTHONPATH=src pytest tests/unit/v2/ --co -q 2>&1 | grep -E "ERROR|ModuleNotFoun
 
 Skills load via `skill({name: "..." })`. Match a task to a skill's trigger phrase and load immediately — don't paraphrase.
 
+> **Registered 2026-09-01:** skills marked *(symlinked)* live in
+> `~/Área de Trabalho/projects/my-skills/` and are symlinked into
+> `~/.zcode/skills/`. `agent-orchestration` is additionally symlinked into
+> this repo's `.zcode/skills/` (workspace scope). **Restart ZCode** after
+> changing skill registrations.
+
 | Skill | When in this repo |
 |-------|------|
-| `sprint-contract` | **ALWAYS** load when the user asks for a contract (any size, any context); also: 3+ file changes, complex tasks, planning CORR-NNN contracts |
-| `code-review` | Before merging, independent verification of changes |
-| `python-best-practices` | Any Python code change |
-| `project-conventions` | New AEGIS-KG naming, file structure, entity IDs |
-| `context-checkpoint` | Context >70% during long sessions |
-| `agents-md-writer` | Only when updating this file or any AGENTS.md |
-| `pdf` | When case inputs include PDF (Phase 1 §Input Documents) |
-| `docx` | When stakeholders provide .docx specs |
-| `xlsx` | When case inputs include Excel (Phase 1 §Output) |
-| `neo4j-verify` | Before/after Neo4j-related work (port 7688/7475, no hardcoded ports) |
+| `sprint-contract` *(symlinked)* | **ALWAYS** load when the user asks for a contract (any size, any context); also: 3+ file changes, complex tasks, planning CORR-NNN contracts |
+| `agent-orchestration` *(workspace)* | Any eval cycle (checker → judge → digest → matrix), contract planning, model-scoring, or validation gates — the distilled operating cycle (see also `execution/reports/EVAL_PROTOCOL.md`) |
+| `hpc-deucalion` | Before ANY Deucalion work — includes the 2026-09-01 scout recipe (Ollama version split, sequential-only, NFS logs, `scout-bench-m-aegis.sbatch`) |
+| `code-review` *(symlinked)* | Before merging, independent verification of changes |
+| `python-best-practices` *(symlinked)* | Any Python code change |
+| `project-conventions` *(symlinked)* | New AEGIS-KG naming, file structure, entity IDs |
+| `context-checkpoint` *(symlinked)* | Context >70% during long sessions |
+| `agents-md-writer` *(symlinked)* | Only when updating this file or any AGENTS.md |
+| `neo4j-verify` *(symlinked)* | Before/after Neo4j-related work (port 7688/7475, no hardcoded ports) |
+| `pdf` / `docx` / `xlsx` | **Via the official `document-skills` plugin** (not my-skills) — when case inputs/outputs include those formats |
 
 Sub-AGENTS files list **folder-specific** trigger subsets — always read nearest file first.
 
