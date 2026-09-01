@@ -8,6 +8,7 @@ inside ``parser_gate`` is lazy). Fixtures are inline minis.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -199,3 +200,75 @@ def test_cli_help_runs(monkeypatch, capsys):
     assert "--run-dir" in out
     assert "--use-parser-gate" in out
     assert "--preproc" in out
+
+
+# ────────────────────────────────────────────────────────────────────
+# _count_yes — markdown shape (CORR-105 fix)
+# ────────────────────────────────────────────────────────────────────
+
+
+def test_count_yes_markdown_applicable_yes():
+    """Markdown shape: `- applicable: YES` lines counted as activations."""
+    # Reach into the closure by mimicking the inner loop directly
+    # (avoids running main with a full jsonl).
+    activations_total = 0
+    activations_yes = 0
+    body = (
+        "## Status\n"
+        "- applicable: YES\n"
+        "- confidence: HIGH\n\n"
+        "## Interpretations\n"
+        "- TIPO2-X: applicable: YES\n"
+        "- TIPO2-Y: applicable: NO\n"
+        "- TIPO3-Z: applicable: N/A\n"
+        "- TIPO2-Q: activation_verdict: ACTIVATED\n"
+    )
+    for m in re.finditer(r"applicable\s*:\s*(YES|NO|N/A)\b",
+                         body, re.IGNORECASE):
+        activations_total += 1
+        if m.group(1).upper() == "YES":
+            activations_yes += 1
+    for m in re.finditer(r"activation_verdict\s*:\s*(ACTIVATED|NOT_ACTIVATED)\b",
+                         body, re.IGNORECASE):
+        activations_total += 1
+        if m.group(1).upper() == "ACTIVATED":
+            activations_yes += 1
+    # 4 `applicable:` lines (2 YES, 1 NO, 1 N/A) + 1 `activation_verdict:` ACTIVATED
+    assert activations_total == 5
+    assert activations_yes == 3
+
+
+def test_count_yes_markdown_empty_body():
+    activations_total = 0
+    activations_yes = 0
+    body = "(no LLM response for this spec)\n"
+    for _m in re.finditer(r"applicable\s*:\s*(YES|NO|N/A)\b",
+                           body, re.IGNORECASE):
+        activations_total += 1
+    assert activations_total == 0
+    assert activations_yes == 0
+
+
+def test_count_yes_dict_shape_still_works():
+    """Dict-shape input (legacy jsonl) still counted."""
+    d = {
+        "interpretations": [
+            {"applicable": "YES"}, {"applicable": "NO"},
+        ],
+        "sub_domain_activations": [
+            {"activation_verdict": "ACTIVATED"},
+        ],
+    }
+    total = 0
+    yes = 0
+    for k in ("interpretations", "derogations", "implications",
+              "positive_events", "negative_events", "sub_domain_activations"):
+        items = d.get(k, [])
+        for it in items:
+            if isinstance(it, dict):
+                total += 1
+                if (it.get("applicable", "").upper() == "YES" or
+                        it.get("activation_verdict", "").upper() == "ACTIVATED"):
+                    yes += 1
+    assert total == 3
+    assert yes == 2

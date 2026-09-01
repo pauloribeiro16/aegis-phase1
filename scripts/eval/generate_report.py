@@ -345,7 +345,7 @@ def main():
             if not any(ref in c or c in ref for c in canonical_refs):
                 spec_data["invented_refs"].append(ref)
 
-        # Activation count (for spec that has applicable field)
+        # Activation count (dict shape OR markdown shape — CORR-105)
         def _count_yes(o):
             if isinstance(o, dict):
                 for k in ("interpretations", "derogations", "implications",
@@ -358,6 +358,23 @@ def main():
                                 if (it.get("applicable", "").upper() == "YES" or
                                     it.get("activation_verdict", "").upper() == "ACTIVATED"):
                                     spec_data["activations_yes"] += 1
+                return
+            if isinstance(o, str):
+                # CORR-105: count `applicable: YES/NO/N/A` and
+                # `activation_verdict: ACTIVATED/NOT_ACTIVATED` field lines
+                # anywhere in the markdown body. The `applicable` may be
+                # preceded by `- <id>:` or just `-`, so we don't anchor
+                # the line start strictly.
+                for m in re.finditer(r"applicable\s*:\s*(YES|NO|N/A)\b",
+                                     o, re.IGNORECASE):
+                    spec_data["activations_total"] += 1
+                    if m.group(1).upper() == "YES":
+                        spec_data["activations_yes"] += 1
+                for m in re.finditer(r"activation_verdict\s*:\s*(ACTIVATED|NOT_ACTIVATED)\b",
+                                     o, re.IGNORECASE):
+                    spec_data["activations_total"] += 1
+                    if m.group(1).upper() == "ACTIVATED":
+                        spec_data["activations_yes"] += 1
         _count_yes(output)
 
     # Compute aggregates
