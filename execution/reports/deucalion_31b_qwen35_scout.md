@@ -433,8 +433,13 @@ are in `execution/reports/digests/`. As of this scout update:
 
 - qwen3.5:27b run-all → **P1B PASS, P1C FAIL** (parser extracts 0
   activations; REDUCE-LLM skipped).
-- qwen3.8:27b scout → **P1B PASS** (CORR-074 compliant); **P1C
-  PENDING** until run-all lands.
+- qwen3.8:27b scout → **P1B PASS** (CORR-074 compliant).
+- **qwen3.8:27b run-all (JOB 1862843)** → confirmed: P1B 4.7/4.9;
+  **P1C-01 also fails (2.2/5)** with **same root cause as qwen3.5**
+  (`## Pair classifications` shape mismatch with `P1CLLM01Parser`).
+  The gate is the parser, not the model. REDUCE-LLM skipped; P1C-02/03
+  cascade (same as qwen3.5). Doc 04b §5 gains actionable remediations
+  on qwen3.8 (the only downstream win).
   - C) leave qwen3.8 on the shelf until the cluster-wide Ollama
     upgrade is requested.
   None of these have been submitted; they are tracks, not a plan.
