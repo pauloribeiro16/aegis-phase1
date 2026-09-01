@@ -170,3 +170,50 @@ def test_ensure_ollama_still_runs_for_ollama(monkeypatch):
 
     with pytest.raises(LLMUnreachableError):
         inv._ensure_ollama("test_source")
+
+
+# ────────────────────────────────────────────────────────────────────
+# 5. Follow-ups from JOB 1866405 (the actual scout run)
+# ────────────────────────────────────────────────────────────────────
+
+
+def test_compute_max_memory_enumerates_all_devices():
+    """Pure helper: pre-fix only included device 0, leading to a
+    single-GPU OOM on the 31B scout (JOB 1866405)."""
+    inv = TransformersInvoker(model_id="fake/model")
+    budget = inv._compute_max_memory(n_devices=3, device_total_bytes=40 * 1024**3, utilization=0.9)
+    assert set(budget.keys()) == {0, 1, 2, "cpu"}
+    for idx in (0, 1, 2):
+        gib = float(budget[idx].rstrip("GiB"))
+        # 40 GiB * 0.9 - 0.2 GiB safety ≈ 35.8 GiB per GPU.
+        assert 34 <= gib <= 36, f"GPU {idx} budget {gib}GiB outside expected range"
+    assert budget["cpu"] == "30GiB"
+
+
+def test_compute_max_memory_below_one_floor():
+    """Edge case: tiny GPU + low utilization → budget clamped to 1 GiB."""
+    inv = TransformersInvoker(model_id="fake/model")
+    budget = inv._compute_max_memory(n_devices=1, device_total_bytes=2 * 1024**3, utilization=0.5)
+    # 2 GiB * 0.5 - 0.2 = 0.8 GiB → clamped to 1.0 GiB
+    assert budget[0] == "1.0GiB"
+
+
+def test_aegis_max_new_tokens_env_var(monkeypatch):
+    """The SBATCH sets AEGIS_MAX_NEW_TOKENS=16384 (qwen3.8 generated
+    122 599-token outputs; default 1024 would truncate every call)."""
+    monkeypatch.setenv("AEGIS_MAX_NEW_TOKENS", "16384")
+    inv = TransformersInvoker(model_id="fake/model")
+    assert inv.max_new_tokens == 16384
+
+
+def test_aegis_max_new_tokens_explicit_arg_wins(monkeypatch):
+    """Constructor kwarg overrides env var."""
+    monkeypatch.setenv("AEGIS_MAX_NEW_TOKENS", "16384")
+    inv = TransformersInvoker(model_id="fake/model", max_new_tokens=2048)
+    assert inv.max_new_tokens == 2048
+
+
+def test_aegis_max_new_tokens_default_when_no_env(monkeypatch):
+    monkeypatch.delenv("AEGIS_MAX_NEW_TOKENS", raising=False)
+    inv = TransformersInvoker(model_id="fake/model")
+    assert inv.max_new_tokens == TransformersInvoker.DEFAULT_MAX_NEW_TOKENS
