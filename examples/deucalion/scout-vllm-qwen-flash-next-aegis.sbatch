@@ -72,21 +72,36 @@ echo "[vllm] HF base = $HFB"
 : "${VLLM_MAX_MODEL_LEN:=16384}"
 : "${VLLM_GPU_MEMORY_UTILIZATION:=0.90}"
 : "${VLLM_TENSOR_PARALLEL_SIZE:=4}"
-: "${VLLM_DTYPE:=auto}"   # FP8 checkpoint: let vLLM read quantisation from config
+: "${VLLM_DTYPE:=bfloat16}"   # CORR-110 (2026-09-02): vLLM 0.10 + FP8 checkpoint:
+                                 # the weights ARE bf16 (FP8-marlin kernels
+                                 # dequantise at runtime). --dtype bfloat16
+                                 # + --quantization fp8 tells vLLM the
+                                 # marlin kernel is needed.
+: "${VLLM_QUANTIZATION:=fp8}"
 : "${AEGIS_SCOPE:=run-all}"   # submit --export=AEGIS_SCOPE=phase-1b for the cheap scout
-export VLLM_MODEL VLLM_PORT VLLM_MAX_MODEL_LEN VLLM_GPU_MEMORY_UTILIZATION VLLM_DTYPE VLLM_TENSOR_PARALLEL_SIZE
+export VLLM_MODEL VLLM_PORT VLLM_MAX_MODEL_LEN VLLM_GPU_MEMORY_UTILIZATION VLLM_DTYPE VLLM_TENSOR_PARALLEL_SIZE VLLM_QUANTIZATION
 export AEGIS_VLLM_BASE_URL="http://127.0.0.1:${VLLM_PORT}/v1"
 export AEGIS_VLLM_TIMEOUT=900   # long rationales on Flash-Next
 
 # --- Served model name the pipeline asks for (must match vllm --served-model-name) ---
 SERVED_NAME="qwen3.8-flash-next"
 
-# --- vLLM environment (cybermetric venv reuses the cluster venv) ---
-VENV_PATH="${AEGIS_VLLM_VENV:-$BD/aegis-venv-root}"
+# --- vLLM environment ---
+# CORR-110 (2026-09-02): aegis venv has no vllm (by design — the
+# test test_module_imports_only_httpx_and_langchain_core enforces
+# "no vllm import in pipeline"). We install vllm in a SEPARATE
+# venv under Lustre and use it only to spawn the vLLM server.
+# The pipeline still uses the project's own .venv (loaded below).
+VENV_PATH="${AEGIS_VLLM_VENV:-$BD/aegis-vllm-venv/venv}"
 if [[ ! -x "$VENV_PATH/bin/python" ]]; then
   echo "FATAL: venv not found at $VENV_PATH"
-  echo "       set AEGIS_VLLM_VENV to the venv that has vllm installed"
-  echo "       (cybermetric-vllm-cache/venv is the working one)"
+  echo "       install vllm with:"
+  echo "         mkdir -p $BD/aegis-vllm-venv && cd \$_"
+  echo "         PIP_CACHE_DIR=$BD/aegis-vllm-venv/pip-cache \\"
+  echo "         TMPDIR=$BD/aegis-vllm-venv/tmp \\"
+  echo "         python3 -m venv venv && source venv/bin/activate"
+  echo "         pip install vllm"
+  echo "       (this job needs vllm at runtime; submit only after it exists)"
   exit 3
 fi
 
@@ -138,6 +153,7 @@ echo "[vllm] starting vllm serve (background) ..."
   --port "$VLLM_PORT" \
   --tensor-parallel-size "$VLLM_TENSOR_PARALLEL_SIZE" \
   --dtype "$VLLM_DTYPE" \
+  --quantization "$VLLM_QUANTIZATION" \
   --max-model-len "$VLLM_MAX_MODEL_LEN" \
   --gpu-memory-utilization "$VLLM_GPU_MEMORY_UTILIZATION" \
   --served-model-name "$SERVED_NAME" \
