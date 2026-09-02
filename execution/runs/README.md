@@ -37,12 +37,16 @@ execution/
 | `nemotron3_5_30b_scout_1867430` | nemotron 3.5 30B | 1867430 | scout ✅ | 2/2 regulações | `nemotron3_5_scout_1867430.md` |
 | `muse_glimmer_30b_scout_1867431` | muse glimmer 30B | 1867431 | scout ⚠️ | 1/2 regulações | `muse_glimmer_scout_1867431.md` |
 | `gemma4_26b_scout_1867082` | gemma4 26B | 1867082 | scout ✅ | por avaliar | — |
+| `qwen38_27b_runall_1868946` | qwen3.8 27B | 1868946 | run-all ⏳ | em curso (CORR-109 §9 + pipeline ponta-a-ponta) | — (sai a comparar pós-run) |
 
 ## Para recriar um scout
 
 ```bash
-# no login node do Deucalion, dentro de aegis-phase1:
+# Scout Phase-1B-only (modo antigo, ~30 min, 1 doc):
 sbatch examples/deucalion/scout-bench-m-aegis.sbatch <modelo:tag>
+
+# Scout pipeline completa (novo, ~1h30, gera os 9 docs + xlsx):
+sbatch examples/deucalion/scout-bench-m-aegis-full.sbatch <modelo:tag>
 ```
 
 Regras: sequencial (nunca 2 scouts no mesmo nó), walltime ≥2× o scout
