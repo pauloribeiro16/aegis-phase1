@@ -538,14 +538,18 @@ def _section_per_domain(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 3. Per-Domain Assessment\n")
-    overrides = _overrides(state)
+    overrides = _merged_maturity_overrides(state)
     review = _load_review_for_state(state)
     domain_results = state.get("domain_results") or {}
     tier = _tier_for_state(state)
     current_by_dom, target_by_dom = _control_maturity_for_tier(tier)
     domain_ids = sorted(current_by_dom.keys())
     for domain_id in domain_ids:
-        current = overrides.get(domain_id, current_by_dom.get(domain_id, 1))
+        # CORR-107: tier floor is the static YAML value; overrides raise
+        # above the floor (we never lower — that's the human's job via
+        # state["security_posture_overrides"]).
+        tier_floor = current_by_dom.get(domain_id, 1)
+        current = max(tier_floor, overrides.get(domain_id, tier_floor))
         target = target_by_dom.get(domain_id, 1)
         gap = max(0, target - current)
         controls = _controls_for(domain_id, tier)
@@ -860,14 +864,15 @@ def _section_3b_overlap_classification(state: dict[str, Any]) -> list[str]:
 def _section_summary(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 4. Summary Dashboard\n")
-    overrides = _overrides(state)
+    overrides = _merged_maturity_overrides(state)
     tier = _tier_for_state(state)
     current_by_dom, target_by_dom = _control_maturity_for_tier(tier)
     rows: list[tuple[str, int, int, int]] = []
     total_current = 0
     total_target = 0
     for domain_id in sorted(current_by_dom.keys()):
-        current = overrides.get(domain_id, current_by_dom.get(domain_id, 1))
+        tier_floor = current_by_dom.get(domain_id, 1)
+        current = max(tier_floor, overrides.get(domain_id, tier_floor))
         target = target_by_dom.get(domain_id, 1)
         gap = max(0, target - current)
         rows.append((f"{domain_id} {_DOMAIN_NAME[domain_id]}", current, target, gap))
@@ -896,7 +901,7 @@ def _section_summary(state: dict[str, Any]) -> list[str]:
 def _section_top_gaps(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. Top Gaps (feeds Doc 07)\n")
-    overrides = _overrides(state)
+    overrides = _merged_maturity_overrides(state)
     tier = _tier_for_state(state)
     current_by_dom, target_by_dom = _control_maturity_for_tier(tier)
     ranked = sorted(
@@ -1225,6 +1230,91 @@ _GAP_SUMMARY: dict[str, tuple[str, str]] = {
         "Add SBOM artefact, security checklist, and threat-model template per feature",
     ),
 }
+
+
+def _dynamic_maturity_from_readiness(state: dict[str, Any]) -> dict[str, float]:
+    """CORR-107: derive maturity overrides from DOC04 readiness facts.
+
+    The previous behaviour kept every domain at the static tier floor
+    (``data/control_maturity/{TIER}.yaml``) because nothing in the
+    pipeline populated ``state["security_posture_overrides"]``. The
+    case input already has the data
+    (``input/company/implementation_readiness.yaml``), loaded into
+    ``state["implementation_readiness"]`` by CaseProfileLoader — this
+    function is the missing bridge.
+
+    Heuristic v1 (case1-tinytask validation):
+        - PARTIAL → +0.5 to the relevant domain(s)
+        - YES     → +1.0
+
+    The merge site (e.g. ``_section_maturity_evaluation``) clamps the
+    resulting override against the tier floor so a NO answer cannot
+    underflow the tier default.
+    """
+    rd = state.get("implementation_readiness") or {}
+    if not isinstance(rd, Mapping):
+        return {}
+
+    # Map readiness field → (domain_id, delta)
+    # Domain ids match data/control_maturity/{TIER}.yaml keys.
+    delta_table: tuple[tuple[str, str, float], ...] = (
+        ("backup",                  "D-04", 1.0),
+        ("incident_response",       "D-04", 1.0),
+        ("business_continuity",     "D-04", 0.5),
+        ("access_control",          "D-03", 1.0),
+        ("information_security_policy", "D-09", 1.0),
+        ("risk_assessment",         "D-09", 0.5),
+        ("vulnerability_management", "D-02", 1.0),
+        ("audit_logging",           "D-10", 1.0),
+        ("security_awareness",      "D-08", 1.0),
+        ("third_party_risk",        "D-06", 1.0),
+        ("dpo",                     "D-09", 0.5),
+        ("ciso",                    "D-09", 0.5),
+    )
+
+    value_to_delta = {"YES": 1.0, "PARTIAL": 0.5}
+
+    overrides: dict[str, float] = {}
+    for field, domain_id, full_delta in delta_table:
+        raw = rd.get(field)
+        if not isinstance(raw, str):
+            continue
+        delta = value_to_delta.get(raw.upper())
+        if delta is None:
+            continue
+        # Accumulate (a single domain may get multiple deltas — e.g. D-09
+        # can get +0.5 from isp=PARTIAL and +0.5 from ra=YES → +1.0).
+        # ``full_delta`` is the unit value associated with this field;
+        # we cap the contribution at ``full_delta`` so a single field
+        # cannot over-bias a domain.
+        overrides[domain_id] = overrides.get(domain_id, 0.0) + min(delta, full_delta)
+    return overrides
+
+
+def _merged_maturity_overrides(state: dict[str, Any]) -> dict[str, int]:
+    """CORR-107: merge explicit overrides + DOC04-derived overrides.
+
+    Explicit ``state["security_posture_overrides"]`` wins over derived
+    values (humans override heuristics). Tier floor is applied by the
+    caller, not here.
+    """
+    explicit = _overrides(state)
+    derived = _dynamic_maturity_from_readiness(state)
+    out: dict[str, int] = {}
+    for domain_id, delta in derived.items():
+        # Round 0.5 up to 1 — a partial control always lifts above the
+        # tier floor; rounding 0.0 stays at the floor (caller applies).
+        # Use ceil (not int(round())) — banker's rounding on 0.5 -> 0
+        # would lose the partial lift.
+        import math
+        out[domain_id] = int(math.ceil(delta)) if delta >= 0.5 else 0
+    # Apply explicit overrides last so humans can correct the heuristic.
+    for domain_id, value in explicit.items():
+        try:
+            out[domain_id] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return out
 
 
 def _maturity_counts(overrides: Mapping[str, int], tier: str) -> dict[int, int]:
