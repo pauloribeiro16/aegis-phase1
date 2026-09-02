@@ -58,14 +58,15 @@ def _sanitize_model_tag(model: str) -> str:
         ``llama3.1:8b``    -> ``llama3.1_8b``
     """
     import re as _re
+
     return _re.sub(r"[^A-Za-z0-9._-]+", "_", model).strip("_") or "default"
 
 
 def main() -> None:
+    from aegis_phase1.utils.logging import setup_logging
     from aegis_phase1.v2.domain.processor import MapPartialFailure
     from aegis_phase1.v2.llm import build_llm_invoker
     from aegis_phase1.v2.orchestrator import Phase1Orchestrator
-    from aegis_phase1.utils.logging import setup_logging
 
     parser = argparse.ArgumentParser(description="AEGIS Phase 1 v2 Pipeline")
     parser.add_argument(
@@ -239,16 +240,21 @@ def main() -> None:
         "--model",
         default="gemma4:e4b",  # CORR-056 (2026-07-23)
         help="Model name (default: gemma4:e4b). For HF transformers, "
-             "use 'hf:org/repo' or 'org/repo' (auto-detected).",
+        "use 'hf:org/repo' or 'org/repo' (auto-detected). For "
+        "vLLM (CORR-110), use 'vllm:<served-model-name>' — the "
+        "served-model-name passed to `vllm serve --served-model-name`.",
     )
     parser.add_argument(
         "--provider",
-        choices=["ollama", "transformers", "minimax", "auto"],
+        choices=["ollama", "transformers", "minimax", "vllm", "auto"],
         default="auto",  # CORR-056: auto-detect from model name
         help="LLM provider (default: auto-detect from --model). "
-             "'transformers' uses HuggingFace transformers (no Ollama needed). "
-             "'minimax' uses the MiniMax M-series (M2.7/M3) via the Mavis "
-             "gateway (CORR-062 S2). Auth: MAVIS_ACCESS_TOKEN env var.",
+        "'transformers' uses HuggingFace transformers (no Ollama needed). "
+        "'minimax' uses the MiniMax M-series (M2.7/M3) via the Mavis "
+        "gateway (CORR-062 S2). Auth: MAVIS_ACCESS_TOKEN env var. "
+        "'vllm' uses any OpenAI-compatible HTTP server (vLLM / TGI / "
+        "SGLang) — CORR-110. Pair with --model 'vllm:<served-name>'. "
+        "Server URL: AEGIS_VLLM_BASE_URL env (default http://localhost:8000/v1).",
     )
     parser.add_argument(
         "--retry-failed",
@@ -269,6 +275,7 @@ def main() -> None:
     # jsonl log files (llm-calls, format-errors, MAP per-domain, v2
     # pipeline.log) land under logs/phase1/<model_tag>/.
     import os as _os
+
     _model_tag = _sanitize_model_tag(args.model)
     _log_base = _os.environ.get("AEGIS_LOG_BASE", "logs/phase1")
     _os.environ["AEGIS_LOG_DIR"] = str(Path(_log_base) / _model_tag)
@@ -344,6 +351,7 @@ def main() -> None:
     # the run_phase1_graph metadata. Generating it here keeps both
     # usages pointing at the same UUID.
     import uuid as _uuid_top
+
     _run_id = str(_uuid_top.uuid4())
     orch = Phase1Orchestrator(
         llm_invoker=llm_invoker,
@@ -371,13 +379,17 @@ def main() -> None:
             if n_failed >= MAP_ABORT_THRESHOLD:
                 logger.error(
                     "Pipeline aborted — MAP mostly failed (%d/%d domains): %s",
-                    n_failed, n_total, failed,
+                    n_failed,
+                    n_total,
+                    failed,
                 )
                 sys.exit(2)
             if n_failed:
                 logger.warning(
                     "MAP partial failure (%d/%d domains failed: %s) — continuing",
-                    n_failed, n_total, failed,
+                    n_failed,
+                    n_total,
+                    failed,
                 )
         if args.retry_failed:
             domains = [d.strip() for d in args.retry_failed.split(",") if d.strip()]
@@ -390,9 +402,7 @@ def main() -> None:
                     sys.exit(3)
         logger.info("Pipeline complete")
     elif args.run_all_traced or getattr(args, "run_all_graph", False):
-        logger.info(
-            "Non-interactive mode — running all stages via 18-node LangGraph (CORR-018a)"
-        )
+        logger.info("Non-interactive mode — running all stages via 18-node LangGraph (CORR-018a)")
         try:
             rc = cmd_run_all_traced(
                 orch=orch,
@@ -414,14 +424,19 @@ def main() -> None:
             if n_failed >= MAP_ABORT_THRESHOLD:
                 logger.error(
                     "Pipeline aborted — MAP mostly failed (%d/%d domains): %s",
-                    n_failed, n_total, failed,
+                    n_failed,
+                    n_total,
+                    failed,
                 )
                 sys.exit(2)
             if n_failed:
                 logger.warning(
                     "MAP partial failure (%d/%d domains failed: %s) — "
                     "continuing with %d results",
-                    n_failed, n_total, failed, n_total - n_failed,
+                    n_failed,
+                    n_total,
+                    failed,
+                    n_total - n_failed,
                 )
                 # Force rc=0 so we don't sys.exit below; the OUTPUT
                 # stage already handles missing domain_results
@@ -453,13 +468,17 @@ def main() -> None:
             if n_failed >= MAP_ABORT_THRESHOLD:
                 logger.error(
                     "MAP mostly failed (%d/%d domains): %s",
-                    n_failed, n_total, failed,
+                    n_failed,
+                    n_total,
+                    failed,
                 )
                 sys.exit(2)
             if n_failed:
                 logger.warning(
                     "MAP partial failure (%d/%d domains failed: %s) — done",
-                    n_failed, n_total, failed,
+                    n_failed,
+                    n_total,
+                    failed,
                 )
                 # Partial failure is reported but not fatal in map_only
                 # mode — return 0 so callers can inspect the persisted
@@ -474,9 +493,7 @@ def main() -> None:
                     logger.error("Retry still failing: %s", exc)
                     sys.exit(3)
     elif args.deterministic_only:
-        logger.info(
-            "Non-interactive mode — deterministic docs only (skip MAP/REDUCE)"
-        )
+        logger.info("Non-interactive mode — deterministic docs only (skip MAP/REDUCE)")
         orch.load(case_path, prep_path)
         orch.generate_deterministic_docs(output_path)
         paths = orch.state.get("output_paths", {})
@@ -485,9 +502,7 @@ def main() -> None:
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
     elif args.run_applicability:
-        logger.info(
-            "Non-interactive mode — applicability only (CORR-038; no LLM)"
-        )
+        logger.info("Non-interactive mode — applicability only (CORR-038; no LLM)")
         paths = cmd_run_applicability(
             orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
         )
@@ -496,9 +511,7 @@ def main() -> None:
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
     elif args.run_clauses:
-        logger.info(
-            "Non-interactive mode — clauses only (CORR-039; no LLM)"
-        )
+        logger.info("Non-interactive mode — clauses only (CORR-039; no LLM)")
         paths = cmd_run_clauses(
             orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
         )
@@ -507,9 +520,7 @@ def main() -> None:
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
     elif args.run_phase_1b:
-        logger.info(
-            "Non-interactive mode — Phase 1B only (CORR-039; with LLM)"
-        )
+        logger.info("Non-interactive mode — Phase 1B only (CORR-039; with LLM)")
         paths = cmd_run_phase_1b(
             orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
         )
@@ -518,9 +529,7 @@ def main() -> None:
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
     elif args.run_map:
-        logger.info(
-            "Non-interactive mode — MAP only (CORR-040; P1C-LLM-01)"
-        )
+        logger.info("Non-interactive mode — MAP only (CORR-040; P1C-LLM-01)")
         paths = cmd_run_map(
             orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
         )
@@ -529,9 +538,7 @@ def main() -> None:
             print(f"  {label}: {p}")
         print(f"  total: {len(paths)} artefacts")
     elif args.run_reduce:
-        logger.info(
-            "Non-interactive mode — REDUCE only (CORR-041; P1C-LLM-03/02)"
-        )
+        logger.info("Non-interactive mode — REDUCE only (CORR-041; P1C-LLM-03/02)")
         paths = cmd_run_reduce(
             orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
         )
@@ -702,9 +709,9 @@ def cmd_run_map(
         Mapping ``AEGIS-P1-07`` -> absolute file path +
         ``AEGIS-P1-07b`` -> absolute file path.
     """
+    from aegis_phase1.v2.domain.processor import MapPartialFailure
     from aegis_phase1.v2.output.doc_07 import render_doc_07
     from aegis_phase1.v2.output.doc_07b import render_doc_07b
-    from aegis_phase1.v2.domain.processor import MapPartialFailure
 
     orch.load(case_path, prep_path)
     out_dir = Path(output_path)
@@ -842,6 +849,7 @@ def cmd_run_all_traced(
     # phase + case (no internal ticket IDs like corr-XXX which leak
     # into the public Langfuse UI).
     import uuid as _uuid
+
     run_id = str(_uuid.uuid4())
     run_id_short = run_id[:8]
     trace_name = f"AEGIS Phase 1 - {case_name} - {run_id_short}"
@@ -856,7 +864,7 @@ def cmd_run_all_traced(
             # CORR-048: ONLY phase + case tags. Subphase-specific tags
             # (stage:map, domain:D-XX, regulation:GDPR) are added by
             # each node internally in graph.py.
-            tags=[f"phase:phase1", f"case:{case_name}"],
+            tags=["phase:phase1", f"case:{case_name}"],
             # CORR-048: structured metadata. run_id is the same UUID
             # written to corr048_langfuse_trace_id.txt so the trace
             # can be matched to the log file.

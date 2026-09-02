@@ -36,11 +36,11 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from aegis_phase1.llm.unified import UnifiedInvoker  # noqa: E402 — re-exported for callers
 from aegis_phase1.llm.transformers_invoker import (  # noqa: E402 — CORR-056
     TransformersInvoker,
     _detect_provider,
 )
+from aegis_phase1.llm.unified import UnifiedInvoker  # noqa: E402 — re-exported for callers
 
 _MOCK_TRUTHS = {"1", "true", "yes", "on"}
 
@@ -106,15 +106,17 @@ def build_llm_invoker(
     langfuse_handler: Any = None,
     provider: str | None = None,
 ) -> MockInvoker | UnifiedInvoker | TransformersInvoker:
-    """Build the LLM invoker for the current run (CORR-013 + CORR-056 + CORR-062 S2).
+    """Build the LLM invoker for the current run (CORR-013 + CORR-056 + CORR-062 S2 + CORR-110).
 
     Selection rule (in order):
         1. If ``MOCK_LLM`` env var is truthy, returns a :class:`MockInvoker`.
         2. If ``provider`` is given, use it (CORR-056: ``"ollama"`` or
-           ``"transformers"``; CORR-062 S2: ``"minimax"``).
+           ``"transformers"``; CORR-062 S2: ``"minimax"``;
+           CORR-110: ``"vllm"``).
            Unknown providers fall back to auto-detect.
         3. Otherwise auto-detect from ``model``:
            - ``minimax/`` prefix (CORR-062 S2) → ``minimax``
+           - ``vllm:`` prefix (CORR-110) → ``vllm``
            - ``hf:`` prefix or contains ``/`` (HF Hub) → ``transformers``
            - otherwise → ``ollama``
 
@@ -123,11 +125,14 @@ def build_llm_invoker(
             (Ollama). For HF: e.g. ``"google/gemma-4-E2B-it"`` or
             ``"hf:google/gemma-4-E2B-it"``. For MiniMax:
             e.g. ``"minimax/MiniMax-M3"`` (prefix stripped before passing
-            to ``ChatMinimax``).
+            to ``ChatMinimax``). For vLLM (CORR-110):
+            e.g. ``"vllm:gemma4-31b"`` (served-model-name) or
+            ``"vllm:google/gemma-4-31B-it"`` (HF id; resolved server-side).
         langfuse_handler: Optional Langfuse handler (Ollama and MiniMax only —
             transformers ignores it; no LangChain callbacks in the HF path).
         provider: Optional explicit provider (``"ollama"`` | ``"transformers"``
-            | ``"minimax"``). If ``None`` (default), auto-detects from model name.
+            | ``"minimax"`` | ``"vllm"``). If ``None`` (default), auto-detects
+            from model name.
 
     Returns:
         A configured invoker instance. Type depends on selection:
@@ -135,7 +140,8 @@ def build_llm_invoker(
 
     Raises:
         LLMUnreachableError: When provider resolves to ollama and Ollama
-        cannot be reached. NOT raised for transformers or minimax providers.
+        cannot be reached. NOT raised for transformers, minimax, or vllm
+        providers — those fail fast inside the chat client at first call.
     """
     if os.environ.get("MOCK_LLM", "").strip().lower() in _MOCK_TRUTHS:
         logger.info("MOCK_LLM=true → MockInvoker")
@@ -158,7 +164,7 @@ def build_llm_invoker(
         # the Mavis gateway unchanged.
         bare_model = resolved_model
         if bare_model.startswith("minimax/"):
-            bare_model = bare_model[len("minimax/"):]
+            bare_model = bare_model[len("minimax/") :]
         logger.info(
             "provider=minimax → UnifiedInvoker(model=%s, chat=ChatMinimax)",
             bare_model,
@@ -167,9 +173,30 @@ def build_llm_invoker(
             model=bare_model,
             langfuse_handler=langfuse_handler,
             provider="minimax",  # CORR-062 S2: critical — without this the
-                                 # UnifiedInvoker falls back to ChatOllama at
-                                 # localhost:11434, sending M3 model names to
-                                 # the local Ollama → 404.
+            # UnifiedInvoker falls back to ChatOllama at
+            # localhost:11434, sending M3 model names to
+            # the local Ollama → 404.
+        )
+        return invoker
+
+    if resolved_provider == "vllm":
+        # CORR-110: strip the "vllm:" prefix used by the auto-detect
+        # rule. The remainder is the served-model-name (the value
+        # passed to `--served-model-name` of `vllm serve`); it may
+        # also be a HuggingFace repo id when the server aliases it.
+        bare_model = resolved_model
+        if bare_model.startswith("vllm:"):
+            bare_model = bare_model[len("vllm:") :]
+        logger.info(
+            "provider=vllm → UnifiedInvoker(model=%s, chat=ChatOpenAICompat)",
+            bare_model,
+        )
+        invoker = UnifiedInvoker(
+            model=bare_model,
+            langfuse_handler=langfuse_handler,
+            provider="vllm",  # CORR-110: routes chat to ChatOpenAICompat
+            # and skips the Ollama probe (see
+            # UnifiedInvoker._ensure_ollama).
         )
         return invoker
 
@@ -216,9 +243,9 @@ def _health_check(invoker: UnifiedInvoker) -> None:
 
 
 __all__ = [
-    "MockInvoker",
     "LLMUnreachableError",
-    "UnifiedInvoker",
+    "MockInvoker",
     "TransformersInvoker",
+    "UnifiedInvoker",
     "build_llm_invoker",
-] 
+]

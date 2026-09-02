@@ -125,9 +125,7 @@ def get_validator(
         regulatory_baseline_root = layer0_root
     root = regulatory_baseline_root or get_regulatory_baseline_root()
     schemas_path = get_prompts_root() / "output_schemas.yaml"
-    return Phase1Validator(
-        regulatory_baseline_root=root, output_schemas_path=schemas_path
-    )
+    return Phase1Validator(regulatory_baseline_root=root, output_schemas_path=schemas_path)
 
 
 def get_invoker(
@@ -153,6 +151,12 @@ def get_invoker(
     Mavis gateway); the ``base_url`` default then flips to the gateway
     endpoint, and the heavy child (Phase1LLMInvoker) also routes through
     ChatMinimax.
+    CORR-110: pass ``"vllm"`` to wire ChatOpenAICompat (any OpenAI-
+    compatible HTTP server — vLLM, TGI, SGLang). The ``base_url``
+    default then flips to ``http://localhost:8000/v1`` (override with
+    ``AEGIS_VLLM_BASE_URL``); the heavy child also routes through
+    ChatOpenAICompat so REDUCE-LLM (P1C-02/03) is active on this
+    provider — unlike ``transformers``, which intentionally skips it.
     """
     import os
     import warnings
@@ -160,7 +164,6 @@ def get_invoker(
     from aegis_phase1.llm.tracing import get_langfuse_callback
     from aegis_phase1.llm.unified import UnifiedInvoker
     from aegis_phase1.prompts_v2.catalog import CatalogLoader
-    from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
     from aegis_phase1.prompts_v2.loader import PromptLoader
     from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 
@@ -185,14 +188,22 @@ def get_invoker(
     # the model name (causing the gateway to reject the request).
     if provider == "minimax":
         from aegis_phase1.llm.chat_minimax import DEFAULT_MODEL as M3_DEFAULT_MODEL
+
         # honour explicit overrides only
         model = model or M3_DEFAULT_MODEL
         base_url = base_url
+    elif provider == "vllm":
+        # CORR-110: don't pull Ollama-derived env vars for the vLLM
+        # path. ChatOpenAICompat's model_validator reads
+        # AEGIS_VLLM_BASE_URL / AEGIS_VLLM_MODEL itself, so passing
+        # defaults here would only mask the configured server URL.
+        from aegis_phase1.llm.openai_compat import DEFAULT_MODEL as VLLM_DEFAULT_MODEL
+
+        model = model or VLLM_DEFAULT_MODEL
+        base_url = base_url
     else:
         model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
-        base_url = base_url or os.getenv(
-            "OLLAMA_BASE_URL", UnifiedInvoker.DEFAULT_BASE_URL
-        )
+        base_url = base_url or os.getenv("OLLAMA_BASE_URL", UnifiedInvoker.DEFAULT_BASE_URL)
 
     prompt_loader = PromptLoader(root=prompts)
     catalog_loader = CatalogLoader(root=prompts / "catalogs")

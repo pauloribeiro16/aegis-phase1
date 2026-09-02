@@ -63,7 +63,9 @@ def _detect_provider(model: str | None) -> str:
     Returns ``"transformers"`` if the model name contains ``/`` (HF Hub
     convention: ``org/repo``) or has the ``hf:`` prefix;
     ``"minimax"`` if it has the ``minimax/`` prefix (M-series models
-    via the Mavis gateway — CORR-062 S2); otherwise ``"ollama"`` (default).
+    via the Mavis gateway — CORR-062 S2);
+    ``"vllm"`` if it has the ``vllm:`` prefix (OpenAI-compatible HTTP
+    server, e.g. vLLM — CORR-110); otherwise ``"ollama"`` (default).
 
     >>> _detect_provider("google/gemma-4-E2B-it")
     'transformers'
@@ -71,6 +73,8 @@ def _detect_provider(model: str | None) -> str:
     'transformers'
     >>> _detect_provider("minimax/MiniMax-M3")
     'minimax'
+    >>> _detect_provider("vllm:gemma4-31b")
+    'vllm'
     >>> _detect_provider("gemma4:e4b")
     'ollama'
     """
@@ -78,6 +82,12 @@ def _detect_provider(model: str | None) -> str:
         return "ollama"
     if model.startswith("minimax/"):
         return "minimax"
+    # CORR-110: explicit vLLM prefix — disambiguates from HF transformers
+    # so a user can pass `--model vllm:google/gemma-4-31B-it` and the
+    # pipeline routes through ChatOpenAICompat (HTTP) instead of
+    # loading the model in-process with TransformersInvoker.
+    if model.startswith("vllm:"):
+        return "vllm"
     if model.startswith("hf:") or "/" in model:
         return "transformers"
     return "ollama"
@@ -150,18 +160,12 @@ class TransformersInvoker:
         self.model_id = self.model
         self.max_new_tokens = max_new_tokens or self.DEFAULT_MAX_NEW_TOKENS
         self.enable_thinking = enable_thinking
-        self.cache_dir = (
-            cache_dir
-            or os.environ.get(_HF_HOME_ENV)
-            or _DEFAULT_HF_HOME
-        )
+        self.cache_dir = cache_dir or os.environ.get(_HF_HOME_ENV) or _DEFAULT_HF_HOME
         self.device_map = device_map or self.DEFAULT_DEVICE_MAP
         self.dtype = dtype or self.DEFAULT_DTYPE
         self.attn_implementation = attn_implementation or "sdpa"
         self.gpu_memory_utilization = (
-            gpu_memory_utilization
-            if gpu_memory_utilization is not None
-            else 0.9
+            gpu_memory_utilization if gpu_memory_utilization is not None else 0.9
         )
 
         # Lazy-loaded on first invoke() call.
@@ -203,6 +207,7 @@ class TransformersInvoker:
         """Resolved torch device (set on first invoke)."""
         if self._device is None:
             import torch
+
             self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         return self._device
 
@@ -250,11 +255,9 @@ class TransformersInvoker:
             torch.cuda.empty_cache()
 
         # Import here to keep module import cheap (avoid pulling torch on every import)
-        from transformers import AutoTokenizer, AutoModelForCausalLM
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            self.model_id, cache_dir=self.cache_dir
-        )
+        self._tokenizer = AutoTokenizer.from_pretrained(self.model_id, cache_dir=self.cache_dir)
 
         # Resolve dtype: "auto" → torch.bfloat16 (the CORR-056 default; Gemma 4
         # was trained in BF16, so no precision loss).
@@ -289,7 +292,10 @@ class TransformersInvoker:
             logger.info(
                 "TransformersInvoker: model loaded on device=%s — "
                 "GPU memory: %.1fGB / %.1fGB (%.0f%% of VRAM)",
-                self._device, used, total, 100 * used / total,
+                self._device,
+                used,
+                total,
+                100 * used / total,
             )
         else:
             logger.info(
@@ -401,6 +407,6 @@ class TransformersInvoker:
 
 __all__ = [
     "TransformersInvoker",
-    "_strip_hf_prefix",
     "_detect_provider",
+    "_strip_hf_prefix",
 ]
