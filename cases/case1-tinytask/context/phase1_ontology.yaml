@@ -1,185 +1,572 @@
-# CORR-036 (2026-07-21): aligned with input/company/classification.yaml
-# (canonical source). Previous values (employees: 50, revenue: 5M,
-# size: small) were a stale snapshot inconsistent with classification.yaml
-# and with 01_Company_Context.md / 05_company_context.csv / the Case_01
-# reference output in Methodology-main. TinyTask is a MICRO case by design
-# (8 employees, EUR 2M revenue, security_fte 0.85).
 company:
-  name: "TinyTask Lda."              # era "TinyTask SaaS"
-  sector: "Technology/Software"      # era "technology"
-  size: "micro"                      # era "small"
-  employees: 8                       # era 50
-  revenue_eur: 2000000               # era 5000000
-  jurisdiction: "Portugal, EU"       # inalterado
+  name: TinyTask Lda.
+  sector: Technology/Software
+  size: micro
+  employees: 8
+  revenue_eur: 2000000
+  jurisdiction: Portugal, EU
   processes_personal_data: true
   places_digital_products_eu: true
   dora_financial_entity: false
-  nis2_sector: ""
+  nis2_sector: ''
   aiact_high_risk_system: false
-  technological_control_plane: "web application"
+  technological_control_plane: web application
   data_types:
-    - "email"
-    - "name"
-    - "password"
-    - "phone"
-    - "address"
+  - email
+  - name
+  - password
+  - phone
+  - address
   tech_stack:
-    - "python"
-    - "django"
-    - "postgresql"
-    - "aws"
-    - "react"
+  - python
+  - django
+  - postgresql
+  - aws
+  - react
   eu_data_subjects: 5000
-
 regulations:
-  - abbreviation: "GDPR"
-    name: "General Data Protection Regulation"
-    applicable: true
-    reason: "Processes personal data of EU residents (5000 data subjects); data_types include email, name, address, phone"
-    obligated_party: "CONTROLLER"
-  - abbreviation: "CRA"
-    name: "Cyber Resilience Act"
-    applicable: true
-    reason: "Places digital products with digital elements on EU market (web application SaaS)"
-    obligated_party: "MANUFACTURER"
-  - abbreviation: "NIS2"
-    name: "Network and Information Security Directive 2"
-    applicable: false
-    reason: "Not in NIS2 sector (technology/IT services, not Annex I/II); 50 employees below medium threshold"
-    obligated_party: ""
-  - abbreviation: "DORA"
-    name: "Digital Operational Resilience Act"
-    applicable: false
-    reason: "Not a financial entity per Art. 2(1); not an ICT third-party provider to financial entities"
-    obligated_party: ""
-  - abbreviation: "AIACT"
-    name: "Artificial Intelligence Act"
-    applicable: false
-    reason: "No high-risk AI system (Annex II product or Annex III use case); no AI system in scope"
-    obligated_party: ""
-
+- abbreviation: GDPR
+  name: General Data Protection Regulation
+  applicable: true
+  reason: Processes personal data of EU residents (5000 data subjects); data_types include email, name, address, phone
+  obligated_party: CONTROLLER
+- abbreviation: CRA
+  name: Cyber Resilience Act
+  applicable: true
+  reason: Places digital products with digital elements on EU market (web application SaaS)
+  obligated_party: MANUFACTURER
+- abbreviation: NIS2
+  name: Network and Information Security Directive 2
+  applicable: false
+  reason: Not in NIS2 sector (technology/IT services, not Annex I/II); 50 employees below medium threshold
+  obligated_party: ''
+- abbreviation: DORA
+  name: Digital Operational Resilience Act
+  applicable: false
+  reason: Not a financial entity per Art. 2(1); not an ICT third-party provider to financial entities
+  obligated_party: ''
+- abbreviation: AIACT
+  name: Artificial Intelligence Act
+  applicable: false
+  reason: No high-risk AI system (Annex II product or Annex III use case); no AI system in scope
+  obligated_party: ''
 subdomains:
-  # D-01: Data Protection & Encryption
-  - id: "SD-01.1"
-    name: "Data at Rest Encryption"
-    domain: "D-01"
-  - id: "SD-01.2"
-    name: "Data in Transit Encryption"
-    domain: "D-01"
-  - id: "SD-01.3"
-    name: "Cryptographic Key Management"
-    domain: "D-01"
-  - id: "SD-01.4"
-    name: "Data Integrity Mechanisms"
-    domain: "D-01"
-  # D-02: Vulnerability Management
-  - id: "SD-02.1"
-    name: "Vulnerability Identification"
-    domain: "D-02"
-  - id: "SD-02.2"
-    name: "Patch Management & Updates"
-    domain: "D-02"
-  - id: "SD-02.3"
-    name: "Coordinated Vulnerability Disclosure"
-    domain: "D-02"
-  - id: "SD-02.4"
-    name: "Threat-Led Penetration Testing"
-    domain: "D-02"
-  # D-03: Access Control
-  - id: "SD-03.1"
-    name: "Identity Lifecycle Management"
-    domain: "D-03"
-  - id: "SD-03.2"
-    name: "Multi-Factor Authentication"
-    domain: "D-03"
-  - id: "SD-03.3"
-    name: "Authorization & Least Privilege"
-    domain: "D-03"
-  - id: "SD-03.4"
-    name: "Secure System Defaults"
-    domain: "D-03"
-  # D-04: Incident Response
-  - id: "SD-04.1"
-    name: "Incident Detection & Triage"
-    domain: "D-04"
-  - id: "SD-04.2"
-    name: "Containment & Mitigation"
-    domain: "D-04"
-  - id: "SD-04.3"
-    name: "Regulatory Notification"
-    domain: "D-04"
-  - id: "SD-04.4"
-    name: "Data Restoration & Recovery"
-    domain: "D-04"
-  # D-05: Data Lifecycle
-  - id: "SD-05.1"
-    name: "Data Minimization"
-    domain: "D-05"
-  - id: "SD-05.2"
-    name: "Retention & Archiving"
-    domain: "D-05"
-  - id: "SD-05.3"
-    name: "Right to Erasure"
-    domain: "D-05"
-  - id: "SD-05.4"
-    name: "Data Portability"
-    domain: "D-05"
-  # D-06: Supply Chain
-  - id: "SD-06.1"
-    name: "Vendor Risk Assessment"
-    domain: "D-06"
-  - id: "SD-06.2"
-    name: "Software Bill of Materials (SBOM)"
-    domain: "D-06"
-  - id: "SD-06.3"
-    name: "Contractual Security Obligations"
-    domain: "D-06"
-  - id: "SD-06.4"
-    name: "Third-Party Boundary Management"
-    domain: "D-06"
-  # D-07: Secure Development
-  - id: "SD-07.1"
-    name: "Secure-by-Design Principles"
-    domain: "D-07"
-  - id: "SD-07.2"
-    name: "Secure Coding Practices"
-    domain: "D-07"
-  - id: "SD-07.3"
-    name: "CI/CD Pipeline Security"
-    domain: "D-07"
-  - id: "SD-07.4"
-    name: "Change Management"
-    domain: "D-07"
-  # D-08: Human Factors
-  - id: "SD-08.1"
-    name: "General Security Awareness"
-    domain: "D-08"
-  - id: "SD-08.2"
-    name: "Role-Specific Competence"
-    domain: "D-08"
-  - id: "SD-08.3"
-    name: "Management Board Training"
-    domain: "D-08"
-  # D-09: Governance & Documentation
-  - id: "SD-09.1"
-    name: "Information Security Policies"
-    domain: "D-09"
-  - id: "SD-09.2"
-    name: "Impact & Risk Assessments"
-    domain: "D-09"
-  - id: "SD-09.3"
-    name: "Asset Inventories"
-    domain: "D-09"
-  - id: "SD-09.4"
-    name: "Records of Processing"
-    domain: "D-09"
-  # D-10: Monitoring & Audit
-  - id: "SD-10.1"
-    name: "Continuous Security Monitoring"
-    domain: "D-10"
-  - id: "SD-10.2"
-    name: "Audit Logging & Traceability"
-    domain: "D-10"
-  - id: "SD-10.3"
-    name: "Compliance Testing"
-    domain: "D-10"
+- id: SD-01.1
+  name: Data at Rest Encryption
+  domain: D-01
+- id: SD-01.2
+  name: Data in Transit Encryption
+  domain: D-01
+- id: SD-01.3
+  name: Cryptographic Key Management
+  domain: D-01
+- id: SD-01.4
+  name: Data Integrity Mechanisms
+  domain: D-01
+- id: SD-02.1
+  name: Vulnerability Identification
+  domain: D-02
+- id: SD-02.2
+  name: Patch Management & Updates
+  domain: D-02
+- id: SD-02.3
+  name: Coordinated Vulnerability Disclosure
+  domain: D-02
+- id: SD-02.4
+  name: Threat-Led Penetration Testing
+  domain: D-02
+- id: SD-03.1
+  name: Identity Lifecycle Management
+  domain: D-03
+- id: SD-03.2
+  name: Multi-Factor Authentication
+  domain: D-03
+- id: SD-03.3
+  name: Authorization & Least Privilege
+  domain: D-03
+- id: SD-03.4
+  name: Secure System Defaults
+  domain: D-03
+- id: SD-04.1
+  name: Incident Detection & Triage
+  domain: D-04
+- id: SD-04.2
+  name: Containment & Mitigation
+  domain: D-04
+- id: SD-04.3
+  name: Regulatory Notification
+  domain: D-04
+- id: SD-04.4
+  name: Data Restoration & Recovery
+  domain: D-04
+- id: SD-05.1
+  name: Data Minimization
+  domain: D-05
+- id: SD-05.2
+  name: Retention & Archiving
+  domain: D-05
+- id: SD-05.3
+  name: Right to Erasure
+  domain: D-05
+- id: SD-05.4
+  name: Data Portability
+  domain: D-05
+- id: SD-06.1
+  name: Vendor Risk Assessment
+  domain: D-06
+- id: SD-06.2
+  name: Software Bill of Materials (SBOM)
+  domain: D-06
+- id: SD-06.3
+  name: Contractual Security Obligations
+  domain: D-06
+- id: SD-06.4
+  name: Third-Party Boundary Management
+  domain: D-06
+- id: SD-07.1
+  name: Secure-by-Design Principles
+  domain: D-07
+- id: SD-07.2
+  name: Secure Coding Practices
+  domain: D-07
+- id: SD-07.3
+  name: CI/CD Pipeline Security
+  domain: D-07
+- id: SD-07.4
+  name: Change Management
+  domain: D-07
+- id: SD-08.1
+  name: General Security Awareness
+  domain: D-08
+- id: SD-08.2
+  name: Role-Specific Competence
+  domain: D-08
+- id: SD-08.3
+  name: Management Board Training
+  domain: D-08
+- id: SD-09.1
+  name: Information Security Policies
+  domain: D-09
+- id: SD-09.2
+  name: Impact & Risk Assessments
+  domain: D-09
+- id: SD-09.3
+  name: Asset Inventories
+  domain: D-09
+- id: SD-09.4
+  name: Records of Processing
+  domain: D-09
+- id: SD-10.1
+  name: Continuous Security Monitoring
+  domain: D-10
+- id: SD-10.2
+  name: Audit Logging & Traceability
+  domain: D-10
+- id: SD-10.3
+  name: Compliance Testing
+  domain: D-10
+clause_mappings:
+- clause_id: GDPR-C01
+  regulation_id: REG-GDPR
+  article: Art. 1
+  description: Lawfulness of processing
+  maps_to_subdomain: D-05.1
+  normative_strength: 3
+  obligation_type: mandatory
+  obligated_party: controller
+- clause_id: GDPR-C02
+  regulation_id: REG-GDPR
+  article: Art. 2
+  description: Material scope
+  maps_to_subdomain: D-05.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C03
+  regulation_id: REG-GDPR
+  article: Art. 3
+  description: Territorial scope
+  maps_to_subdomain: D-09.2
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C04
+  regulation_id: REG-GDPR
+  article: Art. 5
+  description: Principles relating to processing
+  maps_to_subdomain: D-01.1
+  normative_strength: 3
+  obligation_type: mandatory
+  obligated_party:
+  - controller
+  - processor
+- clause_id: GDPR-C05
+  regulation_id: REG-GDPR
+  article: Art. 6
+  description: Lawfulness of processing
+  maps_to_subdomain: D-05.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C06
+  regulation_id: REG-GDPR
+  article: Art. 7
+  description: Conditions for consent
+  maps_to_subdomain: D-05.1
+  normative_strength: 3
+  obligation_type: conditional
+- clause_id: GDPR-C07
+  regulation_id: REG-GDPR
+  article: Art. 8
+  description: Conditions for child's consent
+  maps_to_subdomain: D-05.1
+  normative_strength: 2
+  obligation_type: conditional
+- clause_id: GDPR-C08
+  regulation_id: REG-GDPR
+  article: Art. 9
+  description: Processing of special categories
+  maps_to_subdomain: D-05.3
+  normative_strength: 3
+  obligation_type: prohibited
+- clause_id: GDPR-C09
+  regulation_id: REG-GDPR
+  article: Art. 12
+  description: Transparent information and communication
+  maps_to_subdomain: D-09.4
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C10
+  regulation_id: REG-GDPR
+  article: Art. 13
+  description: Information to be provided
+  maps_to_subdomain: D-09.4
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C11
+  regulation_id: REG-GDPR
+  article: Art. 14
+  description: Information to be provided to data subject
+  maps_to_subdomain: D-09.4
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C12
+  regulation_id: REG-GDPR
+  article: Art. 15
+  description: Right of access by data subject
+  maps_to_subdomain: D-05.4
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C13
+  regulation_id: REG-GDPR
+  article: Art. 16
+  description: Right to rectification
+  maps_to_subdomain: D-05.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C14
+  regulation_id: REG-GDPR
+  article: Art. 17
+  description: Right to erasure
+  maps_to_subdomain: D-05.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C15
+  regulation_id: REG-GDPR
+  article: Art. 18
+  description: Right to restriction of processing
+  maps_to_subdomain: D-05.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C16
+  regulation_id: REG-GDPR
+  article: Art. 19
+  description: Notification obligation
+  maps_to_subdomain: D-04.4
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C17
+  regulation_id: REG-GDPR
+  article: Art. 20
+  description: Right to data portability
+  maps_to_subdomain: D-05.4
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C18
+  regulation_id: REG-GDPR
+  article: Art. 21
+  description: Right to object
+  maps_to_subdomain: D-05.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C19
+  regulation_id: REG-GDPR
+  article: Art. 22
+  description: Automated decision-making
+  maps_to_subdomain: D-03.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C20
+  regulation_id: REG-GDPR
+  article: Art. 25
+  description: Data protection by design
+  maps_to_subdomain: D-07.1
+  normative_strength: 3
+  obligation_type: mandatory
+  obligated_party:
+  - controller
+  - processor
+- clause_id: GDPR-C21
+  regulation_id: REG-GDPR
+  article: Art. 28
+  description: Processor clauses (DPA, sub-processor auth, processing on instructions, security, audit, assistance)
+  maps_to_subdomain: D-06.3
+  normative_strength: 3
+  obligation_type: mandatory
+  obligated_party:
+  - controller
+  - processor
+- clause_id: GDPR-C22
+  regulation_id: REG-GDPR
+  article: Art. 30
+  description: Records of processing activities (Art. 30(1) controller, Art. 30(2) processor's own records)
+  maps_to_subdomain: D-09.4
+  normative_strength: 2
+  obligation_type: mandatory
+  obligated_party:
+  - controller
+  - processor
+- clause_id: GDPR-C23
+  regulation_id: REG-GDPR
+  article: Art. 31
+  description: Cooperation with supervisory authority
+  maps_to_subdomain: D-04.3
+  normative_strength: 3
+  obligation_type: mandatory
+  obligated_party:
+  - controller
+  - processor
+- clause_id: GDPR-C24
+  regulation_id: REG-GDPR
+  article: Art. 32
+  description: Security of processing (Art. 32(1) controller+processor; Art. 32(2) processor adherance to approved codes/certification)
+  maps_to_subdomain: D-01.1
+  normative_strength: 3
+  obligation_type: mandatory
+  obligated_party:
+  - controller
+  - processor
+- clause_id: GDPR-C25
+  regulation_id: REG-GDPR
+  article: Art. 33
+  description: Breach notification — Art. 33(1) controller to SA within 72h; Art. 33(2) processor to controller without undue delay
+  maps_to_subdomain: D-04.3
+  normative_strength: 3
+  obligation_type: mandatory
+  obligated_party:
+  - controller
+  - processor
+- clause_id: GDPR-C26
+  regulation_id: REG-GDPR
+  article: Art. 34
+  description: Breach notification to data subject
+  maps_to_subdomain: D-04.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C27
+  regulation_id: REG-GDPR
+  article: Art. 35
+  description: Data protection impact assessment
+  maps_to_subdomain: D-09.2
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: GDPR-C28
+  regulation_id: REG-GDPR
+  article: Art. 37
+  description: Designation of DPO
+  maps_to_subdomain: D-08.2
+  normative_strength: 2
+  obligation_type: conditional
+  obligated_party:
+  - controller
+  - processor
+- clause_id: CRA-C01
+  regulation_id: REG-CRA
+  article: Art. 1
+  description: Subject matter and scope
+  maps_to_subdomain: D-07.1
+  normative_strength: 3
+  obligation_type: mandatory
+  obligated_party: manufacturer
+- clause_id: CRA-C02
+  regulation_id: REG-CRA
+  article: Art. 2
+  description: Definitions
+  maps_to_subdomain: D-07.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C03
+  regulation_id: REG-CRA
+  article: Art. 3
+  description: Security requirements
+  maps_to_subdomain: D-03.4
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C04
+  regulation_id: REG-CRA
+  article: Art. 4
+  description: Vulnerability handling
+  maps_to_subdomain: D-02.2
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C05
+  regulation_id: REG-CRA
+  article: Art. 5
+  description: Security updates
+  maps_to_subdomain: D-02.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C06
+  regulation_id: REG-CRA
+  article: Art. 6
+  description: Incident reporting
+  maps_to_subdomain: D-04.1
+  normative_strength: 2
+  obligation_type: mandatory
+- clause_id: CRA-C07
+  regulation_id: REG-CRA
+  article: Art. 7
+  description: Supply chain security
+  maps_to_subdomain: D-06.2
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C08
+  regulation_id: REG-CRA
+  article: Art. 8
+  description: Secure defaults
+  maps_to_subdomain: D-03.4
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C09
+  regulation_id: REG-CRA
+  article: Art. 9
+  description: Password security
+  maps_to_subdomain: D-03.2
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C10
+  regulation_id: REG-CRA
+  article: Art. 10
+  description: Identity authentication
+  maps_to_subdomain: D-03.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C11
+  regulation_id: REG-CRA
+  article: Art. 11
+  description: Data erasure
+  maps_to_subdomain: D-05.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C12
+  regulation_id: REG-CRA
+  article: Art. 12
+  description: Availability at end of support
+  maps_to_subdomain: D-10.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C13
+  regulation_id: REG-CRA
+  article: Art. 13
+  description: Technical documentation
+  maps_to_subdomain: D-09.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C14
+  regulation_id: REG-CRA
+  article: Art. 14
+  description: Conformity assessment
+  maps_to_subdomain: D-10.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C15
+  regulation_id: REG-CRA
+  article: Art. 15
+  description: CE marking
+  maps_to_subdomain: D-01.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C16
+  regulation_id: REG-CRA
+  article: Art. 16
+  description: Market surveillance
+  maps_to_subdomain: D-06.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C17
+  regulation_id: REG-CRA
+  article: Art. 17
+  description: Essential requirements for ICT products
+  maps_to_subdomain: D-02.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C18
+  regulation_id: REG-CRA
+  article: Art. 18
+  description: Security by design
+  maps_to_subdomain: D-07.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C19
+  regulation_id: REG-CRA
+  article: Art. 19
+  description: Vulnerability handling and disclosure
+  maps_to_subdomain: D-02.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C20
+  regulation_id: REG-CRA
+  article: Art. 20
+  description: Reporting incidents
+  maps_to_subdomain: D-04.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C21
+  regulation_id: REG-CRA
+  article: Art. 21
+  description: EU declarative conformity
+  maps_to_subdomain: D-10.3
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C22
+  regulation_id: REG-CRA
+  article: Art. 22
+  description: Traceability
+  maps_to_subdomain: D-10.2
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C23
+  regulation_id: REG-CRA
+  article: Art. 23
+  description: Software security
+  maps_to_subdomain: D-07.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C24
+  regulation_id: REG-CRA
+  article: Art. 24
+  description: Encrypted data storage
+  maps_to_subdomain: D-01.1
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C25
+  regulation_id: REG-CRA
+  article: Art. 25
+  description: Unauthorised access prevention
+  maps_to_subdomain: D-01.2
+  normative_strength: 3
+  obligation_type: mandatory
+- clause_id: CRA-C26
+  regulation_id: REG-CRA
+  article: Art. 26
+  description: Resilience to outages
+  maps_to_subdomain: D-04.4
+  normative_strength: 3
+  obligation_type: mandatory
