@@ -58,6 +58,11 @@ python -m scripts.runs_tools.link_run --all --rebuild
 | 2026-09-02 | 1867429  | `granite4_2_30b_scout_1867429`         | scout       | completed (36min)       |
 | 2026-09-02 | 1867430  | `nemotron3_5_30b_scout_1867430`       | scout       | completed (15min)       |
 | 2026-09-02 | 1867431  | `muse_glimmer_30b_scout_1867431`       | scout       | completed (33min)       |
+| 2026-09-02 | 1869715  | `ornith_35b_full_1869715`              | scout-full  | em curso (60min 8h budget) |
+| 2026-09-02 | 1870003  | `mistral_7b_full_1870003`              | scout-full  | em curso (40GB)        |
+| 2026-09-02 | 1870004  | `phi4_14b_full_1870004`                | scout-full  | em curso (40GB)        |
+| 2026-09-02 | 1870005  | `qwen3_14b_full_1870005`               | scout-full  | em curso (40GB)        |
+| 2026-09-02 | 1870006  | `gemma3_4b_full_1870006`               | scout-full  | em curso (40GB)        |
 
 ## Índice por modelo (bucket `by_model/`)
 
