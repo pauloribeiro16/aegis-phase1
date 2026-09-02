@@ -1,7 +1,7 @@
 """Unit tests for TransformersInvoker (CORR-056).
 
 These tests mock the HF transformers library so we don't actually load
-the 9.6GB gemma-4-E2B-it model — the goal is to verify the contract
+the Qwen3.8-Flash-Next weights — the goal is to verify the contract
 of :class:`aegis_phase1.llm.transformers_invoker.TransformersInvoker`:
 
   - Lazy load (init does NOT load the model)
@@ -83,7 +83,7 @@ def _make_invoker(monkeypatch, **kwargs):
     _install_transformers_stub(monkeypatch)
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it", **kwargs)
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next", **kwargs)
     return inv, *sys.modules["transformers"].__dict__["AutoTokenizer"].return_value, \
         sys.modules["transformers"].__dict__["AutoModelForCausalLM"].return_value
 
@@ -94,8 +94,8 @@ def _make_invoker(monkeypatch, **kwargs):
 def test_strip_hf_prefix():
     from aegis_phase1.llm.transformers_invoker import _strip_hf_prefix
 
-    assert _strip_hf_prefix("hf:google/gemma-4-E2B-it") == "google/gemma-4-E2B-it"
-    assert _strip_hf_prefix("google/gemma-4-E2B-it") == "google/gemma-4-E2B-it"
+    assert _strip_hf_prefix("hf:Qwen/Qwen3.8-Flash-Next") == "Qwen/Qwen3.8-Flash-Next"
+    assert _strip_hf_prefix("Qwen/Qwen3.8-Flash-Next") == "Qwen/Qwen3.8-Flash-Next"
     assert _strip_hf_prefix("gemma4:e4b") == "gemma4:e4b"
     assert _strip_hf_prefix("") == ""
 
@@ -112,8 +112,8 @@ def test_detect_provider_ollama():
 def test_detect_provider_transformers():
     from aegis_phase1.llm.transformers_invoker import _detect_provider
 
-    assert _detect_provider("google/gemma-4-E2B-it") == "transformers"
-    assert _detect_provider("hf:google/gemma-4-E2B-it") == "transformers"
+    assert _detect_provider("Qwen/Qwen3.8-Flash-Next") == "transformers"
+    assert _detect_provider("hf:Qwen/Qwen3.8-Flash-Next") == "transformers"
     assert _detect_provider("meta-llama/Llama-3-8B") == "transformers"
 
 
@@ -125,12 +125,12 @@ def test_init_does_not_load_model(monkeypatch):
     _install_transformers_stub(monkeypatch)
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
 
     tf = sys.modules["transformers"]
     tf.AutoTokenizer.from_pretrained.assert_not_called()
     tf.AutoModelForCausalLM.from_pretrained.assert_not_called()
-    assert inv.model_id == "google/gemma-4-E2B-it"
+    assert inv.model_id == "Qwen/Qwen3.8-Flash-Next"
     assert inv._model is None
     assert inv._tokenizer is None
 
@@ -139,9 +139,9 @@ def test_init_strips_hf_prefix(monkeypatch):
     _install_transformers_stub(monkeypatch)
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker
 
-    inv = TransformersInvoker("hf:google/gemma-4-E2B-it")
-    assert inv.model == "google/gemma-4-E2B-it"
-    assert inv.model_id == "google/gemma-4-E2B-it"
+    inv = TransformersInvoker("hf:Qwen/Qwen3.8-Flash-Next")
+    assert inv.model == "Qwen/Qwen3.8-Flash-Next"
+    assert inv.model_id == "Qwen/Qwen3.8-Flash-Next"
 
 
 def test_init_uses_hf_home_env(monkeypatch):
@@ -149,7 +149,7 @@ def test_init_uses_hf_home_env(monkeypatch):
     monkeypatch.setenv("HF_HOME", "/tmp/custom-hf-cache")
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     assert inv.cache_dir == "/tmp/custom-hf-cache"
 
 
@@ -158,7 +158,7 @@ def test_init_uses_default_cache_when_no_env(monkeypatch):
     monkeypatch.delenv("HF_HOME", raising=False)
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker, _DEFAULT_HF_HOME
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     assert inv.cache_dir == _DEFAULT_HF_HOME
     assert _DEFAULT_HF_HOME.startswith("/media")  # CORR-056: 500G disk
 
@@ -208,7 +208,7 @@ def test_invoke_loads_and_returns_canonical_dict(monkeypatch):
     model = tf.AutoModelForCausalLM.from_pretrained.return_value
     _mocked_model_with_generate(model, n_input_tokens=5, n_output_tokens=8)
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it", max_new_tokens=128)
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next", max_new_tokens=128)
     result = inv.invoke("Write a joke about RAM.")
 
     # Verify the load happened
@@ -237,7 +237,7 @@ def test_invoke_appends_feedback_on_retry(monkeypatch):
     model = tf.AutoModelForCausalLM.from_pretrained.return_value
     _mocked_model_with_generate(model, n_output_tokens=2)
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     inv.invoke("Original prompt.", feedback="missing Status section")
 
     # The chat template should have received a user message containing both
@@ -263,7 +263,7 @@ def test_invoke_disable_thinking_passed_to_chat_template(monkeypatch):
     model = tf.AutoModelForCausalLM.from_pretrained.return_value
     _mocked_model_with_generate(model, n_output_tokens=1)
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it", enable_thinking=False)
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next", enable_thinking=False)
     inv.invoke("hi")
 
     kwargs = tokenizer.apply_chat_template.call_args.kwargs
@@ -282,7 +282,7 @@ def test_invoke_uses_deterministic_generation(monkeypatch):
     model = tf.AutoModelForCausalLM.from_pretrained.return_value
     _mocked_model_with_generate(model, n_output_tokens=1)
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     inv.invoke("hi")
 
     gen_kwargs = model.generate.call_args.kwargs
@@ -299,9 +299,9 @@ def test_build_llm_invoker_auto_detects_transformers_from_slash(monkeypatch):
     monkeypatch.delenv("MOCK_LLM", raising=False)
     from aegis_phase1.v2.llm import build_llm_invoker, TransformersInvoker
 
-    inv = build_llm_invoker(model="google/gemma-4-E2B-it")
+    inv = build_llm_invoker(model="Qwen/Qwen3.8-Flash-Next")
     assert isinstance(inv, TransformersInvoker)
-    assert inv.model_id == "google/gemma-4-E2B-it"
+    assert inv.model_id == "Qwen/Qwen3.8-Flash-Next"
 
 
 def test_build_llm_invoker_explicit_provider_ollama(monkeypatch):
@@ -311,9 +311,9 @@ def test_build_llm_invoker_explicit_provider_ollama(monkeypatch):
     from aegis_phase1.v2.llm import build_llm_invoker, UnifiedInvoker
 
     # Use a real, valid Ollama model name; UnifiedInvoker is built (no probe yet)
-    inv = build_llm_invoker(model="google/gemma-4-E2B-it", provider="ollama")
+    inv = build_llm_invoker(model="Qwen/Qwen3.8-Flash-Next", provider="ollama")
     assert isinstance(inv, UnifiedInvoker)
-    assert inv.model == "google/gemma-4-E2B-it"
+    assert inv.model == "Qwen/Qwen3.8-Flash-Next"
 
 
 def test_build_llm_invoker_explicit_provider_transformers(monkeypatch):
@@ -333,7 +333,7 @@ def test_build_llm_invoker_mock_overrides_provider(monkeypatch):
     from aegis_phase1.v2.llm import build_llm_invoker, MockInvoker
 
     inv = build_llm_invoker(
-        model="google/gemma-4-E2B-it", provider="transformers"
+        model="Qwen/Qwen3.8-Flash-Next", provider="transformers"
     )
     assert isinstance(inv, MockInvoker)
 
@@ -354,7 +354,7 @@ def test_max_memory_uses_90_percent_of_vram_by_default(monkeypatch):
 
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     budget = inv._max_memory()
     assert budget is not None
     assert 0 in budget
@@ -378,7 +378,7 @@ def test_max_memory_respects_custom_utilization(monkeypatch):
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker
 
     inv = TransformersInvoker(
-        "google/gemma-4-E2B-it", gpu_memory_utilization=0.7
+        "Qwen/Qwen3.8-Flash-Next", gpu_memory_utilization=0.7
     )
     budget = inv._max_memory()
     # 8.0 * 0.7 - 0.2 = 5.4 GiB
@@ -394,7 +394,7 @@ def test_max_memory_returns_none_without_cuda(monkeypatch):
 
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     assert inv._max_memory() is None
 
 
@@ -403,7 +403,7 @@ def test_default_attn_implementation_is_sdpa(monkeypatch):
     _install_transformers_stub(monkeypatch)
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     assert inv.attn_implementation == "sdpa"
 
 
@@ -430,7 +430,7 @@ def test_default_dtype_is_auto_resolves_to_bfloat16(monkeypatch):
 
     from aegis_phase1.llm.transformers_invoker import TransformersInvoker
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     inv.invoke("hi")
 
     # dtype='auto' → resolved to torch.bfloat16
@@ -461,7 +461,7 @@ def test_invoke_with_system_prompt_separate_role(monkeypatch):
     model = tf.AutoModelForCausalLM.from_pretrained.return_value
     _mocked_model_with_generate(model, n_output_tokens=1)
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     inv.invoke("user message", system_prompt="you are a compliance analyst")
 
     call_args = tokenizer.apply_chat_template.call_args
@@ -485,7 +485,7 @@ def test_invoke_without_system_prompt_keeps_legacy_user_only(monkeypatch):
     model = tf.AutoModelForCausalLM.from_pretrained.return_value
     _mocked_model_with_generate(model, n_output_tokens=1)
 
-    inv = TransformersInvoker("google/gemma-4-E2B-it")
+    inv = TransformersInvoker("Qwen/Qwen3.8-Flash-Next")
     inv.invoke("just a user message")
 
     call_args = tokenizer.apply_chat_template.call_args

@@ -3,7 +3,7 @@
 Alternative to :class:`aegis_phase1.llm.unified.UnifiedInvoker` (which
 targets Ollama). Uses Hugging Face ``transformers`` directly to load
 and run models from the Hub — useful for testing against canonical
-research models (e.g. ``google/gemma-4-E2B-it``) without requiring
+research models (e.g. ``Qwen/Qwen3.8-Flash-Next``) without requiring
 Ollama to be installed locally.
 
 Interface:
@@ -49,8 +49,8 @@ _DEFAULT_HF_HOME = "/media/epmq-cyber/191a70fe-626c-409b-a8ca-caed8a953c33/hf_ca
 def _strip_hf_prefix(model: str) -> str:
     """Strip the ``hf:`` prefix used in CLI choices to mark HF Hub models.
 
-    >>> _strip_hf_prefix("hf:google/gemma-4-E2B-it")
-    'google/gemma-4-E2B-it'
+    >>> _strip_hf_prefix("hf:Qwen/Qwen3.8-Flash-Next")
+    'Qwen/Qwen3.8-Flash-Next'
     """
     if model.startswith("hf:"):
         return model[3:]
@@ -67,13 +67,13 @@ def _detect_provider(model: str | None) -> str:
     ``"vllm"`` if it has the ``vllm:`` prefix (OpenAI-compatible HTTP
     server, e.g. vLLM — CORR-110); otherwise ``"ollama"`` (default).
 
-    >>> _detect_provider("google/gemma-4-E2B-it")
+    >>> _detect_provider("Qwen/Qwen3.8-Flash-Next")
     'transformers'
-    >>> _detect_provider("hf:google/gemma-4-E2B-it")
+    >>> _detect_provider("hf:Qwen/Qwen3.8-Flash-Next")
     'transformers'
     >>> _detect_provider("minimax/MiniMax-M3")
     'minimax'
-    >>> _detect_provider("vllm:gemma4-31b")
+    >>> _detect_provider("vllm:qwen3.8-flash-next")
     'vllm'
     >>> _detect_provider("gemma4:e4b")
     'ollama'
@@ -83,7 +83,7 @@ def _detect_provider(model: str | None) -> str:
     if model.startswith("minimax/"):
         return "minimax"
     # CORR-110: explicit vLLM prefix — disambiguates from HF transformers
-    # so a user can pass `--model vllm:google/gemma-4-31B-it` and the
+    # so a user can pass `--model vllm:Qwen/Qwen3.8-Flash-Next` and the
     # pipeline routes through ChatOpenAICompat (HTTP) instead of
     # loading the model in-process with TransformersInvoker.
     if model.startswith("vllm:"):
@@ -97,7 +97,7 @@ class TransformersInvoker:
     """LLM invoker backed by Hugging Face ``transformers`` (text-only path).
 
     Args:
-        model_id: HF Hub model identifier (e.g. ``"google/gemma-4-E2B-it"``).
+        model_id: HF Hub model identifier (e.g. ``"Qwen/Qwen3.8-Flash-Next"``).
             The ``hf:`` prefix is accepted and stripped.
         max_new_tokens: Max tokens to generate per call. Default 1024.
         enable_thinking: Whether to enable Gemma 4's native thinking mode.
@@ -137,7 +137,7 @@ class TransformersInvoker:
         """Build a TransformersInvoker.
 
         Args:
-            model_id: HF Hub model identifier (e.g. ``"google/gemma-4-E2B-it"``).
+            model_id: HF Hub model identifier (e.g. ``"Qwen/Qwen3.8-Flash-Next"``).
                 The ``hf:`` prefix is accepted and stripped.
             max_new_tokens: Max tokens to generate per call. Default 1024.
             enable_thinking: Whether to enable Gemma 4's native thinking mode.
@@ -215,15 +215,15 @@ class TransformersInvoker:
         """Lazy-load tokenizer + model. Called by :meth:`invoke`.
 
         CORR-056: uses ``AutoTokenizer`` (text-only path) instead of
-        ``AutoProcessor``. The Gemma 4 ``Gemma4Processor`` requires
-        ``torchvision`` at import time (multimodal image processor
-        chain), which we don't need for Phase 1's text-only regulatory
-        analysis. The tokenizer is shared across ``gemma``/``gemma2``/
-        ``gemma3``/``gemma4`` so text-only inference works correctly.
+        ``AutoProcessor``. Many HF multimodal checkpoints ship a
+        ``*Processor`` class that pulls in ``torchvision`` at import
+        time (image processor chain), which we don't need for Phase 1's
+        text-only regulatory analysis. The language model head is
+        identical in both wrappers, so text-only inference is unaffected.
 
         Loading strategy (CORR-056, optimised for max GPU usage):
-          - ``torch_dtype=torch.bfloat16`` (halves VRAM vs FP32; Gemma 4
-            is trained in BF16 — no precision loss)
+          - ``torch_dtype=torch.bfloat16`` (halves VRAM vs FP32; modern
+            LLMs are trained in BF16 — no precision loss)
           - ``attn_implementation="sdpa"`` (Scaled Dot-Product Attention;
             ~30% less VRAM than the eager default on supported GPUs)
           - ``max_memory={"0": "<X>GiB", "cpu": "30GiB"}`` (cap GPU usage

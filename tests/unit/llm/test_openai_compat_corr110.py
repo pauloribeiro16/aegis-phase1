@@ -5,8 +5,9 @@ Reference: ``00_METHODOLOGY/PROMPTS/P1B-LLM-01-INTERPRETATION.md``
 via the LangChain ``BaseChatModel`` interface. ``ChatOpenAICompat`` is
 the adapter that lets any OpenAI-compatible HTTP server (vLLM, TGI,
 SGLang) sit behind ``UnifiedInvoker`` so we can evaluate models that
-the local Ollama 0.31.1 daemon cannot serve (e.g. gemma-4-31B-it on
-JOB 1846584 — the OOAC failure that motivated CORR-110).
+the local Ollama 0.31.1 daemon cannot serve (e.g. ``Qwen/Qwen3.8-Flash-Next``
+on the original CORR-110 pilot — the OOM / factory-routing failure that
+motivated the vLLM provider).
 
 These tests:
   1. Verify the request body + URL + headers shape (OpenAI chat
@@ -23,7 +24,7 @@ These tests:
      ``_ensure_ollama`` probe is skipped.
   7. Verify ``_detect_provider`` recognises the ``vllm:`` prefix and
      does NOT misroute to ``transformers`` (a HF Hub id can look like
-     ``vllm:google/gemma-4-31B-it``).
+     ``vllm:Qwen/Qwen3.8-Flash-Next``).
 """
 
 from __future__ import annotations
@@ -204,7 +205,7 @@ def test_generate_posts_correct_request_and_parses_response():
 
     payload = {
         "id": "chatcmpl-abc123",
-        "model": "gemma4-31b",
+        "model": "qwen3.8-flash-next",
         "choices": [
             {
                 "index": 0,
@@ -218,7 +219,7 @@ def test_generate_posts_correct_request_and_parses_response():
     mock_client = _mock_httpx_client(mock_resp)
 
     chat = ChatOpenAICompat(
-        model="gemma4-31b",
+        model="qwen3.8-flash-next",
         base_url="http://node01:8000/v1",
         max_tokens=2048,
         temperature=0.0,
@@ -241,7 +242,7 @@ def test_generate_posts_correct_request_and_parses_response():
         "output_tokens": 56,
         "total_tokens": 1290,
     }
-    assert msg.response_metadata["model"] == "gemma4-31b"
+    assert msg.response_metadata["model"] == "qwen3.8-flash-next"
     assert msg.response_metadata["finish_reason"] == "stop"
 
     # Request shape: URL, body, headers
@@ -251,7 +252,7 @@ def test_generate_posts_correct_request_and_parses_response():
     headers = call_args.kwargs["headers"]
 
     assert url == "http://node01:8000/v1/chat/completions"
-    assert body["model"] == "gemma4-31b"
+    assert body["model"] == "qwen3.8-flash-next"
     assert body["max_tokens"] == 2048
     assert body["temperature"] == 0.0
     assert body["stream"] is False
@@ -385,14 +386,14 @@ def test_unified_invoker_with_vllm_provider():
     from aegis_phase1.llm.unified import UnifiedInvoker
 
     invoker = UnifiedInvoker(
-        model="gemma4-31b",
+        model="qwen3.8-flash-next",
         provider="vllm",
         api_key="sk-test",
     )
 
     assert isinstance(invoker.chat, ChatOpenAICompat)
     assert invoker.provider == "vllm"
-    assert invoker.model == "gemma4-31b"
+    assert invoker.model == "qwen3.8-flash-next"
     assert invoker.chat.base_url == DEFAULT_BASE_URL
 
 
@@ -401,7 +402,7 @@ def test_unified_invoker_vllm_base_url_override():
     from aegis_phase1.llm.unified import UnifiedInvoker
 
     invoker = UnifiedInvoker(
-        model="gemma4-31b",
+        model="qwen3.8-flash-next",
         provider="vllm",
         base_url="http://node07:8000/v1",
     )
@@ -414,13 +415,13 @@ def test_build_llm_invoker_routes_vllm_to_unified():
     from aegis_phase1.v2.llm import build_llm_invoker
 
     invoker = build_llm_invoker(
-        model="vllm:gemma4-31b",
+        model="vllm:qwen3.8-flash-next",
         provider="vllm",
     )
     assert isinstance(invoker, UnifiedInvoker)
     assert invoker.provider == "vllm"
     # "vllm:" prefix stripped → bare served-model-name
-    assert invoker.model == "gemma4-31b"
+    assert invoker.model == "qwen3.8-flash-next"
 
 
 def test_build_llm_invoker_auto_detects_vllm_prefix():
@@ -429,21 +430,21 @@ def test_build_llm_invoker_auto_detects_vllm_prefix():
     from aegis_phase1.llm.unified import UnifiedInvoker
     from aegis_phase1.v2.llm import build_llm_invoker
 
-    invoker = build_llm_invoker(model="vllm:google/gemma-4-31B-it")
+    invoker = build_llm_invoker(model="vllm:Qwen/Qwen3.8-Flash-Next")
     assert isinstance(invoker, UnifiedInvoker)
     assert invoker.provider == "vllm"
-    assert invoker.model == "google/gemma-4-31B-it"
+    assert invoker.model == "Qwen/Qwen3.8-Flash-Next"
 
 
 def test_detect_provider_recognises_vllm_prefix():
     from aegis_phase1.llm.transformers_invoker import _detect_provider
 
-    assert _detect_provider("vllm:gemma4-31b") == "vllm"
-    assert _detect_provider("vllm:google/gemma-4-31B-it") == "vllm"
+    assert _detect_provider("vllm:qwen3.8-flash-next") == "vllm"
+    assert _detect_provider("vllm:Qwen/Qwen3.8-Flash-Next") == "vllm"
     # Sanity: existing prefixes unchanged
     assert _detect_provider("minimax/MiniMax-M3") == "minimax"
-    assert _detect_provider("google/gemma-4-E2B-it") == "transformers"
-    assert _detect_provider("hf:google/gemma-4-E2B-it") == "transformers"
+    assert _detect_provider("Qwen/Qwen3.8-Flash-Next") == "transformers"
+    assert _detect_provider("hf:Qwen/Qwen3.8-Flash-Next") == "transformers"
     assert _detect_provider("gemma4:e4b") == "ollama"
     assert _detect_provider(None) == "ollama"
 
@@ -455,7 +456,7 @@ def test_unified_invoker_vllm_skips_ollama_probe():
     even when the vLLM server is up)."""
     from aegis_phase1.llm.unified import UnifiedInvoker
 
-    invoker = UnifiedInvoker(model="gemma4-31b", provider="vllm")
+    invoker = UnifiedInvoker(model="qwen3.8-flash-next", provider="vllm")
 
     with patch("aegis_phase1.llm.unified.probe_ollama") as mock_probe:
         # Should be a no-op for vLLM, regardless of source.
@@ -471,7 +472,7 @@ def test_unified_invoker_vllm_chat_uses_env_timeout(monkeypatch):
     from aegis_phase1.llm.unified import UnifiedInvoker
 
     monkeypatch.setenv("AEGIS_VLLM_TIMEOUT", "90")
-    invoker = UnifiedInvoker(model="gemma4-31b", provider="vllm")
+    invoker = UnifiedInvoker(model="qwen3.8-flash-next", provider="vllm")
     assert isinstance(invoker.chat, ChatOpenAICompat)
     assert invoker.chat.timeout == 90.0
 
@@ -552,7 +553,7 @@ def test_factory_get_invoker_with_vllm_provider():
     from aegis_phase1.llm.unified import UnifiedInvoker
     from aegis_phase1.prompts_v2.factory import get_invoker
 
-    invoker = get_invoker(provider="vllm", model="gemma4-31b")
+    invoker = get_invoker(provider="vllm", model="qwen3.8-flash-next")
     assert isinstance(invoker, UnifiedInvoker)
     assert invoker.provider == "vllm"
     assert isinstance(invoker.chat, ChatOpenAICompat)

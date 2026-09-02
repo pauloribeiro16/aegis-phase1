@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=aegis_scout_vllm_gemma4_31b
+#SBATCH --job-name=aegis_scout_vllm_qwen_flash_next
 #SBATCH --gres=gpu:a100:2
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
@@ -11,27 +11,31 @@
 #SBATCH -N 1
 #SBATCH --signal=B:30@60
 #SBATCH --chdir=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1
-#SBATCH --out=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-scout-vllm-gemma4-31b-%j.out
-#SBATCH --err=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-scout-vllm-gemma4-31b-%j.err
+#SBATCH --out=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-scout-vllm-qwen-flash-next-%j.out
+#SBATCH --err=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-scout-vllm-qwen-flash-next-%j.err
 #
-# AEGIS scout — gemma-4-31B-it via vLLM on the cluster.
+# AEGIS scout — Qwen3.8-Flash-Next (HuggingFace repo Qwen/Qwen3.8-Flash-Next)
+# served via vLLM on the cluster.
 #
 # CORR-110 — pilot recipe. Uses vLLM (HTTP OpenAI-compatible) instead
-# of the HF transformers path that failed in JOB 1846584 (the in-process
-# transformers provider died at the invoker factory because the
+# of the HF transformers path that broke on the invoker factory (the
 # factory probed Ollama at localhost:11434 which is absent on
-# Deucalion). vLLM is a real serving daemon: it loads the model on the
-# node's GPUs and exposes OpenAI chat-completions on port 8000.
+# Deucalion — JOB 1846584 abort). vLLM is a real serving daemon: it
+# loads the model on the node's GPUs and exposes OpenAI chat-
+# completions on port 8000.
 #
 # The pipeline connects to vLLM via ChatOpenAICompat
-# (``--provider vllm --model 'vllm:gemma4-31b'``); env vars
+# (``--provider vllm --model 'vllm:qwen3.8-flash-next'``); env vars
 # ``AEGIS_VLLM_BASE_URL`` (default http://localhost:8000/v1) and
 # ``AEGIS_VLLM_TIMEOUT`` (default 600s) override defaults without
 # touching code.
 #
-# Why TP=2: 31B BF16 ≈ 62 GB. A single A100-40GB cannot hold the
-# weights + KV cache; splitting across 2 GPUs gives ~26 GB per device
-# with VLLM_GPU_MEMORY_UTILIZATION=0.85 + max-model-len=16384.
+# Why TP=2: Qwen3.8-Flash-Next in BF16 is a multi-GPU fit by default.
+# A single A100-40GB will not hold the weights + KV cache; splitting
+# across 2 GPUs gives ~26 GB per device with
+# VLLM_GPU_MEMORY_UTILIZATION=0.85 + max-model-len=16384. If the model
+# actually fits on a single A100-80GB, drop ``--gres=gpu:a100:2`` and
+# ``--tensor-parallel-size`` to 1.
 #
 # Why this scout is run-all by default (and not Phase-1B only): the
 # whole point of vLLM over the transformers provider is that REDUCE-LLM
@@ -40,11 +44,11 @@
 # execution/reports/model_matrix.md are apples-to-apples.
 #
 # Submit:
-#   sbatch examples/deucalion/scout-vllm-gemma431b-aegis.sbatch
+#   sbatch examples/deucalion/scout-vllm-qwen-flash-next-aegis.sbatch
 #
 # Override defaults via env on the submit line:
 #   sbatch --export=VLLM_MAX_MODEL_LEN=8192,VLLM_GPU_MEMORY_UTILIZATION=0.80 \
-#          examples/deucalion/scout-vllm-gemma431b-aegis.sbatch
+#          examples/deucalion/scout-vllm-qwen-flash-next-aegis.sbatch
 
 set -euo pipefail
 umask 077
@@ -53,11 +57,11 @@ BD="/projects/F202512235CPCAA1/CyberMetric_Deucalion"
 PROJ="$BD/aegis-phase1"
 LOG_DIR="$BD/aegis-phase1/logs/scout_runs"
 mkdir -p "$LOG_DIR"
-RUN_LOG="$LOG_DIR/scout_vllm_gemma4_31b_${SLURM_JOB_ID}.log"
+RUN_LOG="$LOG_DIR/scout_vllm_qwen3_8_flash_next_${SLURM_JOB_ID}.log"
 exec >>"$RUN_LOG" 2>&1
 
 # --- Config (override via env on sbatch line) ---
-: "${VLLM_MODEL:=$BD/models/hf/google_gemma-4-31B-it}"
+: "${VLLM_MODEL:=$BD/models/hf/Qwen_Qwen3.8-Flash-Next}"
 : "${VLLM_PORT:=8000}"
 : "${VLLM_MAX_MODEL_LEN:=16384}"
 : "${VLLM_GPU_MEMORY_UTILIZATION:=0.85}"
@@ -65,10 +69,10 @@ exec >>"$RUN_LOG" 2>&1
 : "${AEGIS_SCOPE:=run-all}"   # 'phase-1b' for the cheap scout, 'run-all' for the full
 export VLLM_MODEL VLLM_PORT VLLM_MAX_MODEL_LEN VLLM_GPU_MEMORY_UTILIZATION VLLM_DTYPE
 export AEGIS_VLLM_BASE_URL="http://127.0.0.1:${VLLM_PORT}/v1"
-export AEGIS_VLLM_TIMEOUT=900   # 31B rationale can run long
+export AEGIS_VLLM_TIMEOUT=900   # long rationales on Flash-Next
 
 # --- Served model name the pipeline asks for (must match vllm --served-model-name) ---
-SERVED_NAME="gemma4-31b"
+SERVED_NAME="qwen3.8-flash-next"
 
 # --- vLLM environment (cybermetric venv reuses the cluster venv) ---
 VENV_PATH="${AEGIS_VLLM_VENV:-$BD/aegis-venv-root}"
@@ -84,9 +88,10 @@ mkdir -p "$JOB_TMP"
 VLLM_LOG="$JOB_TMP/vllm.log"
 
 echo "=================================================="
-echo " vLLM SCOUT — gemma-4-31B-it (CORR-110 pilot)"
+echo " vLLM SCOUT — Qwen3.8-Flash-Next (CORR-110)"
 echo " Job       : $SLURM_JOB_ID on $(hostname)"
-echo " Model     : $VLLM_MODEL"
+echo " HF repo   : Qwen/Qwen3.8-Flash-Next"
+echo " Weights   : $VLLM_MODEL"
 echo " Served as : $SERVED_NAME"
 echo " Port      : $VLLM_PORT"
 echo " Scope     : $AEGIS_SCOPE"
@@ -187,11 +192,11 @@ echo "=== running scout ($AEGIS_SCOPE) ==="
 case "$AEGIS_SCOPE" in
   phase-1b)
     RUN_FLAG="--run-phase-1b"
-    OUT_DIR="output/scout_vllm_gemma4_31b_${SLURM_JOB_ID}"
+    OUT_DIR="output/scout_vllm_qwen3_8_flash_next_${SLURM_JOB_ID}"
     ;;
   run-all)
     RUN_FLAG="--run-all"
-    OUT_DIR="output/scout_full_vllm_gemma4_31b_${SLURM_JOB_ID}"
+    OUT_DIR="output/scout_full_vllm_qwen3_8_flash_next_${SLURM_JOB_ID}"
     ;;
   *)
     echo "FATAL: AEGIS_SCOPE=$AEGIS_SCOPE (expected phase-1b or run-all)"

@@ -48,8 +48,9 @@ Auth:
 Used by :class:`aegis_phase1.llm.unified.UnifiedInvoker` when the user
 passes ``--provider vllm`` to the runner, or by
 ``prompts_v2/invoker._attempt`` for the heavy (Phase 1C) path.
-Default model is ``"gemma4-31b"`` (matches the served-model-name the
-sbatch scripts emit via ``--served-model-name``).
+Default model is ``"qwen3.8-flash-next"`` (matches the served-model-
+name the sbatch scripts emit via ``--served-model-name`` — backed by
+the HuggingFace repo ``Qwen/Qwen3.8-Flash-Next``).
 """
 
 from __future__ import annotations
@@ -67,7 +68,7 @@ from pydantic import model_validator
 logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "http://localhost:8000/v1"
-DEFAULT_MODEL = "gemma4-31b"
+DEFAULT_MODEL = "qwen3.8-flash-next"
 DEFAULT_TIMEOUT = 600  # CORR-110: Phase 1B rationales routinely run 60-180s
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.0

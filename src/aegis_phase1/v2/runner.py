@@ -239,10 +239,11 @@ def main() -> None:
     parser.add_argument(
         "--model",
         default="gemma4:e4b",  # CORR-056 (2026-07-23)
-        help="Model name (default: gemma4:e4b). For HF transformers, "
-        "use 'hf:org/repo' or 'org/repo' (auto-detected). For "
-        "vLLM (CORR-110), use 'vllm:<served-model-name>' — the "
-        "served-model-name passed to `vllm serve --served-model-name`.",
+help="Model name (default: gemma4:e4b — Ollama). For HF transformers, "
+             "use 'Qwen/Qwen3.8-Flash-Next' or 'hf:Qwen/Qwen3.8-Flash-Next' "
+             "(auto-detected). For vLLM (CORR-110), use "
+             "'vllm:qwen3.8-flash-next' — the served-model-name passed to "
+             "`vllm serve --served-model-name`.",
     )
     parser.add_argument(
         "--provider",

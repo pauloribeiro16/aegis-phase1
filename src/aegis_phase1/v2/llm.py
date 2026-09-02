@@ -122,12 +122,12 @@ def build_llm_invoker(
 
     Args:
         model: Optional model name override. Default ``"gemma4:e4b"``
-            (Ollama). For HF: e.g. ``"google/gemma-4-E2B-it"`` or
-            ``"hf:google/gemma-4-E2B-it"``. For MiniMax:
+            (Ollama). For HF: e.g. ``"Qwen/Qwen3.8-Flash-Next"`` or
+            ``"hf:Qwen/Qwen3.8-Flash-Next"``. For MiniMax:
             e.g. ``"minimax/MiniMax-M3"`` (prefix stripped before passing
             to ``ChatMinimax``). For vLLM (CORR-110):
-            e.g. ``"vllm:gemma4-31b"`` (served-model-name) or
-            ``"vllm:google/gemma-4-31B-it"`` (HF id; resolved server-side).
+            e.g. ``"vllm:qwen3.8-flash-next"`` (served-model-name) or
+            ``"vllm:Qwen/Qwen3.8-Flash-Next"`` (HF id; resolved server-side).
         langfuse_handler: Optional Langfuse handler (Ollama and MiniMax only —
             transformers ignores it; no LangChain callbacks in the HF path).
         provider: Optional explicit provider (``"ollama"`` | ``"transformers"``
