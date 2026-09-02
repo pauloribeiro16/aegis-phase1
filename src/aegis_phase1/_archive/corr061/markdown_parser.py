@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -482,6 +482,330 @@ class GenericMarkdownParser(MarkdownParser):
 
 
 # Registry of parsers per spec_id (extensible for CORR-051/CORR-066)
+class P1CLLM01Parser(GenericMarkdownParser):
+    """CORR-108: dual-shape parser for P1C-LLM-01-OVERLAP-CLASSIFICATION.
+
+    Reads BOTH output shapes observed in production runs and merges them
+    by sub_domain_id into ``sub_domain_activations`` — the exact key the
+    executor (``run_phase_1c_map`` → ``parsed.get("sub_domain_activations")``)
+    and the normalizer (``domain_activation_context._parse_sub_domain_activations``)
+    consume. Before this parser, Shape B was silently dropped
+    (0 activations → empty REDUCE input → pipeline died after MAP).
+
+    **Shape A (canonical, M3):**
+        ## Sub-domain Activations
+        ### D-01.1
+        - sub_domain_id: D-01.1
+        - reg_pair: [GDPR, CRA]
+        - company_scope_verdict: APPLICABLE
+        - layer0_refs: [...]
+
+    **Shape B (qwen3.5/3.8, granite, nemotron, muse):**
+        ## Pair classifications
+        - D-01.1 : GDPR ↔ CRA — OVERLAP_CONFIRMED. <predicate text>
+        ## Findings
+        - D-01.1 (Data at Rest Encryption): applicable=YES. scope_overlap=Y.
+          applicable_regulations=[GDPR, CRA]. (...) layer0_refs: <paths>
+
+    Verdict mapping (the downstream normalizer converts YES→APPLICABLE):
+        OVERLAP_CONFIRMED / ACTIVE / YES → "YES"
+        NOT_IN_SCOPE / NO_OVERLAP / NO   → "NO"
+        INDETERMINATE / anything else    → "INDETERMINATE"
+
+    Records without an ``applicable``/verdict signal (e.g. pure pair
+    lines with NOT_IN_SCOPE) are still emitted — the normalizer
+    downgrades them to NOT_APPLICABLE/INDETERMINATE and the lane filter
+    (``sd_id.startswith(domain_id + ".")``) drops foreign lanes.
+    """
+
+    # Shape B: `- D-01.1 : GDPR ↔ CRA — OVERLAP_CONFIRMED. text...`
+    # Also tolerates `- D-01.1 : GDPR ↔ CRA - OVERLAP_CONFIRMED.` and
+    # `- D-01.1: GDPR vs CRA — OVERLAP_CONFIRMED.` variants.
+    _PAIR_BULLET_RE = re.compile(
+        r"^-\s*(D-\d+\.\d+)\s*[:\-]\s*"
+        r"([A-Za-z0-9_. ]+?)\s*(?:↔|<->|vs\.?)\s*"
+        r"([A-Za-z0-9_. ]+?)\s*[—–~:-]+\s*"  # noqa: RUF001 — en dash is intentional
+        r"([A-Za-z0-9_]+)\b\.?\s*(.*)$",
+        re.MULTILINE,
+    )
+
+    # Shape B findings: `- D-01.1 (Name): applicable=YES. ...`
+    _FINDINGS_BULLET_RE = re.compile(
+        r"^-\s*(D-\d+\.\d+)\s*(?:\([^)]*\))?\s*:\s*(.*)$",
+        re.MULTILINE,
+    )
+
+    _FINDINGS_VERDICT_FIRST_RE = re.compile(
+        r"^-\s*(D-\d+\.\d+)\s*(?:\([^)]*\))?\s*:\s*"
+        r"(ACTIVE|INACTIVE|YES|NO|OVERLAP_CONFIRMED|NOT_ACTIVATED|"
+        r"INDETERMINATE|APPLICABLE|NOT_APPLICABLE|NOT_IN_SCOPE)\b\.?\s*(.*)$",
+        re.MULTILINE,
+    )
+
+    _PARTICIPATING_RE = re.compile(
+        r"[Pp]articipating regulations[^:]*:\s*([^.\n]*)"
+    )
+
+    _LAYER0_REF_RE = re.compile(r"SubDomains/[^\s;)]+")
+
+    # Splits concatenated lane outputs at each `## Status` header;
+    # the captured text (including the header) is kept via the lookahead.
+    _STATUS_SPLIT_RE = re.compile(r"(?=^##\s+Status\s*$)", re.MULTILINE)
+
+    _VERDICT_MAP: ClassVar[dict[str, str]] = {
+        "OVERLAP_CONFIRMED": "YES",
+        "ACTIVE": "YES",
+        "YES": "YES",
+        "APPLICABLE": "YES",
+        "NOT_IN_SCOPE": "NO",
+        "NOT_APPLICABLE": "NO",
+        "OVERLAP_NOT_TRIGGERED": "NO",
+        "NO_OVERLAP": "NO",
+        "NOT_ACTIVATED": "NO",
+        "NO": "NO",
+    }
+
+    # ── Shape A helpers ──────────────────────────────────────────────
+
+    _SUBSECTION_SPLIT_RE = re.compile(r"^###\s+(D-\d+\.\d+)", re.MULTILINE)
+
+    def _parse_shape_a(self, text: str) -> list[dict[str, Any]]:
+        """Canonical `## Sub-domain Activations` + `### D-XX.Y` blocks."""
+        activations: list[dict[str, Any]] = []
+        # Locate the `## Sub-domain Activations` section by splitting the
+        # block on `##` headers (SECTION_PATTERNS is empty on the generic
+        # base class, so _extract_section can't be reused here).
+        sec = ""
+        matches = list(self._H2_SPLIT_RE.finditer(text))
+        for i, m_h in enumerate(matches):
+            if m_h.group(1).strip() != "Sub-domain Activations":
+                continue
+            start = m_h.end()
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            sec = text[start:end].strip()
+            break
+        if not sec:
+            return activations
+        matches = list(self._SUBSECTION_SPLIT_RE.finditer(sec))
+        for i, m in enumerate(matches):
+            sd_id = m.group(1)
+            start = m.end()
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(sec)
+            body = sec[start:end]
+            rec: dict[str, Any] = {"sub_domain_id": sd_id}
+            for field in (
+                "sub_domain_id", "reg_pair", "company_scope_verdict",
+                "regulatory_baseline_relationship", "applicable",
+            ):
+                val = self._extract_field(body, field)
+                if val is None:
+                    continue
+                val = val.strip()
+                if field == "reg_pair" and val.startswith("[") and val.endswith("]"):
+                    rec[field] = [
+                        r.strip() for r in val.strip("[]").split(",") if r.strip()
+                    ]
+                else:
+                    rec[field] = val
+            refs_val = self._extract_field(body, "layer0_refs")
+            if refs_val:
+                # Canonical shape writes the full ref (path + §section);
+                # may be a [a, b] list or a single entry.
+                refs_val = refs_val.strip()
+                if refs_val.startswith("[") and refs_val.endswith("]"):
+                    refs = [
+                        r.strip() for r in refs_val.strip("[]").split(",") if r.strip()
+                    ]
+                else:
+                    refs = [refs_val]
+                rec["layer0_refs"] = refs
+            else:
+                refs = self._LAYER0_REF_RE.findall(body)
+                if refs:
+                    rec["layer0_refs"] = refs
+            activations.append(rec)
+        return activations
+
+    # ── Shape B helpers ──────────────────────────────────────────────
+
+    def _parse_shape_b(self, sections: dict[str, str]) -> list[dict[str, Any]]:
+        """`## Pair classifications` + `## Findings` bullets → merged records."""
+        by_id: dict[str, dict[str, Any]] = {}
+
+        # 1. Pair classifications → sub_domain_id + reg_pair + verdict text
+        pair_body = sections.get("Pair classifications", "")
+        for m in self._PAIR_BULLET_RE.finditer(pair_body):
+            sd_id, reg_a, reg_b, verdict_raw, tail = (
+                g.strip() for g in m.groups()
+            )
+            verdict_key = verdict_raw.upper().strip()
+            if verdict_key != "INDETERMINATE" and verdict_key not in self._VERDICT_MAP:
+                # D-03 style: "— SAME — ... Verdict: OVERLAP_CONFIRMED."
+                # The token right after the separator is the baseline
+                # relationship; the real verdict is stated explicitly.
+                v2 = re.search(r"Verdict:\s*([A-Za-z0-9_]+)", m.group(0))
+                if v2 and v2.group(1).upper() in self._VERDICT_MAP:
+                    verdict_key = v2.group(1).upper()
+                else:
+                    continue  # not a real pair-verdict bullet
+            rec = by_id.setdefault(sd_id, {"sub_domain_id": sd_id})
+            # Keep the first pair verdict per sub-domain (the second one
+            # is typically a duplicate/N-A restatement).
+            if "company_scope_verdict" in rec:
+                continue
+            rec["company_scope_verdict"] = self._VERDICT_MAP.get(
+                verdict_key, "INDETERMINATE"
+            )
+            rec["reg_pair"] = [reg_a, reg_b]
+            rel = tail.strip()
+            if rel:
+                rec["regulatory_baseline_relationship"] = rel[:500]
+            refs = self._LAYER0_REF_RE.findall(m.group(0))
+            if refs:
+                rec.setdefault("layer0_refs", refs)
+
+        # 2. Findings → applicable (+ override), applicable_regulations,
+        #    layer0_refs, scope_overlap. Two sub-shapes:
+        #    a) `- D-XX.Y (Name): applicable=YES. ...`  (D-01 lane style)
+        #    b) `- D-XX.Y (Name): ACTIVE. Participating regulations
+        #       in scope: GDPR, CRA. ...`  (D-02+ lane style)
+        findings_body = sections.get("Findings", "")
+        for m in self._FINDINGS_BULLET_RE.finditer(findings_body):
+            sd_id, tail = m.group(1).strip(), m.group(2)
+            applicable = re.search(r"applicable[=:]\s*(\w+)", tail, re.IGNORECASE)
+            if not applicable:
+                # Verdict-first variant: `- D-XX.Y (Name): ACTIVE. ...`
+                vf = self._FINDINGS_VERDICT_FIRST_RE.search(m.group(0))
+                if not vf:
+                    # Skip summary/meta bullets ("Cross-sub-domain
+                    # pattern:", "Total sub-domains...") — no verdict.
+                    continue
+                sd_id = vf.group(1).strip()
+                tail = vf.group(3) or ""
+                verdict_key = vf.group(2).upper()
+                rec = by_id.setdefault(sd_id, {"sub_domain_id": sd_id})
+                mapped = self._VERDICT_MAP.get(verdict_key)
+                if mapped:
+                    rec["company_scope_verdict"] = mapped
+                elif "company_scope_verdict" not in rec:
+                    rec["company_scope_verdict"] = "INDETERMINATE"
+                parts = self._PARTICIPATING_RE.search(tail)
+                if parts:
+                    regs = [
+                        r.strip().removesuffix(" only").strip()
+                        for r in parts.group(1).split(",")
+                        if r.strip()
+                    ]
+                    if regs:
+                        rec.setdefault("reg_pair", regs)
+                refs = self._LAYER0_REF_RE.findall(tail)
+                if refs:
+                    rec["layer0_refs"] = list(dict.fromkeys(
+                        list(rec.get("layer0_refs") or []) + refs
+                    ))
+                continue
+            rec = by_id.setdefault(sd_id, {"sub_domain_id": sd_id})
+            app_val = applicable.group(1).upper()
+            if app_val == "YES":
+                rec["company_scope_verdict"] = "YES"
+            elif app_val == "NO":
+                rec["company_scope_verdict"] = "NO"
+            elif "company_scope_verdict" not in rec:
+                rec["company_scope_verdict"] = "INDETERMINATE"
+            regs = re.search(r"applicable_regulations[=:]\s*\[([^\]]*)\]", tail)
+            if regs:
+                rec["reg_pair"] = [
+                    r.strip() for r in regs.group(1).split(",") if r.strip()
+                ]
+            refs = self._LAYER0_REF_RE.findall(tail)
+            if refs:
+                rec["layer0_refs"] = refs
+            if "layer0_refs" in rec and rec.get("layer0_refs"):
+                # Findings refs are more complete; prefer them.
+                rec["layer0_refs"] = list(dict.fromkeys(
+                    list(rec.get("layer0_refs") or []) + refs
+                ))
+        return list(by_id.values())
+
+    # ── Main parse ───────────────────────────────────────────────────
+
+    def _split_blocks(self, text: str) -> list[str]:
+        """Split concatenated lane outputs on each `## Status` header.
+
+        Production input is a single lane (one `## Status`), but the
+        concatenated Doc 05 (10 lanes) and retry-responses also appear
+        in tests/audit flows. Splitting on `## Status` makes both work.
+        """
+        parts = self._STATUS_SPLIT_RE.split(text)
+        return [p for p in (part.strip() for part in parts) if p]
+
+    def parse(self, raw: str) -> tuple[Any | None, str]:
+        text = self._strip_code_fences(raw)
+
+        blocks = self._split_blocks(text)
+        if not blocks:
+            return None, "no `## Section` headers found in markdown"
+
+        m = _import_p1b_models()
+        from aegis_phase1.v2.state import P1CLLM01Output
+
+        all_activations: dict[str, dict[str, Any]] = {}
+        all_sections: dict[str, str] = {}
+        status = m["P1BLLM01Status"].INDETERMINATE
+        confidence = m["P1BLLM01Confidence"].MEDIUM
+        saw_any = False
+
+        for block in blocks:
+            matches = list(self._H2_SPLIT_RE.finditer(block))
+            if not matches:
+                continue
+            sections: dict[str, str] = {}
+            for i, m_h in enumerate(matches):
+                sections[m_h.group(1).strip()] = block[m_h.end():(
+                    matches[i + 1].start() if i + 1 < len(matches) else len(block)
+                )].strip()
+            saw_any = True
+
+            status_body = sections.get("Status", "")
+            status_str = (
+                self._extract_field(status_body, "status")
+                or self._extract_field(status_body, "applicable")
+                or ""
+            ).upper()
+            conf_str = (self._extract_field(status_body, "confidence") or "").upper()
+
+            if status_str:
+                try:
+                    status = m["P1BLLM01Status"](status_str)
+                except ValueError:
+                    status = m["P1BLLM01Status"].INDETERMINATE
+            if conf_str:
+                try:
+                    confidence = m["P1BLLM01Confidence"](conf_str)
+                except ValueError:
+                    confidence = m["P1BLLM01Confidence"].MEDIUM
+
+            # Activations: Shape A first; if empty, Shape B.
+            activations = self._parse_shape_a(block)
+            if not activations:
+                activations = self._parse_shape_b(sections)
+            for rec in activations:
+                # First lane that claims a sub_domain_id wins (lanes are
+                # disjoint in practice — D-01.x only appears in lane D-01).
+                all_activations.setdefault(rec["sub_domain_id"], rec)
+            all_sections.update(sections)
+
+        if not saw_any:
+            return None, "no `## Section` headers found in markdown"
+
+        return P1CLLM01Output(
+            status=status,
+            confidence=confidence,
+            sub_domain_activations=list(all_activations.values()),
+            sections=all_sections,
+        ), ""
+
+
 MARKDOWN_PARSERS: dict[str, type[MarkdownParser]] = {
     "P1B-LLM-01-INTERPRETATION": P1BLLM01Parser,
     # CORR-066: the 4 LLMs below don't yet have spec-specific parsers
@@ -492,7 +816,7 @@ MARKDOWN_PARSERS: dict[str, type[MarkdownParser]] = {
     # `sections[section_name]` so the v2 orchestrator and doc
     # renderers can consume the raw markdown.
     "P1B-LLM-02-RATIONALE": GenericMarkdownParser,
-    "P1C-LLM-01-OVERLAP-CLASSIFICATION": GenericMarkdownParser,
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION": P1CLLM01Parser,  # CORR-108
     "P1C-LLM-02-COMPOUND-EVENT": GenericMarkdownParser,
     "P1C-LLM-03-STRATEGIC-SYNTHESIS": GenericMarkdownParser,
 }

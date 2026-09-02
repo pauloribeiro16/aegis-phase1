@@ -10,7 +10,7 @@ References:
 
 import logging
 from enum import Enum
-from typing import NotRequired, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -467,6 +467,44 @@ class GenericMarkdownOutput(BaseModel):
     model_config = {"extra": "ignore"}
 
 
+class P1CLLM01Output(BaseModel):
+    """CORR-108: parsed output of P1C-LLM-01-OVERLAP-CLASSIFICATION.
+
+    Two shapes observed across non-M3 runs:
+    - Shape A (canonical, M3): `## Sub-domain Activations` + `### D-XX.Y`
+      blocks with sub_domain_id / reg_pair / company_scope_verdict /
+      regulatory_baseline_relationship / layer0_refs fields.
+    - Shape B (qwen3.5/3.8, granite, nemotron, muse): `## Pair
+      classifications` bullets (`- D-XX.Y : REG ↔ REG — VERDICT. ...`)
+      + `## Findings` bullets (`- D-XX.Y (Name): applicable=YES.
+      scope_overlap=Y. applicable_regulations=[GDPR, CRA]. ...`).
+
+    ``P1CLLM01Parser`` reads both shapes and merges by sub_domain_id
+    into ``sub_domain_activations`` — the exact key the executor
+    (``run_phase_1c_map``) and the downstream normalizer
+    (``domain_activation_context._parse_sub_domain_activations``)
+    consume. Shape B was previously dropped (0 activations → empty
+    REDUCE input → pipeline died after MAP).
+
+    CORR-050: envelope fields are injected by the invoker post-parse —
+    the LLM never emits them.
+    """
+
+    # Envelope (invoker-injected; LLM never emits)
+    prompt_spec_id: str = "P1C-LLM-01-OVERLAP-CLASSIFICATION"
+    schema_version: str = "1.0.0"
+    case_id: str = ""
+    invocation_pattern: str = "per_domain_lane"
+
+    # Content
+    status: P1BLLM01Status = P1BLLM01Status.OK
+    confidence: P1BLLM01Confidence = P1BLLM01Confidence.MEDIUM
+    sub_domain_activations: list[dict[str, Any]] = Field(default_factory=list)
+    sections: dict[str, str] = Field(default_factory=dict)
+
+    model_config = {"extra": "ignore"}
+
+
 __all__ = [
     "AISystemClass",
     "CRAProductClass",
@@ -484,6 +522,7 @@ __all__ = [
     "P1BLLM01Interpretation",
     "P1BLLM01Output",
     "P1BLLM01Status",
+    "P1CLLM01Output",
     "ReadinessState",
     "RegulatoryClassification",
     "RegulatoryConflictType",
