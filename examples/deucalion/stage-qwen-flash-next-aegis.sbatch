@@ -28,7 +28,11 @@ umask 077
 
 BD="/projects/F202512235CPCAA1/CyberMetric_Deucalion"
 PROJ="$BD/aegis-phase1"
-HFB="${HFB:-/home/paulinho/models/hf}"
+# CORR-110 follow-up (2026-09-02): staging moved back to Lustre
+# after the ollama_data + gemma-4-31B-it purge freed 266 GB.
+# Override HFB on the sbatch line to use $HOME (NFS) if Lustre is
+# saturated again.
+HFB="${HFB:-$BD/models/hf}"
 DEST="$HFB/Qwen_Qwen3.8-Flash-Next"
 LOG_DIR="$BD/aegis-phase1/logs/scout_runs"
 mkdir -p "$LOG_DIR" "$DEST" "$HFB"
@@ -60,10 +64,11 @@ if [ -f "$DEST/config.json" ] && [ -f "$DEST/tokenizer.model" ]; then
   echo "[stage] $DEST already populated, skipping"
 else
   cd "$DEST"
+  # NOTE: the new `hf` CLI (successor of the deprecated huggingface-cli)
+  # has NO --resume-download flag; resumption is the default behaviour.
   hf download Qwen/Qwen3.8-Flash-Next \
     --local-dir . \
     --token "$HF_TOKEN" \
-    --resume-download \
     --max-workers 8 2>&1 | tail -20
 fi
 
