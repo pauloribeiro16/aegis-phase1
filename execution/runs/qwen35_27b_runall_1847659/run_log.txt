@@ -1,0 +1,75 @@
+==================================================
+ JOB 1847659 STARTED: Mon Aug 24 14:49:10 WEST 2026
+ Model : qwen3.5:27b (1x A100-80, 8h)
+ Node  : gnx505.deucalion.macc.fccn.pt
+ Case  : case1-tinytask (--run-all)
+==================================================
+NVIDIA A100-SXM4-80GB, 81920 MiB
+=== ollama healthy:
+{"models":[{"name":"qwen3.8:27b","model":"qwen3.8:27b","modified_at":"2026-08-15T19:27:03+01:00","size":17741872154,"digest":"22130167c4c20e20c7b71454612966ca8e8171e9b3cc8ab6ce8aa6cbfec79643","details
+=== warm-up: loading qwen3.5:27b
+warm-up OK on attempt 1
+{"model":"qwen3.5:27b","created_at":"2026-08-24T13:50:16.854568025Z","response":"","thinking":"Thinking","done":true,"done_reason":"length","context":[248045,846,198,9694,248046,198,248045,74455,198,2
+
+=== pre-flight ===
+aegis_phase1 OK
+
+=== running full pipeline (--run-all) ===
+2026-08-24 14:51:27 | INFO    | root                           | logging configured: level=INFO, file=logs/phase1/qwen3.5_27b/v2/pipeline_qwen3.5_27b.log, console=true
+2026-08-24 14:51:27 | INFO    | __main__                       | AEGIS Phase 1 v2 Pipeline starting
+2026-08-24 14:51:27 | INFO    | __main__                       | Case path: /projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/cases/case1-tinytask
+2026-08-24 14:51:27 | INFO    | __main__                       | Regulatory Baseline path: /projects/F202512235CPCAA1/CyberMetric_Deucalion/Methodology-main/00_METHODOLOGY/PREPROCESSING
+2026-08-24 14:51:27 | INFO    | __main__                       | Output path: /projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/output/run_qwen35_1847659
+2026-08-24 14:51:27 | INFO    | aegis_phase1.llm.unified       | UnifiedInvoker.__init__: provider=ollama, chat=ChatOllama model=qwen3.5:27b base_url=http://localhost:11434
+2026-08-24 14:51:27 | INFO    | __main__                       | Run ID: 034afb9c-f415-4381-a07b-09cb21ce7cc5 (used as Langfuse session_id)
+2026-08-24 14:51:27 | INFO    | __main__                       | Non-interactive mode — running all stages
+2026-08-24 14:51:27 | INFO    | aegis_phase1.v2.orchestrator   | === RUN ALL STAGES ===
+2026-08-24 14:51:27 | INFO    | aegis_phase1.v2.orchestrator   | === STAGE 0: LOAD ===
+2026-08-24 14:51:33 | INFO    | aegis_phase1.v2.orchestrator   | LOAD complete: 38 sub-domains, 2 regs (6.12s)
+2026-08-24 14:51:33 | INFO    | aegis_phase1.v2.orchestrator   | === STAGE 1.5: PHASE 1B RATIONALE ===
+2026-08-24 14:51:33 | INFO    | aegis_phase1._archive.corr061.validator | CORR-049-T5: loaded 5 schemas from output_schemas.yaml (specs=['P1B-LLM-01-INTERPRETATION', 'P1B-LLM-02-RATIONALE', 'P1C-LLM-01-OVERLAP-CLASSIFICATION', 'P1C-LLM-02-COMPOUND-EVENT', 'P1C-LLM-03-STRATEGIC-SYNTHESIS'])
+2026-08-24 14:51:33 | INFO    | aegis_phase1.llm.unified       | UnifiedInvoker.__init__: provider=ollama, chat=ChatOllama model=qwen3.5:27b base_url=http://localhost:11434
+2026-08-24 14:51:33 | INFO    | aegis_phase1.v2.orchestrator   | REDUCE-LLM Phase1Executor instantiated: model=qwen3.5:27b (source=llm_invoker, invoker_type=UnifiedInvoker)
+[14:56:54] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (318225ms, 125744 tok)
+2026-08-24 14:56:54 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (318225ms, 125744 tok)
+[15:01:14] [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (260116ms, 125095 tok)
+2026-08-24 15:01:14 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (260116ms, 125095 tok)
+[15:04:41] [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (207128ms, 93508 tok)
+2026-08-24 15:04:41 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1B-LLM-01-INTERPRETATION → OK (207128ms, 93508 tok)
+[15:09:05] [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (263318ms, 95717 tok)
+2026-08-24 15:09:05 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1B-LLM-02-RATIONALE → OK (263318ms, 95717 tok)
+2026-08-24 15:09:05 | INFO    | aegis_phase1.v2.orchestrator   | Phase 1B RATIONALE complete for 2 regulation(s) (status=?)
+2026-08-24 15:09:05 | INFO    | aegis_phase1.v2.orchestrator   | === STAGE 1: MAP ===
+[15:11:27] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (142422ms, 29219 tok)
+2026-08-24 15:11:27 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (142422ms, 29219 tok)
+[15:14:16] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (168841ms, 29798 tok)
+2026-08-24 15:14:16 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (168841ms, 29798 tok)
+[15:17:13] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (176850ms, 34604 tok)
+2026-08-24 15:17:13 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (176850ms, 34604 tok)
+[15:20:33] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (199950ms, 43704 tok)
+2026-08-24 15:20:33 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (199950ms, 43704 tok)
+[15:24:05] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (212111ms, 31185 tok)
+2026-08-24 15:24:05 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (212111ms, 31185 tok)
+[15:27:15] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (189123ms, 35425 tok)
+2026-08-24 15:27:15 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (189123ms, 35425 tok)
+[15:30:07] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (172291ms, 35907 tok)
+2026-08-24 15:30:07 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (172291ms, 35907 tok)
+[15:32:36] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (149251ms, 34847 tok)
+2026-08-24 15:32:36 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (149251ms, 34847 tok)
+[15:35:44] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (188152ms, 53256 tok)
+2026-08-24 15:35:44 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (188152ms, 53256 tok)
+[15:39:11] [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (206294ms, 41525 tok)
+2026-08-24 15:39:11 | INFO    | phase1.stdout.phase1           | [INFO] LLM_CALL P1C-LLM-01-OVERLAP-CLASSIFICATION → OK (206294ms, 41525 tok)
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.orchestrator   | MAP complete (P1C-LLM-01 canonical): 10 domains in 1805.70s — statuses={'OK': 10}
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.orchestrator   | MAP seed_review: 10 review entries at /projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/cases/case1-tinytask/review/adapted_objectives.yaml
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.orchestrator   | === STAGE 2: REDUCE ===
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.reduce.concatenator | concatenate: 10 domains -> 0 subdomains, 10 adapted_objectives
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.reduce.merger  | merge_requirements: 0 subdomains merged, 0 total requirements kept
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.reduce.conflict_resolver | resolve_conflicts: 0 ambiguities processed (0 resolved, 0 remaining)
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.reduce.proportionality | apply_proportionality: 0 subdomains profiled (scale=MICRO, fte=0.00)
+2026-08-24 15:39:11 | WARNING | aegis_phase1.v2.orchestrator   | REDUCE-LLM failed (continuing): case_id=case1-tinytask: aggregated_activations is empty across all lanes; P1C-LLM-03/02 have nothing to reduce.
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.orchestrator   | REDUCE complete: 0 subdomains profiled (0.12s)
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.orchestrator   | === STAGE 3: OUTPUT (composite) ===
+2026-08-24 15:39:11 | INFO    | aegis_phase1.v2.orchestrator   | === STAGE 3a: OUTPUT (DETERMINISTIC) ===
+2026-08-24 15:44:03 | INFO    | aegis_phase1.v2.orchestrator   | OUTPUT (deterministic) complete: 6 artefacts in 291.54s -> /projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/output/run_qwen35_1847659
+2026-08-24 15:44:03 | INFO    | aegis_phase1.v2.orchestrator   | === STAGE 3b: OUTPUT (ENHANCED) ===

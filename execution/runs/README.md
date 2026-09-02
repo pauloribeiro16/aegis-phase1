@@ -1,65 +1,58 @@
-# Execution runs — índice de scouts no Deucalion
+# Execution runs — tudo o que os modelos produziram, num só sítio
 
-Onde estão os ficheiros produzidos por cada run e que prompts os produziram.
+Cada pasta em `execution/runs/` tem o **output completo** de um scout
+(Doc 05 e, nos run-all, todos os documentos), o **relatório de avaliação
+automática** (`eval/checker_report.md`) e apontadores para o digest com
+notas. Os **prompts** usados estão em `execution/prompts/`.
 
-## Caminhos
+## Como navegar
 
-| O quê | Onde |
-|---|---|
-| Output no cluster | `/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/output/scout_<JOBID>/` (ou `run_<model>_<JOBID>/` nos run-all) |
-| Log SLURM | `<cluster>:.../aegis-phase1/slurm-scout-<modelo>-<JOBID>.{out,err}` |
-| Log do run | `<cluster>:.../aegis-phase1/logs/scout_runs/scout_<model>_<JOBID>.log` |
-| Mirror local | `../Deucalion/results/<modelo>_<JOBID>/` (fora do repo, pasta irmã) |
-| Digest avaliado | `execution/reports/digests/<modelo>_<JOBID>.md` |
-| Scorecard | `execution/reports/model_matrix.md` |
+```
+execution/
+├── prompts/                     ← os 6 prompts enviados aos modelos
+│   ├── base_system_prompt.md        (prâmbulo comum a todas as chamadas)
+│   ├── P1B-LLM-01-INTERPRETATION.md (questão 1: interpretações/exclusões)
+│   ├── P1B-LLM-02-RATIONALE.md      (questão 2: racional + lacunas)
+│   ├── P1C-LLM-01-...md             (fase seguinte: por domínio)
+│   ├── P1C-LLM-02-...md / -03-...md (reduce)
+│   └── output_schemas.yaml — não copiado (specs ficam no Methodology-main)
+├── runs/
+│   └── <modelo>_<tipo>_<JOB>/
+│       ├── 05_Regulatory_Applicability.md   ← output principal (sempre)
+│       ├── 04*/06*/07*/...                  ← run-alls têm mais documentos
+│       ├── run_log.txt                      ← log do job (quando existe)
+│       └── eval/checker_report.md           ← avaliação automática
+└── reports/digests/<modelo>_<JOB>.md        ← avaliação com notas 0-5
+```
 
-## Prompts utilizados (cópias em `execution/prompts/`)
+## Índice de runs
 
-Todas as chamadas LLM usam `base_system_prompt.md` + o prompt específico da fase:
-
-| Fase | Prompt | Quando corre |
-|---|---|---|
-| Questão 1 (por regulação) | `P1B-LLM-01-INTERPRETATION.md` | Scout e run-all |
-| Questão 2 (por regulação) | `P1B-LLM-02-RATIONALE.md` | Scout e run-all |
-| Fase seguinte (por domínio ×10) | `P1C-LLM-01-OVERLAP-CLASSIFICATION.md` | Só run-all |
-| REDUCE 1 | `P1C-LLM-03-STRATEGIC-SYNTHESIS.md` | Só run-all |
-| REDUCE 2 | `P1C-LLM-02-COMPOUND-EVENT.md` | Só run-all |
-
-## Runs completados
-
-| JOB | Modelo | Tipo | Estado | Doc 05 (KB) | Digest |
+| Pasta (`execution/runs/…`) | Modelo | JOB | Tipo | Estado | Digest (notas) |
 |---|---|---|---|---|---|
-| 1847659 | qwen3.5:27b | run-all | ✅ | — (ver mirror) | `qwen35_runall_1847659.md` |
-| 1862819 | qwen3.8:27b | scout | ✅ | 42 | `qwen38_scout_1862819.md` |
-| 1862843 | qwen3.8:27b | run-all | ✅ | — | `qwen38_runall_1862843.md` |
-| 1867097 | ornith:9b | scout | ✅ | 50 | `ornith9b_scout_1867097.md` |
-| 1867429 | granite4.2:30b | scout | ✅ | 24 | `granite4_2_scout_1867429.md` |
-| 1867430 | nemotron-3.5:30b | scout | ✅ | 39 | `nemotron3_5_scout_1867430.md` |
-| 1867431 | muse-glimmer:30b | scout | ✅ (1/2 regs) | 24 | `muse_glimmer_scout_1867431.md` |
-| 1867082 | gemma4:26b | scout | ✅ (por avaliar) | 42* | — |
-| 1867205 | granite4.2:30b (1ª tent.) | scout | ❌ walltime | — | — |
-| 1866405/40/45/60/76 | gemma-4-31B (HF) | scout | ❌ provider bugs | — | — |
-
-*Mirror: `../Deucalion/results/gemma4_26b_runall_1867082/05_Regulatory_Applicability.md`
-
-## Runs falhados/cancelados (histórico)
-
-| JOB | Motivo |
-|---|---|
-| 1846584 | gemma-4-31B: provider transformers ignorado (CORR-106 corrigiu; pivot para Ollama) |
-| 1846591 | qwen3.8: Ollama 0.31.1 não conhece o renderer (resolvido com 0.32.13) |
-| 1867124-26, 1867193-95 | scouts em paralelo no mesmo nó → conflito de porta 11434 (regra: sequencial) |
-| 1867200 | muse: arquitectura desconhecida no 0.31.1 (resolvido com 0.32.13) |
-| 1868526/27 | gpt-oss/qwen3.5:9b — submissão não solicitada, cancelados |
+| `qwen38_27b_runall_1862843` | qwen3.8 27B | 1862843 | run-all ✅ | completo (REDUCE saltado — ver CORR-108) | `qwen38_runall_1862843.md` |
+| `qwen38_27b_scout_1862819` | qwen3.8 27B | 1862819 | scout ✅ | 2/2 regulações | `qwen38_scout_1862819.md` |
+| `qwen35_27b_runall_1847659` | qwen3.5 27B | 1847659 | run-all ✅ | completo (REDUCE saltado) | `qwen35_runall_1847659.md` |
+| `ornith9b_scout_1867097` | ornith 9B | 1867097 | scout ✅ | 2/2 regulações | `ornith9b_scout_1867097.md` |
+| `granite4_2_30b_scout_1867429` | granite 4.2 30B | 1867429 | scout ✅ | 2/2 regulações | `granite4_2_scout_1867429.md` |
+| `nemotron3_5_30b_scout_1867430` | nemotron 3.5 30B | 1867430 | scout ✅ | 2/2 regulações | `nemotron3_5_scout_1867430.md` |
+| `muse_glimmer_30b_scout_1867431` | muse glimmer 30B | 1867431 | scout ⚠️ | 1/2 regulações | `muse_glimmer_scout_1867431.md` |
+| `gemma4_26b_scout_1867082` | gemma4 26B | 1867082 | scout ✅ | por avaliar | — |
 
 ## Para recriar um scout
 
 ```bash
-# no login node, dentro de aegis-phase1:
+# no login node do Deucalion, dentro de aegis-phase1:
 sbatch examples/deucalion/scout-bench-m-aegis.sbatch <modelo:tag>
 ```
 
-Regras de ouro: sequencial (nunca 2 no mesmo nó), walltime ≥2× o scout
-mais lento anterior, e após o run: copiar Doc 05 para o mirror + correr
-`scripts/eval/generate_report.py --run-dir <mirror> --preproc preproc_out
---output-{dir,md,json} ... --use-parser-gate`.
+Regras: sequencial (nunca 2 scouts no mesmo nó), walltime ≥2× o scout
+mais lento anterior. Após o run: copiar o Doc 05 para
+`execution/runs/<modelo>_<JOB>/`, correr o checker (comando acima no
+histórico do git) e escrever o digest.
+
+## Estado do código da pipeline
+
+O problema do "REDUCE saltado" (0 activações na fase por domínios) foi
+corrigido no código — o leitor aceita agora os dois formatos que os
+modelos produzem. **O próximo run-all já corre a pipeline completa**
+(REDUCE incluído) com qualquer dos modelos.

@@ -1,0 +1,136 @@
+{
+  "contract": "CORR-057 + CORR-105",
+  "model": "gemma4:e2b",
+  "case": "case1-tinytask",
+  "total_entries": 5,
+  "canonical_refs_loaded": 1381,
+  "per_spec": {
+    "P1B-LLM-01-INTERPRETATION": {
+      "total_calls": 1,
+      "status_distribution": {
+        "OK": 1
+      },
+      "schema_compliance_pct": 100.0,
+      "latency_ms_mean": null,
+      "latency_ms_max": null,
+      "input_tokens_mean": null,
+      "output_tokens_mean": null,
+      "retries_mean": null,
+      "total_refs_cited": 0,
+      "invented_refs_count": 0,
+      "invented_refs_pct": 0.0,
+      "top_invented_refs": [],
+      "activations_yes": 2,
+      "activations_total": 2
+    },
+    "P1B-LLM-02-RATIONALE": {
+      "total_calls": 1,
+      "status_distribution": {
+        "OK": 1
+      },
+      "schema_compliance_pct": 100.0,
+      "latency_ms_mean": null,
+      "latency_ms_max": null,
+      "input_tokens_mean": null,
+      "output_tokens_mean": null,
+      "retries_mean": null,
+      "total_refs_cited": 0,
+      "invented_refs_count": 0,
+      "invented_refs_pct": 0.0,
+      "top_invented_refs": [],
+      "activations_yes": 2,
+      "activations_total": 2
+    },
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION": {
+      "total_calls": 1,
+      "status_distribution": {
+        "OK": 1
+      },
+      "schema_compliance_pct": 100.0,
+      "latency_ms_mean": null,
+      "latency_ms_max": null,
+      "input_tokens_mean": null,
+      "output_tokens_mean": null,
+      "retries_mean": null,
+      "total_refs_cited": 1,
+      "invented_refs_count": 1,
+      "invented_refs_pct": 100.0,
+      "top_invented_refs": [
+        [
+          "SubDomains/D-07_Secure-Development/D-07.1.md \u00a71 CRDA pair GDPR\u2194CRA; SubDomains/D-07_Secure-Development/D-07.2.md \u00a71 CRDA; SubDomains/D-07_Secure-Development/D-07.3.md \u00a71 CRDA; SubDomains/D-07_Secure-Development/D-07.4.md \u00a71 CRDA.",
+          1
+        ]
+      ],
+      "activations_yes": 10,
+      "activations_total": 10
+    },
+    "P1C-LLM-02-COMPOUND-EVENT": {
+      "total_calls": 1,
+      "status_distribution": {
+        "OK": 1
+      },
+      "schema_compliance_pct": 100.0,
+      "latency_ms_mean": null,
+      "latency_ms_max": null,
+      "input_tokens_mean": null,
+      "output_tokens_mean": null,
+      "retries_mean": null,
+      "total_refs_cited": 0,
+      "invented_refs_count": 0,
+      "invented_refs_pct": 0.0,
+      "top_invented_refs": [],
+      "activations_yes": 0,
+      "activations_total": 0
+    },
+    "P1C-LLM-03-STRATEGIC-SYNTHESIS": {
+      "total_calls": 1,
+      "status_distribution": {
+        "OK": 1
+      },
+      "schema_compliance_pct": 100.0,
+      "latency_ms_mean": null,
+      "latency_ms_max": null,
+      "input_tokens_mean": null,
+      "output_tokens_mean": null,
+      "retries_mean": null,
+      "total_refs_cited": 0,
+      "invented_refs_count": 0,
+      "invented_refs_pct": 0.0,
+      "top_invented_refs": [],
+      "activations_yes": 0,
+      "activations_total": 0
+    }
+  },
+  "structural_parity": {},
+  "parser_gate": {
+    "P1B-LLM-01-INTERPRETATION": {
+      "pass": 1,
+      "fail": 0,
+      "errors": []
+    },
+    "P1B-LLM-02-RATIONALE": {
+      "pass": 1,
+      "fail": 0,
+      "errors": []
+    },
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION": {
+      "pass": 1,
+      "fail": 0,
+      "errors": []
+    },
+    "P1C-LLM-02-COMPOUND-EVENT": {
+      "pass": 0,
+      "fail": 1,
+      "errors": [
+        "P1C-LLM-02-COMPOUND-EVENT: no `## Section` headers found in markdown"
+      ]
+    },
+    "P1C-LLM-03-STRATEGIC-SYNTHESIS": {
+      "pass": 0,
+      "fail": 1,
+      "errors": [
+        "P1C-LLM-03-STRATEGIC-SYNTHESIS: no `## Section` headers found in markdown"
+      ]
+    }
+  }
+}
