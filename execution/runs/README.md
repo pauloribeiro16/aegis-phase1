@@ -38,9 +38,9 @@ execution/
 | `muse_glimmer_30b_scout_1867431` | muse glimmer 30B | 1867431 | scout ⚠️ | 1/2 regulações | `muse_glimmer_scout_1867431.md` |
 | `gemma4_26b_scout_1867082` | gemma4 26B | 1867082 | scout ✅ | por avaliar | — |
 | `qwen38_27b_runall_1868946` | qwen3.8 27B | 1868946 | run-all ⏳ | em curso (CORR-109 §9 + pipeline ponta-a-ponta) | — (sai a comparar pós-run) |
-| `nemotron3_5_30b_scout_full_1869099` | nemotron 3.5 30B | 1869099 | scout-full ⏳ | em curso | — |
-| `granite4_2_30b_scout_full_1869100` | granite 4.2 30B | 1869100 | scout-full ⏳ | em curso | — |
-| `ornith-1_5_9b_scout_full_1869101` | ornith 1.5 9B | 1869101 | scout-full ⏳ | em curso | — |
+| `nemotron3_5_30b_scout_full_1869099` | nemotron 3.5 30B | 1869099 | scout-full ❌ | cancelado — modelo não está em cache do cluster e egress para ollama.ai bloqueado (2026-09-02 14:18) | — |
+| `granite4_2_30b_scout_full_1869100` | granite 4.2 30B | 1869100 | scout-full ⏳ | em curso (cache confirmado, warm-up a 14:18) | — |
+| `ornith-1_5_9b_scout_full_1869101` | ornith 1.5 9B | 1869101 | scout-full ❌ | cancelado — mesmo motivo (cache miss + sem egress) | — |
 
 ## Para recriar um scout
 
