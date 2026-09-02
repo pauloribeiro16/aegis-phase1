@@ -19,6 +19,19 @@
 # Model is passed as the FIRST CLI argument (NOT via --export):
 #   sbatch examples/deucalion/scout-bench-m-aegis-full.sbatch muse-glimmer:30b
 #
+# IMPORTANT — distinct job-names per model: when running multiple scouts
+# in parallel (``sbatch ... nemotron3.5:30b && sbatch ... granite4.2:30b
+# && sbatch ... ornith-1.5:9b``), all jobs default to ``aegis_scout_full``
+# which makes ``squeue`` unreadable. Use the wrapper below, which sends
+# the sanitised model tag as a per-model job-name:
+#
+#   eval "$(scripts/scouts/scout-full-submit.sh nemotron3.5:30b)"
+#   eval "$(scripts/scouts/scout-full-submit.sh granite4.2:30b)"
+#   eval "$(scripts/scouts/scout-full-submit.sh ornith-1.5:9b)"
+#
+# Each invocation prints the exact `sbatch -J aegis_<model-tag> ...`
+# command ready to paste so the job-name shows the model in `squeue`.
+#
 # Differs from scout-bench-m-aegis.sbatch (Phase 1B-only) in:
 # 1. Runs the full pipeline (``--run-all``) instead of just
 #    ``--run-phase-1b``, so every scout produces the complete set of

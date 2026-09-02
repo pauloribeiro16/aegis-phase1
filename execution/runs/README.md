@@ -38,6 +38,9 @@ execution/
 | `muse_glimmer_30b_scout_1867431` | muse glimmer 30B | 1867431 | scout ⚠️ | 1/2 regulações | `muse_glimmer_scout_1867431.md` |
 | `gemma4_26b_scout_1867082` | gemma4 26B | 1867082 | scout ✅ | por avaliar | — |
 | `qwen38_27b_runall_1868946` | qwen3.8 27B | 1868946 | run-all ⏳ | em curso (CORR-109 §9 + pipeline ponta-a-ponta) | — (sai a comparar pós-run) |
+| `nemotron3_5_30b_scout_full_1869099` | nemotron 3.5 30B | 1869099 | scout-full ⏳ | em curso | — |
+| `granite4_2_30b_scout_full_1869100` | granite 4.2 30B | 1869100 | scout-full ⏳ | em curso | — |
+| `ornith-1_5_9b_scout_full_1869101` | ornith 1.5 9B | 1869101 | scout-full ⏳ | em curso | — |
 
 ## Para recriar um scout
 
@@ -47,6 +50,12 @@ sbatch examples/deucalion/scout-bench-m-aegis.sbatch <modelo:tag>
 
 # Scout pipeline completa (novo, ~1h30, gera os 9 docs + xlsx):
 sbatch examples/deucalion/scout-bench-m-aegis-full.sbatch <modelo:tag>
+
+# Para scouts em paralelo: usa o wrapper para distinguir os job-names
+# (sem isto, todos os jobs aparecem como ``aegis_scout_full`` no squeue).
+eval "$(scripts/scouts/scout-full-submit.sh nemotron3.5:30b)"
+eval "$(scripts/scouts/scout-full-submit.sh granite4.2:30b)"
+eval "$(scripts/scouts/scout-full-submit.sh ornith-1.5:9b)"
 ```
 
 Regras: sequencial (nunca 2 scouts no mesmo nó), walltime ≥2× o scout
