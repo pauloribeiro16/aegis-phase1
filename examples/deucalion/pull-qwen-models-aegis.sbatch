@@ -40,6 +40,7 @@ RUN_LOG="$LOG_DIR/pull_qwen_${SLURM_JOB_ID}.log"
 exec >>"$RUN_LOG" 2>&1
 
 MODELS=(
+  "glm-4.7-flash"
   "qwen3.5:27b"
   "qwen3.8:27b"
 )
