@@ -8,10 +8,50 @@ criterion per model with score, measured numbers, and justification.
 Every claim carries an evidence pointer. Score transitions live in the
 Changelog at the bottom; full history in git.
 
+**Glossário rápido (o que significam as colunas):**
+- **Questão 1 (P1B-01)** — o modelo decide que regras se aplicam à
+  empresa (interpretações e exclusões), citando os factos que decidem.
+- **Questão 2 (P1B-02)** — o modelo produz o racional + lista de
+  implicações e lacunas com esforço, prioridades e referências.
+- **P1C / Fase seguinte** — classificação de sobreposições por domínio
+  (ainda por testar na maioria dos scouts).
+- **"Seguiu o formato"** — as respostas saíram na estrutura pedida e
+  foram lidas pelo programa sem erros.
+- **"Completo?"** — se o run produziu respostas para todas as
+  regulações aplicáveis.
+
 **Runs currently scored:**
 - qwen3.5:27b → JOB 1847659 (full `--run-all`, 2026-08-24)
 - qwen3.8:27b → JOB 1862819 (scout, Phase 1B only, 2026-09-01)
 - qwen3.8:27b → JOB 1862843 (full `--run-all`, 2026-09-01)
+- ornith:9b → JOB 1867097 (scout, 2026-09-01)
+- granite4.2:30b → JOB 1867429 (scout, 2026-09-02)
+- nemotron-3.5-lightning:30b → JOB 1867430 (scout, 2026-09-02)
+- muse-glimmer:30b → JOB 1867431 (scout, 2026-09-02 — **incompleto**, 1/2 regulações)
+
+---
+
+## Comparação geral (questão 1 e 2 — scouts + run-all)
+
+| Modelo | Questão 1 | Questão 2 | Tempo (chamadas) | Completo? | Falhas no run |
+|---|---|---|---|---|---|
+| **M3 (referência)** | 5 | 5 | — | ✅ | 0 |
+| **nemotron 3.5 30B** | **4.6** | **4.7** | ~13 min | ✅ | 0 |
+| **qwen3.8 27B** | **4.7** | **4.9** | 12,6 min | ✅ | 0 |
+| ornith 9B | 4.4 | 4.1 | 4,2 min | ✅ (só q.1-2) | 0 |
+| muse glimmer 30B | 3.8 | 4.2 (½) | 33 min | ⚠️ 1/2 regs | 1 retry |
+| granite 4.2 30B | 3.5 | 4.4 | ~28 min | ✅ | 2 rede |
+| qwen3.5 27B | 3.5 | 3.3 | 17,5 min | ✅ | 0 |
+| gemma4 26B | ⚠️ por avaliar (run terminado, Doc 05 no mirror) | | ~9 min | ✅ | 0 |
+
+**Leitura rápida:** nemotron e qwen3.8 empatam no topo (qualidade
+idêntica, velocidade idêntica). O ornith é o rei da velocidade com
+qualidade quase de topo. O muse ficou incompleto. O granite é lento e
+foi o único a responder "não sei" a uma questão (honesto, mas custa
+nota). O P1C (fase seguinte) está por testar em todos excepto
+qwen3.5/qwen3.8 — e nesses dois as respostas saíram num formato que o
+programa não conseguiu ler (problema conhecido do leitor, não dos
+modelos).
 
 ---
 
@@ -234,3 +274,12 @@ granite4.2:30b, nemotron-3.5-lightning:30b, muse-glimmer:30b.
   (1867429→30→31); cluster backlog ≈2 days at submission.
   Ollama on cluster upgraded in place: $BD/bin now 0.32.13
   (0.31.1 kept as ollama-0.31.1.bak).
+- 2026-09-02 (11:30) — benchmark de 4 modelos novos concluído: granite4.2
+  30b (3.5/4.4, 28 min), nemotron-3.5 30b (4.6/4.7, 13 min, zero falhas —
+  novo co-líder com qwen3.8), muse-glimmer 30b (3.8/4.2, run incompleto
+  1/2 regulações), ornith:9b (4.4/4.1, 4.2 min — rei da velocidade).
+  Digests reescritos em PT directo sem jargão interno (feedback do
+  utilizador: não se lembram dos números de contracto; comportamento do
+  modelo é resultado, não problema). Ollama do cluster actualizado
+  0.31.1 → 0.32.13 (necessário para muse-glimmer). Glossário adicionado
+  ao topo da matriz.
