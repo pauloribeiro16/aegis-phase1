@@ -160,7 +160,6 @@ def get_invoker(
     from aegis_phase1.llm.tracing import get_langfuse_callback
     from aegis_phase1.llm.unified import UnifiedInvoker
     from aegis_phase1.prompts_v2.catalog import CatalogLoader
-    from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
     from aegis_phase1.prompts_v2.loader import PromptLoader
     from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 
@@ -188,6 +187,16 @@ def get_invoker(
         # honour explicit overrides only
         model = model or M3_DEFAULT_MODEL
         base_url = base_url
+    elif provider == "transformers":
+        # CORR-106: transformers path is HF, not Ollama. There is no
+        # Ollama default model — require an explicit HF model id.
+        if not model:
+            raise ValueError(
+                "get_invoker(provider='transformers') requires an explicit "
+                "`model` kwarg (HF model id or 'hf:<id>'). The Ollama "
+                "defaults do not apply to the HF path."
+            )
+        base_url = ""  # not used by the transformers path
     else:
         model = model or os.getenv("OLLAMA_MODEL", UnifiedInvoker.DEFAULT_MODEL)
         base_url = base_url or os.getenv(
@@ -201,6 +210,29 @@ def get_invoker(
     format_logger = JSONLLogger(logs / "format-errors.jsonl")
 
     _langfuse_client, _langfuse_handler = get_langfuse_callback()
+
+    if provider == "transformers":
+        # CORR-106: must build a full Phase1LLMInvoker with loaders so
+        # invoker_to_executor() works (it needs .prompts / .catalogs /
+        # .validator). Returning a bare TransformersInvoker surfaced as
+        # the JOB 1867060 "missing required dependencies" traceback.
+        from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker
+
+        phase1_invoker = Phase1LLMInvoker(
+            prompt_loader=prompt_loader,
+            catalog_loader=catalog_loader,
+            validator=validator,
+            llm_logger=llm_logger,
+            format_logger=format_logger,
+            model=model,
+            langfuse_handler=_langfuse_handler,
+            provider="transformers",
+        )
+        logger.info(
+            "get_invoker(provider='transformers'): Phase1LLMInvoker(model=%s, transformers backend)",
+            model,
+        )
+        return phase1_invoker
 
     invoker = UnifiedInvoker(
         prompt_loader=prompt_loader,

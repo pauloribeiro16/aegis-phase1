@@ -112,6 +112,13 @@ class TransformersInvoker:
     DEFAULT_DEVICE_MAP = "auto"
     DEFAULT_DTYPE = "auto"
 
+    # CORR-106: explicit provider tag. The v2 orchestrator discovers the
+    # provider of ``self.llm_invoker`` via ``getattr(invoker, "provider",
+    # "ollama")`` — without this attribute, ``--provider transformers``
+    # silently fell back to the Ollama path downstream (JOB 1846584
+    # failure mode).
+    provider = "transformers"
+
     def __init__(
         self,
         model_id: str,
@@ -148,7 +155,6 @@ class TransformersInvoker:
         """
         self.model = _strip_hf_prefix(model_id)
         self.model_id = self.model
-        self.max_new_tokens = max_new_tokens or self.DEFAULT_MAX_NEW_TOKENS
         self.enable_thinking = enable_thinking
         self.cache_dir = (
             cache_dir
@@ -164,39 +170,77 @@ class TransformersInvoker:
             else 0.9
         )
 
+        # CORR-106 follow-up: honour AEGIS_MAX_NEW_TOKENS so the SBATCH
+        # can override the default 1024-token ceiling. Phase 1B prompts
+        # produce rationales far longer than 1024 tokens (qwen3.8 scout
+        # generated 122 599-token outputs); 1024 would truncate every
+        # call and silently produce incomplete outputs.
+        env_max_new = os.environ.get("AEGIS_MAX_NEW_TOKENS")
+        if max_new_tokens is not None:
+            self.max_new_tokens = max_new_tokens
+        elif env_max_new and env_max_new.strip().isdigit():
+            self.max_new_tokens = int(env_max_new)
+        else:
+            self.max_new_tokens = self.DEFAULT_MAX_NEW_TOKENS
+
         # Lazy-loaded on first invoke() call.
         self._tokenizer: Any = None
         self._model: Any = None
         self._device: Any | None = None
 
-    def _max_memory(self) -> dict[Any, str] | None:
-        """Compute the ``max_memory`` budget for ``from_pretrained``.
+    def _compute_max_memory(self, n_devices: int, device_total_bytes: int, utilization: float, cpu_budget: str = "30GiB") -> dict[Any, str]:
+        """Pure helper: build the ``max_memory`` dict from device counts.
 
-        Returns:
-            ``{"0": "<X>GiB", "cpu": "30GiB"}`` when CUDA is available —
-            accelerates distributes layers to fit within these caps, putting
-            the maximum possible on GPU without OOM during generate.
-
-            ``None`` when CUDA is unavailable (lets accelerate default to
-            full CPU).
-
-        The GPU cap is computed from
-        ``total_VRAM * self.gpu_memory_utilization`` minus a 200MB safety
-        margin for activations. 30 GiB on CPU is the standard
-        accelerate-suggested budget for laptops.
+        Extracted from :meth:`_max_memory` so it can be unit-tested without
+        importing ``torch`` (which is not installed in the project's
+        minimal test venv).
         """
-        import torch
+        budget: dict[Any, str] = {}
+        for idx in range(n_devices):
+            budget_gib = (device_total_bytes / 1024**3) * utilization - 0.2
+            budget[idx] = f"{max(1.0, budget_gib):.1f}GiB"
+        budget["cpu"] = cpu_budget
+        return budget
 
-        if not torch.cuda.is_available():
+
+def _max_memory(self) -> dict[Any, str] | None:
+    """Compute the ``max_memory`` budget for ``from_pretrained``.
+
+    Returns:
+        ``{"0": "<X>GiB", "1": "<X>GiB", ..., "cpu": "30GiB"}`` when
+        CUDA is available — accelerate distributes layers across
+        all visible GPUs to fit within these caps, putting the
+        maximum possible on GPU without OOM during generate.
+
+        ``None`` when CUDA is unavailable (lets accelerate default to
+        full CPU).
+
+    The GPU cap per device is computed from
+    ``total_VRAM * self.gpu_memory_utilization`` minus a 200MB safety
+    margin for activations. 30 GiB on CPU is the standard
+    accelerate-suggested budget for laptops.
+
+    CORR-106 follow-up: previous version only included device 0,
+    which forced accelerate to load the entire 31B model on a
+    single 40 GiB A100 → OOM. The 2026-09-01 scout (JOB 1866405)
+    hit exactly this. Now we enumerate every visible CUDA device.
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        return None
+    try:
+        n_devices = torch.cuda.device_count()
+        if n_devices <= 0:
             return None
-        try:
-            total = torch.cuda.get_device_properties(0).total_memory
-        except Exception:
-            return None
-        # Convert bytes → GiB, apply utilization, subtract 200MB safety
-        budget_gib = (total / 1024**3) * self.gpu_memory_utilization - 0.2
-        budget_gib = max(1.0, budget_gib)  # never below 1GiB
-        return {0: f"{budget_gib:.1f}GiB", "cpu": "30GiB"}
+        # Per-device total VRAM is uniform within a single Deucalion
+        # partition (A100-40 partition → all 40 GiB), but we still
+        # read it per device so the budget reflects heterogeneity if
+        # the node exposes mixed cards.
+        total = torch.cuda.get_device_properties(0).total_memory
+        return self._compute_max_memory(n_devices, total, self.gpu_memory_utilization)
+    except Exception:
+        return None
 
     @property
     def device(self) -> Any:
@@ -399,8 +443,75 @@ class TransformersInvoker:
         return {"raw": raw, "status": "OK", "usage": usage}
 
 
+class TransformersChat:
+    """LangChain-compatible shim that wraps a :class:`TransformersInvoker`.
+
+    CORR-106: lets ``Phase1LLMInvoker`` (which instantiates
+    ``ChatOllama`` or ``ChatMinimax`` and calls ``.invoke(messages, ...)``)
+    work with HF transformers — without rewriting the heavy invoker.
+
+    The shim exposes the minimal interface the pipeline uses:
+      - ``.invoke([SystemMessage(...), HumanMessage(...)]) -> AIMessage``
+      - ``.model`` (str) — used by logs
+      - ``.base_url`` (str, synthetic) — for log compatibility
+
+    Args:
+        invoker: The owning :class:`TransformersInvoker` (model already
+            loaded or lazy-loaded on first call).
+    """
+
+    def __init__(self, invoker: "TransformersInvoker") -> None:
+        self._invoker = invoker
+        self.model = invoker.model_id
+        self.base_url = f"hf://{invoker.model_id}"
+
+    def invoke(
+        self,
+        messages: list[Any],
+        config: dict[str, Any] | None = None,
+    ) -> Any:
+        # Concatenate system + user into one prompt (transformers is
+        # text-only; LangChain's role separation happens at chat-template
+        # time inside the invoker). Order: system first, then user.
+        system_text = ""
+        user_text = ""
+        for m in messages:
+            content = getattr(m, "content", str(m))
+            # Cheap role detection — LangChain messages expose ``type``
+            # ("system" / "human" / "ai"); legacy msgs use class names.
+            role = getattr(m, "type", "") or type(m).__name__.lower()
+            if "system" in role:
+                system_text = content
+            else:
+                user_text = (user_text + "\n\n" + content).strip() if user_text else content
+
+        # If the invoker was built without a system role, fall back to
+        # the legacy user-only path. Otherwise the system message is
+        # routed via apply_chat_template in the invoker.
+        result = self._invoker.invoke(
+            user_text,
+            feedback="",
+            system_prompt=system_text or None,
+        )
+        raw = result.get("raw", "")
+        # Lazy import — langchain_core may not be installed in test envs.
+        try:
+            from langchain_core.messages import AIMessage
+
+            return AIMessage(content=raw)
+        except Exception:
+            # Fallback duck-typed object with `.content` (matches what
+            # Phase1LLMInvoker reads via ``response.content``).
+            class _Shim:
+                def __init__(self, content: str) -> None:
+                    self.content = content
+
+            return _Shim(raw)
+
+
 __all__ = [
     "TransformersInvoker",
+    "TransformersChat",
     "_strip_hf_prefix",
     "_detect_provider",
 ]

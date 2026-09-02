@@ -452,7 +452,9 @@ class Phase1LLMInvoker:
 
             # 2. Build the chat client. CORR-062 S2: provider-aware —
             #    provider="minimax" → ChatMinimax (M3/M2.7 via Mavis
-            #    gateway); otherwise ChatOllama (legacy local path).
+            #    gateway); provider="transformers" → TransformersChat
+            #    shim around a lazy-loaded HF model (CORR-106); otherwise
+            #    ChatOllama (legacy local path).
             from aegis_phase1.prompts_v2.markdown_parser import MARKDOWN_PARSERS
 
             llm_kwargs: dict[str, Any] = {
@@ -476,6 +478,20 @@ class Phase1LLMInvoker:
                     model=self.model,
                     base_url=self.base_url,
                 )
+            elif self.provider == "transformers":
+                # CORR-106: route through a TransformersChat shim. The
+                # model loads on first .invoke() (lazy); subsequent
+                # calls reuse it. No format=schema — gemma4 doesn't
+                # honour constrained decoding via the HF path.
+                from aegis_phase1.llm.transformers_invoker import (
+                    TransformersInvoker,
+                    TransformersChat,
+                )
+                # Reuse an existing invoker if we built one earlier in
+                # this Phase1LLMInvoker's lifetime.
+                if not hasattr(self, "_hf_invoker") or self._hf_invoker.model != self.model:
+                    self._hf_invoker = TransformersInvoker(model_id=self.model)
+                llm = TransformersChat(self._hf_invoker)
             else:
                 llm = ChatOllama(**llm_kwargs)
 

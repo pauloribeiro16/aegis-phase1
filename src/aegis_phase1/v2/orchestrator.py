@@ -1175,7 +1175,9 @@ class Phase1Orchestrator:
             self.state["aggregated_data"]["compound_events"] = compound_events
         return compound_events if isinstance(compound_events, dict) else None
 
-    def _get_phase1_executor(self) -> "Phase1Executor | None":
+    def _get_phase1_executor(
+        self, *, for_phase_1b: bool = False
+    ) -> "Phase1Executor | None":
         """Lazy-initialize the canonical five-LLM Phase1Executor.
 
         Returns None when no LLM invoker is configured, mock mode is active,
@@ -1188,6 +1190,14 @@ class Phase1Orchestrator:
         stages. ``MOCK_LLM`` is honoured by the guard above; ``MockInvoker``
         exposes no ``.model`` so REDUCE-LLM is unreachable for it anyway
         (guarded above) but the fallback is defensive.
+
+        CORR-106: ``for_phase_1b=True`` skips the transformers short-
+        circuit so Phase 1B (P1B-LLM-01 + P1B-LLM-02) still runs end-to-
+        end on the HF path — Phase 1B uses the lazy-load path inside
+        :class:`Phase1LLMInvoker.invoke_spec` (not ``invoker_to_executor``)
+        so the TransformersChat shim handles it correctly. REDUCE-LLM
+        (which uses ``invoker_to_executor``) still gets the transformers
+        skip — see the provider branch below.
         """
         import os
 
@@ -1246,12 +1256,31 @@ class Phase1Orchestrator:
             model_source = "llm_invoker"
 
         try:
+            provider = getattr(self.llm_invoker, "provider", "ollama")
+
+            # CORR-106: REDUCE-LLM (P1C-02/03) needs a Phase1Executor
+            # which in turn needs an invoker with .prompts / .catalogs /
+            # etc. TransformersInvoker doesn't expose those, and the
+            # parser shape failure documented in CORR-105 means REDUCE
+            # has nothing to reduce anyway (aggregated_activations is
+            # empty until the parser-side fix lands). For Phase 1B
+            # callers, the lazy-load path inside Phase1LLMInvoker goes
+            # through TransformersChat and works fine — so honour
+            # for_phase_1b=True and let the executor build.
+            if provider == "transformers" and not for_phase_1b:
+                logger.info(
+                    "REDUCE-LLM skipped: transformers path is Phase 1B-only "
+                    "(no Phase1Executor for HF models yet); "
+                    "P1C-02/03 cascade by design (see CORR-105 + CORR-106)."
+                )
+                return None
+
             from aegis_phase1.prompts_v2.factory import get_invoker
             from aegis_phase1.prompts_v2.phase1_executor import invoker_to_executor
 
             p1_invoker = get_invoker(
                 model=configured_model,
-                provider=getattr(self.llm_invoker, "provider", "ollama"),
+                provider=provider,
             )
             executor = invoker_to_executor(p1_invoker)
             self._phase1_executor_cached = executor
@@ -1264,7 +1293,6 @@ class Phase1Orchestrator:
             return executor
         except Exception as exc:
             logger.warning("Failed to instantiate Phase1Executor: %s", exc)
-            return None
 
     def generate_deterministic_docs(self, output_dir: str = "output/phase1") -> V2State:
         """Stage 3a: Generate 100% deterministic docs (no MAP/REDUCE required).
@@ -1628,7 +1656,11 @@ class Phase1Orchestrator:
         ):
             self.state["aggregated_data"] = {}
 
-        executor = self._get_phase1_executor()
+        # CORR-106: for_phase_1b=True so the transformers provider
+        # doesn't short-circuit (Phase 1B P1B-LLM-01/02 uses the
+        # lazy-load path inside Phase1LLMInvoker.invoke_spec and
+        # works correctly via the TransformersChat shim).
+        executor = self._get_phase1_executor(for_phase_1b=True)
         if executor is None:
             logger.info(
                 "Phase 1B RATIONALE skipped (deterministic/mock " "mode or --skip-phase-1b flag)"
