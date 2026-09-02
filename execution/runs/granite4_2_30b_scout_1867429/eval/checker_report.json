@@ -1,6 +1,6 @@
 {
   "contract": "CORR-057 + CORR-105",
-  "model": "gemma4:e2b",
+  "model": "granite4.2:30b",
   "case": "case1-tinytask",
   "total_entries": 5,
   "canonical_refs_loaded": 1381,
