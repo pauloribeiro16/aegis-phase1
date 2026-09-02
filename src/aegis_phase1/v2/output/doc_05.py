@@ -129,12 +129,14 @@ def render_doc_05(
     parts.extend(_section_6_strategic_implications(state, regs, invoker, config=config))
     parts.append(_render_rationale_by_reg_section(state))
     parts.extend(_section_7_regulatory_gaps(ontology, subdomains))
+    parts.extend(_section_8_input_to_phase_2(state))
     # _section_9_per_article_breakdown: gold-style per-article table
     # sourced from state['raw_clause_mappings'] (loaded from the case
     # ontology YAML by orchestrator._load_clause_mappings_from_case).
-    # Deterministic, no LLM call.
+    # Deterministic, no LLM call. Sits at the end of the doc so the
+    # handover record (§8) precedes it (matches the §9 ordering in the
+    # gold Doc 05 in Methodology-main/02_CASES/Case_01_TinyTask_SaaS/).
     parts.extend(_section_9_per_article_breakdown(state, regs))
-    parts.extend(_section_8_input_to_phase_2(state))
 
     # CORR-061 S3b: dump every captured per-spec markdown at the end
     # of the doc so reviewers can see the raw LLM output without
