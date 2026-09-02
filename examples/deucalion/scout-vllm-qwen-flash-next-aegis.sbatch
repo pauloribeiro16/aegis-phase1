@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=aegis_scout_vllm_qwen_flash_next
-#SBATCH --gres=gpu:a100:8
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=128G
+#SBATCH --gres=gpu:a100:4
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=64G
 #SBATCH --tasks-per-node=1
 #SBATCH -A F202512235CPCAA1G
 #SBATCH -t 04:00:00
@@ -14,22 +14,22 @@
 #SBATCH --out=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-scout-vllm-qwen-flash-next-%j.out
 #SBATCH --err=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-scout-vllm-qwen-flash-next-%j.err
 #
-# AEGIS scout — Qwen3.8-Flash-Next (HuggingFace repo Qwen/Qwen3.8-Flash-Next)
-# served via vLLM on the cluster.
+# AEGIS scout — Qwen3.8-Flash-Next FP8 (HuggingFace repo
+# Qwen/Qwen3.8-Flash-Next-FP8) served via vLLM on the cluster.
 #
 # CORR-110 + Phase-1B scout (4 LLM calls only). Submission
 # overrrides AEGIS_SCOPE=phase-1b (the file default is run-all; we
 # want the cheap scout for first contact with this model).
 #
-# Allocation (overrides the file-defaults sized for the original
-# gemma-4-31B-it pilot):
-#   * 8 × A100-80GB on the same node (TP=8)
-#   * dev-a100-80 partition (dev slots are <4h; this fits at 4h)
-#   * 4h walltime (vLLM compile + load for a 125B MoE BF16 = ~360 GB
-#     weights is non-trivial; the first minute after `vllm serve`
-#     can hit CUDA-graph compile)
-#   * 32 CPUs + 128G RAM (CPUs for vLLM workers / dataloader; RAM for
-#     the ~360 GB weight staging buffer)
+# Allocation (2026-09-02, after discovering the cluster topology):
+#   * Deucalion nodes carry 4 GPUs each (S:0-1) — 8×A100:8 was
+#     unsatisfiable ("CPU count per node can not be satisfied").
+#   * The BF16 checkpoint is 444 GB — exceeds even 4×A100-80
+#     (320 GB). We serve the OFFICIAL FP8 quantisation
+#     (~190 GB) instead: fits 4×A100-80 with TP=4 and ~90 GB
+#     left for KV cache at 0.90 util.
+#   * vLLM supports FP8 weight-only on Ampere (FP8-Marlin kernels).
+#   * 4h walltime, 16 CPUs + 64G RAM.
 #
 # CORR-110 plumbing: ChatOpenAICompat (no new project dep, only httpx).
 # Pipeline connects to vLLM via ``--provider vllm --model
@@ -55,21 +55,24 @@ mkdir -p "$LOG_DIR"
 RUN_LOG="$LOG_DIR/scout_vllm_qwen3_8_flash_next_${SLURM_JOB_ID}.log"
 exec >>"$RUN_LOG" 2>&1
 
-# --- HF base (CORR-110 follow-up, 2026-09-02) ---
-# Qwen3.8-Flash-Next is ~360 GB in BF16 — too big for the 500 GB
-# Lustre volume ($BD). Stage on $HOME (NFS, 23 TB free) instead.
-# Override HFB on the sbatch line if the staging dir differs.
-: "${HFB:=/home/paulinho/models/hf}"
+# --- HF base (CORR-110) ---
+# Qwen3.8-Flash-Next is ~360 GB in BF16. Default staging dir is the
+# project Lustre volume ($BD/models/hf/) — after the 2026-09-02
+# purge (ollama_data + gemma-4-31B-it cleanup) there is 266 GB
+# free, so 360 GB fits if you re-pull into this path.
+# Override HFB on the sbatch line to use $HOME (NFS) if the Lustre
+# pool is full again.
+: "${HFB:=$BD/models/hf}"
 mkdir -p "$HFB"
 echo "[vllm] HF base = $HFB"
 
 # --- Config (override via env on sbatch line) ---
-: "${VLLM_MODEL:=$HFB/Qwen_Qwen3.8-Flash-Next}"
+: "${VLLM_MODEL:=$HFB/Qwen_Qwen3.8-Flash-Next-FP8}"
 : "${VLLM_PORT:=8000}"
 : "${VLLM_MAX_MODEL_LEN:=16384}"
-: "${VLLM_GPU_MEMORY_UTILIZATION:=0.92}"
-: "${VLLM_TENSOR_PARALLEL_SIZE:=8}"
-: "${VLLM_DTYPE:=bfloat16}"
+: "${VLLM_GPU_MEMORY_UTILIZATION:=0.90}"
+: "${VLLM_TENSOR_PARALLEL_SIZE:=4}"
+: "${VLLM_DTYPE:=auto}"   # FP8 checkpoint: let vLLM read quantisation from config
 : "${AEGIS_SCOPE:=run-all}"   # submit --export=AEGIS_SCOPE=phase-1b for the cheap scout
 export VLLM_MODEL VLLM_PORT VLLM_MAX_MODEL_LEN VLLM_GPU_MEMORY_UTILIZATION VLLM_DTYPE VLLM_TENSOR_PARALLEL_SIZE
 export AEGIS_VLLM_BASE_URL="http://127.0.0.1:${VLLM_PORT}/v1"
@@ -99,7 +102,7 @@ echo " Weights   : $VLLM_MODEL"
 echo " Served as : $SERVED_NAME"
 echo " Port      : $VLLM_PORT"
 echo " Scope     : $AEGIS_SCOPE"
-echo " TP        : $VLLM_TENSOR_PARALLEL_SIZE (matches --gres=gpu:a100:8)"
+echo " TP        : $VLLM_TENSOR_PARALLEL_SIZE (matches --gres=gpu:a100:4)"
 echo " max-len   : $VLLM_MAX_MODEL_LEN"
 echo " dtype     : $VLLM_DTYPE"
 echo " RUN_LOG   : $RUN_LOG"
@@ -116,7 +119,7 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
   exit 4
 }
 
-# --- HF cache co-located with the model on NFS ($HFB) ---
+# --- HF cache co-located with the model ($HFB) ---
 # Compute nodes have no egress. Pre-stage model on the login node
 # with `hf download Qwen/Qwen3.8-Flash-Next --local-dir $HFB/...`.
 export HF_HOME="${HF_HOME:-$HFB/.cache}"
