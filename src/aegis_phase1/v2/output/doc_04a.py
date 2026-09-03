@@ -36,6 +36,7 @@ from typing import Any
 
 from aegis_phase1.data.loader import classify_tier
 from aegis_phase1.v2.output._common import (
+    doc_preamble,
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
@@ -111,6 +112,7 @@ def _build_body(
     config: dict[str, Any] | None = None,
 ) -> str:
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-04a Architecture & Data Inventory\n")
     ctx = state.get("company_context")
     applicable = _attr(ctx, "applicable_regs", default=[]) or []

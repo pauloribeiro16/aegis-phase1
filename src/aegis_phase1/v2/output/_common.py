@@ -258,11 +258,14 @@ def safe_get(obj: Any, *path: str, default: Any = None) -> Any:
 
 
 __all__ = [
+    "doc_preamble",
     "generate_frontmatter",
+    "get_per_spec_markdown",
     "markdown_table",
     "next_version",
     "render_per_spec_markdown_appendix",
     "safe_get",
+    "strip_aegis_frontmatter",
     "write_output",
 ]
 
@@ -296,6 +299,47 @@ def get_per_spec_markdown(state: Any, spec_id: str) -> str:
         return ""
     raw = bucket.get(spec_id)
     return raw if isinstance(raw, str) else ""
+
+
+def doc_preamble(state: Any) -> str:
+    """CORR-111: one-line header for Doc 01-09 — model + quant + job.
+
+    Returns the empty string when no model_capabilities were recorded
+    (deterministic-only run, mock mode, or a re-run from a pre-CORR-111
+    state.json). Renderers append this just before the H1 title so the
+    reader sees ``Model: <model> @ <quant> (job <job>)`` at the very top.
+
+    Caveats are appended automatically by :func:`header_for_doc` when
+    ``quant`` is ``unknown`` or ``provider_default`` — those are the
+    two cases that must NOT be missed by the reader.
+    """
+    if not isinstance(state, Mapping):
+        return ""
+    cap = state.get("v2_model_capabilities")
+    if not isinstance(cap, Mapping):
+        return ""
+    model = str(cap.get("model", "unknown"))
+    quant = str(cap.get("quantization", "unknown"))
+    job = cap.get("job_id", "unknown")
+    from aegis_phase1.llm.quant_manifest import header_for_doc as _qm_header
+    return _qm_header(model=model, quant=quant, job=job) + "\n\n"
+
+
+def strip_aegis_frontmatter(md: str) -> str:
+    """CORR-111: remove the leading ``<!-- aegis:…-->`` comment lines.
+
+    Renderers consume markdown strings that may carry a single-line
+    quant frontmatter prepended by
+    :meth:`Phase1LLMInvoker._capture_per_spec_markdown`. Strip it before
+    forwarding to user-facing markdown (xlsx appendices still keep it
+    so the audit trail survives).
+    """
+    if not md:
+        return md
+    lines = md.splitlines(keepends=True)
+    while lines and lines[0].startswith("<!-- aegis:"):
+        lines.pop(0)
+    return "".join(lines)
 
 
 def render_per_spec_markdown_appendix(state: Any) -> list[str]:

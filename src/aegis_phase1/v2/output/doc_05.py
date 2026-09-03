@@ -33,19 +33,20 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from aegis_phase1.data.loader import get_regulation_summary
+from aegis_phase1.v2.context.applicability_context import (
+    ApplicabilityContext,
+    build_applicability_context,
+)
 from aegis_phase1.v2.output._common import (
+    doc_preamble,
     generate_frontmatter,
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
     write_output,
 )
-from aegis_phase1.v2.context.applicability_context import (
-    ApplicabilityContext,
-    build_applicability_context,
-)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
-from aegis_phase1.data.loader import get_regulation_summary
 
 # CORR-061 S3b: spec IDs that this doc consumes from
 # ``state["per_spec_markdown"]``. Kept local to the doc so the
@@ -106,6 +107,7 @@ def render_doc_05(
     invoker = llm_invoker if use_llm else None
 
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-05 Regulatory Applicability\n")
 
     # CORR-038-T3: ApplicabilityContext (v2 source of truth) — added as

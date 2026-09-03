@@ -34,6 +34,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from aegis_phase1.llm.quant_manifest import resolve_quant_for as _qm_resolve_quant_for
 from aegis_phase1.v2.state import V2State
 
 if TYPE_CHECKING:
@@ -1593,6 +1594,10 @@ class Phase1Orchestrator:
             regulatory_baseline_path,
             preprocessing_path=preprocessing_path,
         )
+        # CORR-111: snapshot the model + quant + job that this run will use
+        # so renderers and digests can declare it transparently in their
+        # output. Idempotent — repeated calls keep the first recorded values.
+        self.init_model_capabilities()
         self.run_phase_1b()
         self.map_domains()
         self.reduce()
@@ -1900,6 +1905,47 @@ class Phase1Orchestrator:
             # of the typed dicts in ``domain_results`` / ``aggregated_data``.
             "per_spec_markdown": {},
         }
+
+    def init_model_capabilities(self) -> dict[str, Any]:
+        """CORR-111: snapshot the model + quant + job used by this run.
+
+        Populates ``state["v2_model_capabilities"]`` so every doc renderer
+        and any future digest has a single source of truth for what model
+        produced the run. Idempotent — first call wins (no silent
+        re-resolution if the invoker changes mid-run, which would confuse
+        digests).
+
+        Sources:
+          - ``self.llm_invoker.model`` / ``.provider`` for the identity.
+          - :func:`aegis_phase1.llm.quant_manifest.resolve_quant_for` for the
+            quant (probes the manifest dir, falls back to
+            ``provider_default`` for ollama, ``unknown`` otherwise).
+          - ``AEGIS_JOB_ID`` / ``SLURM_JOB_ID`` for the job tag.
+
+        Returns the dict that was (or is now) in ``state["v2_model_capabilities"]``.
+        """
+        existing = self.state.get("v2_model_capabilities")
+        if isinstance(existing, dict) and existing.get("model") and existing["model"] != "unknown":
+            return existing
+
+        model: str | None = None
+        provider: str | None = None
+        if self.llm_invoker is not None:
+            model = getattr(self.llm_invoker, "model", None)
+            provider = getattr(self.llm_invoker, "provider", None)
+
+        info = _qm_resolve_quant_for(model, provider)
+        from datetime import UTC, datetime
+        info = {**info, "recorded_at": datetime.now(UTC).isoformat()}
+
+        self.state["v2_model_capabilities"] = info
+        logger.info(
+            "CORR-111 init_model_capabilities: model=%s provider=%s "
+            "quant=%s provenance=%s job=%s manifest_path=%s",
+            info["model"], info["provider"], info["quantization"],
+            info["quantization_provenance"], info["job_id"], info["manifest_path"],
+        )
+        return info
 
     def _persist_state(self) -> None:
         """Persist current state to work/state.json."""
