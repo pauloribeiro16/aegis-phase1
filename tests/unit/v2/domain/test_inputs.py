@@ -40,10 +40,16 @@ def test_assemble_inputs_returns_all_required_keys(mock_state: V2State) -> None:
 
 
 def test_assemble_inputs_authoritative_ids_closed_list(mock_state: V2State) -> None:
-    """CORR-112 F2: the closed ID anchor block mirrors the lane's data."""
+    """CORR-112 F2: the closed ID anchor block mirrors the lane's data.
+
+    CORR-OBJ-01: also carries ``asset_ids`` for the per-section citation
+    gate (SYS-*/STORE-*/FLOW-*).
+    """
     result = assemble_inputs(mock_state, "D-04")
     anchors = result["authoritative_ids"]
-    assert set(anchors.keys()) == {"subdomain_ids", "regulation_ids", "article_ids", "note"}
+    assert set(anchors.keys()) == {
+        "subdomain_ids", "regulation_ids", "article_ids", "asset_ids", "note",
+    }
     # Subdomain IDs must match the filtered subdomains for the lane.
     expected_sub_ids = [s["id"] for s in result["subdomains"] if isinstance(s, dict) and s.get("id")]
     assert anchors["subdomain_ids"] == expected_sub_ids
@@ -52,6 +58,9 @@ def test_assemble_inputs_authoritative_ids_closed_list(mock_state: V2State) -> N
     # Article IDs must be a subset of the applicable_articles ids.
     article_ids = {a["id"] for a in result["applicable_articles"] if isinstance(a, dict) and a.get("id")}
     assert set(anchors["article_ids"]) <= article_ids
+    # Asset IDs block is present with the three sub-categories (mock_state
+    # has no real case_path → all three are [] but the keys exist).
+    assert set(anchors["asset_ids"].keys()) == {"systems", "data_stores", "data_flows"}
     assert "violation" in anchors["note"].lower()
 
 

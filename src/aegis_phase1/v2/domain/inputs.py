@@ -20,6 +20,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from aegis_phase1.prompts_v2.track_b import TrackB
 from aegis_phase1.v2.domain.filters import (
     filter_cross_reg,
@@ -183,17 +185,31 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
     # ONLY IDs from these lists; anything else is a violation caught by
     # the ref gate (prompts_v2/ref_gate.py). Built from the same
     # filtered data the prompt already carries — zero new loaders.
+    # CORR-OBJ-01: include case asset IDs (SYS-*, STORE-*, FLOW-*) so
+    # the per-section citation gate can catch invented architecture
+    # references. Loaded fresh per-domain (no orchestrator state
+    # mutation) — see _load_case_assets().
     article_id_set = sorted({
         a.get("id") for a in applicable_articles
         if isinstance(a, dict) and a.get("id")
     })
+    case_assets_all = _load_case_assets(state)
+    case_assets_filtered = _filter_assets_for_domain(
+        case_assets_all, domain_id, subdomains
+    )
     inputs["authoritative_ids"] = {
         "subdomain_ids": list(subdomain_ids_for_domain),
         "regulation_ids": list(applicable_regs),
         "article_ids": article_id_set,
+        "asset_ids": {
+            "systems": list(case_assets_filtered.get("systems") or []),
+            "data_stores": list(case_assets_filtered.get("data_stores") or []),
+            "data_flows": list(case_assets_filtered.get("data_flows") or []),
+        },
         "note": (
-            "CLOSED LIST: cite only these IDs. Any identifier not "
-            "present here is a violation."
+            "CLOSED LIST: cite only these IDs (subdomain/regulation/"
+            "article AND SYS-*/STORE-*/FLOW-* asset IDs). Any identifier "
+            "not present here is a violation."
         ),
     }
 
@@ -232,6 +248,197 @@ def _case_id(state: V2State) -> str:
     if not case_path:
         return ""
     return Path(case_path).name
+
+
+# ─── Case asset loading (CORR-OBJ-01) ─────────────────────────────────
+
+
+# Top-level key aliases for the case architecture YAMLs. Case 1 uses the
+# short forms ("systems", "stores", "flows"); case 2+ use the explicit
+# forms ("systems", "data_stores", "data_flows"). Mirror the convention
+# in CaseProfileLoader._read_yaml_list_multi.
+_ASSET_KEY_ALIASES: dict[str, list[str]] = {
+    "systems": ["systems"],
+    "data_stores": ["data_stores", "stores"],
+    "data_flows": ["data_flows", "flows"],
+}
+
+
+def _read_yaml_list_safe(path: Path, key_aliases: list[str]) -> list[dict[str, Any]]:
+    """Read a list[dict] from a YAML file under one of several root keys.
+
+    Tolerant of missing files (returns []) and parse errors (logs WARNING
+    and returns []). Used by :func:`_load_case_assets` to read the three
+    case architecture inventories without ever raising.
+    """
+    if not path.exists():
+        logger.debug("_read_yaml_list_safe: missing %s; returning []", path)
+        return []
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+    except Exception as exc:
+        logger.warning(
+            "_read_yaml_list_safe: failed to parse %s: %s; returning []",
+            path, exc,
+        )
+        return []
+    if not isinstance(raw, dict):
+        logger.warning(
+            "_read_yaml_list_safe: top-level YAML at %s is not a dict (got %s); returning []",
+            path, type(raw).__name__,
+        )
+        return []
+    for alias in key_aliases:
+        if alias in raw and isinstance(raw[alias], list):
+            return [item for item in raw[alias] if isinstance(item, dict)]
+    logger.debug(
+        "_read_yaml_list_safe: none of aliases %s found in %s; returning []",
+        key_aliases, path,
+    )
+    return []
+
+
+def _load_case_assets(state: V2State) -> dict[str, list[dict[str, Any]]]:
+    """Load all case architecture assets (SYS-*/STORE-*/FLOW-*) from disk.
+
+    CORR-OBJ-01: previously the MAP context only carried ``subdomain_ids``,
+    ``regulation_ids`` and ``article_ids`` to the LLM. SYS-*/STORE-*/FLOW-*
+    were never anchored, so the LLM could invent (or drop) them freely.
+    This loader reads the three architecture YAMLs once per call and
+    returns a dict shaped like::
+
+        {
+            "systems":     [ {id, name, type, ...}, ... ],
+            "data_stores": [ {id, name, type, ...}, ... ],
+            "data_flows":  [ {id, name, source, ...}, ... ],
+        }
+
+    Files that don't exist or fail to parse return an empty list for
+    that category (no exception propagates). The loader is pure: it
+    reads from ``state['case_path']/input/architecture/`` and does not
+    mutate state.
+
+    Args:
+        state: Pipeline ``V2State`` carrying ``case_path``.
+
+    Returns:
+        Dict with keys ``systems``, ``data_stores``, ``data_flows``;
+        each value is a list of dicts (possibly empty).
+    """
+    case_path = state.get("case_path") or ""
+    if not case_path:
+        return {"systems": [], "data_stores": [], "data_flows": []}
+    arch_dir = Path(case_path) / "input" / "architecture"
+    if not arch_dir.is_dir():
+        logger.debug(
+            "_load_case_assets: %s is not a directory; returning empty",
+            arch_dir,
+        )
+        return {"systems": [], "data_stores": [], "data_flows": []}
+    return {
+        "systems": _read_yaml_list_safe(
+            arch_dir / "systems.yaml", _ASSET_KEY_ALIASES["systems"],
+        ),
+        "data_stores": _read_yaml_list_safe(
+            arch_dir / "data_stores.yaml", _ASSET_KEY_ALIASES["data_stores"],
+        ),
+        "data_flows": _read_yaml_list_safe(
+            arch_dir / "data_flows.yaml", _ASSET_KEY_ALIASES["data_flows"],
+        ),
+    }
+
+
+def _filter_assets_for_domain(
+    assets: dict[str, list[dict[str, Any]]],
+    domain_id: str,
+    subdomains: list[dict[str, Any]],
+) -> dict[str, list[str]]:
+    """Heuristically filter the case asset list to those likely relevant to a domain.
+
+    Heuristic v1 (CORR-OBJ-01): case-insensitive substring match between
+    each asset's text fields (name + type + notes-like fields) and the
+    keywords harvested from the domain's subdomain IDs (the numeric
+    part — e.g. for D-01.1 the keyword is "01" and "1") plus the
+    subdomain names if present.
+
+    See ``data/asset_filter_rules.yaml`` (future) for a versioned,
+    rules-based replacement. Until that file exists, this is a
+    conservative, deterministic v1: any asset with no field that
+    substring-matches a domain keyword is dropped. If no keywords can
+    be derived (empty subdomains / no numeric content), the function
+    falls back to returning ALL asset IDs — which is safer than
+    returning nothing.
+
+    Args:
+        assets: Dict as returned by :func:`_load_case_assets`.
+        domain_id: Domain identifier (e.g. ``"D-01"``).
+        subdomains: List of subdomain dicts for this domain (each may
+            carry an ``id`` and ``name`` field).
+
+    Returns:
+        Dict with the same shape as ``assets`` but each value is a
+        sorted list of asset IDs (strings) only.
+    """
+    keywords = _domain_keywords(domain_id, subdomains)
+    out: dict[str, list[str]] = {"systems": [], "data_stores": [], "data_flows": []}
+    if not keywords:
+        # No keywords → can't filter safely; return all IDs.
+        for category, items in assets.items():
+            out[category] = sorted(
+                str(item.get("id")) for item in items
+                if isinstance(item, dict) and item.get("id")
+            )
+        return out
+    for category, items in assets.items():
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            aid = item.get("id")
+            if not aid:
+                continue
+            haystack = " ".join(
+                str(v) for v in item.values() if v is not None
+            ).lower()
+            if any(kw in haystack for kw in keywords):
+                out[category].append(str(aid))
+    for k in out:
+        out[k] = sorted(out[k])
+    return out
+
+
+def _domain_keywords(domain_id: str, subdomains: list[dict[str, Any]]) -> list[str]:
+    """Derive substring keywords for the asset filter.
+
+    For ``D-XX.Y`` → return both ``"XX"`` and ``"Y"`` plus any
+    subdomain ``name`` fields (lower-cased). The heuristic is
+    intentionally generous: a few extra matches are preferable to
+    dropping a real reference, because the per-section gate will
+    only flag *missing* IDs, not extra ones.
+    """
+    keywords: list[str] = []
+    # Pull numeric tokens out of the domain ID.
+    digits = "".join(ch for ch in domain_id if ch.isdigit())
+    if digits:
+        # Both "01" and "1" so a YAML field containing either matches.
+        keywords.append(digits)
+        if len(digits) > 1 and digits.startswith("0"):
+            keywords.append(digits.lstrip("0") or "0")
+    for sub in subdomains:
+        if not isinstance(sub, dict):
+            continue
+        name = sub.get("name") or sub.get("title") or ""
+        if isinstance(name, str) and name.strip():
+            keywords.append(name.strip().lower())
+    # De-duplicate while preserving order.
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for kw in keywords:
+        kwl = kw.lower() if not kw.isdigit() else kw
+        if kwl and kwl not in seen:
+            seen.add(kwl)
+            deduped.append(kwl)
+    return deduped
 
 
 def _build_manifest_summary(
@@ -545,4 +752,8 @@ def _track_b_rationale(
     )
 
 
-__all__ = ["assemble_inputs"]
+__all__ = [
+    "assemble_inputs",
+    "_load_case_assets",
+    "_filter_assets_for_domain",
+]

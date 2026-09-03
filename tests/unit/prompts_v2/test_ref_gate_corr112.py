@@ -248,3 +248,109 @@ SYS-01 on AWS eu-west-1 complies with GDPR Art. 32(1).
             assert len(res["all_attempts"]) == 2
             assert res["all_attempts"][0]["ok"] is False
             assert res["all_attempts"][1]["ok"] is True
+
+
+# ─── CORR-OBJ-01: per-section citation gate for SYS-*/STORE-*/FLOW-* ───
+
+
+def test_citation_gate_valid_ref_in_list(ref_gate: RefGate):
+    """SYS-/STORE-/FLOW- token that IS in the authoritative list → no violation."""
+    raw = """
+## Rationale
+SYS-01 on AWS eu-west-1 sends data to STORE-01 over FLOW-01. Complies with GDPR Art. 32(1).
+"""
+    inputs = {
+        "authoritative_ids": {
+            "asset_ids": {
+                "systems": ["SYS-01", "SYS-02"],
+                "data_stores": ["STORE-01"],
+                "data_flows": ["FLOW-01", "FLOW-02"],
+            },
+        }
+    }
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs=inputs)
+    # P1B-02 also requires DOC04 grounding — the SYS-01 ref provides that
+    # via the existing _validate_p1b02 logic. So no violations expected.
+    asset_violations = [v for v in res.violations if v.rule == "UNAUTHORISED_ASSET_REF"]
+    assert asset_violations == []
+
+
+def test_citation_gate_invalid_ref_not_in_list(ref_gate: RefGate):
+    """SYS- token NOT in authoritative list → UNAUTHORISED_ASSET_REF violation."""
+    raw = """
+## Rationale
+SYS-99 (an invented system) is referenced. STORE-42 too. FLOW-XX is not real.
+"""
+    inputs = {
+        "authoritative_ids": {
+            "asset_ids": {
+                "systems": ["SYS-01", "SYS-02"],
+                "data_stores": ["STORE-01"],
+                "data_flows": ["FLOW-01"],
+            },
+        }
+    }
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs=inputs)
+    rules = [v.rule for v in res.violations]
+    assert "UNAUTHORISED_ASSET_REF" in rules
+    bad_tokens = {v.context for v in res.violations if v.rule == "UNAUTHORISED_ASSET_REF"}
+    # All three should be flagged
+    assert "SYS-99" in bad_tokens
+    assert "STORE-42" in bad_tokens
+    assert "FLOW-XX" in bad_tokens
+
+
+def test_citation_gate_empty_asset_list_no_violation(ref_gate: RefGate):
+    """Empty asset list → no violation (back-compat with v1.1 specs)."""
+    raw = """
+## Rationale
+SYS-99 STORE-42 FLOW-XX — anything goes when there is no authoritative asset list.
+"""
+    inputs = {
+        "authoritative_ids": {
+            "asset_ids": {
+                "systems": [],
+                "data_stores": [],
+                "data_flows": [],
+            },
+        }
+    }
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs=inputs)
+    asset_violations = [v for v in res.violations if v.rule == "UNAUTHORISED_ASSET_REF"]
+    assert asset_violations == []
+
+
+def test_citation_gate_missing_asset_ids_block_no_violation(ref_gate: RefGate):
+    """No asset_ids block in inputs → no citation violation (v1.1 compat)."""
+    raw = """
+## Rationale
+SYS-99 STORE-42 FLOW-XX should be allowed when there is no asset_ids block at all.
+"""
+    inputs = {"authoritative_ids": {}}
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs=inputs)
+    asset_violations = [v for v in res.violations if v.rule == "UNAUTHORISED_ASSET_REF"]
+    assert asset_violations == []
+
+
+def test_citation_gate_applies_to_p1b01_spec(ref_gate: RefGate):
+    """Citation gate runs for P1B-01 too (not just P1B-02)."""
+    raw = """
+## Interpretations
+### INT-01: example
+- sub_domain_id: D-01.1
+- entry_id: TIPO2-GDPR-RTS-DEADLINES
+- text: SYS-99 referenced here
+"""
+    inputs = {
+        "authoritative_ids": {
+            "subdomain_ids": ["D-01.1"],
+            "asset_ids": {
+                "systems": ["SYS-01"],
+                "data_stores": [],
+                "data_flows": [],
+            },
+        }
+    }
+    res = ref_gate.validate("P1B-LLM-01-INTERPRETATION", raw, inputs=inputs)
+    assert any(v.rule == "UNAUTHORISED_ASSET_REF" for v in res.violations)
+

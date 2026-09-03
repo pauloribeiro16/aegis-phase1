@@ -73,6 +73,12 @@ _GENERIC_MARKER_RE = re.compile(
 
 _INT_ID_RE = re.compile(r"\bINT-(\d+)\b", re.IGNORECASE)
 
+# CORR-OBJ-01: per-section citation gate for case architecture IDs.
+# Matches SYS-, STORE- and FLOW- tokens (uppercase alphanumerics, dashes,
+# underscores) inside the LLM output. Each match is then checked against
+# the authoritative asset list the prompt supplied.
+_ASSET_ID_RE = re.compile(r"\b(SYS|STORE|FLOW)-[A-Z0-9][A-Z0-9_-]*\b", re.IGNORECASE)
+
 
 class GateViolation(NamedTuple):
     rule: str
@@ -174,6 +180,15 @@ class RefGate:
             violations.extend(self._validate_p1b02(raw_markdown, inputs, authoritative))
         elif "P1C-LLM-01" in spec_id or spec_id == "P1C-01":
             violations.extend(self._validate_p1c01(raw_markdown, inputs, authoritative))
+
+        # CORR-OBJ-01: per-section citation gate. Runs after every
+        # spec-specific checker so the rule applies to all 3 specs.
+        # Backward-compat: if the spec is from before OBJ-01 and the
+        # inputs have no ``asset_ids`` block, the gate is a no-op
+        # (we cannot know what the authoritative asset set is).
+        violations.extend(
+            self._validate_citations(raw_markdown, inputs, authoritative)
+        )
 
         valid = len(violations) == 0
         result = GateResult(valid=valid, violations=violations)
@@ -329,6 +344,58 @@ class RefGate:
                         "INVALID_RELATIONSHIP",
                         f"Relationship '{rel}' is not a valid Regulatory Baseline relationship. Allowed: {sorted(VALID_P1C01_RELATIONSHIPS)}",
                         context=rel,
+                    )
+                )
+        return violations
+
+    def _validate_citations(
+        self,
+        raw: str,
+        inputs: dict[str, Any],
+        authoritative: dict[str, Any],
+    ) -> list[GateViolation]:
+        """CORR-OBJ-01: per-section citation gate for SYS-*/STORE-*/FLOW-*.
+
+        Scans the LLM output for case architecture tokens and flags any
+        that are NOT present in the authoritative asset lists. The
+        authoritative set is built by the MAP-stage inputs assembly
+        (``v2/domain/inputs.py:_load_case_assets``) and is delivered
+        under ``authoritative['asset_ids']`` with three sub-keys
+        (``systems``, ``data_stores``, ``data_flows``).
+
+        Backward compatibility:
+          * If the inputs dict has no ``asset_ids`` block (v1.1 specs /
+            older callers), the gate returns ``[]`` — it cannot
+            distinguish legitimate from invented IDs.
+          * If all three sub-lists are empty, the gate is a no-op.
+
+        The validation is deterministic and case-insensitive on token
+        matching (the regex already upper-cases via the ``re.IGNORECASE``
+        flag, then we normalise by upper-casing the asset lists for the
+        set comparison).
+        """
+        asset_block = authoritative.get("asset_ids") or {}
+        if not isinstance(asset_block, dict):
+            return []
+        systems = {str(x).upper() for x in (asset_block.get("systems") or [])}
+        stores = {str(x).upper() for x in (asset_block.get("data_stores") or [])}
+        flows = {str(x).upper() for x in (asset_block.get("data_flows") or [])}
+        if not (systems or stores or flows):
+            return []
+
+        allowed = systems | stores | flows
+
+        violations: list[GateViolation] = []
+        for match in _ASSET_ID_RE.finditer(raw):
+            token = match.group(0).upper()
+            if token not in allowed:
+                violations.append(
+                    GateViolation(
+                        "UNAUTHORISED_ASSET_REF",
+                        f"Architecture token '{token}' is not in the lane's "
+                        f"authoritative asset list (SYS-*/STORE-*/FLOW-*). "
+                        "Cite only IDs provided in the inputs.",
+                        context=token,
                     )
                 )
         return violations
