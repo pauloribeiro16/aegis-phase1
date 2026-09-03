@@ -33,19 +33,20 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from aegis_phase1.v2.output._common import (
-    generate_frontmatter,
-    get_per_spec_markdown,
-    markdown_table,
-    render_per_spec_markdown_appendix,
-    write_output,
-)
+from aegis_phase1.data.loader import get_regulation_summary
 from aegis_phase1.v2.context.applicability_context import (
     ApplicabilityContext,
     build_applicability_context,
 )
+from aegis_phase1.v2.output._common import (
+    doc_preamble,
+    get_per_spec_markdown,
+    markdown_table,
+    render_per_spec_markdown_appendix,
+    section_provenance_tag,
+    write_output,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
-from aegis_phase1.data.loader import get_regulation_summary
 
 # CORR-061 S3b: spec IDs that this doc consumes from
 # ``state["per_spec_markdown"]``. Kept local to the doc so the
@@ -316,6 +317,11 @@ def _section_3_per_regulation(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 3. PER-REGULATION APPLICABILITY\n")
+    _tag = section_provenance_tag(
+        "AEGIS-P1-05", "## 3. PER-REGULATION APPLICABILITY\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Each sub-section below follows a fixed shape: thresholds and "
         "criteria on the left, the company value on the right, and a "
@@ -519,6 +525,11 @@ def _section_6_strategic_implications(
     """
     parts: list[str] = []
     parts.append("## 6. STRATEGIC IMPLICATIONS\n")
+    _tag_6 = section_provenance_tag(
+        "AEGIS-P1-05", "## 6. STRATEGIC IMPLICATIONS\n"
+    )
+    if _tag_6:
+        parts.append(f"{_tag_6}\n")
     parts.append(
         "The applicability profile is condensed into a small set of "
         "implications that feed Phase 2 obligation derivation. Each "
@@ -702,6 +713,11 @@ def _section_7_regulatory_gaps(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 7. REGULATORY GAPS IDENTIFIED\n")
+    _tag = section_provenance_tag(
+        "AEGIS-P1-05", "## 7. REGULATORY GAPS IDENTIFIED\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Gaps surfaced by the ontology tensions catalogue and by "
         "sub-domains whose sole authority is a regulation that does not "

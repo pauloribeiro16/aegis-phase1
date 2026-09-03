@@ -259,10 +259,12 @@ def safe_get(obj: Any, *path: str, default: Any = None) -> Any:
 
 __all__ = [
     "generate_frontmatter",
+    "get_per_spec_markdown",
     "markdown_table",
     "next_version",
     "render_per_spec_markdown_appendix",
     "safe_get",
+    "section_provenance_tag",
     "write_output",
 ]
 
@@ -278,6 +280,43 @@ PER_SPEC_MD_SPECS: tuple[str, ...] = (
     "P1C-LLM-02-COMPOUND-EVENT",
     "P1C-LLM-03-STRATEGIC-SYNTHESIS",
 )
+
+
+def doc_preamble(state: Any) -> str:
+    """Empty preamble — kept for import compatibility with older doc
+    renderers. New code should use :data:`aegis_phase1.v2.output.provenance`
+    registry's :func:`section_provenance_tag` for section-level origin
+    labels instead.
+
+    Returns ``""`` so renderers that ``parts.append(doc_preamble(state))``
+    emit nothing rather than failing. None callers in the current tree,
+    but kept so the pre-CORR-074 import surface stays unbroken.
+    """
+    return ""
+
+
+def section_provenance_tag(doc_id: str, heading: str) -> str | None:
+    """Return the provenance tag to emit under a Doc heading, or None.
+
+    CORR-112: a renderer's exact ``parts.append(\"## N. ...\")`` line
+    is passed; if the registry classifies it as LLM-derived, the caller
+    emits the human-readable tag on the line below the heading. If
+    deterministic, returns ``None`` (no tag noise).
+
+    Caller pattern (matches every renderer):
+
+        parts.append(f"## {n}. {title}\\n")
+        tag = section_provenance_tag("AEGIS-P1-05", f"## {n}. {title}\\n")
+        if tag:
+            parts.append(tag + "\\n")
+    """
+    from aegis_phase1.v2.output.provenance import (
+        section_tag_for_heading,
+        should_tag,
+    )
+    if not should_tag(doc_id, heading):
+        return None
+    return section_tag_for_heading(doc_id, heading)
 
 
 def get_per_spec_markdown(state: Any, spec_id: str) -> str:

@@ -46,6 +46,7 @@ from aegis_phase1.v2.output._common import (
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
+    section_provenance_tag,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -268,6 +269,12 @@ def _section_4_summary(
 def _section_5_complementarity(overlaps: list[Any], state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. COMPLEMENTARITY\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-07", "## 5. COMPLEMENTARITY\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Cross-regulation overlaps are presented below. Section 5.1 "
         "expands each overlap into a table of shared sub-domains with "
@@ -416,6 +423,12 @@ def _section_6_strategic_implications(
     """
     parts: list[str] = []
     parts.append("## 6. STRATEGIC IMPLICATIONS\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-07", "## 6. STRATEGIC IMPLICATIONS\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     rows = _strategic_implication_rows(state, regs)
     parts.append(
         markdown_table(
@@ -457,6 +470,12 @@ def _section_7_gaps(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 7. GAPS\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-07", "## 7. GAPS\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Gaps are surfaced from three sources and ranked by severity: "
         "(a) structural tensions recorded in ``state.ontology.tensions``; "

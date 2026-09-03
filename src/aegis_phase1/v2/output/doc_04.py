@@ -35,14 +35,14 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from aegis_phase1.v2.context.applicability_context import (
+    ApplicabilityContext,
+    build_applicability_context,
+)
 from aegis_phase1.v2.output._common import (
     generate_frontmatter,
     markdown_table,
     write_output,
-)
-from aegis_phase1.v2.context.applicability_context import (
-    ApplicabilityContext,
-    build_applicability_context,
 )
 
 logger = logging.getLogger(__name__)

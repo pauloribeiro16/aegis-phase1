@@ -36,6 +36,7 @@ from aegis_phase1.v2.output._common import (
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
+    section_provenance_tag,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -312,6 +313,12 @@ def _section_6_key_adjustments(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 6. KEY ADJUSTMENTS NARRATIVE\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-07b", "## 6. KEY ADJUSTMENTS NARRATIVE\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Per-tier aggregation of the operational attributes. The "
         "narrative is built by joining the per-row attribute strings "

@@ -36,6 +36,7 @@ from aegis_phase1.v2.output._common import (
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
+    section_provenance_tag,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -314,6 +315,12 @@ def _section_risk_classification(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. Supply Chain Risk Assessment\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-04c", "## 5. Supply Chain Risk Assessment\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     inv = state.get("architecture_inventory") or {}
     cloud = inv.get("cloud_services") or []
     if not cloud:

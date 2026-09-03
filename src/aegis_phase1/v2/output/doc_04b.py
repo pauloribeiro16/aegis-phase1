@@ -44,6 +44,7 @@ from aegis_phase1.v2.output._common import (
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
+    section_provenance_tag,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -538,6 +539,12 @@ def _section_per_domain(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 3. Per-Domain Assessment\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-04b", "## 3. Per-Domain Assessment\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     overrides = _merged_maturity_overrides(state)
     review = _load_review_for_state(state)
     domain_results = state.get("domain_results") or {}
@@ -834,6 +841,12 @@ def _section_3b_overlap_classification(state: dict[str, Any]) -> list[str]:
     """
     parts: list[str] = []
     parts.append("## 3b. LLM Source — P1C-LLM-01 Overlap Classification\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-04b", "## 3b. LLM Source — P1C-LLM-01 Overlap Classification\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Raw markdown response of P1C-LLM-01 OVERLAP-CLASSIFICATION, "
         "concatenated across the 10 D-XX lanes (separated by ``---``). "
