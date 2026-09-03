@@ -38,6 +38,10 @@ def test_case2_deterministic_pipeline(tmp_path: Path) -> None:
 
     expected_docs = [
         "AEGIS-P1-04",
+        "AEGIS-P1-04a",
+        "AEGIS-P1-04b",
+        "AEGIS-P1-04c",
+        "AEGIS-P1-04d",
         "AEGIS-P1-05",
         "AEGIS-P1-06",
         "AEGIS-P1-07",

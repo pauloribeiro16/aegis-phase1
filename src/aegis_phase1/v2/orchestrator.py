@@ -1327,6 +1327,10 @@ class Phase1Orchestrator:
         paths: dict[str, str] = dict(self.state.get("output_paths") or {})
         for label, fn in (
             ("04_body", self.render_doc_04_body),
+            ("04a", self.render_doc_04a),
+            ("04b", self.render_doc_04b),
+            ("04c", self.render_doc_04c),
+            ("04d", self.render_doc_04d),
             ("05", self.render_doc_05),
             ("06", self.render_doc_06),
             ("07", self.render_doc_07),
