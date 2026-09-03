@@ -44,11 +44,13 @@ def test_assemble_inputs_authoritative_ids_closed_list(mock_state: V2State) -> N
 
     CORR-OBJ-01: also carries ``asset_ids`` for the per-section citation
     gate (SYS-*/STORE-*/FLOW-*).
+    CORR-OBJ-07: also carries ``business_goal_ids`` / ``must_business_goal_ids``.
     """
     result = assemble_inputs(mock_state, "D-04")
     anchors = result["authoritative_ids"]
     assert set(anchors.keys()) == {
-        "subdomain_ids", "regulation_ids", "article_ids", "asset_ids", "note",
+        "subdomain_ids", "regulation_ids", "article_ids", "asset_ids",
+        "business_goal_ids", "must_business_goal_ids", "note",
     }
     # Subdomain IDs must match the filtered subdomains for the lane.
     expected_sub_ids = [s["id"] for s in result["subdomains"] if isinstance(s, dict) and s.get("id")]
@@ -61,7 +63,38 @@ def test_assemble_inputs_authoritative_ids_closed_list(mock_state: V2State) -> N
     # Asset IDs block is present with the three sub-categories (mock_state
     # has no real case_path → all three are [] but the keys exist).
     assert set(anchors["asset_ids"].keys()) == {"systems", "data_stores", "data_flows"}
+    # Business goal IDs (mock_state has empty business_goals).
+    assert anchors["business_goal_ids"] == []
+    assert anchors["must_business_goal_ids"] == []
     assert "violation" in anchors["note"].lower()
+
+
+def test_assemble_inputs_business_goal_ids_populated_from_state(mock_state: V2State) -> None:
+    """CORR-OBJ-07: business goals from state surface in authoritative_ids."""
+    mock_state["business_goals"] = [
+        {"id": "BG-01", "description": "GDPR", "priority": "HIGH"},
+        {"id": "BG-02", "description": "CRA", "priority": "HIGH"},
+        {"id": "BG-03", "description": "Trust", "priority": "MEDIUM"},
+        {"id": "BG-04", "description": "Efficiency", "priority": "LOW"},
+    ]
+    result = assemble_inputs(mock_state, "D-04")
+    anchors = result["authoritative_ids"]
+    assert anchors["business_goal_ids"] == ["BG-01", "BG-02", "BG-03", "BG-04"]
+    # HIGH counts as MUST per _MUST_PRIORITIES.
+    assert anchors["must_business_goal_ids"] == ["BG-01", "BG-02"]
+
+
+def test_assemble_inputs_business_goal_priority_must_literal(mock_state: V2State) -> None:
+    """CORR-OBJ-07: the literal ``MUST`` priority value also counts as MUST."""
+    mock_state["business_goals"] = [
+        {"id": "BG-10", "description": "x", "priority": "MUST"},
+        {"id": "BG-11", "description": "y", "priority": "should"},
+        {"id": "BG-12", "description": "z"},  # no priority
+    ]
+    result = assemble_inputs(mock_state, "D-04")
+    anchors = result["authoritative_ids"]
+    assert anchors["business_goal_ids"] == ["BG-10", "BG-11", "BG-12"]
+    assert anchors["must_business_goal_ids"] == ["BG-10"]
 
 
 def test_assemble_inputs_uppercases_domain_id(mock_state: V2State) -> None:

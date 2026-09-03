@@ -423,3 +423,84 @@ A reference to ZZ.XX-99 is fabricated.
     # The two valid tokens must NOT produce violations
     assert not any(v.context in {"PR.DS-01", "GV.OC-01"} for v in csf_violations)
 
+
+
+# ─── CORR-OBJ-07: business-grounding (MISSING_BUSINESS_GROUNDING) ─────
+
+
+def test_p1b02_business_grounding_cited(ref_gate: RefGate):
+    """P1B-02 with at least one MUST goal cited → no MISSING_BUSINESS_GROUNDING."""
+    raw = """
+## Rationale
+SYS-01 is the primary system. This investment supports BG-01 (GDPR-compliant
+data processing) and aligns with the company's stated direction. Per GDPR
+Art. 32(1), technical measures are required.
+## Findings
+- effort_estimate: hours to days (LOW tier)
+"""
+    inputs = {
+        "authoritative_ids": {
+            "must_business_goal_ids": ["BG-01", "BG-02"],
+            "business_goal_ids": ["BG-01", "BG-02", "BG-03"],
+        }
+    }
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs=inputs)
+    bg_violations = [v for v in res.violations if v.rule == "MISSING_BUSINESS_GROUNDING"]
+    assert bg_violations == []
+
+
+def test_p1b02_business_grounding_missing(ref_gate: RefGate):
+    """P1B-02 with NO MUST goal cited → MISSING_BUSINESS_GROUNDING."""
+    raw = """
+## Rationale
+SYS-01 is the primary system. Per GDPR Art. 32(1), technical measures are required.
+## Findings
+- effort_estimate: hours to days (LOW tier)
+"""
+    inputs = {
+        "authoritative_ids": {
+            "must_business_goal_ids": ["BG-01", "BG-02"],
+            "business_goal_ids": ["BG-01", "BG-02", "BG-03"],
+        }
+    }
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs=inputs)
+    assert any(v.rule == "MISSING_BUSINESS_GROUNDING" for v in res.violations)
+    # At least one violation mentions the available MUST goals.
+    msg = next(v.message for v in res.violations if v.rule == "MISSING_BUSINESS_GROUNDING")
+    assert "BG-01" in msg or "BG-02" in msg
+
+
+def test_p1b02_business_grounding_no_must_goals_no_violation(ref_gate: RefGate):
+    """No MUST goals configured → rule is a no-op (back-compat)."""
+    raw = """
+## Rationale
+SYS-01 is the primary system. Per GDPR Art. 32(1), technical measures are required.
+## Findings
+- effort_estimate: hours to days
+"""
+    inputs = {
+        "authoritative_ids": {
+            "must_business_goal_ids": [],
+            "business_goal_ids": ["BG-01"],
+        }
+    }
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs=inputs)
+    bg_violations = [v for v in res.violations if v.rule == "MISSING_BUSINESS_GROUNDING"]
+    assert bg_violations == []
+
+
+def test_p1b02_business_grounding_only_one_must_goal_cited_works(ref_gate: RefGate):
+    """Of 3 MUST goals, citing any single one is enough."""
+    raw = """
+## Rationale
+SYS-01 on AWS eu-west-1. Aligned with BG-02 (CRA-conformant product).
+## Findings
+- effort_estimate: days
+"""
+    inputs = {
+        "authoritative_ids": {
+            "must_business_goal_ids": ["BG-01", "BG-02", "BG-03"],
+        }
+    }
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs=inputs)
+    assert not any(v.rule == "MISSING_BUSINESS_GROUNDING" for v in res.violations)

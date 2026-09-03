@@ -189,6 +189,9 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
     # the per-section citation gate can catch invented architecture
     # references. Loaded fresh per-domain (no orchestrator state
     # mutation) — see _load_case_assets().
+    # CORR-OBJ-07: include business goal IDs (BG-XX) so the synthesis
+    # gate can require at least one strong-priority (MUST) goal to be
+    # cited — see _load_business_goals() for the priority mapping.
     article_id_set = sorted({
         a.get("id") for a in applicable_articles
         if isinstance(a, dict) and a.get("id")
@@ -197,6 +200,7 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
     case_assets_filtered = _filter_assets_for_domain(
         case_assets_all, domain_id, subdomains
     )
+    business_goal_ids, must_goal_ids = _load_business_goals(state)
     inputs["authoritative_ids"] = {
         "subdomain_ids": list(subdomain_ids_for_domain),
         "regulation_ids": list(applicable_regs),
@@ -206,10 +210,14 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
             "data_stores": list(case_assets_filtered.get("data_stores") or []),
             "data_flows": list(case_assets_filtered.get("data_flows") or []),
         },
+        "business_goal_ids": list(business_goal_ids),
+        "must_business_goal_ids": list(must_goal_ids),
         "note": (
             "CLOSED LIST: cite only these IDs (subdomain/regulation/"
-            "article AND SYS-*/STORE-*/FLOW-* asset IDs). Any identifier "
-            "not present here is a violation."
+            "article AND SYS-*/STORE-*/FLOW-* asset IDs AND BG-* "
+            "business goal IDs). Synthesis must reference at least one "
+            "MUST-priority business goal. Any identifier not present "
+            "here is a violation."
         ),
     }
 
@@ -439,6 +447,56 @@ def _domain_keywords(domain_id: str, subdomains: list[dict[str, Any]]) -> list[s
             seen.add(kwl)
             deduped.append(kwl)
     return deduped
+
+
+# Priority values that count as a "MUST" (strong-priority) business
+# goal. The case files use HIGH/MEDIUM/LOW but the proportionality
+# methodology speaks MUST/SHOULD/COULD. AGENTS.md says "MUST is the
+# safe default for adaptation" — so we accept MUST literally AND
+# HIGH as a synonym (no current case ships "MUST" as a value).
+_MUST_PRIORITIES = {"MUST", "HIGH"}
+
+
+def _load_business_goals(state: V2State) -> tuple[list[str], list[str]]:
+    """Read business goals from state and split into (all_ids, must_ids).
+
+    CORR-OBJ-07: business goals are the per-company strategic anchor
+    that Doc 04 / synthesis output must reference. We surface the
+    full ID list and a filtered "MUST"-priority subset so the
+    per-section gate can enforce "at least one MUST goal must be
+    cited" without re-reading the YAMLs.
+
+    Tolerant of: missing key, empty list, malformed goals (non-dict
+    entries, missing id, missing priority). The priority field is
+    matched case-insensitively. Goals with no priority field default
+    to MEDIUM and are NOT counted as MUST — this is the safe choice
+    for downstream consumers.
+
+    Args:
+        state: Pipeline ``V2State``. Reads ``state['business_goals']``.
+
+    Returns:
+        2-tuple ``(all_ids, must_ids)`` — each a sorted list of
+        goal IDs. Both empty when the key is absent or no goals
+        carry an id.
+    """
+    goals = state.get("business_goals") or []
+    if not isinstance(goals, list):
+        return [], []
+    all_ids: set[str] = set()
+    must_ids: set[str] = set()
+    for goal in goals:
+        if not isinstance(goal, dict):
+            continue
+        gid = goal.get("id")
+        if not gid:
+            continue
+        gid_str = str(gid)
+        all_ids.add(gid_str)
+        priority_raw = goal.get("priority")
+        if isinstance(priority_raw, str) and priority_raw.strip().upper() in _MUST_PRIORITIES:
+            must_ids.add(gid_str)
+    return sorted(all_ids), sorted(must_ids)
 
 
 def _build_manifest_summary(
