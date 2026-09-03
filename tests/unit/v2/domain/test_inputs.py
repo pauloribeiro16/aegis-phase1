@@ -34,8 +34,25 @@ def test_assemble_inputs_returns_all_required_keys(mock_state: V2State) -> None:
         "cross_reg_analysis",
         "existing_implementations",
         "track_b_suggestion",
+        "authoritative_ids",  # CORR-112 F2: closed ID anchors
     }
     assert set(result.keys()) == expected
+
+
+def test_assemble_inputs_authoritative_ids_closed_list(mock_state: V2State) -> None:
+    """CORR-112 F2: the closed ID anchor block mirrors the lane's data."""
+    result = assemble_inputs(mock_state, "D-04")
+    anchors = result["authoritative_ids"]
+    assert set(anchors.keys()) == {"subdomain_ids", "regulation_ids", "article_ids", "note"}
+    # Subdomain IDs must match the filtered subdomains for the lane.
+    expected_sub_ids = [s["id"] for s in result["subdomains"] if isinstance(s, dict) and s.get("id")]
+    assert anchors["subdomain_ids"] == expected_sub_ids
+    # Regulation IDs must match applicable_regs.
+    assert anchors["regulation_ids"] == result["applicable_regs"]
+    # Article IDs must be a subset of the applicable_articles ids.
+    article_ids = {a["id"] for a in result["applicable_articles"] if isinstance(a, dict) and a.get("id")}
+    assert set(anchors["article_ids"]) <= article_ids
+    assert "violation" in anchors["note"].lower()
 
 
 def test_assemble_inputs_uppercases_domain_id(mock_state: V2State) -> None:

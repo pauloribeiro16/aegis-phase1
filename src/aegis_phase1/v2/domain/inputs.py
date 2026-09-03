@@ -179,6 +179,24 @@ def assemble_inputs(state: V2State, domain_id: str) -> dict[str, Any]:
         "track_b_suggestion": track_b_suggestion,
     }
 
+    # CORR-112 F2: closed ID anchors for the lane. The LLM must cite
+    # ONLY IDs from these lists; anything else is a violation caught by
+    # the ref gate (prompts_v2/ref_gate.py). Built from the same
+    # filtered data the prompt already carries — zero new loaders.
+    article_id_set = sorted({
+        a.get("id") for a in applicable_articles
+        if isinstance(a, dict) and a.get("id")
+    })
+    inputs["authoritative_ids"] = {
+        "subdomain_ids": list(subdomain_ids_for_domain),
+        "regulation_ids": list(applicable_regs),
+        "article_ids": article_id_set,
+        "note": (
+            "CLOSED LIST: cite only these IDs. Any identifier not "
+            "present here is a violation."
+        ),
+    }
+
     # CORR-101 Gap 2: when a ManifestLoader was injected into the
     # orchestrator, add a top-level ``manifest_summary`` block to the
     # inputs dict. The summary aggregates the per-subdomain ai_act
