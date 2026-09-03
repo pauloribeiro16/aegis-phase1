@@ -1,14 +1,17 @@
 # AEGIS-KG Phase 1 — Neo4j Unified Ontology & LLM Navigation Specification
 
 **Document ID:** `AEGIS-DOC-NEO4J-ONTOLOGY-002`
-**Status:** DRAFT / PENDING PEER MODEL REVIEW
-**Author:** Antigravity (Pair Programming Session)
-**Date:** 2026-09-03 (v2 — merged with canonical Phase 1 class model v1.1)
+**Status:** DRAFT v3 — review conflicts resolved (see Change Note)
+**Author:** Antigravity (Pair Programming Session) + ZCode review (2026-09-03)
+**Date:** 2026-09-03 (v3 — review-driven refinements)
 **Source of Truth:** `methodology-00/diagrams/Class_Models/phase1_contextual_definition.md` (v1.1, 2026-07-13)
 **Target Graph Database:** Neo4j (Bolt: `bolt://localhost:7688`, HTTP: `http://localhost:7475`)
 **Repository:** `aegis-phase1`
 **Audience:** Peer LLMs, Knowledge Engineers, ETL Authors, Academic Reviewers.
 
+> **v3 Change Note:** Supersedes v2. Review findings (ZCode 2026-09-03) resolved:
+> (1) ghost entities `RegulatoryObligation`, `StrategicImplication`, `ImplementationMapping` removed (Phase 2 scope, moved to §7); (2) **ambiguity gap closed** — `(:RegulatoryPair)` Tier 1 + run-scoped `(:PairActivation)` + `(:AmbiguityDisposition)` matching the [`OBJECTIVES_CONTRACT.md`](OBJECTIVES_CONTRACT.md) §4 mechanism; (3) party roles generalised (`(:RegulatoryRole)` + `ACTS_AS {context}`); (4) DataFlow endpoints generalised + `(:ExternalParty)` + properties added to match real `cases/*/input/architecture/data_flows.yaml` fields; (5) SO hierarchy edge direction corrected (`AGGREGATES`, not `AGGREGATED_BY`); array-vs-edge duplications removed; (6) **run dimension** added (`(:Run)`) so multi-model / multi-spec runs do not collide on PKs and LLM-vs-deterministic provenance is captured per node; (7) `(:ControlEvidence)` mirrors the real `data/control_evidence/D-XX.yaml` shape; (8) `IN_SCOPE_OF` derivation now deterministic + versioned + testable (one rule, one test); (9) integration position (§1.3) declared: KG is the **derived view** layer; pipeline stays autonomous at runtime on the cluster; (10) ETL PHASE 4 VERIFY block added (counts, orphans, isolation, MERGE collisions, fingerprint); (11) DDL fills the ~10 missing constraints and adds run-scoped composite indices; (12) minor fixes (System.criticality UPPER, DataSubject.minor as attribute, Gate/GateP unified, step count).
+>
 > **v2 Change Note:** This revision fundamentally supersedes v1 (AEGIS-DOC-NEO4J-ONTOLOGY-001).
 > The prior version was drafted without reading the canonical Phase 1 class model
 > (`phase1_contextual_definition.md` v1.1) and was therefore missing 14 critical entities:
@@ -36,12 +39,12 @@ This specification merges two complementary layers:
 │  Stakeholder · BusinessGoal · CompanyContext · Regulation · Article ·           │
 │  RegulatoryClause · SecurityControlDomain(=MacroDomain) · SubDomain ·          │
 │  RegulatoryObligation · StrategicImplication · ComplementarityAnalysis ·       │
-│  DomainCoverageEntry · DomainElaborationEntry · ImplementationMapping ·        │
+│  DomainCoverageEntry · DomainElaborationEntry ·                               │
 │  SecurityObjective · HierarchicalSecurityObjective · SubSecurityObjective ·    │
 │  SubDomainPipeline · SecurityRule · RegulatoryApplicabilityResult ·            │
 │  DeclarationGap · BlockTrigger · ConditionalExtension · RegulatoryInteraction ·│
 │  SubDomainActivation · ProportionalityProfile · ProportionalityEntry ·         │
-│  Gate · GateP · Gate1A · Gate1B · Gate1C · NativeCompliance · InheritedCompl. │
+│  Gate · ConditionalExtension · BlockTrigger · RegulatoryInteraction ·│
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │  TIER 2 — ENTERPRISE ARCHITECTURE ONTOLOGY  (Source: cases/*/input/*)          │
 │  Entities loaded from case YAML files — unique per case, scoped by case_id     │
@@ -62,7 +65,20 @@ This specification merges two complementary layers:
 3. **Canonical IDs:** Clause IDs: `{REG}-{SUFFIX}{NN}`. SubDomain IDs: `D-{NN}.{N}`. CSF: `{FUNC}.{CAT}-{NN}`. System IDs: `{case_prefix}:SYS-*`.
 4. **Ports:** Neo4j Bolt `bolt://localhost:7688`, HTTP `http://localhost:7475`. Never 7687/7474.
 
+### 1.3 Integration Position (binding decision for ETL authors)
+
+The graph is a **derived view + agent/consultation layer**, not a runtime dependency of the pipeline. Specifically:
+
+- The pipeline (`src/aegis_phase1/v2/`) reads inputs directly from `cases/*/input/architecture/*.yaml` and `preproc_out/`, builds `authoritative_ids` closed lists at MAP time (`src/aegis_phase1/v2/domain/inputs.py`), and runs autonomously on the cluster (Deucalion). **Neo4j MUST NOT be required at pipeline runtime.**
+- ETL jobs ingest the *post-run* state (per `Run` node) and the static sources (YAMLs, preproc catalogue) into the graph. The graph is the substrate for human review, peer-model review, and Phase-2-style offline queries.
+- Consequences:
+  - Drift between the graph and the pipeline is a real risk; PHASE 4 VERIFY (§6.4) catches it via fingerprint and per-case counts.
+  - The graph must be **reproducible from sources alone** (no manual edits in Neo4j).
+  - Rule 0 (unscoped architecture queries are forbidden) is enforced as a convention + future linter (see §5).
+
 ---
+
+
 
 ## 2. Node Labels & Full Property Specifications
 
@@ -81,13 +97,12 @@ complexity_tier              String  Enum   LOW | MEDIUM | HIGH
 employees                    Integer        5000
 revenue_eur                  Float          1_500_000_000.0
 security_fte                 Float          100.0
-processes_personal_data      Boolean        true
-places_digital_products_eu   Boolean        true
-dora_financial_entity        Boolean        true
-nis2_sector                  String         "banking"
-aiact_high_risk_system       Boolean        true
+processes_personal_data      Boolean        true   INPUT (case profile)
+places_digital_products_eu   Boolean        true   INPUT (case profile)
 assessment_date              String         "2026-09-03"
 ```
+
+**Rule:** `Enterprise` carries **intrinsic inputs only** (case profile). Derived applicability facts (`dora_financial_entity`, `nis2_sector`, `aiact_high_risk_system`) live exclusively on `(:RegulatoryApplicabilityResult)`. Re-running the filter MUST NOT overwrite intrinsic properties.
 
 #### `(:Regulation)` — EU Legal Instrument
 Exactly 5 nodes in Phase 1: GDPR, CRA, NIS2, DORA, AI_Act.
@@ -123,7 +138,7 @@ description             String         Normalized clause text (verbatim from pre
 normative_strength      String  Enum   MANDATORY_UNCONDITIONAL | MANDATORY_CONDITIONAL | GUIDANCE
 normative_weight        Integer        1=MAY | 2=SHOULD | 3=SHALL
 obligation_type         String  Enum   CONTINUOUS | PERIODIC | TRIGGERED | ONE_TIME
-obligated_party         String[]       ["CONTROLLER","PROCESSOR"]  (ObligatedPartyType enum values)
+obligated_party         REMOVED        Use BINDS_PARTY edges to (:RegulatoryRole); see §3.1
 is_atomic               Boolean        true
 parent_clause_id        String         null or "GDPR-CL05"
 sanction_reference      String         "GDPR Art. 83(4) — up to €10M or 2% of turnover"
@@ -193,25 +208,6 @@ security_rationale    String
 nist_csf_mappings     String[]       ["PR.DS-01", "PR.DS-02"]
 ```
 
-#### `(:RegulatoryObligation)` — Derived Compliance Obligation
-```
-id                      String  PK     "OBL-D-01.1-GDPR-001"
-description             String
-category                String         "Technical" | "Organisational" | "Legal"
-target_sub_domain       String  FK→SubDomain
-obligation_type         String  Enum   CONTINUOUS | PERIODIC | TRIGGERED | ONE_TIME
-obligated_party         String[]       ["CONTROLLER"]
-normative_intensity     Float          0.5 to 1.0
-```
-
-#### `(:StrategicImplication)` — Business-Level Impact Statement
-```
-id                String  PK     "SI-DORA-001"
-description       String
-business_impact   String         Operational or financial consequence
-compliance_risk   String         Regulatory risk if ignored
-```
-
 #### `(:RegulatoryApplicabilityResult)` — Filter 1 Output (per case × regulation)
 ```
 id                String  PK     "RAR-case3-DORA"
@@ -250,11 +246,25 @@ priority              String  Enum   MUST | SHOULD | COULD
 has_emergent_tension  Boolean        true
 applicable_regs       String[]       ["GDPR", "CRA", "DORA", "NIS2"]
 active_reg_count      Integer        4
-normative_intensity   Float          3.8
+normative_intensity   Float          3.8          (CANONICAL scale, weighted; see note below)
 proportionality_tier  String  Enum   MINIMAL | LIGHTWEIGHT | STANDARD | RIGOROUS | DEFERRED
+origin               String         "llm:P1C-LLM-01"
 ```
 
-#### `(:RegulatoryInteraction)` — Cross-Regulation Friction (from interactions.yaml)
+**Note on `normative_intensity`:** the canonical scale (used on `SubDomainActivation` and `DomainElaborationEntry`) is the weighted float derived from the methodology (typical range 0.0–5.0). A second variant in 0.0–1.0 is reserved for Phase 2 (normative intensity *index*) and shall be named `*_index` if introduced — never reuse the same property name with a different scale.
+
+#### `(:ClauseActivation)` — Per-Case Per-Clause Activation (OBJ-02 zero-omission substrate)
+Computed deterministically from `activation_predicate` ∧ `Enterprise` boolean properties ∧ RAR/role. Gives the pipeline an explicit, countable substrate for the "zero omissions" objective.
+
+```
+id                  String  PK     "CA-{case_id}-GDPR-CL06"
+case_id             String  FK→Enterprise
+clause_id           String  FK→RegulatoryClause
+activation_state    String  Enum   ACTIVE | INACTIVE | CONDITIONAL_PENDING
+activated_by_role   String  FK→RegulatoryRole    (when ACTIVE)
+```
+
+---
 Replaces the vague `:RegulatoryTension` from v1. Uses the formal 4-enum InteractionType.
 
 ```
@@ -354,6 +364,8 @@ ownership               String  Enum   SUPPLIER | SHARED | COMPANY | COMPANY_AUD
 example_controls        String         "Thales payShield HSM FIPS 140-2 L3, AES-256-GCM at rest on DB2 z/OS"
 ```
 
+`(:ProportionalityEntry)-[:OWNED_BY]->(:Stakeholder)` is added (see §3.1) to enable DORA board-level accountability queries (resolves open question §8.2).
+
 #### `(:Gate)` — Pipeline Validation Checkpoint
 ```
 id                    String  PK     "GATE-1A-case3"
@@ -397,14 +409,99 @@ priority              String  Enum   MUST | SHOULD | COULD
 strategic_alignment   String         "EU Digital Finance Strategy"
 ```
 
-#### `(:ImplementationMapping)` — NIST CSF grounding for a subdomain
+#### `(:RegulatoryPair)` — Cross-Regulation Pair from preproc (196 total)
+Frozen classification — never modified by loader or LLM. Source: `entities/pairs/D-{XX}/D-{XX.Y}_{A}-{B}.json`.
+
 ```
-id                  String  PK     "IM-D-01.1-PR.DS-01"
-sub_domain_id       String  FK→SubDomain
-primary_framework   String         "NIST CSF 2.0"
-framework_reference String         "PR.DS-01"
-rationale           String
-confidence_level    String  Enum   HIGH | MEDIUM | LOW
+id                    String  PK     "D-01.1_GDPR-CRA"
+subdomain_id          String  FK→SubDomain
+reg_a                 String  FK→Regulation
+reg_b                 String  FK→Regulation
+classification        String         "SAME" | "COMPLEMENTARY" | "CONTRADICTORY" | "SCOPE_DISJOINT" | "CONDITIONAL"
+verified_relationship String         FROZEN textual relationship (Layer 0 read-only)
+layer2_flag           Boolean        true if a CONDITIONAL predicate requires Layer-2 evaluation
+scope_overlap         String         "Y" | "N" | "CONDITIONAL"
+scope_disjoint_test   String         Predicate text
+downstream_implication String
+verbatim_articles     JSON           {reg: article_reference}
+```
+
+`CONDITIONAL` pairs are the **documented ambiguity surface** (multiple legitimate readings); the LLM disposition (`:AmbiguityDisposition`, run-scoped) closes this per company.
+
+#### `(:PairActivation)` — Run-Scoped Activation of a RegulatoryPair
+One node per `(run_id, pair_id)`; carries the MAP verdict. Re-keyed by Run so multi-model runs do not collide.
+
+```
+id                    String  PK     "PA-{run_id}-D-01.1_GDPR-CRA"
+run_id                String  FK→Run
+pair_id               String  FK→RegulatoryPair
+case_id               String  FK→Enterprise
+company_scope_verdict String  Enum   OVERLAP_CONFIRMED | OVERLAP_NOT_TRIGGERED |
+                                     SCOPE_DISJOINT | INDETERMINATE
+origin                String         "llm:P1C-LLM-01"
+notes                 String
+```
+
+#### `(:AmbiguityDisposition)` — Run-Scoped Resolution of a CONDITIONAL Pair (OBJECTIVES_CONTRACT §4)
+One node per `(run_id, pair_id)` where `Pair.classification = CONDITIONAL`; emit only when specs are at v1.2+. Closed disposition vocabulary.
+
+```
+id                String  PK     "AD-{run_id}-D-01.1_GDPR-CRA"
+run_id            String  FK→Run
+pair_id           String  FK→RegulatoryPair
+case_id           String  FK→Enterprise
+applicable_reading String        One of the documented readings from `verbatim_articles` (text)
+anchors           String[]       Anchors from closed lists only (article IDs, tier, asset IDs, business goal IDs)
+consequence       String
+disposition       String  Enum   RESOLVED_BY_FACT | RESOLVED_BY_TIER | NEEDS_HUMAN
+origin            String         "llm:P1C-LLM-01"  (when populated)
+```
+
+#### `(:RegulatoryRole)` — Obligated Party Enumeration
+Replaces the `obligated_party: String[]` field on `RegulatoryClause` (which was non-traversable) and the single-value `SUBJECT_TO.role` (which cannot represent multi-role enterprises — OmniBank is CONTROLLER for customers, PROCESSOR for partners, PROVIDER and DEPLOYER under AI Act).
+
+```
+id           String  PK     "GDPR-CONTROLLER" | "DORA-FINANCIAL_ENTITY" |
+                        "AI_Act-DEPLOYER" | "AI_Act-PROVIDER" | "GDPR-PROCESSOR" |
+                        "CRA-MANUFACTURER" | "CRA-IMPORTER" | "CRA-DISTRIBUTOR" |
+                        "NIS2-ESSENTIAL_OR_IMPORTANT_ENTITY"
+regulation_id String FK→Regulation
+role_name    String         ObligatedPartyType enum value
+```
+
+#### `(:ControlEvidence)` — Mirror of `data/control_evidence/D-XX.yaml`
+Populated in Phase 1; STATUS (IMPLEMENTED/PARTIAL/PLANNED/ABSENT) is Phase 2 work (resolves open question §8.1).
+
+```
+id              String  PK     "CE-D-01-encryption-at-rest"
+domain_id       String  FK→SecurityControlDomain
+control         String         "Encryption at rest"
+current_by_tier JSON           {"MICRO": "...", "SMALL": "...", "MEDIUM": "...", "LARGE": "...", "MAX": "..."}
+evidence_refs   String[]       ["STORES", "FLOWS", "SYSTEMS"]
+```
+
+#### `(:Run)` — Pipeline Run Identity
+All run-derived nodes hang from a Run. Deterministic nodes are case-scoped (no Run).
+
+```
+run_id          String  PK     "{case}-{model}-{provider}-{quant}-{ts}"
+case_id         String  FK→Enterprise
+model           String         "nemotron-3.5-lightning:30b" | "MiniMax-M3" | ...
+provider        String         "ollama" | "transformers" | "minimax"
+quantization    String         "q4_k_m" | "fp8" | "provider_default" | null
+spec_versions   JSON           {"P1B-LLM-01": "1.1.0", "P1C-LLM-01": "1.1.0", ...}
+gate_mode       String  Enum   "warn" | "hard"
+started_at      String         ISO-8601 UTC
+ended_at        String         ISO-8601 UTC | null
+status          String  Enum   "running" | "completed" | "degraded" | "failed"
+```
+
+#### `(:GraphMeta)` — Catalog Fingerprint (per database)
+Used by PHASE 4 VERIFY to detect drift between sources and graph.
+
+```
+key             String  PK     "preproc_fingerprint" | "etl_version" | "loaded_at"
+value           String
 ```
 
 ---
@@ -421,7 +518,7 @@ name                String         "Core Banking System (Temenos T24)"
 type                String         "core_banking_mainframe" | "web_application" | "ai_ml_platform"
 tech_stack          String         "Temenos T24, IBM z/OS, COBOL, DB2 z/OS"
 owner               String         "Head of Operations (COO)"
-criticality         String  Enum   low | medium | high | critical
+criticality         String  Enum   LOW | MEDIUM | HIGH | CRITICAL  (ETL normalises YAML lowercase)
 hosts_personal_data Boolean        true
 ai_annex_iii        Boolean        false  (true only for e.g. SYS-CREDITAI)
 notes               String
@@ -443,21 +540,35 @@ retention_days      Integer        3650
 ```
 
 #### `(:DataFlow)` — Data Transit
-Source: `cases/*/input/architecture/data_flows.yaml`
+Source: `cases/*/input/architecture/data_flows.yaml`. **Endpoints are generalised** (the real YAML carries stores, customers, and regulators — not just systems): the `SENDS_DATA_TO` edge duplication from v2 is removed in favour of two directed edges `ORIGINATES_FROM` / `TERMINATES_AT` to any of {System, DataStore, ThirdPartyService, DataSubject, ExternalParty}.
 
 ```
 id                        String  PK     "case3:FLOW-01"
 case_id                   String  FK→Enterprise
 name                      String         "Core to Payment Gateway Transaction Flow"
-source_system_id          String  FK→System
-dest_system_id            String  FK→System
-protocol                  String         "mTLS / gRPC" | "TLS 1.3 / HTTPS"
-is_cross_border           Boolean        false
-origin_jurisdiction       String         "DE"
-destination_jurisdiction  String         "DE"
-transfer_mechanism        String         "None" | "SCCs" | "Adequacy" | "BCR"
-carries_pii               Boolean        true
-carries_financial         Boolean        true
+data_type                 String         Free text from YAML (e.g. "Customer PII + authn credentials")
+volume                    String         Free text ("~2 M unique customers; ~150 M sessions/month")
+protocol                  String         "mTLS / gRPC" | "TLS 1.3 / HTTPS" | ...
+encryption_in_transit     String         "TLS 1.3 (FAPI 2.0 profile)" | ...
+subprocessor              Boolean        true if YAML `subprocessor: Y`
+subprocessor_vendor       String         Vendor name when subprocessor=true
+is_cross_border           Boolean        Derived (DERIVED rule in ETL; see §6.5)
+origin_jurisdiction       String         Derived from source endpoint
+destination_jurisdiction  String         Derived from destination endpoint
+transfer_mechanism        String         Derived (None | SCCs | Adequacy | BCR)
+carries_pii               Boolean        Derived from data_type keywords (DERIVED; see §6.5)
+carries_financial         Boolean        Derived from data_type keywords (DERIVED; see §6.5)
+```
+
+#### `(:ExternalParty)` — Regulators, Customer-facing Parties, Public Endpoints
+Endpoints outside the company control plane that appear as flow endpoints (e.g. BaFin goAML gateway in case3, "Retail customer browser").
+
+```
+id            String  PK     "case3:EXT-BAFIN"
+case_id       String  FK→Enterprise
+name          String         "BaFin (FIU Germany via goAML)"
+kind          String  Enum   REGULATOR | END_USER | PUBLIC_INTERNET | OTHER
+jurisdiction  String         "DE"
 ```
 
 #### `(:AuthSystem)` — Authentication & Cryptographic Hardware
@@ -493,7 +604,8 @@ Source: `cases/*/input/architecture/data_subjects.yaml`
 ```
 id                  String  PK     "case3:DS-CUSTOMERS"
 case_id             String  FK→Enterprise
-type                String  Enum   customer | employee | minor | counter_party | applicant
+type                String  Enum   CUSTOMER | EMPLOYEE | COUNTER_PARTY | APPLICANT
+is_minor            Boolean        false  (attribute, NOT a type; a customer can be minor)
 special_category    Boolean        false  (true → GDPR Art. 9 mandatory; triggers extra clauses)
 estimated_count     Integer        750000
 description         String         "Retail and SMB banking customers"
@@ -533,35 +645,47 @@ nist_version    String         "2.0 (CSWP 29, 2024-02-26)"
 
 | Source → Edge → Target | Properties |
 |---|---|
-| `(:Enterprise)-[:SUBJECT_TO]->(:Regulation)` | `role: String, rationale: String, applicable: Boolean` |
 | `(:Enterprise)-[:HAS_APPLICABILITY_RESULT]->(:RegulatoryApplicabilityResult)` | — |
 | `(:Enterprise)-[:HAS_DECLARATION_GAP]->(:DeclarationGap)` | — |
 | `(:Enterprise)-[:HAS_PROPORTIONALITY_PROFILE]->(:ProportionalityProfile)` | — |
 | `(:Enterprise)-[:TRIGGERS_EXTENSION]->(:ConditionalExtension)` | `active: Boolean` |
 | `(:Enterprise)-[:HAS_REGULATORY_INTERACTION]->(:RegulatoryInteraction)` | — |
+| `(:Enterprise)-[:ACTS_AS {context}]->(:RegulatoryRole)` | `context: String` (e.g. "customer_data", "ai_system_deployment") — replaces v2's single-value SUBJECT_TO.role |
+| `(:RegulatoryRole)-[:BELONGS_TO_REGULATION]->(:Regulation)` | — (the FK-like association that Pattern 5 traverses via `ACTS_AS`→`RegulatoryRole`→`BELONGS_TO_REGULATION`→`Regulation`) |
 | `(:Regulation)-[:HAS_ARTICLE]->(:Article)` | — |
 | `(:Article)-[:CONTAINS_CLAUSE]->(:RegulatoryClause)` | — |
-| `(:RegulatoryClause)-[:MAPPED_TO_SUBDOMAIN]->(:SubDomain)` | `confidence: String, normative_strength: Float` |
-| `(:RegulatoryClause)-[:GENERATES_OBLIGATION]->(:RegulatoryObligation)` | — |
-| `(:RegulatoryObligation)-[:IMPLIES]->(:StrategicImplication)` | — |
+| `(:RegulatoryClause)-[:MAPPED_TO_SUBDOMAIN]->(:SubDomain)` | `confidence: String, mapping_type: DIRECT\|PARTIAL` (the v2 property `normative_strength: Float` is replaced by `mapping_type`; intensity lives on SubDomainActivation only) |
+| `(:RegulatoryClause)-[:BINDS_PARTY]->(:RegulatoryRole)` | — (replaces `obligated_party: String[]` property) |
 | `(:SecurityControlDomain)-[:HAS_SUBDOMAIN]->(:SubDomain)` | — |
-| `(:SubDomain)-[:ANCHORED_TO_CSF]->(:CSFSubcategory)` | `mapping_type: "DIRECT"\|"PARTIAL"` |
+| `(:SecurityControlDomain)-[:HAS_CONTROL_EVIDENCE]->(:ControlEvidence)` | — |
+| `(:SubDomain)-[:ANCHORED_TO_CSF]->(:CSFSubcategory)` | `mapping_type: DIRECT\|PARTIAL, confidence_level: HIGH\|MEDIUM\|LOW, rationale: String` (the former `(:ImplementationMapping)` node is now property set on this edge) |
 | `(:SubDomain)-[:HAS_ACTIVATION]->(:SubDomainActivation)` | scoped by case_id on activation node |
 | `(:SubDomainActivation)-[:GOVERNED_BY_PROPORTIONALITY]->(:ProportionalityEntry)` | — |
 | `(:ProportionalityProfile)-[:CONTAINS_ENTRY]->(:ProportionalityEntry)` | — |
 | `(:ProportionalityEntry)-[:SCOPED_TO]->(:SubDomain)` | — |
+| `(:ProportionalityEntry)-[:OWNED_BY]->(:Stakeholder)` | — (resolves open question §8.2 — board-level accountability) |
 | `(:SecurityObjective)-[:BELONGS_TO]->(:Regulation)` | — |
-| `(:SecurityObjective)-[:SCOPED_TO]->(:SubDomain)` | — |
+| `(:SecurityObjective)-[:SCOPED_TO]->(:SubDomain)` | — (replaces `SecurityObjective.sub_domain_ids: String[]` array) |
 | `(:HierarchicalSecurityObjective)-[:DERIVES_FROM]->(:SecurityObjective)` | — |
-| `(:SubSecurityObjective)-[:AGGREGATED_BY]->(:HierarchicalSecurityObjective)` | — |
+| `(:SubSecurityObjective)-[:AGGREGATES]->(:HierarchicalSecurityObjective)` | direction corrected in v3 (was `AGGREGATED_BY` — semantically inverted); the array `SubSecurityObjective.inherits_from` removed |
 | `(:SecurityRule)-[:REFINES]->(:SecurityObjective)` | — |
-| `(:SecurityRule)-[:ANCHORED_TO_CSF]->(:CSFSubcategory)` | — |
+| `(:SecurityRule)-[:ANCHORED_TO_CSF]->(:CSFSubcategory)` | `mapping_type: DIRECT\|PARTIAL` |
 | `(:RegulatoryClause)-[:IN_TENSION_WITH]->(:RegulatoryClause)` | `tension_id: String, interaction_type: String` |
-| `(:Gate)-[:VALIDATES_RESULT]->(:RegulatoryApplicabilityResult)` | Gate1A |
-| `(:Gate)-[:VALIDATES_ACTIVATION]->(:SubDomainActivation)` | Gate1B |
-| `(:GateP)-[:VALIDATES_PROFILE]->(:ProportionalityProfile)` | GateP |
+| `(:RegulatoryPair)-[:HAS_ACTIVATION]->(:PairActivation)` | scoped by run_id on activation node |
+| `(:PairActivation)-[:GOVERNED_BY_PROPORTIONALITY]->(:ProportionalityEntry)` | — |
+| `(:RegulatoryPair)-[:HAS_AMBIGUITY_DISPOSITION]->(:AmbiguityDisposition)` | scoped by run_id; only for CONDITIONAL pairs |
+| `(:RegulatoryClause)-[:HAS_CLAUSE_ACTIVATION]->(:ClauseActivation)` | scoped by case_id |
+| `(:Gate)-[:VALIDATES_RESULT]->(:RegulatoryApplicabilityResult)` | gate_type=Gate1A, run_id |
+| `(:Gate)-[:VALIDATES_ACTIVATION]->(:SubDomainActivation)` | gate_type=Gate1B, run_id |
+| `(:Gate)-[:VALIDATES_PROFILE]->(:ProportionalityProfile)` | gate_type=GateP (replaces v2's separate (:GateP) label), run_id |
+| `(:Gate)-[:VALIDATES_PAIR]->(:PairActivation)` | gate_type=Gate1C, run_id |
 | `(:Stakeholder)-[:DEFINES]->(:BusinessGoal)` | — |
-| `(:BusinessGoal)-[:RESTRICTS_SHAPE_OF]->(:StrategicImplication)` | — |
+| `(:Run)-[:PRODUCED]->(:SubDomainActivation)` | — |
+| `(:Run)-[:PRODUCED]->(:PairActivation)` | — |
+| `(:Run)-[:PRODUCED]->(:AmbiguityDisposition)` | — |
+| `(:Run)-[:PRODUCED]->(:Gate)` | — |
+
+**Provenance (`origin` property):** every run-derived node carries `origin: "deterministic" | "llm:<spec_id>"` (e.g. `llm:P1C-LLM-01`). This is the CORR-112 deterministic/LLM distinction made structurally navigable in the graph.
 
 ### 3.2 Enterprise Architecture Relationships
 
@@ -570,10 +694,11 @@ nist_version    String         "2.0 (CSWP 29, 2024-02-26)"
 | `(:Enterprise)-[:OPERATES_SYSTEM]->(:System)` | `owner: String` |
 | `(:Enterprise)-[:HAS_DATA_SUBJECT]->(:DataSubject)` | — |
 | `(:System)-[:STORES_DATA_IN]->(:DataStore)` | `access_type: String` |
-| `(:System)-[:SENDS_DATA_TO]->(:System)` | `dataflow_id: String, protocol: String` |
 | `(:System)-[:AUTHENTICATED_BY]->(:AuthSystem)` | `enforced: Boolean` |
 | `(:System)-[:OUTSOURCED_TO]->(:ThirdPartyService)` | `critical_dora: Boolean` |
-| `(:System)-[:IN_SCOPE_OF]->(:SubDomain)` | `proportionality_tier: String` |
+| `(:System)-[:IN_SCOPE_OF]->(:SubDomain)` | `proportionality_tier: String, rule_id: String, basis: String` (v3: rule_id points to a deterministic rule in `data/in_scope_of_rules.yaml`; basis is the human-readable justification; no LLM in v1 derivation) |
+| `(:DataFlow)-[:ORIGINATES_FROM]->(:System \| :DataStore \| :DataSubject \| :ExternalParty)` | — |
+| `(:DataFlow)-[:TERMINATES_AT]->(:System \| :DataStore \| :ThirdPartyService \| :ExternalParty)` | — (replaces v2's two FK properties + redundant `SENDS_DATA_TO` edge) |
 | `(:DataFlow)-[:INVOLVES_DATA_OF]->(:DataSubject)` | — |
 | `(:DataSubject)-[:TRIGGERS_CLAUSE]->(:RegulatoryClause)` | `trigger_reason: String` |
 
@@ -585,8 +710,8 @@ nist_version    String         "2.0 (CSWP 29, 2024-02-26)"
 | `(:RegulatoryInteraction)-[:SCOPED_TO_SUBDOMAIN]->(:SubDomain)` | Conflict subdomain scope |
 | `(:ComplementarityAnalysis)-[:COMPARES]->(:Regulation)` | `regulation_position: "A"\|"B"` |
 | `(:ComplementarityAnalysis)-[:SCOPED_TO]->(:SubDomain)` | Subdomain scope |
-| `(:ImplementationMapping)-[:ANCHORS]->(:CSFSubcategory)` | CSF grounding |
-| `(:ImplementationMapping)-[:APPLIED_TO]->(:SubDomain)` | Subdomain coverage |
+| `(:CSFSubcategory)<-[:ANCHORS]-(edge between SubDomain and CSFSubcategory)` | see §3.1 — `(:ImplementationMapping)` node replaced by properties on the edge |
+| `(:SubDomain)<-[:APPLIED_TO]-(edge between SubDomain and CSFSubcategory)` | see §3.1 |
 
 ---
 
@@ -606,6 +731,8 @@ CREATE CONSTRAINT so_pk              IF NOT EXISTS FOR (n:SecurityObjective)    
 CREATE CONSTRAINT hso_pk             IF NOT EXISTS FOR (n:HierarchicalSecurityObjective) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT sso_pk             IF NOT EXISTS FOR (n:SubSecurityObjective)     REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT sr_pk              IF NOT EXISTS FOR (n:SecurityRule)             REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT pair_pk            IF NOT EXISTS FOR (n:RegulatoryPair)           REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT role_pk            IF NOT EXISTS FOR (n:RegulatoryRole)           REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT csf_fn_pk          IF NOT EXISTS FOR (n:CSFFunction)              REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT csf_cat_pk         IF NOT EXISTS FOR (n:CSFCategory)              REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT csf_sub_pk         IF NOT EXISTS FOR (n:CSFSubcategory)           REQUIRE n.id IS UNIQUE;
@@ -615,25 +742,53 @@ CREATE CONSTRAINT dataflow_pk        IF NOT EXISTS FOR (n:DataFlow)             
 CREATE CONSTRAINT authsys_pk         IF NOT EXISTS FOR (n:AuthSystem)               REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT thirdparty_pk      IF NOT EXISTS FOR (n:ThirdPartyService)        REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT datasubject_pk     IF NOT EXISTS FOR (n:DataSubject)              REQUIRE n.id IS UNIQUE;
-CREATE CONSTRAINT sda_pk             IF NOT EXISTS FOR (n:SubDomainActivation)      REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT externalparty_pk   IF NOT EXISTS FOR (n:ExternalParty)            REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT stakeholder_pk     IF NOT EXISTS FOR (n:Stakeholder)              REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT bizgoal_pk         IF NOT EXISTS FOR (n:BusinessGoal)             REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT sda_pk             IF NOT EXISTS FOR (n:SubDomainActivation)      REQUIRE n.run_id IS UNIQUE;
+CREATE CONSTRAINT pa_pk              IF NOT EXISTS FOR (n:PairActivation)           REQUIRE n.run_id IS UNIQUE;
+CREATE CONSTRAINT ad_pk              IF NOT EXISTS FOR (n:AmbiguityDisposition)     REQUIRE n.run_id IS UNIQUE;
+CREATE CONSTRAINT gate_pk            IF NOT EXISTS FOR (n:Gate)                     REQUIRE n.run_id IS UNIQUE;
+CREATE CONSTRAINT run_pk             IF NOT EXISTS FOR (n:Run)                      REQUIRE n.run_id IS UNIQUE;
+CREATE CONSTRAINT clauseact_pk       IF NOT EXISTS FOR (n:ClauseActivation)         REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT ri_pk              IF NOT EXISTS FOR (n:RegulatoryInteraction)    REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT pe_pk              IF NOT EXISTS FOR (n:ProportionalityEntry)     REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT gap_pk             IF NOT EXISTS FOR (n:DeclarationGap)           REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT rar_pk             IF NOT EXISTS FOR (n:RegulatoryApplicabilityResult) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT pp_pk              IF NOT EXISTS FOR (n:ProportionalityProfile)   REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT ce_pk              IF NOT EXISTS FOR (n:ControlEvidence)          REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT ext_pk             IF NOT EXISTS FOR (n:ConditionalExtension)     REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT bt_pk              IF NOT EXISTS FOR (n:BlockTrigger)             REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT dce_pk             IF NOT EXISTS FOR (n:DomainCoverageEntry)      REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT dee_pk             IF NOT EXISTS FOR (n:DomainElaborationEntry)   REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT ca_pk              IF NOT EXISTS FOR (n:ComplementarityAnalysis)   REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT meta_pk            IF NOT EXISTS FOR (n:GraphMeta)                REQUIRE n.key IS UNIQUE;
 
 // ── Lookup Indexes ───────────────────────────────────────────────────────────
 CREATE INDEX system_case             IF NOT EXISTS FOR (n:System)                   ON (n.case_id);
 CREATE INDEX datastore_case          IF NOT EXISTS FOR (n:DataStore)                ON (n.case_id);
 CREATE INDEX dataflow_case           IF NOT EXISTS FOR (n:DataFlow)                 ON (n.case_id);
-CREATE INDEX sda_case_subdomain      IF NOT EXISTS FOR (n:SubDomainActivation)      ON (n.case_id, n.sub_domain_id);
+CREATE INDEX authsys_case            IF NOT EXISTS FOR (n:AuthSystem)               ON (n.case_id);
+CREATE INDEX thirdparty_case         IF NOT EXISTS FOR (n:ThirdPartyService)        ON (n.case_id);
+CREATE INDEX externalparty_case      IF NOT EXISTS FOR (n:ExternalParty)            ON (n.case_id);
+CREATE INDEX stakeholder_case        IF NOT EXISTS FOR (n:Stakeholder)              ON (n.case_id);
+CREATE INDEX bizgoal_case            IF NOT EXISTS FOR (n:BusinessGoal)             ON (n.case_id);
+CREATE INDEX sda_run_subdomain       IF NOT EXISTS FOR (n:SubDomainActivation)      ON (n.run_id, n.sub_domain_id);
+CREATE INDEX sda_run_case            IF NOT EXISTS FOR (n:SubDomainActivation)      ON (n.run_id, n.case_id);
+CREATE INDEX pa_run_pair             IF NOT EXISTS FOR (n:PairActivation)           ON (n.run_id, n.pair_id);
+CREATE INDEX ad_run_pair             IF NOT EXISTS FOR (n:AmbiguityDisposition)     ON (n.run_id, n.pair_id);
+CREATE INDEX gate_run_type           IF NOT EXISTS FOR (n:Gate)                     ON (n.run_id, n.gate_type);
+CREATE INDEX clauseact_case_clause   IF NOT EXISTS FOR (n:ClauseActivation)         ON (n.case_id, n.clause_id);
 CREATE INDEX pe_case_subdomain       IF NOT EXISTS FOR (n:ProportionalityEntry)     ON (n.case_id, n.sub_domain_id);
 CREATE INDEX ri_case_type            IF NOT EXISTS FOR (n:RegulatoryInteraction)    ON (n.case_id, n.interaction_type);
 CREATE INDEX clause_reg              IF NOT EXISTS FOR (n:RegulatoryClause)         ON (n.regulation_id);
-CREATE INDEX so_reg                  IF NOT EXISTS FOR (n:SecurityObjective)        ON (n.regulation_code);
+CREATE INDEX so_reg                  IF NOT EXISTS FOR (n:SecurityObjective)        REQUIRE n.regulation_code IS UNIQUE;
 CREATE INDEX subdomain_macro         IF NOT EXISTS FOR (n:SubDomain)                ON (n.macro_id);
 CREATE INDEX gap_case_severity       IF NOT EXISTS FOR (n:DeclarationGap)           ON (n.case_id, n.severity);
+CREATE INDEX ce_domain               IF NOT EXISTS FOR (n:ControlEvidence)          ON (n.domain_id);
 ```
+
+> **v3 note (REQUIRED):** `Run`-derived node constraints (SDA, PairActivation, AmbiguityDisposition, Gate) are keyed on `(run_id)` — NOT `(id, case_id)` as in v2. Multi-model / multi-spec runs MUST NOT collide on PK.
 
 ---
 
@@ -641,9 +796,10 @@ CREATE INDEX gap_case_severity       IF NOT EXISTS FOR (n:DeclarationGap)       
 
 ### Rule 0 — The Prime Directive (No Unscoped Architecture Queries)
 > Every query touching Tier 2 nodes (System, DataStore, DataFlow, AuthSystem,
-> ThirdPartyService, DataSubject) MUST begin with the Enterprise anchor:
+> ThirdPartyService, DataSubject, ExternalParty) MUST begin with the Enterprise anchor:
 > `MATCH (e:Enterprise {case_id: $case_id})-[...]`
-> The query linter rejects unscoped architecture queries.
+>
+> **Status (v3):** enforced as a **convention** and reviewable in the query examples below; a real linter is on the roadmap but does not exist yet. ETL authors and reviewer agents must apply Rule 0 manually until the linter ships.
 
 ---
 
@@ -651,14 +807,19 @@ CREATE INDEX gap_case_severity       IF NOT EXISTS FOR (n:DeclarationGap)       
 **Always the first query for any assessment.**
 
 ```cypher
-MATCH (e:Enterprise {case_id: $case_id})-[st:SUBJECT_TO]->(r:Regulation)
+MATCH (e:Enterprise {case_id: $case_id})
+MATCH (e)-[:ACTS_AS {context: $context}]->(role:RegulatoryRole)
+MATCH (role)-[:BELONGS_TO_REGULATION]->(r:Regulation)
+OPTIONAL MATCH (rar:RegulatoryApplicabilityResult)
+  WHERE rar.case_id = $case_id AND rar.regulation_id = r.id
 OPTIONAL MATCH (e)-[:HAS_DECLARATION_GAP]->(gap:DeclarationGap)
 RETURN e.name                    AS enterprise,
        e.scale                   AS scale,
        collect(DISTINCT {
            regulation: r.id,
-           role: st.role,
-           applicable: st.applicable
+           role: role.role_name,
+           context: $context,
+           applicable: rar.applicable
        })                        AS applicable_regulations,
        collect(DISTINCT {
            reg: gap.reg,
@@ -668,29 +829,35 @@ RETURN e.name                    AS enterprise,
        })                        AS declaration_gaps;
 ```
 
+*Note:* `context` (e.g. `"customer_data"`, `"ai_system_deployment"`) picks which role binding to traverse. `OPTIONAL MATCH` against `RegulatoryApplicabilityResult` keeps the applicability verdict available without imposing one role binding per query.
+
 *Agent reads:* If `declaration_gaps` non-empty → flag as outstanding risks before proceeding.
 
 ---
 
 ### Pattern 2: Asset-to-Obligation Grounding for a Subdomain
-**The core pattern. Provides legal obligations + real system IDs + proportionality tier.**
+**The core pattern. Provides legal obligations + real system IDs + proportionality tier. Scoped to a `Run` so the agent cites evidence from a specific run, not from stale graph state.**
 
 ```cypher
+MATCH (run:Run {run_id: $run_id})
+MATCH (e:Enterprise {case_id: $case_id})
 MATCH (sd:SubDomain {id: $subdomain_id})
 MATCH (c:RegulatoryClause)-[:MAPPED_TO_SUBDOMAIN]->(sd)
 MATCH (c)<-[:CONTAINS_CLAUSE]-(a:Article)<-[:HAS_ARTICLE]-(r:Regulation)
-MATCH (e:Enterprise {case_id: $case_id})-[:OPERATES_SYSTEM]->(s:System)-[:IN_SCOPE_OF]->(sd)
+MATCH (e)-[:OPERATES_SYSTEM]->(s:System)-[iso:IN_SCOPE_OF]->(sd)
 OPTIONAL MATCH (s)-[:STORES_DATA_IN]->(ds:DataStore)
 OPTIONAL MATCH (s)-[:AUTHENTICATED_BY]->(auth:AuthSystem)
-OPTIONAL MATCH (sd)-[:HAS_ACTIVATION]->(sda:SubDomainActivation {case_id: $case_id})
+OPTIONAL MATCH (sd)-[:HAS_ACTIVATION]->(sda:SubDomainActivation {run_id: $run_id})
 OPTIONAL MATCH (sd)-[:ANCHORED_TO_CSF]->(csf:CSFSubcategory)
 RETURN sd.name                                                          AS subdomain,
        sda.normative_intensity                                           AS normative_intensity,
        sda.proportionality_tier                                          AS tier,
        sda.applicable_regs                                              AS active_regulations,
+       sda.origin                                                       AS activation_origin,
+       iso.rule_id                                                       AS in_scope_rule_id,
+       iso.basis                                                         AS in_scope_basis,
        collect(DISTINCT r.id + ': ' + c.id
-               + ' (' + a.article_reference + ') ['
-               + c.normative_strength + ']')                            AS legal_clauses,
+               + ' (' + a.article_reference + ')')                     AS legal_clauses,
        collect(DISTINCT s.id + ' | ' + s.name
                + ' | criticality=' + s.criticality)                     AS affected_systems,
        collect(DISTINCT coalesce(ds.id,'') + ' | ' + coalesce(ds.storage_type,'')
@@ -700,7 +867,7 @@ RETURN sd.name                                                          AS subdo
        collect(DISTINCT csf.id + ': ' + csf.outcome_text)              AS csf_anchors;
 ```
 
-*Agent MUST cite in prose:* All IDs in `affected_systems` and `affected_stores`.
+*Agent MUST cite in prose:* All IDs in `affected_systems` and `affected_stores`. *Agent SHOULD surface* `in_scope_rule_id` and `in_scope_basis` when invoking `IN_SCOPE_OF` in claims, to make the deterministic basis auditable.
 
 ---
 
@@ -749,7 +916,7 @@ ORDER BY
 - Resolution adopted: [resolution_principle]
 - Severity: [severity]
 ```
-Saying "the company must balance these requirements" without citing `resolution_principle` = Gate C failure.
+Saying "the company must balance these requirements" without citing `resolution_principle` = Gate C failure. CONDITIONAL pairs (documented ambiguities) require the structured disposition block from Pattern 8.
 
 ---
 
@@ -759,7 +926,7 @@ Saying "the company must balance these requirements" without citing `resolution_
 ```cypher
 MATCH (so:SecurityObjective)-[:SCOPED_TO]->(sd:SubDomain {id: $subdomain_id})
 MATCH (so)-[:BELONGS_TO]->(r:Regulation)
-MATCH (e:Enterprise {case_id: $case_id})-[:SUBJECT_TO]->(r)
+MATCH (e:Enterprise {case_id: $case_id})-[:ACTS_AS]->(:RegulatoryRole)-[:BELONGS_TO_REGULATION]->(r)
 OPTIONAL MATCH (sr:SecurityRule)-[:REFINES]->(so)
 OPTIONAL MATCH (sr)-[:ANCHORED_TO_CSF]->(csf:CSFSubcategory)
 RETURN so.id                                    AS so_id,
@@ -792,20 +959,50 @@ RETURN ds.type                                            AS subject_type,
 **Always run before producing any Phase 1 output document.**
 
 ```cypher
-MATCH (g:Gate {case_id: $case_id})
+MATCH (run:Run {run_id: $run_id})-[:PRODUCED]->(g:Gate)
 RETURN g.gate_type AS gate, g.status AS status, g.criteria_check_result AS detail
-UNION ALL
-MATCH (gp:GateP {case_id: $case_id})
-RETURN 'GateP' AS gate, gp.status AS status,
-       'doc_exists=' + toString(gp.document_exists)
-       + ' | active_rows=' + toString(gp.active_rows_complete)
-       + ' | five_attrs=' + toString(gp.five_attributes_complete)
-       + ' | rule11=' + toString(gp.rule_11_satisfied) AS detail;
 ```
+
+(`GateP` is no longer a separate label — it lives under `Gate` with `gate_type = GateP` and the same provenance pattern.)
 
 ---
 
-## 6. ETL Load Order (34-Step Dependency Graph)
+### Pattern 8: Conditional Pairs & Ambiguity Dispositions
+**Closes the ambiguity substrate (OBJECTIVES_CONTRACT §4). Run-scoped; only populated when specs are at v1.2+.**
+
+```cypher
+MATCH (run:Run {run_id: $run_id})
+MATCH (e:Enterprise {case_id: $case_id})
+MATCH (p:RegulatoryPair)
+WHERE p.classification = 'CONDITIONAL'
+  AND any(r IN p.reg_a + [p.reg_b] WHERE r IN
+    [(e)-[:ACTS_AS]->(:RegulatoryRole)-[:BELONGS_TO_REGULATION]->(reg:Regulation) | reg.id])
+MATCH (p)-[:HAS_ACTIVATION]->(pa:PairActivation {run_id: $run_id})
+OPTIONAL MATCH (p)-[:HAS_AMBIGUITY_DISPOSITION]->(ad:AmbiguityDisposition {run_id: $run_id})
+RETURN p.id                              AS pair,
+       pa.company_scope_verdict          AS scope_verdict,
+       ad.applicable_reading             AS reading,
+       ad.disposition                    AS disposition,
+       ad.consequence                    AS consequence,
+       ad.anchors                        AS anchors;
+```
+
+*Agent MUST produce for each CONDITIONAL pair (no exceptions):*
+```markdown
+### Ambiguity Disposition: [REG_A] vs [REG_B] — D-XX.Y
+- Reading adopted: [applicable_reading]
+- Anchors: [comma-separated list, e.g. "GDPR Art. 5(1)(c), Tier=HIGH, case3:SYS-CBS, BG-case3-001"]
+- Consequence: [consequence]
+- Disposition: [RESOLVED_BY_FACT | RESOLVED_BY_TIER | NEEDS_HUMAN]
+```
+
+*Gate checks:* every CONDITIONAL pair in scope has exactly one `AmbiguityDisposition` node per Run (coverage); `disposition ∈ closed vocabulary`; `anchors ⊆ closed lists` (article IDs, tier, asset IDs, business goal IDs); `NEEDS_HUMAN` rows must include `consequence` non-empty.
+
+---
+
+
+
+## 6. ETL Load Order (41-Step Dependency Graph)
 
 ```
 PHASE 0 — Foundation (once, case-agnostic — load order matters for FK integrity)
@@ -815,48 +1012,67 @@ PHASE 0 — Foundation (once, case-agnostic — load order matters for FK integr
   04. Regulation                     (5 nodes)
   05. Article                        (FK→Regulation) + HAS_ARTICLE
   06. RegulatoryClause               (331 nodes, FK→Article) + CONTAINS_CLAUSE
-  07. SecurityControlDomain          (10 macro-domains)
-  08. SubDomain                      (38, FK→SecurityControlDomain) + HAS_SUBDOMAIN
-  09. MAPPED_TO_SUBDOMAIN            (Clause → SubDomain, bulk)
-  10. ANCHORED_TO_CSF                (SubDomain → CSFSubcategory, bulk)
-  11. SecurityObjective              (FK→Regulation) + BELONGS_TO, SCOPED_TO
-  12. HierarchicalSecurityObjective  (FK→SecurityObjective) + DERIVES_FROM
-  13. SubSecurityObjective           (FK→HSO) + AGGREGATED_BY
-  14. SecurityRule                   (FK→SO) + REFINES, ANCHORED_TO_CSF
-  15. IN_TENSION_WITH                (Clause ↔ Clause, from methodology conflict catalogue)
+  07. RegulatoryRole                 (9 nodes) + BELONGS_TO_REGULATION
+  08. BINDS_PARTY                    (RegulatoryClause → RegulatoryRole, bulk)
+  09. SecurityControlDomain          (10 macro-domains)
+  10. SubDomain                      (38, FK→SecurityControlDomain) + HAS_SUBDOMAIN
+  11. MAPPED_TO_SUBDOMAIN            (Clause → SubDomain, bulk)
+  12. ANCHORED_TO_CSF                (SubDomain → CSFSubcategory, bulk; carries confidence + rationale on the edge)
+  13. SecurityObjective              (FK→Regulation) + BELONGS_TO, SCOPED_TO
+  14. HierarchicalSecurityObjective  (FK→SecurityObjective) + DERIVES_FROM
+  15. SubSecurityObjective           + AGGREGATES → HSO
+  16. SecurityRule                   (FK→SO) + REFINES, ANCHORED_TO_CSF
+  17. IN_TENSION_WITH                (Clause ↔ Clause, from methodology conflict catalogue)
+  18. RegulatoryPair                 (196 nodes, FROZEN) — populated by `preproc_catalog.load_pairs()`
 
 PHASE 1 — Per-Case Normative (run once per case_id)
-  16. Enterprise                     (root node)
-  17. Stakeholder                    (FK→Enterprise) + DEFINES → BusinessGoal
-  18. BusinessGoal                   (FK→Enterprise)
-  19. SUBJECT_TO                     (Enterprise → Regulation, with role property)
-  20. RegulatoryApplicabilityResult  + HAS_APPLICABILITY_RESULT
-  21. DeclarationGap                 (from negative_analyses in interactions.yaml) + HAS_DECLARATION_GAP
-  22. ConditionalExtension + BlockTrigger
-  23. RegulatoryInteraction          (all 4 types from interactions.yaml) + HAS_REGULATORY_INTERACTION
-  24. SubDomainActivation            (MAP output, 38 per case) + HAS_ACTIVATION
-  25. ComplementarityAnalysis        + COMPARES, SCOPED_TO
-  26. DomainCoverageEntry            + (Regulation→Entry, Domain→Entry)
-  27. DomainElaborationEntry         + (Complementarity→Entry, Entry→SubDomain)
-  28. ProportionalityProfile         + HAS_PROPORTIONALITY_PROFILE
-  29. ProportionalityEntry           (38 per case) + CONTAINS_ENTRY, SCOPED_TO
-  30. Gate (1A, 1B, 1C)             + VALIDATES_* relationships
-  31. GateP                          + VALIDATES_PROFILE
+  19. Enterprise                     (root node, intrinsic inputs only)
+  20. Stakeholder                    (FK→Enterprise) + DEFINES → BusinessGoal
+  21. BusinessGoal                   (FK→Enterprise)
+  22. ACTS_AS                        (Enterprise → RegulatoryRole, with `context` property)
+  23. RegulatoryApplicabilityResult  + HAS_APPLICABILITY_RESULT
+  24. DeclarationGap                 (from negative_analyses in interactions.yaml) + HAS_DECLARATION_GAP
+  25. ConditionalExtension + BlockTrigger
+  26. RegulatoryInteraction          (all 4 types from interactions.yaml) + HAS_REGULATORY_INTERACTION
+  27. ClauseActivation               (per case × clause, deterministic derivation) + HAS_CLAUSE_ACTIVATION
+  28. ComplementarityAnalysis        + COMPARES, SCOPED_TO
+  29. DomainCoverageEntry            + (Regulation→Entry, Domain→Entry)
+  30. DomainElaborationEntry         + (Complementarity→Entry, Entry→SubDomain)
+  31. ProportionalityProfile         + HAS_PROPORTIONALITY_PROFILE
+  32. ProportionalityEntry           (38 per case) + CONTAINS_ENTRY, SCOPED_TO, OWNED_BY → Stakeholder
+  33. ControlEvidence                (mirrors data/control_evidence/D-XX.yaml) + HAS_CONTROL_EVIDENCE
 
 PHASE 2 — Per-Case Architecture (run once per case_id, after Phase 1)
-  32. System                         (FK→Enterprise) + OPERATES_SYSTEM
-  33. DataStore                      + STORES_DATA_IN (System→DataStore)
-  34. DataFlow                       + SENDS_DATA_TO (System→System)
-  35. AuthSystem                     + AUTHENTICATED_BY (System→AuthSystem)
-  36. ThirdPartyService              + OUTSOURCED_TO (System→ThirdParty)
-  37. DataSubject                    + HAS_DATA_SUBJECT (Enterprise→DataSubject)
+  34. System                         (FK→Enterprise) + OPERATES_SYSTEM  (criticality normalised UPPER)
+  35. DataStore                      + STORES_DATA_IN (System→DataStore)
+  36. DataFlow                       + ORIGINATES_FROM, TERMINATES_AT (multi-target)
+  37. AuthSystem                     + AUTHENTICATED_BY (System→AuthSystem)
+  38. ThirdPartyService              + OUTSOURCED_TO (System→ThirdParty)
+  39. ExternalParty                  (BaFin goAML, end-users, public endpoints) + (no FK until referenced)
+  40. DataSubject                    + HAS_DATA_SUBJECT (Enterprise→DataSubject)
 
-PHASE 3 — Computed / Inferred (run after Phase 2)
-  38. IN_SCOPE_OF (System→SubDomain)  — derived from criticality + data mapping
-  39. TRIGGERS_CLAUSE (DataSubject→RegulatoryClause) — special_category=true → Art.9
-  40. INVOLVES_DATA_OF (DataFlow→DataSubject)  — from data_flows.yaml subject refs
-  41. GOVERNED_BY_PROPORTIONALITY (SubDomainActivation→ProportionalityEntry) — join
+PHASE 3 — Computed / Inferred (run after Phase 2; deterministic, versioned, testable)
+  41. IN_SCOPE_OF (System→SubDomain)  — via `data/in_scope_of_rules.yaml`; rule_id + basis recorded on edge
+  42. TRIGGERS_CLAUSE (DataSubject→RegulatoryClause) — special_category=true → Art.9
+  43. INVOLVES_DATA_OF (DataFlow→DataSubject)  — from data_flows.yaml subject refs
+  44. GOVERNED_BY_PROPORTIONALITY (SubDomainActivation→ProportionalityEntry) — join
 ```
+
+### 6.5 Derived properties on DataFlow (rules)
+- `is_cross_border`: `origin_jurisdiction ≠ destination_jurisdiction`
+- `carries_pii`: regex match against `data_type` keywords (`PII`, `name`, `email`, `address`, etc.) — kept conservative (defaults to false on no match); superset list checked into `data/dataflow_derivation_rules.yaml`
+- `carries_financial`: same pattern against financial keywords
+- `transfer_mechanism`: empty → "None"; populated by manual annotation only
+
+Rules are versioned in `data/*_rules.yaml` with one rule = one test in the ETL test suite.
+
+### 6.4 PHASE 4 — Verify (mandatory after every load)
+- Counts vs. expected: CSFFunction=6, CSFCategory=34, CSFSubcategory=106, Regulation=5, RegulatoryClause=331, SecurityControlDomain=10, SubDomain=38, RegulatoryPair=196, RegulatoryRole=9. Mismatches MUST fail the load.
+- Per case: system/data_store/data_flow/auth_system/third_party/data_subject counts vs YAMLs.
+- Orphan check: every FK on the right side has a target.
+- Isolation: `MATCH (n) WHERE (n:RegulatoryInteraction OR n:SubDomainActivation OR n:PairActivation OR n:AmbiguityDisposition OR n:Gate OR n:ClauseActivation OR n:ProportionalityEntry OR n:ProportionalityProfile OR n:ControlEvidence OR n:DeclarationGap) AND (n.case_id IS NULL OR n.run_id IS NULL)` returns zero (Run-derived nodes need `run_id`; case-derived nodes need `case_id`).
+- MERGE collision report: any case where two source files would produce the same PK is a hard failure.
+- Fingerprint: write `(:GraphMeta {key: 'preproc_fingerprint', value: <sha256>})` and `(:GraphMeta {key: 'etl_version', value: <semver>})`. PHASE 4 fails on mismatch against the source-of-truth fingerprint from `preproc_out/`.
 
 ---
 
@@ -866,38 +1082,26 @@ The following entities from `phase2_elaboration_secure_design.md` are **explicit
 
 | Entity | Phase 2 Reason |
 |---|---|
+| `RegulatoryObligation` | Doc 08 derivation (v3: removed from Phase 1 ontology; was ghost in v2) |
+| `StrategicImplication` | Doc 08 / 09 elaboration |
+| `ImplementationMapping` | v3: reabsorbed into properties on `SubDomain-[:ANCHORED_TO_CSF]->CSFSubcategory` edge; listed here for traceability |
 | `StrategicTension` | Requires MAP output + LLM synthesis (REDUCE stage) |
 | `ConflictResolution` + `JustificationRecord` | Requires Phase 1 tensions as input |
 | `ArchitecturalGoal` / `PrivacyGoal` / `SecurityGoal` | Derived from RegulatoryObligation — Phase 2 output |
 | `AbstractRule` / `ComplianceRule` / `BestPracticeRule` | Phase 2 rules catalog |
 | `RulesCatalog` | Aggregation of Phase 2 outputs |
 | `RiskOwner` | Maps to Stakeholder from Phase 1 but requires Phase 2 context |
+| `(:Control {status: IMPLEMENTED\|PARTIAL\|PLANNED\|ABSENT})` + `[:SATISFIES]->(:RegulatoryClause)` | Phase 2: evidence is in Phase 1 (ControlEvidence), STATUS is not. Open Q1 resolved. |
 
 ---
 
-## 8. Open Questions for Peer Model Review
+## 8. Resolved Decisions (formerly Open Questions)
 
-1. **Control Implementation State:** Should a `(:Control)` node with
-   `status: IMPLEMENTED|PARTIAL|PLANNED|ABSENT` and `[:SATISFIES]->(:RegulatoryClause)` live
-   in Phase 1 or Phase 2? It bridges the obligation layer and operational reality —
-   arguably it's Phase 1 context but populated during Phase 2.
-
-2. **Accountability Chain in Graph:** `ProportionalityEntry.ownership` captures SUPPLIER/COMPANY/SHARED
-   tiers but doesn't name the accountable Stakeholder. Should
-   `(:ProportionalityEntry)-[:OWNED_BY]->(:Stakeholder)` be added to enable DORA board-level
-   accountability queries?
-
-3. **Provenance / Source Traceability:** No `(:Source)` node tracks which YAML file
-   and schema version each node came from. Required for academic reproducibility and
-   for CI pipeline drift detection. Should this be a full node or just properties on each node?
-
-4. **Temporal Deadline as Node vs Property:** `RegulatoryClause.enforcement_date` exists
-   as a property. Is this sufficient for agents to answer "what obligations are due in 6 months"
-   or do we need a dedicated `(:ComplianceDeadline)` node with countdown semantics?
-
-5. **Cross-Case ComplementarityAnalysis:** `ComplementarityAnalysis` currently compares
-   two regulations scoped to a SubDomain. Should it also be scoped to `case_id`,
-   or is it case-agnostic (purely regulatory comparison independent of which company is assessed)?
+1. **Control implementation status (status field):** evidence lives in Phase 1 (`:ControlEvidence`); the `status: IMPLEMENTED|PARTIAL|PLANNED|ABSENT` `(:Control)-[:SATISFIES]->(:RegulatoryClause)` lives in Phase 2 (see §7).
+2. **Accountability chain:** `(:ProportionalityEntry)-[:OWNED_BY]->(:Stakeholder)` added (see §3.1); enables DORA board-level queries without changing property schemas.
+3. **Source traceability:** per-node `origin` property (`"deterministic" | "llm:<spec_id>"`) + per-case `provenance` (file + line) recorded in ETL; full `(:Source)` node is overkill at this scale. `(:GraphMeta)` fingerprint catches catalog drift.
+4. **Temporal deadlines:** `RegulatoryClause.enforcement_date` as a property is sufficient for Phase 1. Dedicated `(:ComplianceDeadline)` node is reserved for Phase 2 (countdown semantics).
+5. **Cross-case ComplementarityAnalysis:** stays case-agnostic — it is a structural regulatory comparison by class-model definition.
 
 ---
 
