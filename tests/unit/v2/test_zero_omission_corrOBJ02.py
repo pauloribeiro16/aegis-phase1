@@ -19,7 +19,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO = Path(__file__).resolve()
 for p in REPO.parents:
     if (p / "src" / "aegis_phase1").is_dir():

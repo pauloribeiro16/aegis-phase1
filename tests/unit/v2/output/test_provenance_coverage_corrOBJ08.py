@@ -63,19 +63,24 @@ def _count_provenance_calls(source: str) -> int:
     tree = ast.parse(source)
     count = 0
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call):
-            func = node.func
-            if isinstance(func, ast.Name) and func.id in {
-                "section_provenance_tag",
-                "section_tag_for_heading",
-            }:
-                count += 1
-            elif isinstance(func, ast.Attribute) and func.attr in {
-                "section_provenance_tag",
-                "section_tag_for_heading",
-            }:
-                count += 1
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        is_name_target = (
+            isinstance(func, ast.Name) and func.id in _TARGET_NAMES
+        )
+        is_attr_target = (
+            isinstance(func, ast.Attribute) and func.attr in _TARGET_NAMES
+        )
+        if is_name_target or is_attr_target:
+            count += 1
     return count
+
+
+_TARGET_NAMES = frozenset({
+    "section_provenance_tag",
+    "section_tag_for_heading",
+})
 
 
 def _sections_for_doc(doc_id: str) -> list[tuple[str, str]]:
