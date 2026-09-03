@@ -354,3 +354,72 @@ def test_citation_gate_applies_to_p1b01_spec(ref_gate: RefGate):
     res = ref_gate.validate("P1B-LLM-01-INTERPRETATION", raw, inputs=inputs)
     assert any(v.rule == "UNAUTHORISED_ASSET_REF" for v in res.violations)
 
+
+# ─── CORR-OBJ-04: CSF 2.0 token validation ───────────────────────────
+
+
+def test_csf_gate_valid_token_accepted(ref_gate: RefGate):
+    """A canonical CSF 2.0 subcategory token in the catalogue is allowed."""
+    # First call to load the catalogue
+    ref_gate._ensure_csf()
+    assert "PR.DS-01" in ref_gate._csf_ids, "PR.DS-01 must be in the loaded CSF catalogue"
+
+    raw = """
+## Rationale
+SYS-01 data at rest is protected via PR.DS-01. The architecture maps to
+NIST guidance for data security. Doc 04 references in scope.
+"""
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs={})
+    csf_violations = [v for v in res.violations if v.rule == "UNKNOWN_CSF_TOKEN"]
+    assert csf_violations == []
+
+
+def test_csf_gate_unknown_token_rejected(ref_gate: RefGate):
+    """A CSF-shaped token NOT in the catalogue → UNKNOWN_CSF_TOKEN violation."""
+    raw = """
+## Rationale
+SYS-01 uses FAKE-99 (a made-up CSF id) and ZZ.XX-99 also bogus.
+Doc 04 references in scope.
+"""
+    res = ref_gate.validate("P1B-LLM-02-RATIONALE", raw, inputs={})
+    csf_violations = [v for v in res.violations if v.rule == "UNKNOWN_CSF_TOKEN"]
+    # Both FAKE-99 (lowercase '99' suffix is in regex, but 'FAKE' is the
+    # function prefix; the regex requires [A-Z]{2} so 4-letter words won't
+    # match) — but ZZ.XX-99 should match the regex AND be unknown.
+    # We only assert at least one UNKNOWN_CSF_TOKEN is produced.
+    assert any(v.context == "ZZ.XX-99" for v in csf_violations)
+
+
+def test_csf_gate_skipped_for_p1b01_spec(ref_gate: RefGate):
+    """P1B-01 (interpretation) does not legitimately emit CSF tokens;
+    the gate must skip and not over-trigger on incidental references.
+    """
+    # Use a token that *would* be unknown if the gate ran, and confirm
+    # no UNKNOWN_CSF_TOKEN is reported for the P1B-01 spec.
+    raw = """
+## Interpretations
+### INT-01: SOMETHING
+- entry_id: TIPO2-GDPR-RTS-DEADLINES
+- activation_verdict: ACTIVATED
+Mentioned: ZZ.XX-99 (incidental)
+"""
+    res = ref_gate.validate("P1B-LLM-01-INTERPRETATION", raw, inputs={})
+    csf_violations = [v for v in res.violations if v.rule == "UNKNOWN_CSF_TOKEN"]
+    assert csf_violations == []
+
+
+def test_csf_gate_applies_to_p1c03_strategic_synthesis(ref_gate: RefGate):
+    """P1C-03 (strategic synthesis) IS a CSF-emitting spec and the gate
+    must run there. Mix of valid + unknown tokens.
+    """
+    raw = """
+## Strategic synthesis
+The architecture maps to PR.DS-01 and GV.OC-01 in the catalogue.
+A reference to ZZ.XX-99 is fabricated.
+"""
+    res = ref_gate.validate("P1C-LLM-03-STRATEGIC-SYNTHESIS", raw, inputs={})
+    csf_violations = [v for v in res.violations if v.rule == "UNKNOWN_CSF_TOKEN"]
+    assert any(v.context == "ZZ.XX-99" for v in csf_violations)
+    # The two valid tokens must NOT produce violations
+    assert not any(v.context in {"PR.DS-01", "GV.OC-01"} for v in csf_violations)
+
