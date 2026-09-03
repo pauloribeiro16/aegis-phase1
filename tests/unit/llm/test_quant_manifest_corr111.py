@@ -217,6 +217,100 @@ def test_normalize_quant_tag(raw, expected) -> None:
     assert qm._normalize_quant_tag(raw) == expected
 
 
+def test_detect_via_blob_happy_path(tmp_path: Path) -> None:
+    """Stage a fake Ollama cache on disk and read file_type from the
+    config blob. No subprocesses — proves Path 3 (CORR-111 follow-up,
+    2026-09-03)."""
+    root = tmp_path
+    manifest_dir = root / "manifests" / "registry.ollama.ai" / "library" / "qwen3.5"
+    manifest_dir.mkdir(parents=True)
+    # manifest references a config blob by sha256
+    cfg_sha = "f" * 64  # 64 hex chars; sha length
+    (root / "blobs").mkdir(parents=True)
+    cfg_path = root / "blobs" / f"sha256-{cfg_sha}"
+    cfg_path.write_text(json.dumps({
+        "model_format": "gguf",
+        "model_family": "qwen35",
+        "file_type": "Q4_K_M",
+    }))
+    cfg_digest = f"sha256:{cfg_sha}"
+    (manifest_dir / "27b").write_text(json.dumps({
+        "config": {"digest": cfg_digest, "mediaType": "image.v1+json", "size": 1},
+        "layers": [{"digest": "sha256:0" * 64, "size": 1}],
+    }))
+    # Tag in model name → match by wanted_tag
+    assert qm.detect_ollama_quantization_via_blob("qwen3.5:27b", ollama_models_root=root) == "q4_k_m"
+
+
+def test_detect_via_blob_no_manifest_dir(tmp_path: Path) -> None:
+    """Bare-name match against a missing model → unknown, not error."""
+    assert qm.detect_ollama_quantization_via_blob("ghost:99", ollama_models_root=tmp_path) == "unknown"
+
+
+def test_detect_via_blob_missing_config_blob(tmp_manifest_root: Path) -> None:
+    """Manifest present but its config blob is gone → unknown, not error."""
+    root = tmp_path_for_blob_test(tmp_manifest_root)
+    manifest_dir = root / "manifests" / "registry.ollama.ai" / "library" / "ghost"
+    manifest_dir.mkdir(parents=True)
+    (manifest_dir / "1b").write_text(json.dumps({
+        "config": {"digest": "sha256:" + "0" * 64, "size": 1},
+        "layers": [],
+    }))
+    assert qm.detect_ollama_quantization_via_blob("ghost:1b", ollama_models_root=root) == "unknown"
+
+
+def test_detect_via_blob_no_file_type_field(tmp_manifest_root: Path) -> None:
+    """Manifest + config blob exist but the config lacks file_type → unknown."""
+    root = tmp_path_for_blob_test(tmp_manifest_root)
+    manifest_dir = root / "manifests" / "registry.ollama.ai" / "library" / "naked"
+    manifest_dir.mkdir(parents=True)
+    cfg_sha = "a" * 64
+    (root / "blobs").mkdir(parents=True)
+    (root / "blobs" / f"sha256-{cfg_sha}").write_text(json.dumps({
+        "model_format": "gguf",
+        "model_family": "naked",
+        # NO file_type
+    }))
+    (manifest_dir / "30b").write_text(json.dumps({
+        "config": {"digest": f"sha256:{cfg_sha}", "size": 1},
+        "layers": [],
+    }))
+    assert qm.detect_ollama_quantization_via_blob("naked:30b", ollama_models_root=root) == "unknown"
+
+
+def tmp_path_for_blob_test(root: Path) -> Path:
+    """Helper: a fresh tmp dir independent of the one in tmp_manifest_root."""
+    import shutil
+    d = root / "_blob_test_root"
+    if d.exists():
+        shutil.rmtree(d)
+    d.mkdir()
+    return d
+
+
+def test_detect_ollama_falls_back_to_blob_when_show_unavailable(tmp_manifest_root: Path) -> None:
+    """When subprocess returns 'unknown' (e.g. no daemon), the function
+    should attempt the blob path before giving up. Confirms the chain."""
+    fake = subprocess.CompletedProcess(
+        args=[], returncode=1, stdout="", stderr="could not connect",
+    )
+    # Stage a real blob so the fallback succeeds
+    root = tmp_path_for_blob_test(tmp_manifest_root)
+    manifest_dir = root / "manifests" / "registry.ollama.ai" / "library" / "miniglm"
+    manifest_dir.mkdir(parents=True)
+    cfg_sha = "b" * 64
+    (root / "blobs").mkdir(parents=True)
+    (root / "blobs" / f"sha256-{cfg_sha}").write_text(json.dumps({
+        "file_type": "q4_k_m", "model_family": "miniglm",
+    }))
+    (manifest_dir / "latest").write_text(json.dumps({
+        "config": {"digest": f"sha256:{cfg_sha}", "size": 1},
+        "layers": [],
+    }))
+    with patch("subprocess.run", return_value=fake):
+        assert qm.detect_ollama_quantization("miniglm:latest", ollama_models_root=root) == "q4_k_m"
+
+
 # ---------------------------------------------------------------------------
 # Helpers — provider probes
 # ---------------------------------------------------------------------------

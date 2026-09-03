@@ -245,18 +245,24 @@ def find_manifest(
 # ---------------------------------------------------------------------------
 
 
-def detect_ollama_quantization(model: str) -> str:
+def detect_ollama_quantization(
+    model: str,
+    *,
+    ollama_models_root: str | os.PathLike[str] | None = None,
+) -> str:
     """Best-effort quant probe for an Ollama model — never raises.
 
-    Calls ``ollama show <model> --json`` (graphify 0.32.13+) and looks for a
-    "quantization" or "format" field. Falls back to parsing plain
-    ``ollama show <model>`` text output (cluster-shipped 0.31.1 only
-    ships text output, not JSON — see skill `hpc-deucalion` lines 86-87).
+    Three paths, in order:
+
+    1. ``ollama show <model> --json`` (graphify 0.32.13+).
+    2. Plain ``ollama show <model>`` text (cluster-shipped 0.31.1, when
+       a daemon is reachable).
+    3. :func:`detect_ollama_quantization_via_blob` — reads the config
+       blob on disk directly. No subprocess, no daemon needed. Last
+       resort when 1+2 fail.
 
     Returns ``'unknown'`` on every error so the pipeline keeps moving.
-
-    Optional: callers can pass ``AEGIS_QUANT_NO_PROBE=1`` to skip
-    subprocess entirely.
+    Optional: set ``AEGIS_QUANT_NO_PROBE=1`` to skip subprocess entirely.
     """
     if os.environ.get("AEGIS_QUANT_NO_PROBE", "0") == "1":
         return "unknown"
@@ -299,11 +305,95 @@ def detect_ollama_quantization(model: str) -> str:
             capture_output=True, text=True, timeout=10, check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        # Path 3 below will try the blob.
+        out = None
+    if out is not None and out.returncode == 0:
+        quant = _parse_ollama_show_text(out.stdout)
+        if quant:
+            return _normalize_quant_tag(quant)
+
+    # Path 3 (CORR-111 follow-up): the cluster-shipped Ollama 0.31.1
+    # also fails plain ``ollama show`` because it needs an active
+    # daemon — but the model's config blob on disk has ``file_type`` set
+    # by the CLI at pull time. Read it directly, no subprocess.
+    return detect_ollama_quantization_via_blob(
+        model, ollama_models_root=ollama_models_root
+    )
+
+
+def detect_ollama_quantization_via_blob(
+    model: str,
+    *,
+    ollama_models_root: str | os.PathLike[str] | None = None,
+) -> str:
+    """Detect an Ollama model's quantization from the on-disk blob config.
+
+    Skips ``ollama`` subprocesses entirely (no daemon needed — proven
+    2026-09-03 when the cluster-shipped 0.31.1 has no ``--json`` and
+    the plain-text ``ollama show`` returns ``unknown`` without an
+    active server). Reads the manifest JSON + config blob that the
+    Ollama CLI wrote at pull time, parses ``file_type`` from there.
+
+    Layout (default for aegis-phase1 on Deucalion):
+
+        <ollama_models_root>/manifests/registry.ollama.ai/library/<model>/<tag>
+        <ollama_models_root>/blobs/sha256-<...>
+
+    Caller can override ``ollama_models_root`` for non-Deucalion hosts.
+    Returns ``'unknown'`` on every error so the pipeline keeps moving.
+
+    Path 3 of :func:`detect_ollama_quantization`. Called automatically
+    when both ``--json`` and ``ollama show`` fail.
+    """
+    root = Path(
+        ollama_models_root
+        or os.environ.get("OLLAMA_MODELS")
+        or "/projects/F202512235CPCAA1/CyberMetric_Deucalion/ollama_data/models"
+    )
+    # Strip the :tag suffix — the manifest dir uses the bare name.
+    bare = model.split(":", 1)[0]
+    manifest_dir = root / "manifests" / "registry.ollama.ai" / "library" / bare
+    if not manifest_dir.is_dir():
         return "unknown"
-    if out.returncode != 0:
+
+    # Pick the manifest file (subdir layout is one file per tag).
+    manifest_files = sorted(p for p in manifest_dir.iterdir() if p.is_file())
+    if not manifest_files:
         return "unknown"
-    quant = _parse_ollama_show_text(out.stdout)
-    return _normalize_quant_tag(quant) if quant else "unknown"
+
+    # If the user asked for a specific tag and it's present, use that;
+    # otherwise default to the newest by mtime — matches what `ollama
+    # show` would show for a bare name.
+    wanted_tag = model.split(":", 1)[1] if ":" in model else None
+    manifest_path: Path | None = None
+    if wanted_tag:
+        candidate = manifest_dir / wanted_tag
+        manifest_path = candidate if candidate.is_file() else None
+    if manifest_path is None:
+        manifest_path = max(manifest_files, key=lambda p: p.stat().st_mtime)
+
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return "unknown"
+
+    config_digest = manifest.get("config", {}).get("digest", "")
+    if not config_digest.startswith("sha256:"):
+        return "unknown"
+    config_sha = config_digest[len("sha256:"):]
+    config_blob = root / "blobs" / f"sha256-{config_sha}"
+    if not config_blob.is_file():
+        return "unknown"
+
+    try:
+        config = json.loads(config_blob.read_text())
+    except (json.JSONDecodeError, OSError):
+        return "unknown"
+
+    file_type = config.get("file_type")
+    if isinstance(file_type, str) and file_type.strip():
+        return _normalize_quant_tag(file_type)
+    return "unknown"
 
 
 def _parse_ollama_show_text(text: str) -> str:
@@ -473,6 +563,7 @@ __all__ = [
     "QuantManifest",
     "build_from_ollama_pull",
     "detect_ollama_quantization",
+    "detect_ollama_quantization_via_blob",
     "find_manifest",
     "frontmatter_comment",
     "head_sha256",
