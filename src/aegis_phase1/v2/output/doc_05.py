@@ -40,6 +40,7 @@ from aegis_phase1.v2.context.applicability_context import (
 )
 from aegis_phase1.v2.output._common import (
     doc_preamble,
+    generate_frontmatter,
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
@@ -107,6 +108,7 @@ def render_doc_05(
     invoker = llm_invoker if use_llm else None
 
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-05 Regulatory Applicability\n")
 
     # CORR-038-T3: ApplicabilityContext (v2 source of truth) — added as

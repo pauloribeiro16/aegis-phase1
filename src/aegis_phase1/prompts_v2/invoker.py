@@ -31,6 +31,10 @@ from langchain_core.runnables.config import RunnableConfig
 from langchain_ollama import ChatOllama
 
 from aegis_phase1.config.defaults import RAW_OUTPUT_DIR
+from aegis_phase1.llm.quant_manifest import (
+    frontmatter_comment as _qm_frontmatter,
+    resolve_quant_for as _qm_resolve_quant,
+)
 from aegis_phase1.llm.token_counter import TokenCounter
 from aegis_phase1.llm.unified import LLMUnreachableError, probe_ollama
 from aegis_phase1.prompts_v2.catalog import CatalogLoader
@@ -828,8 +832,8 @@ class Phase1LLMInvoker:
                 "parsed_output": None,
             }
 
-    @staticmethod
     def _capture_per_spec_markdown(
+        self,
         state: dict[str, Any],
         spec_id: str,
         attempt_result: dict[str, Any],
@@ -849,6 +853,11 @@ class Phase1LLMInvoker:
         in a single string. The first call's response is stored verbatim
         (no leading separator).
 
+        CORR-111: prepends a one-line HTML comment with model + provider +
+        quant + job + spec + ts on the FIRST call per (spec_id, lane).
+        The same string is stored under
+        ``state["v2_model_capabilities"]`` for downstream consumers.
+
         Args:
             state: Pipeline state (mutated in place).
             spec_id: Canonical Phase 1 LLM ID.
@@ -859,6 +868,12 @@ class Phase1LLMInvoker:
         raw = attempt_result.get("raw_response")
         if not raw:
             return
+
+        # CORR-111: resolve active quant (best-effort) and remember it
+        # for the whole run. We don't fail the pipeline if the manifest
+        # is missing — the header just records 'unknown' / 'provider_default'.
+        quant_info = self._current_quant()
+        self._remember_model_capabilities(state, quant_info)
 
         bucket = state.setdefault("per_spec_markdown", {})
         if not isinstance(bucket, dict):
@@ -875,10 +890,60 @@ class Phase1LLMInvoker:
         if isinstance(existing, str) and existing:
             # Subsequent call for the same spec — append with a
             # horizontal-rule separator so reviewers can grep the
-            # boundary between lanes.
+            # boundary between lanes. The frontmatter from the FIRST
+            # call stays at the top of the bucket.
             bucket[spec_id] = existing + "\n\n---\n\n" + raw
-        else:
-            bucket[spec_id] = raw
+            return
+
+        # First write for this spec_id. CORR-111: prepend a single-line
+        # quant frontmatter comment so the markdown carries the model
+        # + quant + job that produced it.
+        front = _qm_frontmatter(
+            model=self.model,
+            provider=self.provider,
+            quant=quant_info["quantization"],
+            job=quant_info["job_id"],
+            spec=spec_id,
+        )
+        bucket[spec_id] = front + "\n" + raw
+
+    def _current_quant(self) -> dict[str, Any]:
+        """Resolve the quant currently in use (CORR-111).
+
+        Looks up the manifest written by the pull/stage scripts.
+        Falls back to ``"unknown"`` (never raises) so the pipeline
+        keeps running when the manifest directory doesn't exist or
+        the sidecar was forgotten.
+        """
+        return _qm_resolve_quant(self.model, self.provider)
+
+    @staticmethod
+    def _remember_model_capabilities(
+        state: dict[str, Any],
+        info: dict[str, Any],
+    ) -> None:
+        """Record the active model/quant for the whole run (CORR-111).
+
+        Idempotent: first call wins (we don't want a downstream spec to
+        silently switch quant under the reader's nose). When the run is
+        a multi-model comparison, callers can pass a list under
+        ``state["v2_model_capabilities"]["history"]`` instead — but for
+        now the v2 pipeline runs ONE model at a time so a single record
+        is sufficient.
+        """
+        cap = state.get("v2_model_capabilities")
+        if isinstance(cap, dict) and cap.get("model"):
+            return
+        state["v2_model_capabilities"] = {
+            **info,
+            "recorded_at": datetime.now(UTC).isoformat(),
+        }
+        logger.info(
+            "CORR-111: model=%s provider=%s quant=%s provenance=%s job=%s",
+            info["model"], info["provider"],
+            info["quantization"], info["quantization_provenance"],
+            info["job_id"],
+        )
 
     @staticmethod
     def _persist_raw_call(

@@ -19,6 +19,7 @@ from aegis_phase1.v2.context.clause_mapping_context import (
     build_clause_mapping_context,
 )
 from aegis_phase1.v2.output._common import (
+    doc_preamble,
     generate_frontmatter,
     markdown_table,
     render_per_spec_markdown_appendix,
@@ -59,6 +60,7 @@ def _render_from_context(
     omitted.
     """
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-06 Clause Mapping Matrix\n")
     parts.append("## 1. PURPOSE\n")
     parts.append(

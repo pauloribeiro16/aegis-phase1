@@ -42,6 +42,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from aegis_phase1.v2.output._common import (
+    doc_preamble,
     generate_frontmatter,
     get_per_spec_markdown,
     markdown_table,
@@ -140,6 +141,7 @@ def render_doc_07(
     invoker = llm_invoker if use_llm else None
 
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-07 Structured Compliance Matrix\n")
     parts.extend(_section_1_purpose())
     parts.extend(_section_2_inputs())

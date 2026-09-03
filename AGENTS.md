@@ -167,9 +167,9 @@ PYTHONPATH=src pytest tests/unit/v2/ --co -q 2>&1 | grep -E "ERROR|ModuleNotFoun
 
 | Tier | Action |
 |------|--------|
-| **Always** | Add tests for any code change. Run lint + tests before commit. Use type hints. Update nearest AGENTS.md if the rule belongs there. |
+| **Always** | Add tests for any code change. Run lint + tests before commit. Use type hints. Update nearest AGENTS.md if the rule belongs there. **Load the `hpc-deucalion` skill BEFORE touching the Deucalion cluster** (ssh, scp, sbatch, srun, squeue, model pulls on the login node, sync of code from workstation). The skill is the documented source of truth for SLURM flags, partition/QoS, Ollama vs vLLM binary split, the `tar+scp via /tmp` sync pattern (NOT `scp` to `$HOME` — quota), and the stale `.pyc` rule. Don't ad-hoc SSH by guessing hostnames or usernames — that's what the skill exists to prevent. |
 | **Ask first** | Adding new dependencies. Touching `Methodology-main/` (separate repo). Adding new regulation / entity kind to preproc. Neo4j / Langfuse / conftest changes. Renaming state keys. Schema changes mid-contract. |
-| **Never** | Hardcode ports (use `.env`). Commit secrets or `.env` values. Edit `archive/`. Use `except: pass`. Withhold evidence (golden regen) when schema changes. |
+| **Never** | Hardcode ports (use `.env`). Commit secrets or `.env` values. Edit `archive/`. Use `except: pass`. Withhold evidence (golden regen) when schema changes. Never `sbatch` heavy work on a login node (Rule #1 of `hpc-deucalion`). Never run two Ollama-serving scouts on the same node simultaneously (they collide on port 11434). |
 
 ---
 
@@ -187,7 +187,7 @@ Skills load via `skill({name: "..." })`. Match a task to a skill's trigger phras
 |-------|------|
 | `sprint-contract` *(symlinked)* | **ALWAYS** load when the user asks for a contract (any size, any context); also: 3+ file changes, complex tasks, planning CORR-NNN contracts |
 | `agent-orchestration` *(workspace)* | Any eval cycle (checker → judge → digest → matrix), contract planning, model-scoring, or validation gates — the distilled operating cycle (see also `execution/reports/EVAL_PROTOCOL.md`) |
-| `hpc-deucalion` | Before ANY Deucalion work — includes the 2026-09-01 scout recipe (Ollama version split, sequential-only, NFS logs, `scout-bench-m-aegis.sbatch`) |
+| `hpc-deucalion` *(symlinked)* | **ALWAYS load before ANY Deucalion work** — submitting scouts/runs/pulls, syncing code via `tar+scp`, reading `squeue`/`sacct`, fixing cluster errors, choosing partition/QoS/model binary. Without this skill you will guess hostnames (won't resolve from the workstation), pick the wrong Ollama binary (0.31.1 vs 0.32.13), or `scp` to `$HOME` and hit the disk-quota wall. Includes the scout recipe (Ollama version split, sequential-only, NFS logs) |
 | `code-review` *(symlinked)* | Before merging, independent verification of changes |
 | `python-best-practices` *(symlinked)* | Any Python code change |
 | `project-conventions` *(symlinked)* | New AEGIS-KG naming, file structure, entity IDs |

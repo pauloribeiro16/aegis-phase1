@@ -40,6 +40,7 @@ from aegis_phase1.v2.context.applicability_context import (
     build_applicability_context,
 )
 from aegis_phase1.v2.output._common import (
+    doc_preamble,
     generate_frontmatter,
     markdown_table,
     write_output,
@@ -209,6 +210,7 @@ def _build_doc_04_body(state: dict[str, Any]) -> str:
     app_ctx: ApplicabilityContext = build_applicability_context(state)
 
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-04 Company Context Assessment\n")
 
     # §1 Document Purpose
