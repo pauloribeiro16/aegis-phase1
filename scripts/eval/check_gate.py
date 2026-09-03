@@ -96,7 +96,16 @@ def parse_args():
             "Strict mode: any [G] failure OR any regression vs the "
             "baseline (when --baseline is set) exits non-zero. Missing "
             "gates and unwired judges are reported but do not fail by "
-            "themselves (per OBJECTIVES_CONTRACT §2 status column)."
+            "themselves (per OBJECTIVES_CONTRACT §2 status column). "
+            "Also sets AEGIS_GATE_MODE=hard (CORR-OBJ-00)."
+        ),
+    )
+    p.add_argument(
+        "--lenient",
+        action="store_true",
+        help=(
+            "Dev mode (CORR-OBJ-00): set AEGIS_GATE_MODE=warn so RefGate "
+            "violations are logged but do not fail."
         ),
     )
     p.add_argument(
