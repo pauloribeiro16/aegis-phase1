@@ -316,7 +316,11 @@ def main() -> None:
 
     case_path = str(Path(args.case).resolve())
     prep_path = str(Path(rb_path).resolve())
-    output_path = str(Path(args.output).resolve())
+    case_slug = Path(args.case).name
+    if args.output == DEFAULT_OUTPUT:
+        output_path = str((Path("output") / case_slug / "phase1").resolve())
+    else:
+        output_path = str(Path(args.output).resolve())
 
     logger.info("Case path: %s", case_path)
     logger.info("Regulatory Baseline path: %s", prep_path)

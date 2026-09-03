@@ -92,7 +92,8 @@ export PYTHONPATH="$PROJ/src:$PROJ:${PYTHONPATH:-}"
 export LANGFUSE_ENABLED=false
 export AEGIS_GATE_MODE=hard
 
-OUT_DIR="output/run_40g_${MODEL_SLUG}_${SLURM_JOB_ID}"
+CASE_SLUG="$(basename "$CASE_NAME" | sed 's|^cases/||')"
+OUT_DIR="output/${CASE_SLUG}/phase1/run_40g_${MODEL_SLUG}_${SLURM_JOB_ID}"
 mkdir -p "$OUT_DIR"
 
 echo "=== running Phase 1B on 1x A100-40 ==="

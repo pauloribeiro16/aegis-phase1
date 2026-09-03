@@ -106,7 +106,7 @@ echo ""
 echo "=== pre-flight ==="
 python -c "import aegis_phase1.v2.runner; from aegis_phase1.prompts_v2.ref_gate import RefGate; print('aegis_phase1 + RefGate OK')"
 
-OUT_DIR="output/run_${MODEL_SLUG}_${SLURM_JOB_ID}"
+OUT_DIR="output/${CASE_SLUG}/phase1/run_${MODEL_SLUG}_${SLURM_JOB_ID}"
 mkdir -p "$OUT_DIR"
 
 echo ""
