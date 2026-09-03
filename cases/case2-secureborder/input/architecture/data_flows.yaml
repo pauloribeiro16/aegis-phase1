@@ -1,1 +1,31 @@
-flows: []
+data_flows:
+  - id: FLOW-01
+    source: Kiosk (SYS-04/SYS-06)
+    destination: Government Border Control API (SYS-02)
+    data_type: Passport MRZ + Biometric Verification Probe
+    encryption_in_transit: mTLS over QUIC (TPM 2.0 cert)
+  - id: FLOW-02
+    source: Kiosk (SYS-04/SYS-06)
+    destination: National Watchlist Service (SYS-03)
+    data_type: Encrypted Watchlist Probe
+    encryption_in_transit: mTLS over private 5G/LTE
+  - id: FLOW-03
+    source: Kiosk (SYS-04/SYS-06)
+    destination: Cloud Audit Sink (SYS-09 STORE-04)
+    data_type: Cryptographically signed audit event
+    encryption_in_transit: mTLS over QUIC
+  - id: FLOW-04
+    source: Cloud Model Training (SYS-05)
+    destination: Kiosk OTA (SYS-04)
+    data_type: Signed model artifact + CycloneDX SBOM
+    encryption_in_transit: mTLS + Cosign signature
+  - id: FLOW-05
+    source: Kiosk Syslog / EDR
+    destination: CrowdStrike Cloud (SYS-12)
+    data_type: Security telemetry & process hashes
+    encryption_in_transit: TLS 1.3
+  - id: FLOW-06
+    source: Developer Workstation
+    destination: GitHub Enterprise (SYS-11)
+    data_type: Source code & signed commits
+    encryption_in_transit: TLS 1.3 + FIDO2

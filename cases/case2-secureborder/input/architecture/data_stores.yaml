@@ -1,1 +1,50 @@
-stores: []
+data_stores:
+  - id: STORE-01
+    name: RDS PostgreSQL Operational DB
+    type: postgres
+    location: AWS eu-central-1
+    personal_data: true
+    encryption_at_rest: AES-256 KMS Customer-Managed Key
+    retention_days: 2555
+  - id: STORE-02
+    name: S3 Object Storage (Models, SBOMs, Artifacts)
+    type: s3
+    location: AWS eu-central-1
+    personal_data: false
+    encryption_at_rest: SSE-KMS AES-256
+    retention_days: 3650
+  - id: STORE-03
+    name: Watchlist Cache
+    type: in_memory_cache
+    location: AWS eu-central-1 isolated VPC
+    personal_data: true
+    encryption_at_rest: AES-256 HSM-bound
+    retention_days: 1
+  - id: STORE-04
+    name: Audit Log Immutable WORM Store
+    type: s3_worm
+    location: AWS eu-central-1 + eu-west-1
+    personal_data: true
+    encryption_at_rest: AES-256 KMS + Hash Chaining
+    retention_days: 3650
+  - id: STORE-05
+    name: Biometric Template Cache (Transient Edge)
+    type: encrypted_ram_flash
+    location: Kiosk Edge (SYS-06)
+    personal_data: true
+    encryption_at_rest: AES-256 TPM-bound
+    retention_days: 0
+  - id: STORE-06
+    name: Okta Identity Store
+    type: idp_directory
+    location: Okta EU Tenant
+    personal_data: true
+    encryption_at_rest: AES-256
+    retention_days: 90
+  - id: STORE-07
+    name: SAP Corporate ERP
+    type: sap_hana
+    location: AWS eu-central-1
+    personal_data: true
+    encryption_at_rest: AES-256 KMS
+    retention_days: 2555

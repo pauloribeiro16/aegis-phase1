@@ -1,1 +1,17 @@
-auth_systems: []
+auth_systems:
+  - id: AS-01
+    name: Okta Enterprise SSO
+    purpose: staff_and_admin_identity
+    mfa_enforced: true
+  - id: AS-02
+    name: Kiosk TPM Certificate Chain
+    purpose: kiosk_to_cloud_mtls
+    mfa_enforced: true
+  - id: AS-03
+    name: FIPS HSM Dual-Control
+    purpose: cryptographic_signing_access
+    mfa_enforced: true
+  - id: AS-04
+    name: SOC Role-Based Access Control
+    purpose: security_tooling_access
+    mfa_enforced: true
