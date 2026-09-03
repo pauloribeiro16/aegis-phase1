@@ -137,3 +137,43 @@ If you are a peer LLM reviewing this proposal, please evaluate and critique the 
    *If 2 out of 45 calls fail during a large OmniBank run, what is the best partial-recovery strategy to avoid re-running the entire pipeline?*
 
 ---
+
+## 7. Review Findings (ZCode, 2026-09-03)
+
+Grounded review against the code on `feature/aegis-p1-corr-112-provenance-gate-scale`. The proposal's direction (Pillar 1 + Pillar 2) is endorsed; the findings below are blind spots to fix before implementation. The full acceptance framework is [`OBJECTIVES_CONTRACT.md`](OBJECTIVES_CONTRACT.md) (`AEGIS-DOC-OBJ-001`).
+
+### 7.1 Blind Spot 1 — Architecture assets never reach the LLM (Gate A is unenforceable as written)
+
+MAP context assembly (`src/aegis_phase1/v2/domain/inputs.py`) builds closed lists of subdomain IDs, regulation IDs, and article IDs (`authoritative_ids`, CORR-112 F2) — but **no architecture assets** (`SYS-*`, `STORE-*`, `FLOW-*`). Assets exist only in the deterministic renderers (`doc_04a.py`, `doc_04b.py`). Consequently:
+
+- "Radical architectural grounding" (§1.2) is structurally impossible today — not a model-quality issue: the model has never seen the inventory.
+- Gate A would reject models for failing to cite assets they were never given.
+
+**Fix:** per-domain closed asset lists in MAP context + gate check **citation ⊆ list provided to that call**. The ⊆-check is the strong form: because the pipeline knows exactly what it handed each call, decorative citation of out-of-scope assets becomes mechanically detectable. Highest-leverage change in this review, at zero extra LLM calls.
+
+### 7.2 Blind Spot 2 — Conflicts are detected, not resolved (Gate C lacks its calls)
+
+The deterministic conflicts matrix (`run_sync`) flags `INDETERMINATE` pairs as "Flag for Phase 2 / human review"; conflict-resolution prose exists only inside the single global P1C-03 synthesis call. The proposal's pairwise tension calls (§3.2, trigger 3) are the right fix and align with the design law *scale coverage, not task complexity* — but they are load-bearing for Gate C, not an optional refinement.
+
+### 7.3 Gates A/B as written cause false rejections — make them per-section
+
+Blanket gates (any section must cite `SYS-*`; "according to GDPR" rejects anywhere) penalize legitimate enterprise-wide governance prose — the proposal's own reviewer question 2 concedes this. The mechanism to fix it already exists: the provenance section tags (CORR-112, `v2/output/provenance.py`). Gates should be **per-section**: obligation sections require article tokens; narrative sections do not.
+
+### 7.4 Underestimated risks of 43–48 calls
+
+1. **Synthesis scaling:** REDUCE feeds ALL lanes' activations into ONE global P1C-03 call with no truncation (CORR-102 fails loud on cap overflow). More MAP calls → larger aggregate → either `PromptTooLargeError` or quality dilution. Needs hierarchical synthesis (per-cluster → global) or deterministic pre-reduction.
+2. **Partial recovery:** at this call count, partial failures are certain on a cluster; per-call checkpoint/resume is required (the proposal's question 4), otherwise one failed call loses the run.
+3. **Gate mode:** `AEGIS_GATE_MODE` defaults to `warn`. Validation runs must use `hard`, otherwise Pillar 2 exists only on paper.
+
+### 7.5 Ambiguity analysis is missing — and it is grounding gold
+
+Preproc ambiguity pairs are injected into MAP inputs as data, but no spec references them (zero mentions across the 5 specs) and no gate checks them. Documented ambiguities are curated anchors: the LLM should emit a per-pair company-specific disposition (`applicable_reading` + `anchors[]` + `disposition ∈ {RESOLVED_BY_FACT, RESOLVED_BY_TIER, NEEDS_HUMAN}`), mirroring the CONDITIONAL-activation pattern without violating the NO-re-classification invariant. Full mechanism: `OBJECTIVES_CONTRACT.md` §4.
+
+### 7.6 Answers to the reviewer questions (§6 of this proposal)
+
+1. **Scalability vs latency:** more calls are justified only if each new call has a narrower closed context and its own gate; otherwise they add failure surface without verification. The cheap win is not a call — it is assets in MAP context (§7.1).
+2. **Gate A fragility:** real; fix via per-section gates + citation ⊆ provided-context (§7.1, §7.3).
+3. **Granularity threshold:** regulation-count triggers are fine; normative intensity can be added, but the trigger table must stay deterministic and testable — drop the unspecified `Surface = f(...)` formula in §3 in favor of the explicit trigger table.
+4. **Failure recovery:** per-call checkpointing of LangGraph state + resume from last good call; degraded sections render visibly (fail-loud), never silently dropped.
+
+---
