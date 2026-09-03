@@ -90,6 +90,50 @@ Three verification layers plus one acceptance rule:
 3. Switch validation runs to `AEGIS_GATE_MODE=hard` now, before additional LLM calls are added?
 4. Ambiguity mechanism vehicle: extend P1B-02 vs a dedicated per-pair dispositions pass (recommendation: dedicated pass — mirrors the activation pattern and keeps P1B per-regulation).
 
+## 7. Implementation Status (2026-09-03)
+
+Eleven of fourteen objectives now have at least a partial gate or test surface. **Five are wired into the live scorecard** (`scripts/eval/check_gate.py --contract docs/OBJECTIVES_CONTRACT.md`); the rest either emit `MISSING_GATE` / `JUDGE_NOT_WIRED` honestly or are out of scope for this iteration (Phase 1.2 = `Methodology-main` work, deferred; Pillar 1 = conditional on these gates passing).
+
+### 7.1 Per-objective status
+
+| ID | Status (2026-09-03) | Mechanism in code | Notes |
+|----|---------------------|-------------------|-------|
+| OBJ-01 | **IMPLEMENTED** (gate) | `_validate_citations()` in `ref_gate.py` + `asset_ids` in `inputs.py:authoritative_ids` | Per-section asset citation ⊆ provided-context; assets filtered per domain (heuristic v1). |
+| OBJ-02 | **IMPLEMENTED** (gate + tests) | `check_subdomain_coverage()` in `check_gate.py` + `tests/unit/v2/test_zero_omission_corrOBJ02.py` | Wired into scorecard; 38/38 subdomains covered on case3. |
+| OBJ-03 | **PARTIAL** | `_validate_citations()` + banned-phrase regex in `ref_gate.py` | Per-section shape enforced for asset/article refs; broader ambiguity phrasing list is TODO. |
+| OBJ-04 | **IMPLEMENTED** (gate) | `_validate_csf_tokens()` in `ref_gate.py` (loads 106 from `preproc_out/global/NIST_CSF_2.0_subcategories.json`) | Active on P1B-02 / P1C-01 / P1C-03. Not yet wired into scorecard (no `[G]` cell). |
+| OBJ-05 | **IMPLEMENTED** (judge) | `obj05_proportionality_adequacy` cell in `scripts/eval/rubric.py` | Judge, sampled per case × model; needs run-dir with rendered docs. |
+| OBJ-06 | **DEFERRED** (Phase 1.2) | Mechanism specified in §4 (AmbiguityDisposition); ref_gate validation TBD | Specs still at v1.1 in `Methodology-main`; needs v1.2 bump + PR. |
+| OBJ-07 | **IMPLEMENTED** (gate) | `_validate_p1b02` checks `must_business_goal_ids ⊆ cited` | Back-compat when no MUST goals present. |
+| OBJ-08 | **PARTIAL** (audit only) | AST audit `test_provenance_coverage_corrOBJ08.py` — 5 of 9 renderers emit tags, 4 are intentionally tagless (every H2 is deterministic) | Wired into scorecard (counts tags in rendered docs). |
+| OBJ-09 | **PARTIAL** | `ref_gate` covers invented stats + catalog IDs + CSF tokens + asset refs | Per-spec granularity varies; full per-section table is TODO. |
+| OBJ-10 | **IMPLEMENTED** (tests) | `test_consistency_internal_corrOBJ10.py` — subdomain↔Doc-06, CSF↔Doc-04, stakeholder parity | Not yet wired into scorecard as a [G] cell. |
+| OBJ-11 | **PARTIAL** | P1B rationale coverage + P1C-01 CONDITIONAL activations wired | Ambiguity dispositions need specs v1.2 (Phase 1.2). |
+| OBJ-12 | **PARTIAL** (pinned) | `test_fail_loud_corrOBJ12.py` pins current placeholder behaviour; 1 of 9 renderers uses a different path | Marker upgrade is a TODO; current behaviour is "fail-loud italic placeholder". |
+| OBJ-13 | **DEFERRED** (Phase 1.2) | Same dependency as OBJ-06 | |
+| OBJ-14 | **IMPLEMENTED** (dataclass + tests) | `src/aegis_phase1/runs/metadata.py:RunMetadata` + `test_run_metadata_corrOBJ14.py` | Human arbiter (H); out of scorecard scope by design. |
+
+### 7.2 Scorecard wiring
+
+The contract is parsed by `scripts/eval/objectives_contract.py` and rendered by `scripts/eval/check_gate.py`:
+
+```
+PYTHONPATH=src python scripts/eval/check_gate.py \
+    --run-dir execution/runs/<run> \
+    --contract docs/OBJECTIVES_CONTRACT.md \
+    --strict \
+    --baseline docs/OBJECTIVES_BASELINE.json
+```
+
+Five cells are wired (OBJ-02, 05, 08, 09, 12). The other 9 emit `MISSING_GATE` / `JUDGE_NOT_WIRED` — visible in the scorecard, not silently passing. Baseline captured 2026-09-03; any [G] regression vs the baseline exits non-zero under `--strict` (the non-regression rule of §5).
+
+### 7.3 What's NOT done (out of scope this iteration)
+
+- **Phase 1.2** — specs v1.2 in `Methodology-main/00_METHODOLOGY/PROMPTS/` (separate repo; AGENTS.md §6 = "Ask first"). Until bumped, OBJ-06, OBJ-11, OBJ-13 stay partial.
+- **Pillar 1 triggers** — subdomain split, asset-centric, pairwise conflict. Pre-condition per `PROPOSAL_ADAPTIVE_EXECUTION_AND_QUALITY_GATES.md` §7: OBJ-01, 03, 06 green in `hard` mode across the 3 cases. Not met yet.
+- **Neo4j ETL** — spec v3 (`AEGIS-DOC-NEO4J-ONTOLOGY-002`) is the artefact; ETL code is separate work.
+
 ## Change Log
 
-- **v0 (2026-09-03):** initial contract from the review session on PROP-001. 7 original objectives (Paulo) + 7 added (review); priority order proposed; ambiguity-as-anchor mechanism specified.
+- **v0 (2026-09-03, initial):** contract from the review session on PROP-001. 7 original objectives (Paulo) + 7 added (review); priority order proposed; ambiguity-as-anchor mechanism specified.
+- **v0 (2026-09-03, implementation):** Phase 0 + 1.1 + 1.3 + 2 + 3 + 4 implemented on branch `feature/aegis-p1-corr-112-provenance-gate-scale` (12 commits, 0 regressions vs baseline). Five [G]/[J] cells wired into the contract-driven scorecard; baseline captured at `docs/OBJECTIVES_BASELINE.json`; OBJ-01, 02, 04, 05, 07, 10, 14 IMPLEMENTED; OBJ-03, 08, 09, 11, 12 PARTIAL; OBJ-06, 13 DEFERRED (Phase 1.2).

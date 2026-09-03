@@ -1,0 +1,138 @@
+{
+  "contract_path": "docs/OBJECTIVES_CONTRACT.md",
+  "case_id": "case1-tinytask",
+  "run_id": "dryrun",
+  "timestamp": "2026-09-03T19:18:15.955771+00:00",
+  "results": [
+    {
+      "objective_id": "OBJ-01",
+      "title": "Company grounding",
+      "mechanism": "G",
+      "status": "MISSING_GATE",
+      "measured": "no [G] cell implemented",
+      "detail": "Contract status: **MISSING** — assets never enter MAP context (`v2/domain/inputs.py` builds closed subdomain/reg/article ID lists only; assets live solely in deterministic renderers doc_04a/04b). PROP-001 Gate A is unenforceable as written.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-02",
+      "title": "No omissions",
+      "mechanism": "G",
+      "status": "SKIPPED",
+      "measured": "no subdomains loaded",
+      "detail": "OBJ-02 zero-omission gate skipped because no subdomains were loaded.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-03",
+      "title": "Zero output ambiguity",
+      "mechanism": "G",
+      "status": "MISSING_GATE",
+      "measured": "no [G] cell implemented",
+      "detail": "Contract status: **PARTIAL** — `ref_gate.py` checks placeholder markers, invented statistics, verdict vocab; no per-section article-token requirement yet.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-04",
+      "title": "Controls",
+      "mechanism": "G",
+      "status": "MISSING_GATE",
+      "measured": "no [G] cell implemented",
+      "detail": "Contract status: **PARTIAL** — deterministic rendering from preproc is safe; LLM-side CSF mentions unchecked.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-05",
+      "title": "Proportionality / adequacy",
+      "mechanism": "J",
+      "status": "FAIL",
+      "measured": "score=1/5; scale=UNKNOWN, tier=UNKNOWN",
+      "detail": "Cannot evaluate proportionality without rendered Doc 04.",
+      "evidence": {
+        "case_id": "unknown",
+        "scale": "UNKNOWN",
+        "complexity_tier": "UNKNOWN"
+      }
+    },
+    {
+      "objective_id": "OBJ-06",
+      "title": "Tensions resolved",
+      "mechanism": "G",
+      "status": "MISSING_GATE",
+      "measured": "no [G] cell implemented",
+      "detail": "Contract status: **MISSING (resolution half)** — deterministic matrix flags conflicts; `INDETERMINATE` → \"Flag for Phase 2 / human review\" (`phase1_executor.py` run_sync); resolution prose exists only inside the single global P1C-03 synthesis call.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-07",
+      "title": "Business alignment",
+      "mechanism": "G",
+      "status": "MISSING_GATE",
+      "measured": "no [G] cell implemented",
+      "detail": "Contract status: **MISSING** — business objectives are not a gated anchor set.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-08",
+      "title": "Traceability",
+      "mechanism": "G",
+      "status": "SKIPPED",
+      "measured": "no rendered docs",
+      "detail": "OBJ-08 skipped because no rendered docs were found.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-09",
+      "title": "No fabrication",
+      "mechanism": "G",
+      "status": "SKIPPED",
+      "measured": "no rendered docs",
+      "detail": "OBJ-09 skipped because no rendered docs were found.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-10",
+      "title": "Internal consistency",
+      "mechanism": "G",
+      "status": "MISSING_GATE",
+      "measured": "no [G] cell implemented",
+      "detail": "Contract status: **MISSING**.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-11",
+      "title": "Interpretive transparency",
+      "mechanism": "G",
+      "status": "MISSING_GATE",
+      "measured": "no [G] cell implemented",
+      "detail": "Contract status: **PARTIAL** — P1B-01/02 produce interpretations/rationale; ambiguity pairs are injected into MAP inputs as **data** but no spec mentions them (zero \"ambiguity\" references across the 5 specs) — the model may ignore them and no gate notices.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-12",
+      "title": "Fail-loud degradation",
+      "mechanism": "G",
+      "status": "SKIPPED",
+      "measured": "state.json not found",
+      "detail": "OBJ-12 skipped because state.json is missing.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-13",
+      "title": "Phase-2 actionability",
+      "mechanism": "G",
+      "status": "MISSING_GATE",
+      "measured": "no [G] cell implemented",
+      "detail": "Contract status: **MISSING** — `INDETERMINATE` rows carry no resolution context.",
+      "evidence": {}
+    },
+    {
+      "objective_id": "OBJ-14",
+      "title": "Reproducibility / comparability",
+      "mechanism": "H",
+      "status": "SKIPPED",
+      "measured": "human arbiter (H); out of scope",
+      "detail": "Contract status: **PARTIAL** — runs organized + quantization sidecars (CORR-111); no enforced sampling/version pinning contract.",
+      "evidence": {}
+    }
+  ]
+}
