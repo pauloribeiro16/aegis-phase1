@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import re
 import sys
 from pathlib import Path
@@ -96,16 +97,7 @@ def parse_args():
             "Strict mode: any [G] failure OR any regression vs the "
             "baseline (when --baseline is set) exits non-zero. Missing "
             "gates and unwired judges are reported but do not fail by "
-            "themselves (per OBJECTIVES_CONTRACT §2 status column). "
-            "Also sets AEGIS_GATE_MODE=hard (CORR-OBJ-00)."
-        ),
-    )
-    p.add_argument(
-        "--lenient",
-        action="store_true",
-        help=(
-            "Dev mode (CORR-OBJ-00): set AEGIS_GATE_MODE=warn so RefGate "
-            "violations are logged but do not fail."
+            "themselves (per OBJECTIVES_CONTRACT §2 status column)."
         ),
     )
     p.add_argument(
@@ -327,6 +319,13 @@ def check_run(
 
 def main():
     args = parse_args()
+    # CORR-OBJ-00: default to AEGIS_GATE_MODE=hard so RefGate violations
+    # fail the check; --lenient switches to warn (dev mode).
+    if getattr(args, "lenient", False):
+        os.environ.setdefault("AEGIS_GATE_MODE", "warn")
+    else:
+        os.environ.setdefault("AEGIS_GATE_MODE", "hard")
+    print(f"Gate mode: {os.environ['AEGIS_GATE_MODE']}")
     # Contract-driven scorecard mode (CORR-OBJ-Phase4). When --contract
     # is supplied, the scorecard is the primary artefact and the exit
     # code is driven by the no-regression rule. The legacy check_run

@@ -26,13 +26,12 @@ from pathlib import Path
 import pytest
 
 from aegis_phase1.runs.metadata import (
+    VALID_GATE_MODES,
     InvalidGateModeError,
     RunMetadata,
-    VALID_GATE_MODES,
     from_env,
     validate_gate_mode,
 )
-
 
 # ────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -41,21 +40,21 @@ from aegis_phase1.runs.metadata import (
 
 def _make_metadata(**overrides) -> RunMetadata:
     """Build a representative ``RunMetadata`` with sensible defaults."""
-    defaults = dict(
-        run_id="run-001",
-        case_id="case1-tinytask",
-        model="gemma4:e4b",
-        provider="ollama",
-        quantization="Q4_K_M",
-        spec_versions={
+    defaults = {
+        "run_id": "run-001",
+        "case_id": "case1-tinytask",
+        "model": "gemma4:e4b",
+        "provider": "ollama",
+        "quantization": "Q4_K_M",
+        "spec_versions": {
             "P1B-LLM-01-INTERPRETATION": "1.0.0",
             "P1B-LLM-02-RATIONALE": "1.0.0",
             "P1C-LLM-01-OVERLAP-CLASSIFICATION": "1.0.0",
         },
-        gate_mode="hard",
-        started_at="2026-09-03T10:00:00+00:00",
-        ended_at="2026-09-03T10:15:00+00:00",
-    )
+        "gate_mode": "hard",
+        "started_at": "2026-09-03T10:00:00+00:00",
+        "ended_at": "2026-09-03T10:15:00+00:00",
+    }
     defaults.update(overrides)
     return RunMetadata(**defaults)
 
@@ -143,7 +142,7 @@ def test_hash_avalanche_unrelated_to_equality():
     a = _make_metadata(run_id="run-001")
     b = _make_metadata(run_id="run-002")
     # Hashes should differ in many hex positions, not just the last.
-    differing = sum(1 for x, y in zip(a.hash(), b.hash()) if x != y)
+    differing = sum(1 for x, y in zip(a.hash(), b.hash(), strict=False) if x != y)
     assert differing >= 8, f"expected avalanche (>=8 chars differ), got {differing}"
 
 
@@ -356,13 +355,14 @@ def test_diff_fields_empty_for_identical():
 
 def test_valid_gate_modes_is_frozen_set():
     assert isinstance(VALID_GATE_MODES, frozenset)
-    assert VALID_GATE_MODES == frozenset({"warn", "hard"})
+    assert frozenset({"warn", "hard"}) == VALID_GATE_MODES
 
 
 def test_run_metadata_is_frozen():
     """Frozen dataclass — assignment must raise."""
+    import dataclasses
     m = _make_metadata()
-    with pytest.raises(Exception):  # FrozenInstanceError, but Exception is the parent
+    with pytest.raises(dataclasses.FrozenInstanceError):
         m.run_id = "x"  # type: ignore[misc]
 
 

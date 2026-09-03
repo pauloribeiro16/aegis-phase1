@@ -22,13 +22,11 @@ from __future__ import annotations
 
 import importlib
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-
 
 REPO = Path(__file__).resolve()
 for p in REPO.parents:

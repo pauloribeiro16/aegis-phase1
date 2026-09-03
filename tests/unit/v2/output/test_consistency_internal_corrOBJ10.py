@@ -18,10 +18,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 import pytest
-
 
 # ────────────────────────────────────────────────────────────────────
 # Synthetic case profile + renderer for tests
@@ -205,7 +203,7 @@ Summary text.
 - D-01.4 Data Protection context.
 - D-04.2 Access Control context.
 """
-    doc_06 = f"""# Clause Mapping Matrix
+    doc_06 = """# Clause Mapping Matrix
 
 | Subdomain | CSF | Clause |
 |-----------|-----|--------|
@@ -245,7 +243,7 @@ def _build_inconsistent_bundle(case_id: str) -> CaseBundle:
         SubdomainProfile(id="D-01.4", title="Data Protection", csf_anchor="PR.DS-01"),
         SubdomainProfile(id="D-04.2", title="Access Control", csf_anchor="PR.AC-01"),
     ]
-    doc_04 = f"""# Company Context Assessment
+    doc_04 = """# Company Context Assessment
 
 ## 3. STAKEHOLDER ANALYSIS (A1)
 
@@ -261,7 +259,7 @@ def _build_inconsistent_bundle(case_id: str) -> CaseBundle:
 """
     # Doc 06 omits D-04.2 and cites a CSF token (DE.CM-09) that is not
     # in Doc 04.
-    doc_06 = f"""# Clause Mapping Matrix
+    doc_06 = """# Clause Mapping Matrix
 
 | Subdomain | CSF | Clause |
 |-----------|-----|--------|
@@ -270,7 +268,7 @@ def _build_inconsistent_bundle(case_id: str) -> CaseBundle:
 | D-99.9 | DE.CM-09 | orphan |
 """
     # Doc 04d RACI has SH-99 that Doc 04 does not.
-    doc_04d = f"""# Roles & RACI
+    doc_04d = """# Roles & RACI
 
 ## 2. RACI Matrix
 

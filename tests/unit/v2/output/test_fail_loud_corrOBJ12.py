@@ -57,8 +57,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 REPO = Path(__file__).resolve()
 for p in REPO.parents:
     if (p / "src" / "aegis_phase1").is_dir():
@@ -66,11 +64,10 @@ for p in REPO.parents:
         break
 sys.path.insert(0, str(REPO / "src"))
 
-from aegis_phase1.v2.output._common import (
+from aegis_phase1.v2.output._common import (  # noqa: E402
     get_per_spec_markdown,
     render_per_spec_markdown_appendix,
 )
-
 
 # The 9 doc renderers in emit order. 8 of 9 call
 # render_per_spec_markdown_appendix at the end of their render

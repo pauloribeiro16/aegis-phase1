@@ -811,7 +811,7 @@ def _track_b_rationale(
 
 
 __all__ = [
-    "assemble_inputs",
-    "_load_case_assets",
     "_filter_assets_for_domain",
+    "_load_case_assets",
+    "assemble_inputs",
 ]

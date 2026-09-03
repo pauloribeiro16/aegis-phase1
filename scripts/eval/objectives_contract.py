@@ -33,10 +33,11 @@ import enum
 import json
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -148,17 +149,14 @@ def parse_objectives_contract(contract_path: Path | str) -> list[Objective]:
         # The "Objective" cell is a single sentence that may include a
         # bold "Title — detail" prefix. Take the part before the em-dash
         # as the canonical title (matches the contract's bold markup).
-        title = re.split(r"\s+[—–-]\s+", raw_objective, maxsplit=1)[0].strip()
+        title = re.split(r"\s+[—–-]\s+", raw_objective, maxsplit=1)[0].strip()  # noqa: RUF001
         # Strip trailing asterisks and surrounding whitespace.
         title = title.strip("* ").strip()
 
-        if "+" in marker:
-            # The contract allows "G+J" or "J+G". Default to G (the
-            # deterministic half) when both are present — the gate runs
-            # every run; the judge is sampled on top.
-            mechanism = Mechanism.GATE
-        else:
-            mechanism = Mechanism(marker)
+        # The contract allows "G+J" or "J+G". Default to G (the
+        # deterministic half) when both are present — the gate runs
+        # every run; the judge is sampled on top.
+        mechanism = Mechanism.GATE if "+" in marker else Mechanism(marker)
 
         objectives.append(
             Objective(
@@ -208,7 +206,7 @@ class ObjectiveResult:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ObjectiveResult":
+    def from_dict(cls, d: dict[str, Any]) -> ObjectiveResult:
         return cls(
             objective_id=d["objective_id"],
             title=d["title"],
@@ -240,7 +238,7 @@ class Scorecard:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Scorecard":
+    def from_dict(cls, d: dict[str, Any]) -> Scorecard:
         return cls(
             contract_path=d["contract_path"],
             case_id=d.get("case_id", ""),
@@ -267,7 +265,7 @@ class Scorecard:
     def to_markdown(self) -> str:
         """Render the scorecard as a GitHub-flavoured markdown table."""
         lines = [
-            f"# AEGIS Phase 1 Scorecard",
+            "# AEGIS Phase 1 Scorecard",
             "",
             f"- **Contract:** `{self.contract_path}`",
             f"- **Case:** `{self.case_id or 'unknown'}`",
@@ -311,7 +309,6 @@ def _ev_obj02_zero_omission(
         # Local import to avoid making PreprocCatalogLoader a hard dep
         # for the parser module.
         from scripts.eval.check_gate import (
-            _applicable_subdomains,
             check_subdomain_coverage,
         )
 
@@ -727,16 +724,16 @@ def diff_against_baseline(
 
 
 __all__ = [
-    "Mechanism",
-    "CellStatus",
     "EXPECTED_OBJECTIVE_COUNT",
+    "CellStatus",
+    "Mechanism",
     "Objective",
     "ObjectiveResult",
-    "Scorecard",
     "Regression",
+    "Scorecard",
+    "diff_against_baseline",
+    "load_baseline",
     "parse_objectives_contract",
     "run_scorecard",
     "save_baseline",
-    "load_baseline",
-    "diff_against_baseline",
 ]

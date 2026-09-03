@@ -38,10 +38,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any
-
 
 # The closed list of acceptable ``AEGIS_GATE_MODE`` values.
 # Anything else is rejected at run start so the no-regression rule
@@ -149,7 +148,7 @@ class RunMetadata:
 
     # Convenience aliases
 
-    def is_comparable_to(self, other: "RunMetadata") -> bool:
+    def is_comparable_to(self, other: RunMetadata) -> bool:
         """Return True iff this run is comparable to ``other``.
 
         Two runs are comparable iff they share case_id, model, provider,
@@ -167,7 +166,7 @@ class RunMetadata:
         )
 
     @staticmethod
-    def diff_fields(a: "RunMetadata", b: "RunMetadata") -> dict[str, tuple[Any, Any]]:
+    def diff_fields(a: RunMetadata, b: RunMetadata) -> dict[str, tuple[Any, Any]]:
         """Return a dict of fields that differ between ``a`` and ``b``.
 
         Useful for human review when ``is_comparable_to`` returns False.
@@ -222,9 +221,9 @@ def from_env(
 
 
 __all__ = [
-    "RunMetadata",
     "VALID_GATE_MODES",
     "InvalidGateModeError",
-    "validate_gate_mode",
+    "RunMetadata",
     "from_env",
+    "validate_gate_mode",
 ]

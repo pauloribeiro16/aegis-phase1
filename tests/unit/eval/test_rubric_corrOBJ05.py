@@ -24,20 +24,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from scripts.eval.rubric import (
     PROPORTIONALITY_BOUNDS,
     SCORECARD_LAYERS,
     ScorecardCell,
+    _count_words,
+    _proportionality_score,
+    _split_subdomain_sections,
     evaluate_obj05,
     obj05_proportionality_adequacy,
     read_enterprise_context,
-    _count_words,
-    _split_subdomain_sections,
-    _proportionality_score,
 )
-
 
 # ────────────────────────────────────────────────────────────────────
 # Fixtures
