@@ -7,9 +7,24 @@ Affirms:
   - 100% rendered sections tagged with [deterministic] or [LLM: ...]
   - 100% subdomain coverage across rendered Doc 04-07b (--check-coverage)
 
+CORR-OBJ-Phase4: this script is also the **single entry point** for the
+no-regression rule (per ``docs/OBJECTIVES_CONTRACT.md`` §5). When invoked
+with ``--contract``, it walks the 14 objectives table, runs the
+deterministic [G] gates and sampled [J] judge cells, and emits a
+per-objective scorecard. Missing gates and unwired judges are warned
+in non-strict mode; in ``--strict`` mode they are reported but the
+exit code is driven by:
+  * any [G] failure, and
+  * any regression vs ``--baseline PATH`` (per-objective status more
+    severe than the baseline).
+
 Usage:
+    # Legacy single-run mode (CORR-112 F4)
     python -m scripts.eval.check_gate --run-dir /path/to/run
-    python -m scripts.eval.check_gate --run-dir /path/to/run --check-coverage --preproc-root preproc_out
+    # Contract-driven scorecard (no-regression rule)
+    python -m scripts.eval.check_gate --run-dir /path/to/run --contract docs/OBJECTIVES_CONTRACT.md
+    python -m scripts.eval.check_gate --run-dir /path/to/run --contract ... --strict --baseline baseline.json
+    python -m scripts.eval.check_gate --run-dir /path/to/run --contract ... --strict --capture-baseline baseline.json
 """
 
 from __future__ import annotations
@@ -25,6 +40,9 @@ from typing import Any
 from aegis_phase1.prompts_v2.ref_gate import RefGate
 
 logger = logging.getLogger(__name__)
+
+# Default contract path (per OBJECTIVES_CONTRACT §2 — AEGIS-DOC-OBJ-001).
+DEFAULT_CONTRACT_PATH = Path("docs/OBJECTIVES_CONTRACT.md")
 
 
 # A subdomain ID matches "D-NN.M" (e.g. D-01.1). Used by the coverage
@@ -56,6 +74,73 @@ def parse_args():
         type=float,
         default=100.0,
         help="Minimum subdomain coverage %% required for the check to pass (default: 100.0).",
+    )
+    # ────────────────────────────────────────────────────────────────
+    # CORR-OBJ-Phase4: contract-driven scorecard flags
+    # ────────────────────────────────────────────────────────────────
+    p.add_argument(
+        "--contract",
+        required=False,
+        type=Path,
+        default=None,
+        help=(
+            "Path to OBJECTIVES_CONTRACT.md. When provided, check_gate runs "
+            "the per-objective scorecard (14 objectives) and applies the "
+            "no-regression rule per OBJECTIVES_CONTRACT §5."
+        ),
+    )
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "Strict mode: any [G] failure OR any regression vs the "
+            "baseline (when --baseline is set) exits non-zero. Missing "
+            "gates and unwired judges are reported but do not fail by "
+            "themselves (per OBJECTIVES_CONTRACT §2 status column)."
+        ),
+    )
+    p.add_argument(
+        "--baseline",
+        required=False,
+        type=Path,
+        default=None,
+        help=(
+            "Path to a baseline scorecard JSON (saved by a previous "
+            "run via --capture-baseline). In --strict mode, any [G] "
+            "regression against the baseline exits 2."
+        ),
+    )
+    p.add_argument(
+        "--capture-baseline",
+        required=False,
+        type=Path,
+        default=None,
+        help=(
+            "Path to write the current run's scorecard JSON as the "
+            "baseline. Used to bootstrap the no-regression rule on the "
+            "first validation run. Conflicts with --baseline."
+        ),
+    )
+    p.add_argument(
+        "--output",
+        required=False,
+        type=Path,
+        default=None,
+        help="Path to write the scorecard JSON (in addition to stdout).",
+    )
+    p.add_argument(
+        "--case-id",
+        required=False,
+        type=str,
+        default="",
+        help="Optional case_id tag for the scorecard (e.g. case1-tinytask).",
+    )
+    p.add_argument(
+        "--run-id",
+        required=False,
+        type=str,
+        default="",
+        help="Optional run_id tag for the scorecard.",
     )
     return p.parse_args()
 
@@ -233,6 +318,25 @@ def check_run(
 
 def main():
     args = parse_args()
+    # Contract-driven scorecard mode (CORR-OBJ-Phase4). When --contract
+    # is supplied, the scorecard is the primary artefact and the exit
+    # code is driven by the no-regression rule. The legacy check_run
+    # still runs underneath so a single invocation covers both legacy
+    # checks and the new scorecard.
+    if args.contract is not None:
+        code = run_scorecard_check(
+            args.run_dir,
+            contract_path=args.contract,
+            state_json=args.state_json,
+            preproc_root=args.preproc_root,
+            case_id=args.case_id,
+            run_id=args.run_id,
+            strict=args.strict,
+            baseline_path=args.baseline,
+            capture_baseline_path=args.capture_baseline,
+            output_path=args.output,
+        )
+        sys.exit(code)
     code = check_run(
         args.run_dir,
         args.state_json,
@@ -241,6 +345,145 @@ def main():
         coverage_min_pct=args.coverage_min_pct,
     )
     sys.exit(code)
+
+
+# ────────────────────────────────────────────────────────────────────
+# CORR-OBJ-Phase4: contract-driven scorecard entry point
+# ────────────────────────────────────────────────────────────────────
+
+
+def run_scorecard_check(
+    run_dir: Path,
+    *,
+    contract_path: Path,
+    state_json: Path | None = None,
+    preproc_root: Path | None = None,
+    case_id: str = "",
+    run_id: str = "",
+    strict: bool = False,
+    baseline_path: Path | None = None,
+    capture_baseline_path: Path | None = None,
+    output_path: Path | None = None,
+) -> int:
+    """Run the contract-driven per-objective scorecard against a run.
+
+    This is the **single entry point** for the no-regression rule
+    (OBJECTIVES_CONTRACT §5). Behaviour:
+
+    * Parses the 14 objectives from ``contract_path`` (markdown table).
+    * Runs the registered [G] / [J] cells.
+    * Emits a per-objective scorecard to stdout AND ``--output PATH``.
+    * In ``strict`` mode: any [G] failure OR regression vs ``--baseline``
+      exits non-zero (exit code 2 for regressions, 1 for failures).
+    * ``--capture-baseline PATH`` saves the current scorecard as JSON
+      and returns 0 regardless of failures (the bootstrap path).
+
+    Returns 0 on success, 1 on [G] failure, 2 on regression.
+    """
+    if baseline_path is not None and capture_baseline_path is not None:
+        print("❌ --baseline and --capture-baseline are mutually exclusive", file=sys.stderr)
+        return 1
+
+    # Local import to avoid a hard dependency for users who only run
+    # the legacy single-run checks.
+    from scripts.eval.objectives_contract import (
+        EXPECTED_OBJECTIVE_COUNT,
+        CellStatus,
+        diff_against_baseline,
+        load_baseline,
+        parse_objectives_contract,
+        run_scorecard,
+        save_baseline,
+    )
+
+    print(f"=== AEGIS Phase 1 scorecard for {run_dir} ===")
+    print(f"  contract: {contract_path}")
+    if strict:
+        print("  mode: STRICT (any [G] failure or regression fails the run)")
+    else:
+        print("  mode: NON-STRICT (missing gates warn; only hard failures exit non-zero)")
+
+    objectives = parse_objectives_contract(contract_path)
+    if not objectives:
+        print(f"❌ No objectives parsed from {contract_path}.", file=sys.stderr)
+        return 1
+    print(f"  parsed {len(objectives)} objectives (expected {EXPECTED_OBJECTIVE_COUNT})")
+
+    scorecard = run_scorecard(
+        run_dir,
+        objectives,
+        case_id=case_id,
+        run_id=run_id,
+        state_json=state_json,
+        preproc_root=preproc_root,
+    )
+    scorecard.contract_path = str(contract_path)
+
+    # Print per-objective verdict to stdout.
+    print()
+    print(scorecard.to_markdown())
+    print(
+        f"Summary: {scorecard.n_pass()} PASS / {scorecard.n_fail()} FAIL / "
+        f"{scorecard.n_missing()} MISSING / {scorecard.n_skipped()} SKIPPED / "
+        f"{scorecard.n_total()} total"
+    )
+
+    # Optionally write JSON.
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(scorecard.to_dict(), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"  scorecard JSON written to {output_path}")
+
+    # Capture-baseline path: bootstrap the no-regression rule.
+    if capture_baseline_path is not None:
+        save_baseline(scorecard, capture_baseline_path)
+        print(f"  baseline captured to {capture_baseline_path}")
+        return 0
+
+    # Regression check (only when a baseline is supplied).
+    regression_exit_code = 0
+    if baseline_path is not None:
+        if not baseline_path.exists():
+            print(
+                f"❌ baseline {baseline_path} not found. "
+                f"Use --capture-baseline on the first run.",
+                file=sys.stderr,
+            )
+            return 1
+        baseline = load_baseline(baseline_path)
+        regressions = diff_against_baseline(scorecard, baseline)
+        if regressions:
+            print()
+            print(f"❌ {len(regressions)} regression(s) vs baseline {baseline_path}:")
+            for r in regressions:
+                print(
+                    f"   - {r.objective_id} ({r.title}): "
+                    f"{r.baseline_status} → {r.current_status}"
+                )
+            regression_exit_code = 2
+        else:
+            print(f"  0 regressions vs baseline {baseline_path}")
+
+    # Decide exit code.
+    fail_results = [r for r in scorecard.results if r.status == CellStatus.FAIL]
+    error_results = [r for r in scorecard.results if r.status == CellStatus.ERROR]
+
+    if strict:
+        if regression_exit_code != 0:
+            return regression_exit_code
+        if fail_results:
+            return 1
+        if error_results:
+            return 1
+        return 0
+
+    # Non-strict: hard-fail on FAIL/ERROR only (missing gates warn).
+    if fail_results or error_results:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
