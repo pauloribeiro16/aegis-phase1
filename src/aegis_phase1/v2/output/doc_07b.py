@@ -33,7 +33,6 @@ from typing import Any
 from aegis_phase1.prompts_v2.track_b import TrackB
 from aegis_phase1.v2.output._common import (
     doc_preamble,
-    generate_frontmatter,
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
@@ -546,9 +545,19 @@ def _not_covered_index(state: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return out
 
 
+def _normalize_reg(reg: str) -> str:
+    r = str(reg).strip()
+    if r.upper() in {"AI_ACT", "AIACT", "AI ACT"}:
+        return "AI_Act"
+    if r.upper() in {"NIS_2", "NIS 2", "NIS2"}:
+        return "NIS2"
+    return r.upper()
+
+
 def _applicable_list(state: dict[str, Any]) -> list[str]:
     ctx = state.get("company_context")
-    return [str(r).upper() for r in (_safe_attr(ctx, "applicable_regs", default=[]) or [])]
+    regs = _safe_attr(ctx, "applicable_regs", default=[]) or []
+    return sorted([_normalize_reg(r) for r in regs if r])
 
 
 def _cross_check_rows(
@@ -822,8 +831,8 @@ def _build_frontmatter(state: dict[str, Any], applicable: list[str]) -> str:
             "14_Architectural_Nodes.md",
         ],
         "applicable_regs": list(applicable),
-        "scale": getattr(ctx, "scale", "-") if ctx else "-",
-        "security_fte": getattr(ctx, "security_fte", 0) if ctx else 0,
+        "scale": _safe_attr(ctx, "scale", "-"),
+        "security_fte": _safe_attr(ctx, "security_fte", 0),
         "related_documents": [
             "04_Company_Context_Assessment.md",
             "05_Regulatory_Applicability.md",

@@ -509,7 +509,7 @@ def _section_methodology(state: dict[str, Any]) -> list[str]:
         + f"{tier_template['maturity']['default_min']}). "
         + f"Proportional language: tier={tier} ({tier_template.get('scope', '-')}). "
         + "Active Layer 0 scope is aligned with active "
-        + f"GDPR/CRA SubDomains fit criteria (applicable_regs = "
+        + "GDPR/CRA SubDomains fit criteria (applicable_regs = "
         + f"{applicable_text}).\n"
     )
     parts.append(
@@ -616,10 +616,10 @@ def _section_adapted_objective_placeholder(
     )
     parts.append("")
     parts.append(
-        f"_(per-domain LLM response not rendered here in S3b — see "
-        f"**§3b LLM Source — P1C-LLM-01 Overlap Classification** for "
-        f"the raw concatenated spec markdown, or the **Appendix** "
-        f"for the full per-spec dump)_"
+        "_(per-domain LLM response not rendered here in S3b — see "
+        "**§3b LLM Source — P1C-LLM-01 Overlap Classification** for "
+        "the raw concatenated spec markdown, or the **Appendix** "
+        "for the full per-spec dump)_"
     )
     parts.append("")
     return "\n".join(parts)

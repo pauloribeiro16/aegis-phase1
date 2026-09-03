@@ -40,7 +40,6 @@ from aegis_phase1.v2.context.applicability_context import (
 )
 from aegis_phase1.v2.output._common import (
     doc_preamble,
-    generate_frontmatter,
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
@@ -1191,4 +1190,4 @@ def _safe_value(value: Any) -> str:
     return text
 
 
-__all__ = ["render_doc_05", "_render_rationale_by_reg_section"]
+__all__ = ["_render_rationale_by_reg_section", "render_doc_05"]

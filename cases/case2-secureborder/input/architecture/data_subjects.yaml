@@ -1,0 +1,22 @@
+# Data Subjects (Case 02 — SecureBorder Solutions)
+data_subjects:
+  - id: SUBJ-01
+    category: "Schengen Travellers"
+    data_types: ["Passport MRZ", "Facial Biometric Template", "Match Decision Audit Metadata"]
+    legal_basis: "Art. 9(2)(g) GDPR (Substantial public interest / government mandate)"
+    erasure_mechanism: "Automatic purge from edge cache within seconds post-match"
+  - id: SUBJ-02
+    category: "EU Employees"
+    data_types: ["Employment records", "Performance", "Salaries", "Benefits", "Training records"]
+    legal_basis: "Art. 6(1)(b) GDPR (Contract performance)"
+    erasure_mechanism: "HR-driven per NL statutory 7-year retention schedule"
+  - id: SUBJ-03
+    category: "Job Applicants"
+    data_types: ["CV", "Interview notes", "References"]
+    legal_basis: "Art. 6(1)(a)/(b) GDPR"
+    erasure_mechanism: "Auto-purge 4 weeks after process closure"
+  - id: SUBJ-04
+    category: "External Contractors & Vendors"
+    data_types: ["Contract details", "Building & system access logs", "Payment metadata"]
+    legal_basis: "Art. 6(1)(b)/(c) GDPR"
+    erasure_mechanism: "Per contract terms + 7-year tax retention"

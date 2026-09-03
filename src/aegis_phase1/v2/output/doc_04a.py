@@ -37,7 +37,6 @@ from typing import Any
 from aegis_phase1.data.loader import classify_tier
 from aegis_phase1.v2.output._common import (
     doc_preamble,
-    get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
     write_output,

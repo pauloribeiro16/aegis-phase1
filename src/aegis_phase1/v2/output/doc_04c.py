@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -468,7 +467,7 @@ def _section_gate(state: dict[str, Any]) -> list[str]:
     parts.append("## 8. Gate\n")
     inv = state.get("architecture_inventory") or {}
     cloud = inv.get("cloud_services") or []
-    has_overlaps = bool(((state.get("ontology") or {}).get("overlaps") or []))
+    has_overlaps = bool((state.get("ontology") or {}).get("overlaps") or [])
     parts.append(
         markdown_table(
             ["Gate Criterion", "Status", "Evidence"],

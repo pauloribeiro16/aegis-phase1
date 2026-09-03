@@ -92,9 +92,9 @@ class ManifestDriftError(RuntimeError):
         )
 
 
-# Default root (relative to the repo root). Tests can inject a
-# different path via ``ManifestLoader(manifests_root=...)``.
-DEFAULT_MANIFESTS_ROOT = Path("Methodology-main/00_METHODOLOGY/PREPROCESSING_by_domain/domains")
+_cand_manifest_1 = Path("Methodology-main/00_METHODOLOGY/PREPROCESSING_by_domain/domains")
+_cand_manifest_2 = Path("../Methodology-main/00_METHODOLOGY/PREPROCESSING_by_domain/domains")
+DEFAULT_MANIFESTS_ROOT = _cand_manifest_1 if _cand_manifest_1.exists() else _cand_manifest_2
 
 # The 3 ai_act states allowed by the schema (see STRUCTURE_REFERENCE.md
 # §3: "absent" | "partial" | "present"). Anything else is coerced to
