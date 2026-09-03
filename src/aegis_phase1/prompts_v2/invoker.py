@@ -47,6 +47,7 @@ from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
 from aegis_phase1.prompts_v2.robust_parser import RobustParser
 from aegis_phase1.prompts_v2.validator import Phase1Validator
 from aegis_phase1.validator import ContentValidator
+from aegis_phase1.prompts_v2.ref_gate import RefGate, GateResult
 
 # CORR-048: module-level logger. Required for the prompt truncation
 # warning (line ~250) and any other logger calls in this file.
@@ -158,7 +159,7 @@ class Phase1LLMInvoker:
     DEFAULT_MODEL = "gemma4:e4b"  # CORR-056 (2026-07-23): switched from gemma4:e2b
     DEFAULT_BASE_URL = "http://localhost:11434"
     DEFAULT_TIMEOUT = 180  # 3 min for local inference
-    DEFAULT_MAX_RETRIES = 2
+    DEFAULT_MAX_RETRIES = 3
     DEFAULT_TEMPERATURE = 0.0
 
     def __init__(
@@ -182,6 +183,7 @@ class Phase1LLMInvoker:
         # validation (legacy path; the source lives in
         # _archive/corr061/validator.py).
         self.validator = validator if validator is not None else ContentValidator()
+        self.ref_gate = RefGate(catalog_root=getattr(catalog_loader, "root", None) if catalog_loader else None)
         self.llm_logger = llm_logger
         self.format_logger = format_logger
         self.model = model or self.DEFAULT_MODEL
@@ -349,16 +351,31 @@ class Phase1LLMInvoker:
         all_attempts: list[dict[str, Any]] = []
         total_start = time.time()
 
+        feedback_instructions: str | None = None
+        previous_raw: str | None = None
+
         for attempt in range(1, max_retries + 1):
+            attempt_inputs = dict(inputs)
+            if feedback_instructions:
+                attempt_inputs["feedback_prompt"] = feedback_instructions
+                if previous_raw:
+                    attempt_inputs["previous_response"] = previous_raw
+
             attempt_result = self._attempt(
                 spec_id=spec_id,
-                inputs=inputs,
+                inputs=attempt_inputs,
                 invocation_pattern=invocation_pattern,
                 stage=stage,
                 attempt=attempt,
                 config=config,
             )
             all_attempts.append(attempt_result)
+
+            if not attempt_result["ok"]:
+                gate_res = attempt_result.get("gate_result")
+                if gate_res and not gate_res.valid:
+                    feedback_instructions = gate_res.feedback
+                    previous_raw = attempt_result.get("raw_response")
 
             if attempt_result["ok"]:
                 # CORR-061 S3b: capture the raw markdown response to
@@ -707,6 +724,22 @@ class Phase1LLMInvoker:
                             spec_id, output, inputs
                         )
 
+            # CORR-112 F3: RefGate deterministic validation
+            gate_mode = os.getenv("AEGIS_GATE_MODE", "warn").lower()
+            gate_result = self.ref_gate.validate(spec_id, raw, inputs=inputs)
+            gate_valid = gate_result.valid
+
+            if not gate_valid:
+                logger.warning(
+                    "CORR-112 RefGate detected violations for %s (mode=%s): %s",
+                    spec_id, gate_mode, [v.rule for v in gate_result.violations]
+                )
+                if gate_mode == "hard":
+                    validation_result["valid"] = False
+                    validation_result.setdefault("errors", []).append(
+                        f"RefGate violations: {gate_result.feedback}"
+                    )
+
             # Token usage (best-effort; Ollama may not always expose it)
             usage = self._extract_usage(response)
 
@@ -770,6 +803,7 @@ class Phase1LLMInvoker:
                 "parse_status": "PARSED",
                 "parsed_output": output,
                 "validation": validation_result,
+                "gate_result": gate_result,
                 "latency_ms": latency_ms,
                 "usage": usage,
                 # CORR-061 S3b: thread the raw markdown response back
