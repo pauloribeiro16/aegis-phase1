@@ -34,15 +34,17 @@ if [ $# -lt 1 ]; then
   exit 2
 fi
 MODEL="$1"
+CASE="${2:-cases/case1-tinytask}"
 MODEL_SLUG="${MODEL//[:.]/_}"
-RUN_LOG="$LOG_DIR/run_all_${MODEL_SLUG}_${SLURM_JOB_ID}.log"
+CASE_SLUG="$(basename "$CASE")"
+RUN_LOG="$LOG_DIR/run_all_${CASE_SLUG}_${MODEL_SLUG}_${SLURM_JOB_ID}.log"
 exec >>"$RUN_LOG" 2>&1
 
 echo "=================================================="
 echo " JOB $SLURM_JOB_ID STARTED: $(date)"
 echo " Model : $MODEL (1x A100-80, 4h, full --run-all)"
 echo " Node  : $(hostname)"
-echo " Case  : case1-tinytask"
+echo " Case  : $CASE"
 echo " Gate  : AEGIS_GATE_MODE=hard"
 echo " Log   : $RUN_LOG"
 echo "=================================================="
@@ -110,7 +112,7 @@ mkdir -p "$OUT_DIR"
 echo ""
 echo "=== running full pipeline (--run-all) with AEGIS_GATE_MODE=hard ==="
 python -m aegis_phase1.v2.runner \
-    --case cases/case1-tinytask \
+    --case "$CASE" \
     --model "$MODEL" \
     --provider ollama \
     --run-all \
