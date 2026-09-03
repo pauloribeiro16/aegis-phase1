@@ -248,42 +248,86 @@ def find_manifest(
 def detect_ollama_quantization(model: str) -> str:
     """Best-effort quant probe for an Ollama model — never raises.
 
-    Calls ``ollama show <model> --json`` and looks for a "quantization" or
-    "format" field. Falls back to 'unknown' on every error.
+    Calls ``ollama show <model> --json`` (graphify 0.32.13+) and looks for a
+    "quantization" or "format" field. Falls back to parsing plain
+    ``ollama show <model>`` text output (cluster-shipped 0.31.1 only
+    ships text output, not JSON — see skill `hpc-deucalion` lines 86-87).
 
-    Optional: callers can pass AEGIS_QUANT_NO_PROBE=1 to skip subprocess entirely.
+    Returns ``'unknown'`` on every error so the pipeline keeps moving.
+
+    Optional: callers can pass ``AEGIS_QUANT_NO_PROBE=1`` to skip
+    subprocess entirely.
     """
     if os.environ.get("AEGIS_QUANT_NO_PROBE", "0") == "1":
         return "unknown"
+
+    # Path 1: --json (newer Ollama)
     try:
         out = subprocess.run(
             ["ollama", "show", model, "--json"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+        if out.returncode == 0 and out.stdout.strip().startswith("{"):
+            try:
+                data = json.loads(out.stdout)
+            except json.JSONDecodeError:
+                data = None
+            if isinstance(data, dict):
+                info = data.get("model_info", {}) or {}
+                for key in (
+                    "general.quantization_version",
+                    "quantization",
+                    "general.file_type",
+                    "format",
+                ):
+                    v = info.get(key) or data.get(key)
+                    if isinstance(v, str) and v.strip():
+                        return _normalize_quant_tag(v)
+                family = info.get("general.architecture")
+                if family:
+                    return _normalize_quant_tag(family)
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+
+    # Path 2: plain text output (cluster-shipped 0.31.1).
+    # The text contains a line like: ``    quantization        Q4_K_M    ``
+    # inside the "Model" section. Parse it line-by-line; bail out on
+    # anything that doesn't match the simple shape.
+    try:
+        out = subprocess.run(
+            ["ollama", "show", model],
             capture_output=True, text=True, timeout=10, check=False,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return "unknown"
     if out.returncode != 0:
         return "unknown"
-    try:
-        data = json.loads(out.stdout)
-    except json.JSONDecodeError:
-        return "unknown"
-    # `ollama show --json` returns dict with model_info + details; quant is in model_info
-    info = data.get("model_info", {}) if isinstance(data, dict) else {}
-    for key in (
-        "general.quantization_version",
-        "quantization",
-        "general.file_type",
-        "format",
-    ):
-        v = info.get(key) or data.get(key)
-        if isinstance(v, str) and v.strip():
-            return _normalize_quant_tag(v)
-    # last resort — sometimes model_info has "general.architecture" + size fingerprint
-    family = info.get("general.architecture")
-    if family:
-        return _normalize_quant_tag(family)
-    return "unknown"
+    quant = _parse_ollama_show_text(out.stdout)
+    return _normalize_quant_tag(quant) if quant else "unknown"
+
+
+def _parse_ollama_show_text(text: str) -> str:
+    """Return the quantization tag from plain-text ``ollama show`` output.
+
+    Looks for ``  quantization        <TAG>  `` in the ``Model`` section.
+    Returns ``""`` if no match.
+    """
+    in_model_section = False
+    for line in text.splitlines():
+        if line.strip().lower().startswith("model"):
+            in_model_section = True
+            continue
+        if in_model_section and line.strip() and not line.startswith((" ", "\t")):
+            # Left-aligned non-indented line ends the Model section.
+            in_model_section = False
+        if not in_model_section:
+            continue
+        stripped = line.strip()
+        if stripped.lower().startswith("quantization"):
+            parts = stripped.split()
+            if len(parts) >= 2:
+                return parts[-1]
+    return ""
 
 
 def build_from_ollama_pull(

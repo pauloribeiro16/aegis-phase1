@@ -22,16 +22,22 @@
 #   - Override OLLAMA_BIN if your cluster wraps ollama under a different path.
 
 #SBATCH --job-name=aegis-pull-ollama-quant
-#SBATCH --account=f202512235cpcaa1g
-#SBATCH --partition=login
+# Account is the canonical x86 account on Deucalion (skill: DEUCALION_ACCOUNT_X86).
+# `dev-x86` is the CPU partition paired with that account; GPU accounts (…G) are
+# rejected. Egress is needed for `ollama pull` — compute nodes do NOT have it,
+# so the script's normal usage is via SSH on the login node (`bash -lc`),
+# not sbatch. sbatch is kept here as a fallback for users who want to queue.
+#SBATCH -A F202512235CPCAA1X
+#SBATCH --partition=dev-x86
 #SBATCH --qos=normal
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=4G
 #SBATCH --time=02:00:00
-#SBATCH --output=slurm-aegis-pull-ollama-quant-%j.out
-#SBATCH --error=slurm-aegis-pull-ollama-quant-%j.err
+#SBATCH --chdir=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1
+#SBATCH --output=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-aegis-pull-ollama-quant-%j.out
+#SBATCH --error=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-aegis-pull-ollama-quant-%j.err
 
 set -euo pipefail
 set -x
@@ -40,23 +46,40 @@ umask 077
 : "${OLLAMA_MODEL:?OLLAMA_MODEL must be set (e.g. qwen3.5:27b)}"
 : "${OLLAMA_BIN:=/projects/F202512235CPCAA1/CyberMetric_Deucalion/bin/ollama}"
 : "${OLLAMA_PULL_TIMEOUT:=1800}"  # 30 min per model
-: "${AEGIS_QUANT_MANIFEST_ROOT:=${HOME}/aegis_quant_manifests}"
+# Default to a project-shared dir on Lustre. The user's $HOME has a tight
+# quota (DISK QUOTA EXCEEDED, confirmed 2026-09-03), so writing to it
+# fails with errno 122. The project dir has 39 GB free.
+: "${AEGIS_QUANT_MANIFEST_ROOT:=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-quant-manifests}"
+mkdir -p "${AEGIS_QUANT_MANIFEST_ROOT}" || true
 export AEGIS_QUANT_MANIFEST_ROOT
 
 echo "[pull] ollama=${OLLAMA_BIN}  model=${OLLAMA_MODEL}"
 echo "[pull] manifest_root=${AEGIS_QUANT_MANIFEST_ROOT}"
+echo "[pull] job_id=${AEGIS_JOB_ID:-${SLURM_JOB_ID:-unknown}}"
 
 # --- 1) pull (skipped if already present) ---
+# NOTE: compute nodes (dev-x86, dev-a100-*) have NO egress to
+# registry.ollama.ai. Use a login node shell, NOT sbatch, when pulling a
+# NEW model. For models already in the shared cache the no-op path below
+# works on any node — but the sidecar-write step ALWAYS succeeds (helper
+# records `provider_default` when it can't probe; see CORR-111).
 if "${OLLAMA_BIN}" show "${OLLAMA_MODEL}" >/dev/null 2>&1; then
     echo "[pull] already present — skipping download"
 else
-    echo "[pull] ollama pull ${OLLAMA_MODEL}"
-    timeout "${OLLAMA_PULL_TIMEOUT}" "${OLLAMA_BIN}" pull "${OLLAMA_MODEL}"
+    echo "[pull] ollama pull ${OLLAMA_MODEL}  (egress needed — use login node)"
+    timeout "${OLLAMA_PULL_TIMEOUT}" "${OLLAMA_BIN}" pull "${OLLAMA_MODEL}" || {
+        echo "[pull] WARN: pull failed (rc=$?); recording manifest anyway with provider_default"
+    }
 fi
 
 # --- 2) record sidecar via the Phase-1 helper ---
-# Reuse the project's venv python so we don't depend on system packages.
-PYTHON=${PYTHON:-${HOME}/Área\ de\ Trabalho/projects/aegis-phase1/.venv/bin/python}
+# Use the project's venv python (per-project venv rule — skill hpc-deucalion).
+PRJ=${PRJ:-/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1}
+PYTHON="${PRJ}/.venv/bin/python"
+if [[ ! -x "${PYTHON}" ]]; then
+    echo "[pull] ERROR: venv python missing at ${PYTHON} — fix PRJ or run: python -m venv ${PRJ}/.venv"
+    exit 1
+fi
 # shellcheck disable=SC2086
 "${PYTHON}" - <<PYEOF
 import os, json

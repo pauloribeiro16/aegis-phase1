@@ -251,6 +251,72 @@ def test_detect_ollama_parses_quantization_key(tmp_manifest_root: Path) -> None:
         assert qm.detect_ollama_quantization("x") == "q4_k_m"
 
 
+def test_detect_ollama_parses_show_text(tmp_manifest_root: Path) -> None:
+    """Cluster-shipped Ollama 0.31.1 has no ``--json`` — fall back to
+    parsing the plain text output (CORR-111 lesson, 2026-09-03).
+    """
+    text = (
+        "  Model\n"
+        "    architecture        gemma4\n"
+        "    parameters          31.3B\n"
+        "    quantization        Q4_K_M\n"
+        "    requires            0.20.0\n\n"
+        "  Capabilities\n"
+        "    completion\n"
+    )
+    fake = subprocess.CompletedProcess(args=[], returncode=0, stdout=text, stderr="")
+    with patch("subprocess.run", return_value=fake):
+        assert qm.detect_ollama_quantization("gemma4:31b") == "q4_k_m"
+
+
+def test_detect_ollama_text_no_quantization_section(tmp_manifest_root: Path) -> None:
+    """No quantization line in the show output → unknown."""
+    fake = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout="  Model\n    architecture gemma4\n", stderr=""
+    )
+    with patch("subprocess.run", return_value=fake):
+        assert qm.detect_ollama_quantization("gemma4:31b") == "unknown"
+
+
+def test_detect_ollama_falls_back_to_text_when_json_fails(tmp_manifest_root: Path) -> None:
+    """First call returns rc=0 but non-JSON text → second call parses text."""
+    calls = {"n": 0}
+
+    def fake_run(cmd, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0,
+                stdout="Model\n  architecture gemma4\n  parameters 31B\n",
+                stderr="",
+            )
+        return subprocess.CompletedProcess(
+            args=cmd, returncode=0,
+            stdout="Model\n  quantization Q4_K_M\n",
+            stderr="",
+        )
+
+    with patch("subprocess.run", side_effect=fake_run):
+        assert qm.detect_ollama_quantization("gemma4:31b") == "q4_k_m"
+        assert calls["n"] == 2
+
+
+def test_parse_ollama_show_text_extracts_quant(tmp_manifest_root: Path) -> None:
+    text = (
+        "  Model\n"
+        "    architecture        gemma4\n"
+        "    quantization        q8_0\n"
+        "    requires            0.20.0\n\n"
+        "  Capabilities\n"
+    )
+    assert qm._parse_ollama_show_text(text) == "q8_0"
+
+
+def test_parse_ollama_show_text_returns_empty_when_missing(tmp_manifest_root: Path) -> None:
+    assert qm._parse_ollama_show_text("") == ""
+    assert qm._parse_ollama_show_text("  Capabilities\n    completion\n") == ""
+
+
 def test_build_from_ollama_pull_uses_probe_when_successful(tmp_manifest_root: Path) -> None:
     with patch.object(qm, "detect_ollama_quantization", return_value="q4_k_m"):
         m = qm.build_from_ollama_pull(model="qwen3.5:27b")

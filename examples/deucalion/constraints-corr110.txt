@@ -1,0 +1,35 @@
+# AEGIS-KG CORR-110 — version pins for vLLM on Deucalion
+#
+# Why this file exists (proved 2026-09-02 locally + JOB 1871385 on cluster):
+#
+#   `pip install vllm==0.10.0` with no upper-bound on `transformers`
+#   resolves to 5.x. vLLM 0.10.0's `get_tokenizer` calls
+#   `tokenizer.all_special_tokens_extended` — removed in transformers 5.x.
+#   vLLM 0.10.0 then dies at startup with:
+#
+#       AttributeError: Qwen2Tokenizer has no attribute all_special_tokens_extended
+#
+#   The fix is to pin transformers to a 4.x that the vLLM 0.10.0 release
+#   was tested against. 4.55.2 was verified locally (Docker python:3.12-slim):
+#
+#       pip install "vllm==0.10.0" -c constraints-corr110.txt
+#       python -c 'from vllm.transformers_utils.tokenizer import get_tokenizer; \
+#                  get_tokenizer("Qwen/Qwen2-0.5B")'   # OK
+#
+# Set:
+#   vllm                       0.10.0   (the only version with FP8 marlin + no need for rustc on Deucalion)
+#   transformers               4.55.2   (last release supporting all_special_tokens_extended)
+#   tokenizers                 0.21.4   (compatible with transformers 4.55.2; prevents the resolver from grabbing 0.23 which forces transformers>=5)
+#   huggingface_hub            0.36.2   (compatible with transformers 4.55.2; prevents the resolver from grabbing 1.x which forces transformers>=5)
+#   numpy                      2.2.6    (overrides the 1.x that vllm default-resolves to, breaks torch 2.7)
+#   torch                      2.7.1    (matches the Deucalion cluster's CUDA 12.8 wheel)
+
+vllm==0.10.0
+transformers==4.55.2
+tokenizers==0.21.4
+huggingface_hub==0.36.2
+numpy==2.2.6
+torch==2.7.1
+filelock==3.32.5
+requests==2.34.2
+packaging==26.3

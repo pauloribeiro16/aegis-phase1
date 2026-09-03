@@ -23,16 +23,21 @@
 #     `sbatch -p login`. (Cluster policy discovered 2026-09-02.)
 
 #SBATCH --job-name=aegis-stage-hf-quant
-#SBATCH --account=f202512235cpcaa1g
-#SBATCH --partition=login
+# -A F202512235CPCAA1X is the canonical x86 account on Deucalion.
+# Compute nodes have NO egress for HF download — this script must run on the
+# login node (`bash`, NOT sbatch) or on the dev-x86 partition. The default
+# below lets you sbatch it; for interactive pulls prefer login node.
+#SBATCH -A F202512235CPCAA1X
+#SBATCH --partition=dev-x86
 #SBATCH --qos=normal
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --time=06:00:00
-#SBATCH --output=slurm-aegis-stage-hf-quant-%j.out
-#SBATCH --error=slurm-aegis-stage-hf-quant-%j.err
+#SBATCH --chdir=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1
+#SBATCH --output=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-aegis-stage-hf-quant-%j.out
+#SBATCH --error=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1/slurm-aegis-stage-hf-quant-%j.err
 
 set -euo pipefail
 set -x
@@ -42,7 +47,9 @@ umask 077
 : "${HF_QUANT:=bf16}"
 : "${HF_TOKEN:=}"
 : "${HF_STAGING_ROOT:=/projects/F202512235CPCAA1/CyberMetric_Deucalion/models/hf}"
-: "${AEGIS_QUANT_MANIFEST_ROOT:=${HOME}/aegis_quant_manifests}"
+# See pull-ollama-model-aegis.sbatch for why $HOME is not used.
+: "${AEGIS_QUANT_MANIFEST_ROOT:=/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-quant-manifests}"
+mkdir -p "${AEGIS_QUANT_MANIFEST_ROOT}" || true
 export AEGIS_QUANT_MANIFEST_ROOT
 
 LOCAL_DIR="${HF_STAGING_ROOT}/$(echo "${HF_REPO}" | tr '/' '_')"
@@ -66,7 +73,12 @@ if [[ ! -f "${CONFIG_JSON}" ]]; then
 fi
 
 # --- 3) record sidecar ---
-PYTHON=${PYTHON:-${HOME}/Área\ de\ Trabalho/projects/aegis-phase1/.venv/bin/python}
+PRJ=${PRJ:-/projects/F202512235CPCAA1/CyberMetric_Deucalion/aegis-phase1}
+PYTHON="${PRJ}/.venv/bin/python"
+if [[ ! -x "${PYTHON}" ]]; then
+    echo "[stage] ERROR: venv python missing at ${PYTHON} — fix PRJ or run: python -m venv ${PRJ}/.venv"
+    exit 1
+fi
 "${PYTHON}" - <<PYEOF
 import json, os, re
 from pathlib import Path
