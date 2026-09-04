@@ -1,7 +1,7 @@
 # KG Reasoning Evaluation Protocol — AEGIS-KG Phase 1 (T1)
 
 **Document ID:** `AEGIS-DOC-KG-EVAL-001`
-**Status:** DRAFT v0 — pending curation by Paulo (P7)
+**Status:** DRAFT v1.1 — adds §3.5 pilot validation, §4.5 inference taxonomy, §6 T2 navigation spec, §7 sweep plan
 **Date:** 2026-09-03
 **Source of Truth:** [`OBJECTIVES_CONTRACT.md`](OBJECTIVES_CONTRACT.md) (`AEGIS-DOC-OBJ-001`),
 [`KG_IMPLEMENTATION_CONTRACT.md`](KG_IMPLEMENTATION_CONTRACT.md) (`AEGIS-DOC-KG-CONTRACT-001`),
@@ -319,6 +319,31 @@ bias is irrelevant (single-answer scoring); verbosity is penalised by
 specificity-per-100-chars in `EVAL_PROTOCOL.md` §2b; self-preference is impossible
 because the judge is never the model under test.
 
+### 3.5 Pilot Validation Criteria (what "validado" means for a pilot run)
+
+P7 chose to run a **pilot on one model first, then a sweep** (instead of N-model
+run-all up front). A pilot is "validado" — and a sweep is authorised — only when:
+
+- **Technical completeness.** 100% of pilot runs complete (no `RUN_ERROR` env
+  records); ≥90% outputs are parseable; packet SHA + model + provider +
+  gate_mode recorded in every `env.json`; scorer executes without crash on
+  every artefact; **zero MockInvoker responses** (enforced by the
+  `abort_on_mock` guard wired in commit 5).
+- **Signal computable.** Each metric for each family produces a numeric value;
+  the delta table (`WITH-KG − NO-KG`) is populated for every (case, family);
+  invented-reference counts are present in both arms.
+- **Sanity of the gap.** With-KG invented-reference rate ≤ No-KG invented-reference
+  rate, OR a documented explanation (e.g. "model invented DORA Art. 99 because
+  it always confuses DORA Art. 9 with Art. 99 — observed in 2/3 runs").
+- **Cost in budget.** Pilot walltime ≤ 4h on `dev-a100-80` (one A100). If the
+  pilot hits the cap, fix scope (fewer cases, smaller model) before sweep.
+- **Human sign-off.** Digest in plain PT (≤1 page, no jargon) presented to P7;
+  P7 replies GO or NO-GO with reasons captured in `OBJECTIVES_CONTRACT.md` §7.
+
+A pilot that fails any criterion does **not** block the work — it triggers a
+focused fix (harness bug, model swap, scope trim) and a re-run. No sweep until
+all criteria pass.
+
 ---
 
 ## 4. Rubric (5-layer scorecard, per task family)
@@ -345,6 +370,33 @@ on a structured metric is enough to fail the family, averages never save it).
 **NOT** counted toward KG value — it is a signal that the file-based stand-in is
 incomplete for that family on that case. KG-09 (closed-set fidelity) is the upstream
 check that prevents an `EMPTY_PACKET` from being silently accepted.
+
+---
+
+### 4.5 Inference Taxonomy (what kinds of derivation we measure)
+
+T1.6 (and the broader T2 work) decomposes "reasoning about the KG" into five
+distinct kinds of inference. The taxonomy determines **what kind of ground
+truth is available** and **what score function is honest**:
+
+| Type | Description | Example | Ground truth | Scoring |
+|------|-------------|--------|--------------|---------|
+| **(a) Deterministic composition** | Combine facts already in the packet via a deterministic rule | "This `subprocessor=Y` flow, given the company role, requires DORA Art. 28 + GDPR Art. 28" | Pre-computable from packet by a script that uses the same sources | **Exact-match** on the output set |
+| **(b) Inherited / composed obligation** | Cross-reference rows that say "this rule inherits from that clause" | "DORA obligations inherit from the AWS Frankfurt ThirdPartyService — what evidence depth?" | Pre-computable from packet | **Exact-match** |
+| **(c) Trade-off between tensions** | Pick a `resolution_principle` when two regulations pull apart | "GDPR Art. 5(1)(c) vs NIS2 Art. 21(2)(e) for case X" | Semi-open (structure is closed; content is judged) | **Deterministic structure + judge on content** |
+| **(d) Gap detection** | Identify obligations the enterprise's architecture does NOT satisfy | "What obligations cannot be met with the current inventory?" | Open | **Deterministic pre-checks + judge** |
+| **(e) Counterfactual** | "If this store moves outside the EU, what obligations change?" | Open | Open; needs Art. 44 SCCS reasoning | **Fase 3 — not now** |
+
+**Ground-truth rule:** wherever the truth is pre-computable (a, b, c
+structure, d pre-checks), the scorer is **exact-match against a
+pre-computed reference** (T1.6's `ground_truth.py`). Wherever it is open,
+the judge carries the burden (and its cells are sampled + verbose, never
+bare PASS/FAIL).
+
+T1.1–T1.5 already cover type (c) at varying depth; **T1.6 is the canonical
+type-(a) implementation** — same sources, same activation rule, exact-match
+scoring. Type (b) gets partial coverage via T1.4 (proportionality); type (d)
+is the next big stretch (Doc 09 territory); type (e) is Phase 2 / Phase 3.
 
 ---
 
@@ -413,43 +465,153 @@ excluded from the scorecard. This mirrors `EVAL_PROTOCOL.md` §7.
 
 ---
 
-## 7. Open Questions for P7
+## 7. Sweep Plan (after pilot is validated)
 
-1. **Model picker.** v0 ships `KG_EVAL_MODEL` as a CLI flag with a documented default
-   that **fails loud if unset and not exported** (no silent gemma4:e4b fallback — the
-   protocol must declare the model it evaluates). P7 confirms the first cheap student
-   (`qwen3.5:9b` is the proposed default for a 30-run v0 cycle; cheap, deterministic
-   on-cluster, and well-known to the AEGIS-KG corpus).
-2. **Sample rate.** v0 = 1 task per (case × family × arm). A future bump may go to
-   ≥3 tasks per (case × family) — the YAML supports this; the scorecard averages across
-   the tasks but always reports the per-task breakdown so a single bad task cannot
-   silently drag the family score.
-3. **Packet regeneration cadence.** Today the packet is regenerated each run (deterministic
-   from sources). A future bump may cache the packet under `output/kg_eval/_cache/` keyed
-   on the `preproc_fingerprint` so two runs on the same case share the packet (faster,
-   cheaper, but introduces a stale-packet failure mode that needs its own detection).
-4. **Judge wiring.** v0 ships `judge: null` in the score JSON. The judge pass (L3 of
-   §4) is the next iteration and uses the same GLM-5.3-Flash judge as
-   [`execution/reports/EVAL_PROTOCOL.md`](../execution/reports/EVAL_PROTOCOL.md) §1.
-   This protocol must not claim `judge ≥ 3.5/5` until the judge is actually wired; the
-   pass rule in §4 explicitly allows `JUDGE_NOT_WIRED` in v0.
+The sweep is the **N-model run-all** that turns the pilot's single-model
+delta into a matrix. It runs **only** after the pilot passes every criterion
+in §3.5. The order is deliberate:
+
+1. **Model list.** Start with the 5 co-leaders from the most recent
+   `OBJECTIVES_CONTRACT_BASELINE` / DIGEST round that already proved they
+   produce parseable output (track record matters — a model that the
+   parse gate has rejected historically costs a job slot without producing
+   data). For the first sweep the proposed set is:
+
+   - **Co-leaders (proven)**: `nemotron-3.5-lightning:30b`, `qwen3.8:27b`
+   - **Likely strong**: `gemma4:e4b`, `qwen3.5:27b`, `muse-glimmer:30b`
+   - **Edge cases** (1 sweep only — confirms they don't break infra): `ornith:9b`, `mistral:7b`
+
+   P7 confirms the final list before sweep submission.
+
+2. **Submission shape.** 1 model per `sbatch` (sequential by node per
+   `hpc-deucalion` skill rule), `dev-a100-80` partition (4h cap), no
+   dependency between jobs (let the scheduler decide). Job names carry
+   sanitised model + case to keep `squeue` readable.
+
+3. **Per-model walltime budget.** 30 runs × ~30s/run ≈ 15 min for the
+   scoring + I/O; warm-up adds ~5 min; margin = 1h. Two case3 cases with
+   T1.6 ground truth computation can push 30 → 60 min — still well under
+   4h. If any model crosses 1h walltime, the model is dropped from the
+   sweep (recorded as `SWEEP_TIMEOUT` in the digest).
+
+4. **Collect + score.** `score_runs(output/kg_eval/)` is re-run on the
+   workstation against the cluster artefacts; the scorecard JSON per
+   model is the input to the sweep digest.
+
+5. **Digest.** One plain-PT page per model, matrix of `(model × family)`
+   delta on the headline metrics; GO/NO-GO recommendation per model
+   (no model that violates OBJ-02 zero-omission may join Phase 2
+   integration without remediation).
+
+6. **Anti-patterns.** No new families added during a sweep (lock the
+   catalogue; bumps go in a new contract iteration). No silent model
+   swaps. No averaging over models with different temperaments — each
+   model gets its own digest page.
+
+7. **Sweep budget.** Aim for ≤1 week walltime on `dev-a100-80`. If the
+   queue is hostile, defer models one-by-one rather than burning the
+   budget on partial data.
 
 ---
 
-## 8. Implementation Status (2026-09-03 — initial)
+## 8. T2 — Navigation (agent with cypher() tool, separate work)
+
+T1 measures generation quality under controlled conditions (the packet
+removes the need to *find* the data). T2 measures the next question:
+**does the model know what to ask for?** Requires the real KG ETL (Phase
+2 work) + an agent harness that exposes a `cypher(query) → rows` tool.
+Outline only — not implemented in v1.1.
+
+**Harness shape.** The model receives: a small prompt with the schema
+summary (from spec v3 §3), the task question, and a turn budget of
+8–10 invocations. Every query and response is logged verbatim. Judge
+cells carry 5 dimensions:
+
+1. **Query strategy** — number of queries to reach the answer vs the
+   optimal (we pre-compute the optimal against our own graph). Sub-optimal
+   ≥2x flags for review.
+2. **Syntactic + schema validity** — labels, relations, properties used
+   in `MATCH` must exist in the spec catalogue. Parsed + checked
+   deterministically. (Failure mode expected: `(:Company)` instead of
+   `(:Enterprise)`; `[:DEPENDS_ON]` invented.)
+3. **Error recovery** — when a query returns empty or wrong, does the
+   model adapt or repeat? Counted and categorised.
+4. **Grounding discipline** — every fact in the final response must come
+   from a query the agent actually issued (grounded in the conversation
+   log; same `⊆` discipline as T1.1 but over the agent's own history).
+5. **Knowing when to stop** — 3–5 "impossible" questions per task
+   family whose answer is genuinely absent from the graph. Correct
+   behaviour = declare absence + describe what would be needed
+   (`NEEDS_HUMAN`); failure = confabulate.
+
+**Attribution discipline.** A model that fails navigation may fail for
+three distinct reasons (skill L2.3 of `agent-orchestration`):
+
+- (i) doesn't know Cypher syntax,
+- (ii) is overwhelmed by the schema size in the prompt,
+- (iii) can't plan multi-hop.
+
+The harness **must** separate these signals (syntax error rate; prompt
+size ablations; query count vs optimal) before blaming the model. The
+schema summary in the prompt must be **fixed** across ablations — varying
+the prompt changes the question.
+
+---
+
+## 9. Open Questions for P7
+
+1. **Model picker (pilot).** P7 confirms the first model for the pilot
+   run. Recommendation: `nemotron-3.5-lightning:30b` (proven co-leader,
+   zero PENDING history in the cluster memory, 30B on A100 fits the 4h
+   cap). Backup: `qwen3.8:27b`. See `execution/runs/...` history and
+   the model scoring matrix.
+2. **Sample rate.** v0 = 1 task per (case × family × arm); the pilot
+   reuses the same catalogue (now 20 tasks after T1.6 commit).
+3. **Packet regeneration cadence.** Today the packet is regenerated each
+   run. A future bump may cache the packet under `output/kg_eval/_cache/`
+   keyed on `preproc_fingerprint` — out of scope for the pilot.
+4. **Judge wiring.** v0 ships `judge: null` in the score JSON. The judge
+   pass (L3 of §4) is the next iteration and uses the same judge as
+   `OBJECTIVES_CONTRACT` §5; the pass rule explicitly allows
+   `JUDGE_NOT_WIRED` in v0.
+5. **T2 readiness.** §8 is outline-only. The T2 pilot requires the mini-ETL
+   (KG-01..04 of `KG_IMPLEMENTATION_CONTRACT.md`) to land first; P7
+   confirms whether T2 enters the next sprint.
+
+---
+
+## 10. Implementation Status (2026-09-03 — initial + v1.1 updates)
 
 | Component | Status | Path |
 |---|---|---|
-| `docs/KG_EVAL_PROTOCOL.md` | **DRAFT v0** | this file |
-| `scripts/kg_eval/generate_context_packets.py` | **NEW (this contract)** | Commit 2 |
-| `scripts/kg_eval/run_t1.py` | **NEW (this contract)** | Commit 3 |
-| `scripts/kg_eval/tasks.yaml` | **NEW (this contract)** | Commit 3 |
-| `scripts/kg_eval/score_t1.py` | **NEW (this contract)** | Commit 4 |
-| `tests/unit/kg_eval/test_generate_context_packets.py` | **NEW (this contract)** | Commit 2 |
-| `tests/unit/kg_eval/test_run_t1.py` | **NEW (this contract)** | Commit 3 |
-| `tests/unit/kg_eval/test_score_t1.py` | **NEW (this contract)** | Commit 4 |
-| KG ETL (the real graph) | **MISSING** — `scripts/kg_etl/` does not exist | separate work; KG-01 |
+| `docs/KG_EVAL_PROTOCOL.md` | **DRAFT v1.1** | this file |
+| `scripts/kg_eval/generate_context_packets.py` | **NEW** | Commit 2 |
+| `scripts/kg_eval/run_t1.py` | **NEW (anti-mock guard wired in v1.1)** | Commit 3 + Commit 5 |
+| `scripts/kg_eval/tasks.yaml` | **NEW (T1.6 added in v1.1)** | Commit 3 + Commit 6 |
+| `scripts/kg_eval/score_t1.py` | **NEW (T1.6 scorer + _score_t16)** | Commit 4 + Commit 6 |
+| `scripts/kg_eval/ground_truth.py` | **NEW (deterministic T1.6 reference)** | Commit 6 |
+| `tests/unit/kg_eval/test_generate_context_packets.py` | **NEW** | Commit 2 |
+| `tests/unit/kg_eval/test_run_t1.py` | **NEW (anti-mock tests added)** | Commit 3 + Commit 5 |
+| `tests/unit/kg_eval/test_score_t1.py` | **NEW** | Commit 4 |
+| `tests/unit/kg_eval/test_ground_truth.py` | **NEW** | Commit 6 |
+| KG ETL (the real graph) | **MISSING** — `scripts/kg_etl/` does not exist | separate work; KG-01..04 |
 | Judge wiring (L3) | **JUDGE_NOT_WIRED** | deferred (v0 allows it) |
+| T2 navigation harness | **OUTLINE ONLY** | §8; depends on KG-01..04 |
+| Pilot sbatch template | **PLANNED** | `examples/deucalion/kg-eval-t1-pilot.sbatch` (Phase 2 of the implementation plan) |
+
+**Anti-mock guard (v1.1):** the previous v0 had a silent MockInvoker fallback in
+`run_t1.py` — if the build_llm_invoker call raised, the runner would quietly use
+the mock and the run would produce mock answers. v1.1 closes this gap
+(`abort_on_mock=True` + explicit `allow_mock=True` opt-in for tests + `--abort-on-mock`
+CLI flag the pilot job sets hard). See commit 5.
+
+**T1.6 obligation derivation (v1.1):** new family with deterministic ground truth
+generated from `preproc_out/regulation/<REG>/aggregated/02_SecurityRules_NIST.json`
+(matches the KG ETL contract KG-10 — what `(:ClauseActivation)` would emit in
+production). Scoring is exact-match precision/recall/F1 against the precomputed
+SHA-256-pinned reference. See commit 6.
+
+**56 unit tests** as of v1.1; ruff clean on `scripts/kg_eval/` + `tests/unit/kg_eval/`.
 
 The protocol ships before any real KG ETL so the value question (does the substrate
 *help reasoning*) can be answered from the start, with the file-based stand-in. When
@@ -465,3 +627,13 @@ emits the same JSON shape; the A/B loop, the rubric, and the scorecard do not ch
   rubric per family. 30 runs v0 (3 cases × 5 families × 2 arms × 1 model).
   Scorecard emission deferred to `scripts/kg_eval/score_t1.py`; judge cell stubbed
   to `null` until the next iteration wires the GLM-5.3-Flash judge.
+- **v1.1 (2026-09-03):** adds T1.6 obligation-derivation family with
+  deterministic precomputed ground truth (commit 6); closes the silent-MockInvoker
+  gap with `abort_on_mock` + explicit `allow_mock=True` (commit 5); introduces
+  §3.5 pilot validation criteria (the answer to "what does validado mean");
+  §4.5 inference taxonomy (5 types — composition, inheritance, trade-off,
+  gap-detection, counterfactual — with ground-truth feasibility per type);
+  §7 sweep plan (model picker, queue etiquette, anti-patterns); §8 T2 navigation
+  outline (5 dimensions, attribution discipline for skill L2.3). Catalogue grows
+  from 15 → 20 tasks (T1.6: 5 new across the 3 cases). Tests: 41 → 56.
+  Rubric and A/B design unchanged — backward-compatible v0 scorecards remain valid.
