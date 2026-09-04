@@ -1,0 +1,41 @@
+{
+  "contract_id": "CORR-115-S1",
+  "name": "Phase A: Neo4j KG ETL Foundation & Schema DDL",
+  "date": "2026-09-04",
+  "status": "VALIDATED",
+  "trials": 1,
+  "owned_files": [
+    "scripts/kg_etl/__init__.py",
+    "scripts/kg_etl/config.py",
+    "scripts/kg_etl/driver.py",
+    "scripts/kg_etl/schema.py",
+    "scripts/kg_etl/schema.cypher",
+    "tests/unit/kg_etl/__init__.py",
+    "tests/unit/kg_etl/test_kg12_decoupling.py",
+    "tests/unit/kg_etl/test_config.py",
+    "tests/unit/kg_etl/test_schema.py"
+  ],
+  "criteria": [
+    {
+      "id": "CRIT-KG12-DECOUPLING",
+      "description": "KG-12: The pipeline src/aegis_phase1/v2/ must NOT import neo4j or any scripts/kg_etl module.",
+      "tier": "T3",
+      "validation_command": "PYTHONPATH=src:scripts pytest tests/unit/kg_etl/test_kg12_decoupling.py -v",
+      "passed": true
+    },
+    {
+      "id": "CRIT-KG-CONFIG-PORTS",
+      "description": "scripts/kg_etl/config.py loads canonical Neo4j ports (7688 Bolt, 7475 HTTP) and rejects prohibited ports (7687, 7474).",
+      "tier": "T3",
+      "validation_command": "PYTHONPATH=src:scripts pytest tests/unit/kg_etl/test_config.py -v",
+      "passed": true
+    },
+    {
+      "id": "CRIT-KG-SCHEMA-DDL",
+      "description": "scripts/kg_etl/schema.cypher and schema.py define the canonical DDL with the 2 spec errata fixed (composite constraints for run-derived nodes, lookup index for SecurityObjective).",
+      "tier": "T3",
+      "validation_command": "PYTHONPATH=src:scripts pytest tests/unit/kg_etl/test_schema.py -v",
+      "passed": true
+    }
+  ]
+}
