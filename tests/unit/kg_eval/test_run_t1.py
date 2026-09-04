@@ -63,17 +63,21 @@ def t14_task(tasks: list[dict]) -> dict:
 # ─── Tasks catalogue ─────────────────────────────────────────────────
 
 
-def test_load_tasks_returns_15(tasks: list[dict]) -> None:
-    """15 tasks = 3 cases x 5 families (1 representative task per family per case)."""
-    assert len(tasks) == 15
+def test_load_tasks_returns_20(tasks: list[dict]) -> None:
+    """20 tasks: 3 cases x 5 families (T1.1-T1.5) + 5 T1.6 obligation-derivation tasks."""
+    assert len(tasks) == 20
 
 
 def test_load_tasks_5_per_family(tasks: list[dict]) -> None:
-    """3 cases x 5 families = 15; each family must appear exactly 3 times."""
+    """3 cases x 5 families = 15; each family T1.1..T1.5 appears exactly 3 times.
+
+    T1.6 appears 5 times (case1 x 2 + case2 x 1 + case3 x 2) per the catalogue.
+    """
     from collections import Counter
     counts = Counter(t["family"] for t in tasks)
     for family in ("T1.1", "T1.2", "T1.3", "T1.4", "T1.5"):
         assert counts[family] == 3, f"family {family} appears {counts[family]} times"
+    assert counts["T1.6"] == 5, f"family T1.6 appears {counts['T1.6']} times"
 
 
 def test_select_task_unknown_raises(tasks: list[dict]) -> None:

@@ -348,3 +348,95 @@ tasks:
       - "≥1 CSF anchor cited"
       - "≥1 structured tension/ambiguity block"
       - "no invented regulation tokens"
+  # ─── T1.6 — Obligation derivation (deterministic ground truth) ─────
+  #
+  # For a (case, subdomain) pair, derive the set of ACTIVATED obligations.
+  # Ground truth is precomputed by scripts/kg_eval/ground_truth.py (mirrors
+  # what the KG ETL would emit as (:ClauseActivation) per KG-10). Scoring is
+  # exact-match: every required clause_id must appear in the model output;
+  # any invented clause_id is a fail. Tier is fixed at the case's scale to
+  # remove one variable.
+
+  - id: T1.6-case1-D-01.1
+    family: T1.6
+    case: case1-tinytask
+    subdomain_id: D-01.1
+    asset_id: SYS-01
+    question: >-
+      For case1-tinytask, derive every regulatory obligation that is
+      ACTIVATED for subdomain D-01.1 (Data Encryption) at the enterprise's
+      scale. For each obligation, cite the clause ID and the source
+      article. Do NOT cite obligations that do not bind this enterprise.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set (exact-match)"
+      - "zero invented clause_ids"
+      - "article references ⊆ activated clauses' articles"
+      - "no GlobalRegulation/regulation-only tokens without clause_id"
+
+  - id: T1.6-case1-D-09.1
+    family: T1.6
+    case: case1-tinytask
+    subdomain_id: D-09.1
+    asset_id: SYS-01
+    question: >-
+      For case1-tinytask, derive every regulatory obligation ACTIVATED
+      for subdomain D-09.1 (Incident Detection). Cite clause IDs and
+      articles. Do not invent.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set"
+      - "zero invented clause_ids"
+
+  - id: T1.6-case2-D-01.1
+    family: T1.6
+    case: case2-secureborder
+    subdomain_id: D-01.1
+    asset_id: SYS-FW
+    question: >-
+      For case2-secureborder, derive every regulatory obligation ACTIVATED
+      for subdomain D-01.1 (Data Encryption) at the enterprise's scale.
+      Cite clause IDs and articles. Do not invent.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set"
+      - "zero invented clause_ids"
+
+  - id: T1.6-case3-D-01.1
+    family: T1.6
+    case: case3-omnibank
+    subdomain_id: D-01.1
+    asset_id: SYS-CBS
+    question: >-
+      For case3-omnibank (a financial entity), derive every regulatory
+      obligation ACTIVATED for subdomain D-01.1 (Data Encryption) at the
+      enterprise's scale. Cite clause IDs and articles. Do not invent.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set"
+      - "zero invented clause_ids"
+      - "DORA / GDPR / NIS2 all represented (case3 has 5 applicable regs)"
+
+  - id: T1.6-case3-D-04.3
+    family: T1.6
+    case: case3-omnibank
+    subdomain_id: D-04.3
+    asset_id: SYS-CBS
+    question: >-
+      For case3-omnibank, derive every regulatory obligation ACTIVATED
+      for subdomain D-04.3 (Access Control — the mainframe CBS context).
+      Cite clause IDs and articles. Do not invent.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set"
+      - "zero invented clause_ids"

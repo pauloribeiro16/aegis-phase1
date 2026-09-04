@@ -448,12 +448,85 @@ def _score_t15(raw: str, packet: dict | None) -> list[dict[str, Any]]:
     ]
 
 
+# ─── T1.6 — Obligation derivation (deterministic exact-match) ────────
+
+
+_OBLIGATION_ID_RE = re.compile(r"\b([A-Z][A-Z0-9-]*-C[LP]\d{1,4})\b")  # GDPR-CL06 / GDPR-CP02
+
+
+def _extract_cited_obligation_ids(raw: str) -> list[str]:
+    """Extract every ``<REG>-CL<NN>`` or ``<REG>-CP<NN>`` token from the model's output.
+
+    Returns the list in first-seen order. The scorer compares against a
+    set so order is irrelevant for the result.
+    """
+    return _OBLIGATION_ID_RE.findall(raw or "")
+
+
+def _score_t16(
+    raw: str,
+    packet: dict | None,
+    ground_truth: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Exact-match against the precomputed ground truth.
+
+    ``ground_truth`` is computed by ``scripts/kg_eval/ground_truth.py`` from
+    the same sources the packet is generated from. Same SHA-256 input →
+    same activations → reproducible.
+    """
+    if ground_truth is None:
+        # Caller forgot to thread the ground truth → surface as MISSING_GATE
+        return [{
+            "metric": "obligation_derivation",
+            "value": None,
+            "pass": None,
+            "error": "ground_truth not threaded by caller",
+            "status": "MISSING_GATE",
+        }]
+
+    gt_ids: set[str] = {c["clause_id"] for c in ground_truth.get("activated_clauses") or [] if c.get("clause_id")}
+    cited_ids: set[str] = set(_extract_cited_obligation_ids(raw))
+
+    # Exact-match precision/recall on clause IDs.
+    if not gt_ids:
+        return [{
+            "metric": "obligation_derivation",
+            "value": None,
+            "pass": None,
+            "ground_truth_sha256": ground_truth.get("ground_truth_sha256"),
+            "status": "EMPTY_GROUND_TRUTH",
+        }]
+    true_pos = gt_ids & cited_ids
+    false_pos = cited_ids - gt_ids
+    false_neg = gt_ids - cited_ids
+    precision = len(true_pos) / len(cited_ids) if cited_ids else 0.0
+    recall = len(true_pos) / len(gt_ids) if gt_ids else 0.0
+    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+    return [{
+        "metric": "obligation_derivation",
+        "value": {
+            "true_positives": sorted(true_pos),
+            "false_positives": sorted(false_pos),
+            "false_negatives": sorted(false_neg),
+            "precision": round(precision, 3),
+            "recall": round(recall, 3),
+            "f1": round(f1, 3),
+            "ground_truth_count": len(gt_ids),
+            "cited_count": len(cited_ids),
+            "ground_truth_sha256": ground_truth.get("ground_truth_sha256"),
+        },
+        "pass": (len(false_pos) == 0 and len(false_neg) == 0),
+        "status": "OK",
+    }]
+
+
 _FAMILY_SCORERS = {
     "T1.1": _score_t11,
     "T1.2": _score_t12,
     "T1.3": _score_t13,
     "T1.4": _score_t14,
     "T1.5": _score_t15,
+    "T1.6": _score_t16,
 }
 
 
@@ -532,7 +605,31 @@ def score_run(run_dir: Path | str) -> dict[str, Any]:
         score["errors"].append(f"unknown family: {family!r}")
         return score
 
-    score["metrics"] = scorer(raw, packet)
+    # T1.6: thread the precomputed ground truth through (same sources the
+    # packet is generated from; reproducible via SHA-256 in env.json).
+    ground_truth: dict[str, Any] | None = None
+    if family == "T1.6":
+        case_id = env.get("case_id")
+        subdomain_id = env.get("subdomain_id")
+        if case_id and subdomain_id:
+            case_path = _PROJECT_ROOT / "cases" / case_id
+            preproc_root = _PROJECT_ROOT / "preproc_out"
+            try:
+                from scripts.kg_eval.ground_truth import compute_ground_truth
+                ground_truth = compute_ground_truth(case_path, preproc_root, subdomain_id)
+            except Exception as exc:  # pragma: no cover — defensive
+                score["errors"].append(f"failed to compute ground truth: {exc}")
+        else:
+            score["errors"].append("T1.6 missing case_id or subdomain_id in env.json")
+        score["ground_truth_sha256"] = (ground_truth or {}).get("ground_truth_sha256")
+
+    # Call the family scorer. For T1.6 we pass the ground truth as a 3rd
+    # positional argument via a thin wrapper (the scorer signatures are
+    # (raw, packet) for T1.1..T1.5; (raw, packet, ground_truth) for T1.6).
+    if family == "T1.6":
+        score["metrics"] = scorer(raw, packet, ground_truth)
+    else:
+        score["metrics"] = scorer(raw, packet)
 
     # EMPTY_PACKET detection per protocol §4
     if packet is not None and family in {"T1.1", "T1.5"}:
