@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from aegis_phase1.llm.quant_manifest import resolve_quant_for as _qm_resolve_quant_for
+from aegis_phase1.v2.domain.processor import MapPartialFailure
 from aegis_phase1.v2.state import V2State
 
 if TYPE_CHECKING:
@@ -1631,9 +1632,27 @@ class Phase1Orchestrator:
         # output. Idempotent — repeated calls keep the first recorded values.
         self.init_model_capabilities()
         self.run_phase_1b()
-        self.map_domains()
+        # CORR-114 (P5/P6 fix): when MAP raises MapPartialFailure, never
+        # abort the run before REDUCE + OUTPUT. The deterministic docs
+        # 04/05/06/07/04a-04d/07b + xlsx are still useful with partial
+        # domain results. The runner's MAP_ABORT_THRESHOLD gate (P5
+        # exit-code-2) is preserved — we re-raise after OUTPUT so the
+        # job-slurm exit code reflects the partial failure (CI/grep).
+        map_failure: Exception | None = None
+        try:
+            self.map_domains()
+        except MapPartialFailure as exc:
+            map_failure = exc
+            logger.warning(
+                "MAP raised MapPartialFailure (%d failed domains) — "
+                "continuing so REDUCE + OUTPUT still write docs",
+                len(exc.failed_domains or []),
+            )
         self.reduce()
         self.generate_outputs(output_dir)
+        if map_failure is not None:
+            logger.info("=== PIPELINE COMPLETE (partial: MAP failed) ===")
+            raise map_failure
         logger.info("=== PIPELINE COMPLETE ===")
         return self.state
 

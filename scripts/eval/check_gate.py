@@ -35,7 +35,7 @@ import logging
 import os
 import re
 import sys
-from pathlib import Path
+from typing import Any
 
 from aegis_phase1.prompts_v2.ref_gate import RefGate
 
@@ -252,7 +252,7 @@ def check_run(
         except Exception as e:
             print(f"⚠️ Could not parse state.json: {e}")
     else:
-        print("[info] state.json not found, skipping PENDING sections check.")
+        print("ℹ️ state.json not found, skipping PENDING sections check.")
 
     # 2. Check generated markdown docs for tags and RefGate violations
     doc_files = sorted(run_dir.glob("*.md"))
@@ -291,7 +291,7 @@ def check_run(
     if total_docs > 0 and tagged_docs == total_docs:
         print(f"✅ 100% of rendered documents ({tagged_docs}/{total_docs}) carry provenance tags.")
     elif total_docs > 0:
-        print(f"[info] {tagged_docs}/{total_docs} rendered documents carry provenance tags.")
+        print(f"ℹ️ {tagged_docs}/{total_docs} rendered documents carry provenance tags.")
 
     # 3. Zero-omission subdomain coverage (CORR-OBJ-02)
     if check_coverage:

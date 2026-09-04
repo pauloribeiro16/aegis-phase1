@@ -33,37 +33,58 @@ PROJ="$BD/aegis-phase1"
 GFX="/projects/F202512235CPCAA1/graphify-methodology"
 MODEL="qwen3.8:27b"
 
+# Porta unica por JOB (permite multi-job no mesmo no sem colisao Ollama)
+OLLAMA_PORT=$((11434 + SLURM_JOB_ID % 20000))
+export OLLAMA_HOST="127.0.0.1:${OLLAMA_PORT}"
+export OLLAMA_BASE_URL="${OLLAMA_HOST}"
+export OLLAMA_API_KEY="local"
+
+# RUN_LOG desde a linha 1 (resolve P1 do skill: jobs sem rasto)
+LOG_DIR="${PROJ}/logs/scout_runs"
+mkdir -p "${LOG_DIR}"
+RUN_LOG="${LOG_DIR}/run_qwen3_8_27b_case1-tinytask_${SLURM_JOB_ID}.log"
+exec >>"${RUN_LOG}" 2>&1
+trap 'echo "=== TRAP ==="; echo "python_exit=$PYTHON_EXIT"; echo "ran_at=$(date -Is)"' EXIT
+
 echo "=================================================="
 echo " JOB $SLURM_JOB_ID STARTED: $(date)"
 echo " Model : $MODEL (1x A100-80, 8h)"
-echo " Node  : $(hostname)"
 echo " Case  : case1-tinytask (--run-all)"
-echo " Ollama: 0.32.13 from $GFX/{bin,lib/ollama}"
+echo " Node  : $(hostname)"
+echo " Ollama: 0.32.13 from $GFX/{bin,lib/ollama} (port $OLLAMA_PORT)"
+echo " RUN_LOG: ${RUN_LOG}"
 echo "=================================================="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+
+# Cache check por MANIFEST DIR (resolve P3/P4 do skill: nunca pull inside job)
+CACHE_MARK="${BD}/ollama_data/models/manifests/registry.ollama.ai/library/qwen3.8/27b"
+if [ ! -f "${CACHE_MARK}" ] && [ ! -d "${CACHE_MARK}" ]; then
+  echo "ERROR: model 'qwen3.8:27b' NOT in cache (manifest missing at $CACHE_MARK)"
+  echo "       Resolve: login-node + bash scripts/hpc/pull-verify.sh qwen3.8:27b"
+  exit 1
+fi
+echo "cache manifest present"
 
 # --- Ollama 0.32.13 (shared model cache; never `ollama pull` here) ---
 export PATH="$GFX/bin:$PATH"
 export LD_LIBRARY_PATH="$GFX/lib/ollama:${LD_LIBRARY_PATH:-}"
 export OLLAMA_MODELS="$BD/ollama_data/models"
-export OLLAMA_HOST="127.0.0.1:11434"
-export OLLAMA_API_KEY="local"
 
 ollama serve > "/tmp/ollama-${SLURM_JOB_ID}.log" 2>&1 &
 OLLAMA_PID=$!
 
 for i in $(seq 1 90); do
-  if curl -sf -m 2 "http://127.0.0.1:11434/api/tags" > /dev/null 2>&1; then
+  if curl -sf -m 2 "${OLLAMA_HOST}/api/tags" > /dev/null 2>&1; then
     break
   fi
   sleep 2
 done
 echo "=== ollama version:"
-curl -sf -m 5 "http://127.0.0.1:11434/api/version" | head -c 200; echo
+curl -sf -m 5 "${OLLAMA_HOST}/api/version" | head -c 200; echo
 echo "=== warm-up: loading $MODEL"
 WARM_OK=0
 for attempt in 1 2 3 4 5; do
-  if curl -sf -m 180 "http://127.0.0.1:11434/api/generate" \
+  if curl -sf -m 180 "${OLLAMA_HOST}/api/generate" \
       -d "{\"model\":\"$MODEL\",\"prompt\":\"ping\",\"stream\":false,\"options\":{\"num_predict\":1}}" \
       > /tmp/warmup.out 2>&1; then
     echo "warm-up OK on attempt $attempt"
@@ -86,6 +107,10 @@ source .venv/bin/activate
 
 export PYTHONPATH="$PROJ:${PYTHONPATH:-}"
 export LANGFUSE_ENABLED=false
+export PYTHONDONTWRITEBYTECODE=1  # defesa contra .pyc stale (skill rule)
+
+# Logs por run (sem colisao entre jobs do mesmo modelo+caso)
+export AEGIS_LOG_BASE="${PROJ}/logs/phase1/case1-tinytask/${SLURM_JOB_ID}"
 
 echo ""
 echo "=== pre-flight ==="
