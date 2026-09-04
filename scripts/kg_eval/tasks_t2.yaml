@@ -1,0 +1,36 @@
+# KG-eval T2 Navigation Task Catalogue (CORR-115).
+# Focus: Testing Model Usability, Multi-hop Exploration, and Error Handling with cypher() tool.
+
+tasks:
+  - id: T2.1-case1-SYS01-grounding
+    family: T2.1
+    case: case1-tinytask
+    subdomain_id: D-01.1
+    question: >-
+      Investigate system SYS-01. Query the knowledge graph using Cypher to find which
+      regulatory clauses and NIST CSF 2.0 subcategories apply to it via its in-scope subdomains.
+    target_pattern: "MATCH (s:System {id: 'SYS-01'})-[:IN_SCOPE_OF]->(sd:SubDomain) ..."
+    optimal_query_count: 2
+    impossible: false
+
+  - id: T2.2-case3-D044-tension
+    family: T2.2
+    case: case3-omnibank
+    subdomain_id: D-04.4
+    question: >-
+      Query the knowledge graph to discover cross-regulation tensions or conflicts scoped to
+      subdomain D-04.4. State the conflict description, resolution principle, and severity.
+    target_pattern: "MATCH (ri:RegulatoryInteraction) WHERE 'D-04.4' IN ri.sub_domains ..."
+    optimal_query_count: 1
+    impossible: false
+
+  - id: T2.3-case1-impossible-cloud
+    family: T2.3
+    case: case1-tinytask
+    subdomain_id: D-09.1
+    question: >-
+      Query the knowledge graph for any dedicated mainframe hardware cryptographic modules
+      operated directly on-premise by case1-tinytask. If none exist in the graph, declare absence.
+    target_pattern: "MATCH (s:System {case_id: 'case1-tinytask'}) ..."
+    optimal_query_count: 1
+    impossible: true

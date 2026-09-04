@@ -1,0 +1,47 @@
+{
+  "contract_id": "CORR-115-S2",
+  "name": "Phase T2: KG Agent Usability & Navigation Harness for Deucalion",
+  "date": "2026-09-04",
+  "status": "VALIDATED",
+  "trials": 1,
+  "owned_files": [
+    "scripts/kg_eval/engine.py",
+    "scripts/kg_eval/tasks_t2.yaml",
+    "scripts/kg_eval/run_t2.py",
+    "scripts/kg_eval/score_t2.py",
+    "examples/deucalion/kg-eval-t2-pilot.sbatch",
+    "tests/unit/kg_eval/test_engine.py",
+    "tests/unit/kg_eval/test_run_t2.py",
+    "tests/unit/kg_eval/test_score_t2.py"
+  ],
+  "criteria": [
+    {
+      "id": "CRIT-T2-ENGINE-CYPHER",
+      "description": "scripts/kg_eval/engine.py builds an in-memory graph from case + preproc_out data and executes Cypher MATCH queries deterministically with syntax error feedback.",
+      "tier": "T3",
+      "validation_command": "PYTHONPATH=src:scripts pytest tests/unit/kg_eval/test_engine.py -v",
+      "passed": true
+    },
+    {
+      "id": "CRIT-T2-RUNNER-AGENT",
+      "description": "scripts/kg_eval/run_t2.py runs multi-turn agent loop with cypher() tool, logging queries, hops, syntax validity, and final answers.",
+      "tier": "T3",
+      "validation_command": "PYTHONPATH=src:scripts pytest tests/unit/kg_eval/test_run_t2.py -v",
+      "passed": true
+    },
+    {
+      "id": "CRIT-T2-SCORER-METRICS",
+      "description": "scripts/kg_eval/score_t2.py scores runs across the 5 usability dimensions (query strategy, schema validity, error recovery, grounding discipline, knowing when to stop).",
+      "tier": "T3",
+      "validation_command": "PYTHONPATH=src:scripts pytest tests/unit/kg_eval/test_score_t2.py -v",
+      "passed": true
+    },
+    {
+      "id": "CRIT-T2-SBATCH-PREFLIGHT",
+      "description": "examples/deucalion/kg-eval-t2-pilot.sbatch passes bash -n and conforms to Deucalion staged launch rules.",
+      "tier": "T3",
+      "validation_command": "bash -n examples/deucalion/kg-eval-t2-pilot.sbatch",
+      "passed": true
+    }
+  ]
+}
