@@ -100,12 +100,15 @@ import yaml
 from pathlib import Path
 from scripts.kg_eval.run_t2 import run_t2_agent
 from scripts.kg_eval.score_t2 import score_t2_run
-from aegis_phase1.prompts_v2.invoker import build_llm_invoker
+from aegis_phase1.prompts_v2.factory import get_invoker
 
-inv = build_llm_invoker(provider='ollama', model='$MODEL')
+inv = get_invoker(provider='ollama', model='$MODEL')
 
 def invoker_call(prompt: str) -> str:
     res = inv.invoke(prompt)
+    # UnifiedInvoker.invoke(prompt) returns dict (light path).
+    if isinstance(res, dict):
+        return str(res.get('content', res.get('text', '')))
     if hasattr(res, 'content'):
         return res.content
     return str(res)
