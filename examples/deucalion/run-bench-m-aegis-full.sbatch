@@ -5,7 +5,7 @@
 #SBATCH --mem=40G
 #SBATCH --tasks-per-node=1
 #SBATCH -A F202512235CPCAA1G
-#SBATCH -t 04:00:00
+#SBATCH -t 2-00:00:00
 #SBATCH -p normal-a100-80
 #SBATCH --qos=normal
 #SBATCH -N 1
@@ -40,9 +40,11 @@ CASE_SLUG="$(basename "$CASE")"
 RUN_LOG="$LOG_DIR/run_all_${CASE_SLUG}_${MODEL_SLUG}_${SLURM_JOB_ID}.log"
 exec >>"$RUN_LOG" 2>&1
 
+PORT=$((11434 + SLURM_JOB_ID % 20000))
+
 echo "=================================================="
 echo " JOB $SLURM_JOB_ID STARTED: $(date)"
-echo " Model : $MODEL (1x A100-80, 4h, full --run-all)"
+echo " Model : $MODEL (1x A100-80, 2-day walltime, full --run-all, port $PORT)"
 echo " Node  : $(hostname)"
 echo " Case  : $CASE"
 echo " Gate  : AEGIS_GATE_MODE=hard"
@@ -54,25 +56,26 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 export PATH="$GFX/bin:$BD/bin:$PATH"
 export LD_LIBRARY_PATH="$GFX/lib/ollama:$BD/lib/ollama:${LD_LIBRARY_PATH:-}"
 export OLLAMA_MODELS="$BD/ollama_data/models"
-export OLLAMA_HOST="127.0.0.1:11434"
+export OLLAMA_HOST="127.0.0.1:$PORT"
+export OLLAMA_BASE_URL="http://127.0.0.1:$PORT"
 export OLLAMA_API_KEY="local"
 
 ollama serve > "/tmp/ollama-${SLURM_JOB_ID}.log" 2>&1 &
 OLLAMA_PID=$!
 
 for i in $(seq 1 90); do
-  if curl -sf -m 2 "http://127.0.0.1:11434/api/tags" > /dev/null 2>&1; then
+  if curl -sf -m 2 "http://127.0.0.1:${PORT}/api/tags" > /dev/null 2>&1; then
     break
   fi
   sleep 2
 done
 echo "=== ollama version:"
-curl -sf -m 5 "http://127.0.0.1:11434/api/version" | head -c 200; echo
+curl -sf -m 5 "http://127.0.0.1:${PORT}/api/version" | head -c 200; echo
 
 echo "=== warm-up: loading $MODEL"
 WARM_OK=0
 for attempt in 1 2 3 4 5; do
-  if curl -sf -m 180 "http://127.0.0.1:11434/api/generate" \
+  if curl -sf -m 180 "http://127.0.0.1:${PORT}/api/generate" \
       -d "{\"model\":\"$MODEL\",\"prompt\":\"ping\",\"stream\":false,\"options\":{\"num_predict\":1}}" \
       > /tmp/warmup.out 2>&1; then
     echo "warm-up OK on attempt $attempt"

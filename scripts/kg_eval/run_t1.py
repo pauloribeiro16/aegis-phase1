@@ -80,6 +80,12 @@ _FAMILY_SYSTEM_BLOCK: dict[str, str] = {
         "tensions, unresolved ambiguities. Cite regulation IDs and CSF "
         "subcategories for every claim."
     ),
+    "T1.6": (
+        "You are an AEGIS-KG Phase 1 regulatory analyst. For the subdomain "
+        "in question, list every regulatory obligation that is ACTIVATED at "
+        "the enterprise's scale. Cite the clause ID (e.g. GDPR-CL06) and the "
+        "source article. Do NOT cite obligations that do not bind this enterprise."
+    ),
 }
 
 # NO-KG case context: a 3-sentence case context (company name, sector, tier)
@@ -460,7 +466,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--task-family",
         required=True,
-        choices=["T1.1", "T1.2", "T1.3", "T1.4", "T1.5"],
+        choices=["T1.1", "T1.2", "T1.3", "T1.4", "T1.5", "T1.6"],
         help="Task family (filters tasks.yaml).",
     )
     parser.add_argument(

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #SBATCH --account=F202512235CPCAA1G
-#SBATCH --partition=dev-a100-80
+#SBATCH --partition=normal-a100-80
 #SBATCH --qos=normal
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:a100:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --time=04:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --output=slurm-kgeval-pilot-%j.out
 #SBATCH --error=slurm-kgeval-pilot-%j.err
 #SBATCH --signal=B:30@300
@@ -15,7 +15,7 @@
 #
 # CORR-113 — KG Eval T1 pilot sbatch (Protocol v1.1).
 #
-# Runs one model on T1 across 3 cases × 6 families × 2 arms = 36 generations.
+# Runs one model on T1 across 3 cases × 5 families × 2 arms = 30 generations.
 # Hard abort on MockInvoker (the v1.1 anti-mock guard). Scoreboard via
 # scripts/kg_eval/score_t1.py on the workstation after scp.
 #
@@ -26,7 +26,7 @@
 #   e.g.  sbatch -J aegis_kgeval_pilot_nemotron_30b \
 #             examples/deucalion/kg-eval-t1-pilot.sbatch nemotron-3.5-lightning:30b
 #
-# The job self-verifies: anti-mock smoke test BEFORE the 36-run loop. If the
+# The job self-verifies: anti-mock smoke test BEFORE the 30-run loop. If the
 # invoker resolves to MockInvoker, the job aborts with status=2 (no run-dir
 # artefacts produced). This closes the silent-mock gap.
 
@@ -40,13 +40,15 @@ MODEL="${1:?usage: sbatch kg-eval-t1-pilot.sbatch <model:tag>}"
 SANITISED_TAG=$(echo "$MODEL" | tr ':.' '__')
 
 CASES=(case1-tinytask case2-secureborder case3-omnibank)
-FAMILIES=(T1.1 T1.2 T1.3 T1.4 T1.5 T1.6)
+FAMILIES=(T1.1 T1.2 T1.3 T1.4 T1.5)
 ARMS=(with-kg no-kg)
+
+PORT=$((11434 + SLURM_JOB_ID % 20000))
 
 echo "=================================================="
 echo " JOB $SLURM_JOB_ID STARTED: $(date)"
-echo " Model : $MODEL (1x A100-80, 4h cap)"
-echo " Pilot : 3 cases × 6 families × 2 arms = 36 runs"
+echo " Model : $MODEL (1x A100-80, 2-day walltime, port $PORT)"
+echo " Pilot : 3 cases × 5 families × 2 arms = 30 runs"
 echo " Node  : $(hostname)"
 echo " Code  : $(cat "$PROJ/.synced_sha" 2>/dev/null || echo unknown)"
 echo "=================================================="
@@ -56,24 +58,25 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 export PATH="$GFX/bin:$PATH"
 export LD_LIBRARY_PATH="$GFX/lib/ollama:${LD_LIBRARY_PATH:-}"
 export OLLAMA_MODELS="$BD/ollama_data/models"
-export OLLAMA_HOST="127.0.0.1:11434"
+export OLLAMA_HOST="127.0.0.1:$PORT"
+export OLLAMA_BASE_URL="http://127.0.0.1:$PORT"
 export OLLAMA_API_KEY="local"
 
 ollama serve > "/tmp/ollama-${SLURM_JOB_ID}.log" 2>&1 &
 OLLAMA_PID=$!
 
 for i in $(seq 1 90); do
-  if curl -sf -m 2 "http://127.0.0.1:11434/api/tags" > /dev/null 2>&1; then
+  if curl -sf -m 2 "http://127.0.0.1:${PORT}/api/tags" > /dev/null 2>&1; then
     break
   fi
   sleep 2
 done
 echo "=== ollama version:"
-curl -sf -m 5 "http://127.0.0.1:11434/api/version" | head -c 200; echo
+curl -sf -m 5 "http://127.0.0.1:${PORT}/api/version" | head -c 200; echo
 echo "=== warm-up: loading $MODEL"
 WARM_OK=0
 for attempt in 1 2 3 4 5; do
-  if curl -sf -m 180 "http://127.0.0.1:11434/api/generate" \
+  if curl -sf -m 180 "http://127.0.0.1:${PORT}/api/generate" \
       -d "{\"model\":\"$MODEL\",\"prompt\":\"ping\",\"stream\":false,\"options\":{\"num_predict\":1}}" \
       > /tmp/warmup.out 2>&1; then
     echo "warm-up OK on attempt $attempt"
@@ -132,7 +135,7 @@ mkdir -p "$PROJ/logs/scout_runs"
 } > "$PILOT_LOG"
 
 echo ""
-echo "=== running pilot (36 generations; anti-mock guard on every call) ==="
+echo "=== running pilot (30 generations; anti-mock guard on every call) ==="
 set +e
 PILOT_OK=0
 PILOT_RC=0
@@ -175,12 +178,12 @@ PILOT_TGZ="$PROJ/output/kgeval_pilot_${SANITISED_TAG}_${SLURM_JOB_ID}.tgz"
 tar -czf "$PILOT_TGZ" -C "$PROJ/output" kg_eval 2>/dev/null || true
 echo ""
 echo "pilot_output_tgz=$PILOT_TGZ" | tee -a "$PILOT_LOG"
-echo "ok_runs=$PILOT_OK / 36" | tee -a "$PILOT_LOG"
+echo "ok_runs=$PILOT_OK / 30" | tee -a "$PILOT_LOG"
 echo "ended=$(date -Is)" | tee -a "$PILOT_LOG"
 
 echo ""
 echo "=================================================="
 echo " JOB $SLURM_JOB_ID FINISHED: $(date)"
-echo " STATUS: pilot_complete ok_runs=$PILOT_OK / 36 (last_rc=$PILOT_RC)"
+echo " STATUS: pilot_complete ok_runs=$PILOT_OK / 30 (last_rc=$PILOT_RC)"
 echo "=================================================="
 exit $PILOT_RC
