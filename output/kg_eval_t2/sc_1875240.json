@@ -1,0 +1,43 @@
+[
+  {
+    "task_id": "T2.1-case1-SYS01-grounding",
+    "model": "gemma4:31b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 6,
+    "failed_queries": 0,
+    "notes": [
+      "Exceeded query budget: 6 queries (optimal: 2).",
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.2-case3-D044-tension",
+    "model": "gemma4:31b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": true,
+    "grounding_discipline_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": true,
+    "total_queries": 2,
+    "failed_queries": 0,
+    "notes": []
+  },
+  {
+    "task_id": "T2.3-case1-impossible-cloud",
+    "model": "gemma4:31b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 5,
+    "failed_queries": 0,
+    "notes": [
+      "Exceeded query budget: 5 queries (optimal: 1)."
+    ]
+  }
+]

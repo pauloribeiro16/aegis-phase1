@@ -1,0 +1,45 @@
+[
+  {
+    "task_id": "T2.1-case1-SYS01-grounding",
+    "model": "qwen3.8:27b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": true,
+    "grounding_discipline_pass": false,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "notes": [
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.2-case3-D044-tension",
+    "model": "qwen3.8:27b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": true,
+    "grounding_discipline_pass": false,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "notes": [
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.3-case1-impossible-cloud",
+    "model": "qwen3.8:27b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": true,
+    "grounding_discipline_pass": false,
+    "absence_declared_pass": false,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "notes": [
+      "Final answer empty or truncated.",
+      "Failed to declare absence on impossible task."
+    ]
+  }
+]

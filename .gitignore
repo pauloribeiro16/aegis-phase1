@@ -28,9 +28,13 @@ work_test/
 .DS_Store
 Thumbs.db
 
-# Project (anchor to top-level only)
-/output/
-/cases/*/output/
+# Project outputs (anchor to top-level only) — keep T2 scorecards for audit
+output/*
+!output/kg_eval_t2/
+output/kg_eval_t2/*
+!output/kg_eval_t2/sc_*.json
+!output/kg_eval_t2/t2_pilot_v*_summary.md
+cases/*/output/
 *.tar.gz
 .eggs/
 
