@@ -106,9 +106,9 @@ inv = get_invoker(provider='ollama', model='$MODEL')
 
 def invoker_call(prompt: str) -> str:
     res = inv.invoke(prompt)
-    # UnifiedInvoker.invoke(prompt) returns dict (light path).
+    # UnifiedInvoker.invoke_raw returns dict {raw, status, usage}; .content only on heavy path.
     if isinstance(res, dict):
-        return str(res.get('content', res.get('text', '')))
+        return str(res.get('raw', res.get('content', res.get('text', ''))))
     if hasattr(res, 'content'):
         return res.content
     return str(res)
