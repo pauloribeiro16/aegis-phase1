@@ -17,11 +17,13 @@ from pathlib import Path
 
 import pytest
 
+from aegis_phase1.v2.llm import MockInvoker
 from scripts.kg_eval.generate_context_packets import generate_packet
 from scripts.kg_eval.run_t1 import (
     _build_no_kg_case_context,
     _build_prompt,
     _git_commit_sha,
+    _is_mock,
     invoke_llm,
     load_tasks,
     run_task,
@@ -288,10 +290,6 @@ def test_invoker_mock_with_allow_returns_mock(monkeypatch: pytest.MonkeyPatch) -
 
 def test_invoke_llm_aborts_on_mock() -> None:
     """invoke_llm(..., abort_on_mock=True) with a MockInvoker raises before the call."""
-    from aegis_phase1.v2.llm import MockInvoker
-
-    from scripts.kg_eval.run_t1 import _is_mock, invoke_llm
-
     inv = MockInvoker()
     assert _is_mock(inv)
     with pytest.raises(RuntimeError, match="MockInvoker but abort_on_mock=True"):
@@ -300,10 +298,6 @@ def test_invoke_llm_aborts_on_mock() -> None:
 
 def test_invoke_llm_allows_mock_when_explicit() -> None:
     """invoke_llm(..., abort_on_mock=False) with a MockInvoker does NOT raise."""
-    from aegis_phase1.v2.llm import MockInvoker
-
-    from scripts.kg_eval.run_t1 import invoke_llm
-
     inv = MockInvoker()
     inv.script = [{"raw": "ok", "status": "OK"}]
     out = invoke_llm(inv, "system", "user", abort_on_mock=False)
