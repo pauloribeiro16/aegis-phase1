@@ -16,8 +16,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from scripts.kg_eval.engine import build_graph_for_case
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -51,7 +49,7 @@ def test_proportionality_entry_instantiated() -> None:
     pe_with_valid_tier = [pe for pe in pe_nodes if pe.properties.get("tier") in VALID_PE_TIERS]
     assert (
         len(pe_with_valid_tier) > 0
-    ), f"Expected at least one PE with tier in {VALID_PE_TIERS}; got tiers {set(pe.properties.get('tier') for pe in pe_nodes)}"
+    ), f"Expected at least one PE with tier in {VALID_PE_TIERS}; got tiers { {pe.properties.get('tier') for pe in pe_nodes} }"
 
     pe_with_real_sd = [pe for pe in pe_nodes if pe.properties.get("sub_domain_id") in real_sd_ids]
     assert pe_with_real_sd, (
@@ -108,6 +106,6 @@ def test_data_subject_absent_case1() -> None:
     graph = build_graph_for_case(CASE1_PATH, PREPROC_ROOT)
 
     ds_nodes = [n for n in graph.nodes if "DataSubject" in n.labels]
-    assert ds_nodes == [], (
-        f"Expected 0 DataSubject nodes for case1 (no data_subjects.yaml); got {len(ds_nodes)}"
-    )
+    assert (
+        ds_nodes == []
+    ), f"Expected 0 DataSubject nodes for case1 (no data_subjects.yaml); got {len(ds_nodes)}"
