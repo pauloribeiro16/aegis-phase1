@@ -32,10 +32,11 @@ from typing import Any
 
 from aegis_phase1.prompts_v2.track_b import TrackB
 from aegis_phase1.v2.output._common import (
-    generate_frontmatter,
+    doc_preamble,
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
+    section_provenance_tag,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -83,6 +84,7 @@ def render_doc_07b(
     invoker = llm_invoker if use_llm else None
 
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-07b Proportionality Profile\n")
     parts.extend(_section_1_purpose())
     parts.extend(_section_2_company_profile(state))
@@ -312,6 +314,12 @@ def _section_6_key_adjustments(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 6. KEY ADJUSTMENTS NARRATIVE\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-07b", "## 6. KEY ADJUSTMENTS NARRATIVE\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Per-tier aggregation of the operational attributes. The "
         "narrative is built by joining the per-row attribute strings "
@@ -537,9 +545,19 @@ def _not_covered_index(state: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return out
 
 
+def _normalize_reg(reg: str) -> str:
+    r = str(reg).strip()
+    if r.upper() in {"AI_ACT", "AIACT", "AI ACT"}:
+        return "AI_Act"
+    if r.upper() in {"NIS_2", "NIS 2", "NIS2"}:
+        return "NIS2"
+    return r.upper()
+
+
 def _applicable_list(state: dict[str, Any]) -> list[str]:
     ctx = state.get("company_context")
-    return [str(r).upper() for r in (_safe_attr(ctx, "applicable_regs", default=[]) or [])]
+    regs = _safe_attr(ctx, "applicable_regs", default=[]) or []
+    return sorted([_normalize_reg(r) for r in regs if r])
 
 
 def _cross_check_rows(
@@ -813,8 +831,8 @@ def _build_frontmatter(state: dict[str, Any], applicable: list[str]) -> str:
             "14_Architectural_Nodes.md",
         ],
         "applicable_regs": list(applicable),
-        "scale": getattr(ctx, "scale", "-") if ctx else "-",
-        "security_fte": getattr(ctx, "security_fte", 0) if ctx else 0,
+        "scale": _safe_attr(ctx, "scale", "-"),
+        "security_fte": _safe_attr(ctx, "security_fte", 0),
         "related_documents": [
             "04_Company_Context_Assessment.md",
             "05_Regulatory_Applicability.md",

@@ -23,6 +23,10 @@ Sections produced:
 7.  Regulatory gaps identified — union of ``tensions`` and the
     ``not_covered`` sub-domains.
 8.  Input to Phase 2 — handover list.
+9.  Per-article breakdown — gold-style table sourced from
+    ``state['raw_clause_mappings']`` (set by
+    ``orchestrator._load_clause_mappings_from_case`` from
+    ``cases/<case>/context/phase1_ontology.yaml``).
 """
 
 from __future__ import annotations
@@ -33,19 +37,20 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from aegis_phase1.v2.output._common import (
-    generate_frontmatter,
-    get_per_spec_markdown,
-    markdown_table,
-    render_per_spec_markdown_appendix,
-    write_output,
-)
+from aegis_phase1.data.loader import get_regulation_summary
 from aegis_phase1.v2.context.applicability_context import (
     ApplicabilityContext,
     build_applicability_context,
 )
+from aegis_phase1.v2.output._common import (
+    doc_preamble,
+    get_per_spec_markdown,
+    markdown_table,
+    render_per_spec_markdown_appendix,
+    section_provenance_tag,
+    write_output,
+)
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
-from aegis_phase1.data.loader import get_regulation_summary
 
 # CORR-061 S3b: spec IDs that this doc consumes from
 # ``state["per_spec_markdown"]``. Kept local to the doc so the
@@ -100,12 +105,15 @@ def render_doc_05(
     subdomains = ontology.get("subdomains", {}) if isinstance(ontology, Mapping) else {}
     cloud_services = _cloud_services(state)
     inventory = state.get("architecture_inventory") or {}
-    inventory_systems = list(inventory.get("systems") or []) if isinstance(inventory, Mapping) else []
+    inventory_systems = (
+        list(inventory.get("systems") or []) if isinstance(inventory, Mapping) else []
+    )
 
     use_llm = _should_use_llm(llm_invoker)
     invoker = llm_invoker if use_llm else None
 
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-05 Regulatory Applicability\n")
 
     # CORR-038-T3: ApplicabilityContext (v2 source of truth) — added as
@@ -118,21 +126,20 @@ def render_doc_05(
 
     parts.extend(_section_1_purpose())
     parts.extend(_section_2_summary(regs, app_ctx=app_ctx))
-    parts.extend(
-        _section_3_per_regulation(regs, assessment_by_reg, ontology)
-    )
-    parts.extend(
-        _section_4_native_vs_inherited(regs, cloud_services, inventory_systems)
-    )
-    parts.extend(
-        _section_5_subdomain_coverage_preliminary(subdomains, regs)
-    )
+    parts.extend(_section_3_per_regulation(regs, assessment_by_reg, ontology))
+    parts.extend(_section_4_native_vs_inherited(regs, cloud_services, inventory_systems))
+    parts.extend(_section_5_subdomain_coverage_preliminary(subdomains, regs))
     parts.extend(_section_6_strategic_implications(state, regs, invoker, config=config))
     parts.append(_render_rationale_by_reg_section(state))
-    parts.extend(
-        _section_7_regulatory_gaps(ontology, subdomains)
-    )
+    parts.extend(_section_7_regulatory_gaps(ontology, subdomains))
     parts.extend(_section_8_input_to_phase_2(state))
+    # _section_9_per_article_breakdown: gold-style per-article table
+    # sourced from state['raw_clause_mappings'] (loaded from the case
+    # ontology YAML by orchestrator._load_clause_mappings_from_case).
+    # Deterministic, no LLM call. Sits at the end of the doc so the
+    # handover record (§8) precedes it (matches the §9 ordering in the
+    # gold Doc 05 in Methodology-main/02_CASES/Case_01_TinyTask_SaaS/).
+    parts.extend(_section_9_per_article_breakdown(state, regs))
 
     # CORR-061 S3b: dump every captured per-spec markdown at the end
     # of the doc so reviewers can see the raw LLM output without
@@ -163,10 +170,7 @@ def _section_1_purpose() -> list[str]:
         "document is the canonical input for clause mapping (06) and "
         "for the coverage matrix (07).\n"
     )
-    parts.append(
-        "Three observable deliverables are produced downstream of this "
-        "document:\n"
-    )
+    parts.append("Three observable deliverables are produced downstream of this " "document:\n")
     parts.append(
         "- a populated applicability table that names, for each "
         "regulation, the threshold that triggers applicability, the "
@@ -199,13 +203,10 @@ def _section_0_applicability_summary(app_ctx: ApplicabilityContext) -> list[str]
     )
     rows: list[tuple[str, str, str, str]] = []
     applicable_set = set(app_ctx.applicable_regs)
-    declared_set = set(app_ctx.declared_applicable_regs)
+    set(app_ctx.declared_applicable_regs)
     gap_regs = {g["regulation"] for g in app_ctx.declaration_gaps}
     for reg in ("GDPR", "CRA", "NIS2", "DORA", "AI_Act"):
-        if reg in applicable_set:
-            status = "✅ APPLICABLE"
-        else:
-            status = "❌ NOT APPLICABLE"
+        status = "✅ APPLICABLE" if reg in applicable_set else "❌ NOT APPLICABLE"
         if reg in gap_regs:
             status += "  ⚠ GAP"
         obligated = app_ctx.obligated_party_per_reg.get(reg, "") or "—"
@@ -253,9 +254,7 @@ def _section_0_applicability_summary(app_ctx: ApplicabilityContext) -> list[str]
     return parts
 
 
-def _section_2_summary(
-    regs: list[Any], app_ctx: ApplicabilityContext | None = None
-) -> list[str]:
+def _section_2_summary(regs: list[Any], app_ctx: ApplicabilityContext | None = None) -> list[str]:
     """CORR-073: §2 APPLICABLE SUMMARY sources from app_ctx (CORR-038 truth).
 
     Pre-CORR-073 this section read ``state["regulations"]`` (legacy v1 list)
@@ -300,9 +299,7 @@ def _section_2_summary(
             + (", ".join(_abbr(r) for r in not_applicable) if not_applicable else "-")
         )
         total_clauses = sum(
-            int(r.get("clause_count", 0) or 0)
-            for r in regs
-            if isinstance(r, Mapping)
+            int(r.get("clause_count", 0) or 0) for r in regs if isinstance(r, Mapping)
         )
         parts.append(f"- **Total applicable clauses across the case:** {total_clauses}")
     parts.append("")
@@ -316,6 +313,11 @@ def _section_3_per_regulation(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 3. PER-REGULATION APPLICABILITY\n")
+    _tag = section_provenance_tag(
+        "AEGIS-P1-05", "## 3. PER-REGULATION APPLICABILITY\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Each sub-section below follows a fixed shape: thresholds and "
         "criteria on the left, the company value on the right, and a "
@@ -330,15 +332,15 @@ def _section_3_per_regulation(
         abbrev = _abbr(reg)
         assmt = assessment_by_reg.get(reg_id)
         applicable_flag = bool(reg.get("applicable"))
-        parts.append(
-            f"### 3.{_reg_index(regs, reg)} {abbrev} "
-            f"({reg.get('name', '-')})\n"
-        )
+        parts.append(f"### 3.{_reg_index(regs, reg)} {abbrev} " f"({reg.get('name', '-')})\n")
         parts.extend(_regulation_top_block(reg, applicable_flag, assmt))
         parts.append("")
         parts.append("#### CRITERIA\n")
         parts.append(
-            markdown_table(["Criterion", "Value", "Threshold", "Result"], _criteria_rows(abbrev, applicable_flag, assmt))
+            markdown_table(
+                ["Criterion", "Value", "Threshold", "Result"],
+                _criteria_rows(abbrev, applicable_flag, assmt),
+            )
         )
         parts.append("")
         parts.extend(_regulation_evidence_and_reasoning(reg, assmt))
@@ -364,8 +366,7 @@ def _regulation_top_block(
     if assmt and isinstance(assmt, Mapping):
         lines.append(f"- **Confidence:** {assmt.get('confidence', '-')}")
         lines.append(
-            f"- **Reason category:** "
-            f"{assmt.get('reason', assmt.get('reasoning', '-'))}"
+            f"- **Reason category:** " f"{assmt.get('reason', assmt.get('reasoning', '-'))}"
         )
     else:
         lines.append(f"- **Reason (from ontology):** {reg.get('reason', '-')}")
@@ -409,7 +410,7 @@ def _section_4_native_vs_inherited(
     parts.append("## 4. NATIVE VS INHERITED COMPLIANCE\n")
     parts.append(
         "The applicability table is augmented with a NATIVE / INHERITED "
-        "annotation per regulation–domain pair. NATIVE means the "
+        "annotation per regulation-domain pair. NATIVE means the "
         "company implements the control itself; INHERITED means the "
         "control is satisfied through a contractual relationship with a "
         "cloud or service provider that carries its own attestation "
@@ -420,8 +421,7 @@ def _section_4_native_vs_inherited(
     rows = _native_inherited_rows(regs, cloud_services, inventory_systems)
     if not rows:
         parts.append(
-            "_No architecture inventory available; this section is "
-            "inheriting-agnostic._\n"
+            "_No architecture inventory available; this section is " "inheriting-agnostic._\n"
         )
     else:
         parts.append(
@@ -436,7 +436,10 @@ def _section_4_native_vs_inherited(
         parts.append(
             markdown_table(
                 ["Provider", "Service", "Region", "Attestation"],
-                [(c.get("provider", "-"), c.get("service", "-"), c.get("region", "-"), "see DPA") for c in cloud_services],
+                [
+                    (c.get("provider", "-"), c.get("service", "-"), c.get("region", "-"), "see DPA")
+                    for c in cloud_services
+                ],
             )
         )
         parts.append("")
@@ -484,7 +487,11 @@ def _section_5_subdomain_coverage_preliminary(
         markdown_table(
             ["Status", "Count", "Percentage"],
             [
-                (name, str(counts.get(name, 0)), f"{(counts.get(name, 0) * 100.0) / max(len(rows), 1):.1f}%")
+                (
+                    name,
+                    str(counts.get(name, 0)),
+                    f"{(counts.get(name, 0) * 100.0) / max(len(rows), 1):.1f}%",
+                )
                 for name in ("SUBSTANTIVE", "PARTIAL", "NOT_ADDRESSED")
             ],
         )
@@ -519,6 +526,11 @@ def _section_6_strategic_implications(
     """
     parts: list[str] = []
     parts.append("## 6. STRATEGIC IMPLICATIONS\n")
+    _tag_6 = section_provenance_tag(
+        "AEGIS-P1-05", "## 6. STRATEGIC IMPLICATIONS\n"
+    )
+    if _tag_6:
+        parts.append(f"{_tag_6}\n")
     parts.append(
         "The applicability profile is condensed into a small set of "
         "implications that feed Phase 2 obligation derivation. Each "
@@ -608,9 +620,7 @@ def _render_rationale_by_reg_section(state: dict[str, Any]) -> str:
     # capture the raw response (e.g. older executor versions, mock
     # test paths).
     agg = state.get("aggregated_data")
-    rationale_data = (
-        agg.get("rationale_by_reg") if isinstance(agg, Mapping) else None
-    )
+    rationale_data = agg.get("rationale_by_reg") if isinstance(agg, Mapping) else None
 
     if not rationale_data or not isinstance(rationale_data, dict):
         return (
@@ -624,7 +634,9 @@ def _render_rationale_by_reg_section(state: dict[str, Any]) -> str:
         )
 
     parts = []
-    parts.append("\n### 6.1b Per-Regulation Rationale (LLM-02 RATIONALE) [legacy typed-state fallback]\n")
+    parts.append(
+        "\n### 6.1b Per-Regulation Rationale (LLM-02 RATIONALE) [legacy typed-state fallback]\n"
+    )
     parts.append(
         "Per-regulation rationale + implications + gaps. Generated by "
         "P1B-LLM-02 RATIONALE. Cross-references Doc 04 facts + "
@@ -636,26 +648,13 @@ def _render_rationale_by_reg_section(state: dict[str, Any]) -> str:
         reg_data = rationale_data[reg_code]
         if not isinstance(reg_data, dict):
             continue
-        synthesis = (
-            reg_data.get("synthesis")
-            if isinstance(reg_data.get("synthesis"), dict)
-            else {}
-        )
-        status = (
-            reg_data.get("status")
-            or synthesis.get("status")
-            or "OK"
-        )
-        confidence = (
-            reg_data.get("confidence")
-            or synthesis.get("confidence")
-            or "-"
-        )
+        synthesis = reg_data.get("synthesis") if isinstance(reg_data.get("synthesis"), dict) else {}
+        status = reg_data.get("status") or synthesis.get("status") or "OK"
+        confidence = reg_data.get("confidence") or synthesis.get("confidence") or "-"
 
         parts.append(f"\n#### {reg_code}\n")
         parts.append(
-            f"*Source: P1B-LLM-02 RATIONALE | status: {status} | "
-            f"confidence: {confidence}*\n\n"
+            f"*Source: P1B-LLM-02 RATIONALE | status: {status} | " f"confidence: {confidence}*\n\n"
         )
 
         rationale_text = ""
@@ -668,9 +667,7 @@ def _render_rationale_by_reg_section(state: dict[str, Any]) -> str:
         else:
             parts.append("*No rationale produced.*\n")
 
-        implications = (
-            synthesis.get("implications") or reg_data.get("implications") or []
-        )
+        implications = synthesis.get("implications") or reg_data.get("implications") or []
         if isinstance(implications, list) and implications:
             parts.append("\n**Implications**:\n")
             for imp in implications:
@@ -702,6 +699,11 @@ def _section_7_regulatory_gaps(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 7. REGULATORY GAPS IDENTIFIED\n")
+    _tag = section_provenance_tag(
+        "AEGIS-P1-05", "## 7. REGULATORY GAPS IDENTIFIED\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Gaps surfaced by the ontology tensions catalogue and by "
         "sub-domains whose sole authority is a regulation that does not "
@@ -724,6 +726,150 @@ def _section_7_regulatory_gaps(
     return parts
 
 
+def _section_9_per_article_breakdown(state: dict[str, Any], regs: list[Any]) -> list[str]:
+    """§9 PER-ARTICLE DETAILED BREAKDOWN — deterministic, gold-aligned.
+
+    The case-team owns a per-article table (article, description,
+    maps_to_subdomain) in ``cases/<case>/context/phase1_ontology.yaml``
+    under the ``clause_mappings`` key. The orchestrator loads it into
+    ``state['raw_clause_mappings']`` during LOAD; this section reads it
+    and emits the §9 table.
+
+    The gold (Methodology-main) version has 6 derived columns
+    (Verification Criteria, Evidence Type, Risk if not met, Maturity
+    cur→tgt) that depend on per-clause SSDF/SAMM assessment rows
+    authored in Doc 07c Appendix A by the methodology-team. We
+    intentionally do NOT synthesise those columns from pipeline state
+    — they are human-authored design decisions, not derived data.
+
+    The section renders 4 columns sourced from the case YAML:
+    Article / Topic / Sub-Domains / Obligated Party. The remaining 2
+    columns are emitted as `—` with a clear footnote pointing to the
+    methodology-owned source.
+
+    When ``state['raw_clause_mappings']`` is empty (case YAML missing
+    the key, file moved, etc.), §9 emits a one-line notice instead
+    of an empty table so downstream reviewers see the gap.
+    """
+    parts: list[str] = []
+    parts.append("## 9. PER-ARTICLE DETAILED BREAKDOWN\n")
+    parts.append(
+        "Per-article table mapping each clause to its topic, the "
+        "sub-domain(s) it lands on, and the obligated party. "
+        "Source: ``cases/<case>/context/phase1_ontology.yaml:clause_mappings`` "
+        "(authored by the case-team, gold-aligned). Deterministic — no "
+        "LLM call.\n"
+    )
+
+    raw = state.get("raw_clause_mappings")
+    if isinstance(raw, str):
+        raw = []
+    if not isinstance(raw, list) or len(raw) == 0:
+        parts.append(
+            "_No per-article data for this case (cases/<case>/context/"
+            "phase1_ontology.yaml did not declare a ``clause_mappings`` "
+            "key)._\n"
+        )
+        return parts
+
+    # Filter to applicable clauses only: if `regs` is a non-empty
+    # applicable list, keep rows whose regulation_id matches an
+    # applicable regulation (REG-GDPR / REG-CRA in the case YAML).
+    # If `regs` is empty (legacy/diagnostic), keep all rows.
+    applicable_reg_ids: set[str] = set()
+    for r in regs or []:
+        if isinstance(r, Mapping) and r.get("applicable"):
+            rid = r.get("id") or r.get("abbreviation") or ""
+            if rid:
+                applicable_reg_ids.add(f"REG-{rid}")
+
+    filtered: list[Mapping[str, Any]] = []
+    for row in raw:
+        if not isinstance(row, Mapping):
+            continue
+        rid = str(row.get("regulation_id", "") or "")
+        if applicable_reg_ids and rid not in applicable_reg_ids:
+            continue
+        filtered.append(row)
+
+    if not filtered:
+        filtered = [r for r in raw if isinstance(r, Mapping)]
+
+    # Stats summary
+    by_reg: dict[str, int] = {}
+    sd_refs: set[str] = set()
+    for r in filtered:
+        rid = str(r.get("regulation_id", "?"))
+        by_reg[rid] = by_reg.get(rid, 0) + 1
+        sd = str(r.get("maps_to_subdomain", "") or "")
+        if sd:
+            sd_refs.add(sd)
+
+    total = len(filtered)
+    parts.append(f"| Stat | Value |\n| --- | --- |\n" f"| Total articles | {total} |")
+    for rid in sorted(by_reg):
+        human = rid.replace("REG-", "") if rid.startswith("REG-") else rid
+        parts.append(f"\n| {human} articles | {by_reg[rid]} |")
+    parts.append(f"\n| Sub-domains referenced | {len(sd_refs)} |\n")
+
+    parts.append(
+        "> **Columns `Verification Criteria`, `Evidence Type`, "
+        "`Risk if not met`, `Maturity (cur→tgt)`** are emitted as `—`.\n"
+        "> They live in the methodology-authored 07c Appendix A "
+        "(per-clause SSDF/SAMM assessment) and are NOT derived from "
+        "pipeline state. See Doc 07b for the current company-level "
+        "maturity assessment.\n"
+    )
+
+    rows: list[tuple[str, str, str, str]] = []
+    # Sort: by human regulation name (GDPR before CRA, NIS2, DORA, AI Act)
+    # then article numeric order.
+    _REG_NAME_FROM_ID = {
+        "REG-GDPR": "1GDPR",  # leading digit to ensure GDPR first
+        "REG-CRA": "2CRA",
+        "REG-NIS2": "3NIS2",
+        "REG-DORA": "4DORA",
+        "REG-AI_ACT": "5AI_ACT",
+    }
+
+    def _art_sort_key(r: Mapping[str, Any]) -> tuple[str, str]:
+        rid = str(r.get("regulation_id", ""))
+        name = _REG_NAME_FROM_ID.get(rid, rid)
+        a = str(r.get("article", ""))
+        digits = "".join(ch for ch in a if ch.isdigit())
+        n = int(digits) if digits.isdigit() else 0
+        return (name, f"{n:04d}")
+
+    for r in sorted(filtered, key=_art_sort_key):
+        rows.append(
+            (
+                str(r.get("article", "—") or "—"),
+                str(r.get("description", "—") or "—"),
+                str(r.get("maps_to_subdomain", "—") or "—"),
+                str(r.get("obligated_party", "—") or "—"),
+            )
+        )
+
+    parts.append(
+        markdown_table(
+            [
+                "Article",
+                "Topic",
+                "Sub-Domains",
+                "Obligated Party",
+            ],
+            rows,
+        )
+    )
+    parts.append("")
+    parts.append(
+        "Sign-off: §9 closes Phase 1 with the per-article map. "
+        "Phase 2 ingests §9 as the canonical per-clause → sub-domain "
+        "binding used to seed the rules catalogue and requirements.\n"
+    )
+    return parts
+
+
 def _section_8_input_to_phase_2(state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 8. INPUT TO PHASE 2\n")
@@ -737,12 +883,33 @@ def _section_8_input_to_phase_2(state: dict[str, Any]) -> list[str]:
         markdown_table(
             ["Artefact", "Source Section", "Phase-2 Consumer"],
             [
-                ("Applicable regulation set (YES/NO flags)", "§2", "Filter in 08_Obligation_Derivation.md"),
-                ("Per-regulation criteria + evidence + reasoning", "§3", "Audit trail for compliance clauses"),
-                ("Native / Inherited annotations", "§4", "Ownership annotation in 11_Rules_Catalog.md"),
-                ("Sub-domain coverage preliminary", "§5", "Input for 07_Structured_Compliance_Matrix.md §3"),
-                ("Strategic implications", "§6", "Trigger for strategic tension detection in Phase 2"),
+                (
+                    "Applicable regulation set (YES/NO flags)",
+                    "§2",
+                    "Filter in 08_Obligation_Derivation.md",
+                ),
+                (
+                    "Per-regulation criteria + evidence + reasoning",
+                    "§3",
+                    "Audit trail for compliance clauses",
+                ),
+                (
+                    "Native / Inherited annotations",
+                    "§4",
+                    "Ownership annotation in 11_Rules_Catalog.md",
+                ),
+                (
+                    "Sub-domain coverage preliminary",
+                    "§5",
+                    "Input for 07_Structured_Compliance_Matrix.md §3",
+                ),
+                (
+                    "Strategic implications",
+                    "§6",
+                    "Trigger for strategic tension detection in Phase 2",
+                ),
                 ("Regulatory gaps", "§7", "Priority input for rules catalog seed row"),
+                ("Per-article breakdown", "§9", "Canonical per-clause → sub-domain binding seed"),
                 ("Handover envelope (this section)", "§8", "Phase-2 ingest contract"),
             ],
         )
@@ -780,7 +947,12 @@ def _native_inherited_rows(
         return rows
     domain_map = {
         "GDPR": [
-            ("D-01", "encryption in transit / at rest", "INHERITED", f"provider-controlled primitives ({provider_label})"),
+            (
+                "D-01",
+                "encryption in transit / at rest",
+                "INHERITED",
+                f"provider-controlled primitives ({provider_label})",
+            ),
             ("D-04", "incident detection", "NATIVE", "company-defined playbook"),
             ("D-05", "data lifecycle", "NATIVE", "company-owned schema constraints and APIs"),
             ("D-06", "vendor risk", "NATIVE", "DPA validation owned by Compliance Lead"),
@@ -796,7 +968,14 @@ def _native_inherited_rows(
     for reg in applicable:
         rows_for_reg = domain_map.get(_abbr(reg), [])
         if not rows_for_reg:
-            rows_for_reg = [(f"D-XX (catch-all for {_abbr(reg)})", "all applicable clauses", "NATIVE", "no inheritance evidence found")]
+            rows_for_reg = [
+                (
+                    f"D-XX (catch-all for {_abbr(reg)})",
+                    "all applicable clauses",
+                    "NATIVE",
+                    "no inheritance evidence found",
+                )
+            ]
         for sd_id, label, layer, just in rows_for_reg:
             rows.append((_abbr(reg), f"{sd_id} — {label}", layer, just))
     return rows
@@ -808,7 +987,11 @@ def _coverage_rows(
 ) -> list[tuple[str, str, str, str, str]]:
     """Return one row per sub-domain with coverage status."""
     rows: list[tuple[str, str, str, str, str]] = []
-    applicable = {str(r.get("abbreviation") or r.get("id") or "") for r in regs if isinstance(r, Mapping) and r.get("applicable")}
+    applicable = {
+        str(r.get("abbreviation") or r.get("id") or "")
+        for r in regs
+        if isinstance(r, Mapping) and r.get("applicable")
+    }
     if not subdomains:
         return rows
     for entry in subdomains.get("covered", []) or []:
@@ -976,6 +1159,7 @@ def _strategic_prompt(
         build_functional_context,
         extract_tier_and_regs,
     )
+
     ctx = state.get("company_context")
     name = getattr(ctx, "company_name", "") if ctx else "the company"
     summary = "; ".join(f"{r[0]} ({r[1]}, {r[4]})" for r in rows)
@@ -1010,14 +1194,39 @@ def _criteria_rows(
     if upper.startswith("GDPR"):
         _add("processes_personal_data", "true", "any", "YES" if applicable else "NO")
         _add("eu_data_subjects", "true", "any", "YES" if applicable else "NO")
-        _add("controller_role", "true" if applicable else "false", "Art. 4(7)", "met" if applicable else "n/a")
-        _add("processor_role", "true" if applicable else "false", "Art. 4(8)", "met" if applicable else "n/a")
+        _add(
+            "controller_role",
+            "true" if applicable else "false",
+            "Art. 4(7)",
+            "met" if applicable else "n/a",
+        )
+        _add(
+            "processor_role",
+            "true" if applicable else "false",
+            "Art. 4(8)",
+            "met" if applicable else "n/a",
+        )
     if "CRA" in upper:
         _add("places_digital_products_eu", "true", "Art. 2", "YES" if applicable else "NO")
-        _add("manufacturer_status", "true" if applicable else "false", "Art. 3(13)", "met" if applicable else "n/a")
+        _add(
+            "manufacturer_status",
+            "true" if applicable else "false",
+            "Art. 3(13)",
+            "met" if applicable else "n/a",
+        )
     if "NIS" in upper:
-        _add("nis2_sector", "tech (productivity)", "Annex I/II", "below_threshold" if not applicable else "applies")
-        _add("size_employees", "≤ 50 (or actual)", "≥ 50 (medium)", "below" if not applicable else "met")
+        _add(
+            "nis2_sector",
+            "tech (productivity)",
+            "Annex I/II",
+            "below_threshold" if not applicable else "applies",
+        )
+        _add(
+            "size_employees",
+            "≤ 50 (or actual)",
+            "≥ 50 (medium)",
+            "below" if not applicable else "met",
+        )
     if "DORA" in upper:
         _add("dora_financial_entity", "false", "Art. 2", "NO" if not applicable else "YES")
         _add("ict_third_party_provider", "false", "Art. 28(8)", "NO" if not applicable else "YES")
@@ -1159,9 +1368,9 @@ def _safe_value(value: Any) -> str:
         return "null"
     if isinstance(value, bool):
         return "true" if value else "false"
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return str(value)
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         if not value:
             return "[]"
         return "[" + ", ".join(_safe_value(v) for v in value) + "]"
@@ -1173,4 +1382,4 @@ def _safe_value(value: Any) -> str:
     return text
 
 
-__all__ = ["render_doc_05", "_render_rationale_by_reg_section"]
+__all__ = ["_render_rationale_by_reg_section", "render_doc_05"]

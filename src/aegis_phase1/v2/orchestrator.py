@@ -34,6 +34,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from aegis_phase1.llm.quant_manifest import resolve_quant_for as _qm_resolve_quant_for
+from aegis_phase1.v2.domain.processor import MapPartialFailure
 from aegis_phase1.v2.state import V2State
 
 if TYPE_CHECKING:
@@ -409,6 +411,100 @@ class Phase1Orchestrator:
         }
         return inv
 
+    def _load_clause_mappings_from_case(self, case_path: str) -> None:
+        """Load gold-style per-article clause_mappings from the case ontology YAML.
+
+        The v2 PreprocCatalogLoader builds a derived clause_mappings list
+        (clause_id, regulation_id, source_sr_ids, maps_to_subdomain,
+        normative_strength) but loses the per-article detail (article,
+        description, obligated_party, obligation_type) that the case-team
+        authors in ``cases/<case>/context/phase1_ontology.yaml``.
+
+        This helper reads the YAML directly and stashes the
+        per-article rows under ``state['raw_clause_mappings']`` so that
+        renderers (notably Doc 05 §9 Per-Article Breakdown) can render
+        the gold-equivalent table.
+
+        Missing YAML or missing ``clause_mappings`` key is logged at
+        debug level and produces an empty list — the renderer shows a
+        graceful "_no per-article data for this case_" notice instead
+        of a broken table.
+        """
+        try:
+            import os as _os
+
+            import yaml as _yaml
+
+            case_name = _os.path.basename(_os.path.normpath(case_path))
+            candidates = [
+                _os.path.join(case_path, "context", "phase1_ontology.yaml"),
+                _os.path.join(case_path, "00_COMMON", "phase1_ontology.yaml"),
+            ]
+            env_root = _os.environ.get("AEGIS_CASES_ROOT")
+            if env_root:
+                candidates.insert(
+                    0,
+                    _os.path.join(env_root, case_name, "context", "phase1_ontology.yaml"),
+                )
+            yaml_path: str | None = None
+            for c in candidates:
+                if _os.path.isfile(c):
+                    yaml_path = c
+                    break
+            if yaml_path is None:
+                logger.debug(
+                    "_load_clause_mappings_from_case: no phase1_ontology.yaml "
+                    "found for %s (searched %s) — state['raw_clause_mappings'] "
+                    "will be empty",
+                    case_name,
+                    candidates,
+                )
+                self.state["raw_clause_mappings"] = []
+                return
+
+            with open(yaml_path, encoding="utf-8") as f:
+                data = _yaml.safe_load(f) or {}
+            rows = data.get("clause_mappings") or []
+            if not isinstance(rows, list):
+                logger.warning(
+                    "_load_clause_mappings_from_case: 'clause_mappings' is not a "
+                    "list in %s — ignoring",
+                    yaml_path,
+                )
+                rows = []
+
+            normalised: list[dict[str, Any]] = []
+            for r in rows:
+                if not isinstance(r, dict):
+                    continue
+                normalised.append(
+                    {
+                        "clause_id": str(r.get("clause_id", "") or ""),
+                        "regulation_id": str(r.get("regulation_id", "") or ""),
+                        "article": str(r.get("article", "") or ""),
+                        "description": str(r.get("description", "") or ""),
+                        "maps_to_subdomain": str(r.get("maps_to_subdomain", "") or ""),
+                        "normative_strength": r.get("normative_strength"),
+                        "obligated_party": str(r.get("obligated_party", "") or ""),
+                        "obligation_type": str(r.get("obligation_type", "") or ""),
+                    }
+                )
+
+            self.state["raw_clause_mappings"] = normalised
+            logger.debug(
+                "_load_clause_mappings_from_case: loaded %d gold-style " "clause_mappings from %s",
+                len(normalised),
+                yaml_path,
+            )
+        except Exception as exc:
+            logger.warning(
+                "_load_clause_mappings_from_case: failed to load from %s (%s) — "
+                "state['raw_clause_mappings'] will be empty",
+                case_path,
+                exc,
+            )
+            self.state.setdefault("raw_clause_mappings", [])
+
     def _build_ontology_shim(self) -> dict[str, Any]:
         """Build v1-shape ontology from v2 pairs and security requirements.
 
@@ -452,6 +548,11 @@ class Phase1Orchestrator:
             "regulations": list(self.state.get("v2_applicable_regs", [])),
             "overlaps": [p.model_dump() for p in self.state.get("v2_pairs", [])],
             "clause_mappings": clause_mappings,
+            # Preserve gold-style per-article rows (article, description,
+            # obligated_party, ...) loaded by _load_clause_mappings_from_case
+            # so legacy consumers reading state['ontology']['clause_mappings']
+            # still see per-article detail when present.
+            "raw_clause_mappings": list(self.state.get("raw_clause_mappings", []) or []),
             "source_regulations": {},
             "stacks": [],
             "company": {
@@ -543,6 +644,23 @@ class Phase1Orchestrator:
         # Populate v2_* state keys + v1 shim (replaces the removed
         # CommonLoader/PreprocessingLoader output).
         self._load_v2_catalog(case_path)
+
+        # _load_clause_mappings_from_case: read the gold-style per-article
+        # clause table (article, description, maps_to_subdomain, etc.)
+        # from the case ontology YAML (cases/<case>/context/phase1_ontology.yaml),
+        # which the case-team owns. The v2 PreprocCatalogLoader builds a
+        # derived clause_mappings list without article/description, so we
+        # layer the gold-style data on top under a parallel state key
+        # (``raw_clause_mappings``) for renderers that need per-article
+        # detail (e.g. Doc 05 §9 Per-Article Breakdown).
+        self._load_clause_mappings_from_case(case_path)
+
+        # Refresh the v1 ontology shim so legacy consumers reading
+        # ``state['ontology']['raw_clause_mappings']`` see the gold-style
+        # rows alongside the derived v2 list. _load_v2_catalog may have
+        # populated ``state['ontology']`` BEFORE _load_clause_mappings_from_case
+        # wrote its key — we re-build the shim now to capture both.
+        self.state["ontology"] = self._build_ontology_shim()
 
         self.state["current_stage"] = "LOADED"
         self.state["case_path"] = case_path
@@ -1175,9 +1293,7 @@ class Phase1Orchestrator:
             self.state["aggregated_data"]["compound_events"] = compound_events
         return compound_events if isinstance(compound_events, dict) else None
 
-    def _get_phase1_executor(
-        self, *, for_phase_1b: bool = False
-    ) -> "Phase1Executor | None":
+    def _get_phase1_executor(self, *, for_phase_1b: bool = False) -> "Phase1Executor | None":
         """Lazy-initialize the canonical five-LLM Phase1Executor.
 
         Returns None when no LLM invoker is configured, mock mode is active,
@@ -1326,6 +1442,10 @@ class Phase1Orchestrator:
         paths: dict[str, str] = dict(self.state.get("output_paths") or {})
         for label, fn in (
             ("04_body", self.render_doc_04_body),
+            ("04a", self.render_doc_04a),
+            ("04b", self.render_doc_04b),
+            ("04c", self.render_doc_04c),
+            ("04d", self.render_doc_04d),
             ("05", self.render_doc_05),
             ("06", self.render_doc_06),
             ("07", self.render_doc_07),
@@ -1621,10 +1741,32 @@ class Phase1Orchestrator:
             regulatory_baseline_path,
             preprocessing_path=preprocessing_path,
         )
+        # CORR-111: snapshot the model + quant + job that this run will use
+        # so renderers and digests can declare it transparently in their
+        # output. Idempotent — repeated calls keep the first recorded values.
+        self.init_model_capabilities()
         self.run_phase_1b()
-        self.map_domains()
+        # CORR-114 (P5/P6 fix): when MAP raises MapPartialFailure, never
+        # abort the run before REDUCE + OUTPUT. The deterministic docs
+        # 04/05/06/07/04a-04d/07b + xlsx are still useful with partial
+        # domain results. The runner's MAP_ABORT_THRESHOLD gate (P5
+        # exit-code-2) is preserved — we re-raise after OUTPUT so the
+        # job-slurm exit code reflects the partial failure (CI/grep).
+        map_failure: Exception | None = None
+        try:
+            self.map_domains()
+        except MapPartialFailure as exc:
+            map_failure = exc
+            logger.warning(
+                "MAP raised MapPartialFailure (%d failed domains) — "
+                "continuing so REDUCE + OUTPUT still write docs",
+                len(exc.failed_domains or []),
+            )
         self.reduce()
         self.generate_outputs(output_dir)
+        if map_failure is not None:
+            logger.info("=== PIPELINE COMPLETE (partial: MAP failed) ===")
+            raise map_failure
         logger.info("=== PIPELINE COMPLETE ===")
         return self.state
 
@@ -1932,6 +2074,47 @@ class Phase1Orchestrator:
             # of the typed dicts in ``domain_results`` / ``aggregated_data``.
             "per_spec_markdown": {},
         }
+
+    def init_model_capabilities(self) -> dict[str, Any]:
+        """CORR-111: snapshot the model + quant + job used by this run.
+
+        Populates ``state["v2_model_capabilities"]`` so every doc renderer
+        and any future digest has a single source of truth for what model
+        produced the run. Idempotent — first call wins (no silent
+        re-resolution if the invoker changes mid-run, which would confuse
+        digests).
+
+        Sources:
+          - ``self.llm_invoker.model`` / ``.provider`` for the identity.
+          - :func:`aegis_phase1.llm.quant_manifest.resolve_quant_for` for the
+            quant (probes the manifest dir, falls back to
+            ``provider_default`` for ollama, ``unknown`` otherwise).
+          - ``AEGIS_JOB_ID`` / ``SLURM_JOB_ID`` for the job tag.
+
+        Returns the dict that was (or is now) in ``state["v2_model_capabilities"]``.
+        """
+        existing = self.state.get("v2_model_capabilities")
+        if isinstance(existing, dict) and existing.get("model") and existing["model"] != "unknown":
+            return existing
+
+        model: str | None = None
+        provider: str | None = None
+        if self.llm_invoker is not None:
+            model = getattr(self.llm_invoker, "model", None)
+            provider = getattr(self.llm_invoker, "provider", None)
+
+        info = _qm_resolve_quant_for(model, provider)
+        from datetime import UTC, datetime
+        info = {**info, "recorded_at": datetime.now(UTC).isoformat()}
+
+        self.state["v2_model_capabilities"] = info
+        logger.info(
+            "CORR-111 init_model_capabilities: model=%s provider=%s "
+            "quant=%s provenance=%s job=%s manifest_path=%s",
+            info["model"], info["provider"], info["quantization"],
+            info["quantization_provenance"], info["job_id"], info["manifest_path"],
+        )
+        return info
 
     def _persist_state(self) -> None:
         """Persist current state to work/state.json."""

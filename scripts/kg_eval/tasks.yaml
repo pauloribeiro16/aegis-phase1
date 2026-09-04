@@ -1,0 +1,442 @@
+# KG-eval T1 task catalogue (CORR-113 Commit 3).
+#
+# One representative task per (case × family) = 15 tasks. Each task is run
+# twice (with-KG / no-KG) per `docs/KG_EVAL_PROTOCOL.md` §3.
+#
+# Field semantics:
+#   id:           Stable task ID; format <FAMILY>-<CASE>-<SUBDOMAIN>.
+#   family:       T1.1..T1.5 (mirrors the 5 families in §2 of the protocol).
+#   case:         Case directory name (relative to cases/).
+#   subdomain_id: Canonical subdomain ID (D-XX.Y).
+#   asset_id:     For T1.1 + T1.5 only: the case asset the task targets.
+#                 Must be present in cases/<case>/input/architecture/ YAMLs.
+#   question:     The task question rendered verbatim into the prompt.
+#   expected_structure: Markdown shape the scorer checks for (T1.1..T1.5 §2.x).
+#   scoring_criteria:    Per-metric hint list (full rubric in protocol §4).
+
+tasks:
+
+  # ─── T1.1 — Grounding fidelity ─────────────────────────────────────
+  - id: T1.1-case1-D-01.1
+    family: T1.1
+    case: case1-tinytask
+    subdomain_id: D-01.1
+    asset_id: SYS-01
+    question: >-
+      For case1-tinytask system SYS-01 (Main SaaS Application), list every
+      regulatory obligation that binds it, cite the source article(s), and
+      the NIST CSF 2.0 subcategories that anchor them.
+    expected_structure: |
+      ## Affected systems
+      ## Legal clauses (per regulation)
+      ## CSF anchors
+      ## In-scope rule
+    scoring_criteria:
+      - "citation ⊆ packet"
+      - "zero invented article references"
+      - "CSF tokens ∈ catalogue"
+      - "≥1 legal clause cited"
+      - "≥1 CSF anchor cited"
+
+  - id: T1.1-case2-D-02.3
+    family: T1.1
+    case: case2-secureborder
+    subdomain_id: D-02.3
+    asset_id: SYS-01
+    question: >-
+      For case2-secureborder system SYS-01, list every regulatory
+      obligation that binds it, cite the source article(s), and the NIST
+      CSF 2.0 subcategories that anchor them.
+    expected_structure: |
+      ## Affected systems
+      ## Legal clauses (per regulation)
+      ## CSF anchors
+      ## In-scope rule
+    scoring_criteria:
+      - "citation ⊆ packet"
+      - "zero invented article references"
+      - "CSF tokens ∈ catalogue"
+      - "≥1 legal clause cited"
+      - "≥1 CSF anchor cited"
+
+  - id: T1.1-case3-D-04.3
+    family: T1.1
+    case: case3-omnibank
+    subdomain_id: D-04.3
+    asset_id: SYS-CBS
+    question: >-
+      For case3-omnibank system SYS-CBS (Core Banking System), list every
+      regulatory obligation that binds it, cite the source article(s),
+      and the NIST CSF 2.0 subcategories that anchor them.
+    expected_structure: |
+      ## Affected systems
+      ## Legal clauses (per regulation)
+      ## CSF anchors
+      ## In-scope rule
+    scoring_criteria:
+      - "citation ⊆ packet"
+      - "zero invented article references"
+      - "CSF tokens ∈ catalogue"
+      - "≥1 legal clause cited"
+      - "≥1 CSF anchor cited"
+
+  # ─── T1.2 — Tension resolution ────────────────────────────────────
+  - id: T1.2-case1-D-04.3
+    family: T1.2
+    case: case1-tinytask
+    subdomain_id: D-04.3
+    question: >-
+      For case1-tinytask subdomain D-04.3, resolve the temporal conflict
+      between GDPR Art. 33 (72h breach notification) and CRA Art. 14
+      (24h for actively exploited vulnerabilities). Cite the resolution
+      principle the methodology records and state the severity.
+    expected_structure: |
+      ### Tension Resolution: REG_A vs REG_B — TYPE
+      - Friction:
+      - Resolution adopted:
+      - Severity:
+      - Source reference:
+    scoring_criteria:
+      - "structured-block present"
+      - "resolution cited"
+      - "severity ∈ {HIGH, MEDIUM, LOW}"
+      - "both regulations cited"
+
+  - id: T1.2-case3-D-04.4
+    family: T1.2
+    case: case3-omnibank
+    subdomain_id: D-04.4
+    question: >-
+      For case3-omnibank subdomain D-04.4, resolve any cross-regulation
+      tension between NIS2 and DORA on incident reporting. Cite the
+      resolution principle the methodology records and state the severity.
+    expected_structure: |
+      ### Tension Resolution: REG_A vs REG_B — TYPE
+      - Friction:
+      - Resolution adopted:
+      - Severity:
+      - Source reference:
+    scoring_criteria:
+      - "structured-block present"
+      - "resolution cited"
+      - "severity ∈ {HIGH, MEDIUM, LOW}"
+      - "both regulations cited"
+
+  - id: T1.2-case2-D-04.4
+    family: T1.2
+    case: case2-secureborder
+    subdomain_id: D-04.4
+    question: >-
+      For case2-secureborder subdomain D-04.4, resolve any cross-regulation
+      tension on incident reporting between NIS2 and CRA. Cite the
+      resolution principle the methodology records and state the severity.
+    expected_structure: |
+      ### Tension Resolution: REG_A vs REG_B — TYPE
+      - Friction:
+      - Resolution adopted:
+      - Severity:
+      - Source reference:
+    scoring_criteria:
+      - "structured-block present"
+      - "resolution cited"
+      - "severity ∈ {HIGH, MEDIUM, LOW}"
+      - "both regulations cited"
+
+  # ─── T1.3 — Ambiguity disposition ─────────────────────────────────
+  - id: T1.3-case1-D-01.2
+    family: T1.3
+    case: case1-tinytask
+    subdomain_id: D-01.2
+    question: >-
+      For case1-tinytask, examine the regulatory pair between GDPR and CRA
+      on subdomain D-01.2. If the pair is CONDITIONAL, choose the
+      applicable reading for this company, state the disposition (one of
+      RESOLVED_BY_FACT, RESOLVED_BY_TIER, NEEDS_HUMAN), and the anchors
+      (article IDs, tier, asset IDs, business goal IDs) that support the
+      call. If the pair is not CONDITIONAL, say so explicitly and explain
+      why no disposition is required.
+    expected_structure: |
+      ### Ambiguity Disposition: REG_A vs REG_B — D-XX.Y
+      - Reading adopted:
+      - Anchors:
+      - Consequence:
+      - Disposition:
+    scoring_criteria:
+      - "structured-block present"
+      - "disposition ∈ closed vocabulary (or explicit N/A rationale)"
+      - "reading ∈ verbatim_articles when CONDITIONAL"
+      - "anchors ⊆ closed lists"
+
+  - id: T1.3-case2-D-01.2
+    family: T1.3
+    case: case2-secureborder
+    subdomain_id: D-01.2
+    question: >-
+      For case2-secureborder, examine the regulatory pair between GDPR
+      and CRA on subdomain D-01.2. If the pair is CONDITIONAL, choose the
+      applicable reading for this company, state the disposition and the
+      anchors. If not CONDITIONAL, say so explicitly.
+    expected_structure: |
+      ### Ambiguity Disposition: REG_A vs REG_B — D-XX.Y
+      - Reading adopted:
+      - Anchors:
+      - Consequence:
+      - Disposition:
+    scoring_criteria:
+      - "structured-block present"
+      - "disposition ∈ closed vocabulary (or explicit N/A rationale)"
+      - "reading ∈ verbatim_articles when CONDITIONAL"
+      - "anchors ⊆ closed lists"
+
+  - id: T1.3-case3-D-01.2
+    family: T1.3
+    case: case3-omnibank
+    subdomain_id: D-01.2
+    question: >-
+      For case3-omnibank, examine the regulatory pair between DORA and
+      GDPR on subdomain D-01.2. If the pair is CONDITIONAL, choose the
+      applicable reading, state the disposition and the anchors. If not
+      CONDITIONAL, say so explicitly.
+    expected_structure: |
+      ### Ambiguity Disposition: REG_A vs REG_B — D-XX.Y
+      - Reading adopted:
+      - Anchors:
+      - Consequence:
+      - Disposition:
+    scoring_criteria:
+      - "structured-block present"
+      - "disposition ∈ closed vocabulary (or explicit N/A rationale)"
+      - "reading ∈ verbatim_articles when CONDITIONAL"
+      - "anchors ⊆ closed lists"
+
+  # ─── T1.4 — Proportionality adequacy ───────────────────────────────
+  - id: T1.4-case1-D-07.1
+    family: T1.4
+    case: case1-tinytask
+    subdomain_id: D-07.1
+    question: >-
+      For case1-tinytask subdomain D-07.1 at MICRO tier, what evidence
+      depth does the methodology require? Name at least one example
+      control and who owns the evidence.
+    expected_structure: |
+      ## Proportionality for D-XX.Y at tier TIER
+      - Tier:
+      - Evidence depth:
+      - Verification method:
+      - Example controls:
+      - Owner:
+    scoring_criteria:
+      - "tier ∈ closed enum"
+      - "evidence_depth non-empty"
+      - "≥1 example control cited"
+      - "owner named"
+      - "verification method ∈ enum"
+
+  - id: T1.4-case3-D-01.1
+    family: T1.4
+    case: case3-omnibank
+    subdomain_id: D-01.1
+    question: >-
+      For case3-omnibank subdomain D-01.1 at the relevant tier, what
+      evidence depth does the methodology require? Name at least one
+      example control and who owns the evidence.
+    expected_structure: |
+      ## Proportionality for D-XX.Y at tier TIER
+      - Tier:
+      - Evidence depth:
+      - Verification method:
+      - Example controls:
+      - Owner:
+    scoring_criteria:
+      - "tier ∈ closed enum"
+      - "evidence_depth non-empty"
+      - "≥1 example control cited"
+      - "owner named"
+      - "verification method ∈ enum"
+
+  - id: T1.4-case2-D-02.3
+    family: T1.4
+    case: case2-secureborder
+    subdomain_id: D-02.3
+    question: >-
+      For case2-secureborder subdomain D-02.3 at the relevant tier, what
+      evidence depth does the methodology require? Name at least one
+      example control and who owns the evidence.
+    expected_structure: |
+      ## Proportionality for D-XX.Y at tier TIER
+      - Tier:
+      - Evidence depth:
+      - Verification method:
+      - Example controls:
+      - Owner:
+    scoring_criteria:
+      - "tier ∈ closed enum"
+      - "evidence_depth non-empty"
+      - "≥1 example control cited"
+      - "owner named"
+      - "verification method ∈ enum"
+
+  # ─── T1.5 — Cross-tier synthesis ──────────────────────────────────
+  - id: T1.5-case1-D-01.1
+    family: T1.5
+    case: case1-tinytask
+    subdomain_id: D-01.1
+    asset_id: SYS-01
+    question: >-
+      For case1-tinytask system SYS-01, synthesise the regulatory
+      posture: active regulations, activated subdomains, the most
+      rigorous proportionality requirement, open tensions, and unresolved
+      ambiguities. Cite the regulation IDs and CSF subcategories for
+      every claim.
+    expected_structure: |
+      ## Active regulations
+      ## Activated subdomains (top 5 by tier)
+      ## Open tensions
+      ## Unresolved ambiguities
+      ## CSF anchors (per active regulation)
+    scoring_criteria:
+      - "active_reg_count cited"
+      - "≥1 activated subdomain cited"
+      - "≥1 CSF anchor cited"
+      - "≥1 structured tension/ambiguity block"
+      - "no invented regulation tokens"
+
+  - id: T1.5-case3-D-04.3
+    family: T1.5
+    case: case3-omnibank
+    subdomain_id: D-04.3
+    asset_id: SYS-CBS
+    question: >-
+      For case3-omnibank system SYS-CBS, synthesise the regulatory
+      posture: active regulations, activated subdomains, the most
+      rigorous proportionality requirement, open tensions, and unresolved
+      ambiguities. Cite the regulation IDs and CSF subcategories for
+      every claim.
+    expected_structure: |
+      ## Active regulations
+      ## Activated subdomains (top 5 by tier)
+      ## Open tensions
+      ## Unresolved ambiguities
+      ## CSF anchors (per active regulation)
+    scoring_criteria:
+      - "active_reg_count cited"
+      - "≥1 activated subdomain cited"
+      - "≥1 CSF anchor cited"
+      - "≥1 structured tension/ambiguity block"
+      - "no invented regulation tokens"
+
+  - id: T1.5-case2-D-04.4
+    family: T1.5
+    case: case2-secureborder
+    subdomain_id: D-04.4
+    asset_id: SYS-01
+    question: >-
+      For case2-secureborder system SYS-01, synthesise the regulatory
+      posture: active regulations, activated subdomains, the most
+      rigorous proportionality requirement, open tensions, and unresolved
+      ambiguities. Cite the regulation IDs and CSF subcategories for
+      every claim.
+    expected_structure: |
+      ## Active regulations
+      ## Activated subdomains (top 5 by tier)
+      ## Open tensions
+      ## Unresolved ambiguities
+      ## CSF anchors (per active regulation)
+    scoring_criteria:
+      - "active_reg_count cited"
+      - "≥1 activated subdomain cited"
+      - "≥1 CSF anchor cited"
+      - "≥1 structured tension/ambiguity block"
+      - "no invented regulation tokens"
+  # ─── T1.6 — Obligation derivation (deterministic ground truth) ─────
+  #
+  # For a (case, subdomain) pair, derive the set of ACTIVATED obligations.
+  # Ground truth is precomputed by scripts/kg_eval/ground_truth.py (mirrors
+  # what the KG ETL would emit as (:ClauseActivation) per KG-10). Scoring is
+  # exact-match: every required clause_id must appear in the model output;
+  # any invented clause_id is a fail. Tier is fixed at the case's scale to
+  # remove one variable.
+
+  - id: T1.6-case1-D-01.1
+    family: T1.6
+    case: case1-tinytask
+    subdomain_id: D-01.1
+    asset_id: SYS-01
+    question: >-
+      For case1-tinytask, derive every regulatory obligation that is
+      ACTIVATED for subdomain D-01.1 (Data Encryption) at the enterprise's
+      scale. For each obligation, cite the clause ID and the source
+      article. Do NOT cite obligations that do not bind this enterprise.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set (exact-match)"
+      - "zero invented clause_ids"
+      - "article references ⊆ activated clauses' articles"
+      - "no GlobalRegulation/regulation-only tokens without clause_id"
+
+  - id: T1.6-case1-D-09.1
+    family: T1.6
+    case: case1-tinytask
+    subdomain_id: D-09.1
+    asset_id: SYS-01
+    question: >-
+      For case1-tinytask, derive every regulatory obligation ACTIVATED
+      for subdomain D-09.1 (Incident Detection). Cite clause IDs and
+      articles. Do not invent.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set"
+      - "zero invented clause_ids"
+
+  - id: T1.6-case2-D-01.1
+    family: T1.6
+    case: case2-secureborder
+    subdomain_id: D-01.1
+    asset_id: SYS-FW
+    question: >-
+      For case2-secureborder, derive every regulatory obligation ACTIVATED
+      for subdomain D-01.1 (Data Encryption) at the enterprise's scale.
+      Cite clause IDs and articles. Do not invent.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set"
+      - "zero invented clause_ids"
+
+  - id: T1.6-case3-D-01.1
+    family: T1.6
+    case: case3-omnibank
+    subdomain_id: D-01.1
+    asset_id: SYS-CBS
+    question: >-
+      For case3-omnibank (a financial entity), derive every regulatory
+      obligation ACTIVATED for subdomain D-01.1 (Data Encryption) at the
+      enterprise's scale. Cite clause IDs and articles. Do not invent.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set"
+      - "zero invented clause_ids"
+      - "DORA / GDPR / NIS2 all represented (case3 has 5 applicable regs)"
+
+  - id: T1.6-case3-D-04.3
+    family: T1.6
+    case: case3-omnibank
+    subdomain_id: D-04.3
+    asset_id: SYS-CBS
+    question: >-
+      For case3-omnibank, derive every regulatory obligation ACTIVATED
+      for subdomain D-04.3 (Access Control — the mainframe CBS context).
+      Cite clause IDs and articles. Do not invent.
+    expected_structure: |
+      ## Activated obligations
+      - <REG>-CL<N>: <Article> — <one-line gist>
+    scoring_criteria:
+      - "set(cited clause_ids) == ground_truth set"
+      - "zero invented clause_ids"

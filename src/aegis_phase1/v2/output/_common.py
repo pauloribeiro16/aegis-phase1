@@ -258,11 +258,15 @@ def safe_get(obj: Any, *path: str, default: Any = None) -> Any:
 
 
 __all__ = [
+    "doc_preamble",
     "generate_frontmatter",
+    "get_per_spec_markdown",
     "markdown_table",
     "next_version",
     "render_per_spec_markdown_appendix",
     "safe_get",
+    "section_provenance_tag",
+    "strip_aegis_frontmatter",
     "write_output",
 ]
 
@@ -278,6 +282,43 @@ PER_SPEC_MD_SPECS: tuple[str, ...] = (
     "P1C-LLM-02-COMPOUND-EVENT",
     "P1C-LLM-03-STRATEGIC-SYNTHESIS",
 )
+
+
+def doc_preamble(state: Any) -> str:
+    """Empty preamble — kept for import compatibility with older doc
+    renderers. New code should use :data:`aegis_phase1.v2.output.provenance`
+    registry's :func:`section_provenance_tag` for section-level origin
+    labels instead.
+
+    Returns ``""`` so renderers that ``parts.append(doc_preamble(state))``
+    emit nothing rather than failing. None callers in the current tree,
+    but kept so the pre-CORR-074 import surface stays unbroken.
+    """
+    return ""
+
+
+def section_provenance_tag(doc_id: str, heading: str) -> str | None:
+    """Return the provenance tag to emit under a Doc heading, or None.
+
+    CORR-112: a renderer's exact ``parts.append(\"## N. ...\")`` line
+    is passed; if the registry classifies it as LLM-derived, the caller
+    emits the human-readable tag on the line below the heading. If
+    deterministic, returns ``None`` (no tag noise).
+
+    Caller pattern (matches every renderer):
+
+        parts.append(f"## {n}. {title}\\n")
+        tag = section_provenance_tag("AEGIS-P1-05", f"## {n}. {title}\\n")
+        if tag:
+            parts.append(tag + "\\n")
+    """
+    from aegis_phase1.v2.output.provenance import (
+        section_tag_for_heading,
+        should_tag,
+    )
+    if not should_tag(doc_id, heading):
+        return None
+    return section_tag_for_heading(doc_id, heading)
 
 
 def get_per_spec_markdown(state: Any, spec_id: str) -> str:
@@ -296,6 +337,47 @@ def get_per_spec_markdown(state: Any, spec_id: str) -> str:
         return ""
     raw = bucket.get(spec_id)
     return raw if isinstance(raw, str) else ""
+
+
+def doc_preamble(state: Any) -> str:
+    """CORR-111: one-line header for Doc 01-09 — model + quant + job.
+
+    Returns the empty string when no model_capabilities were recorded
+    (deterministic-only run, mock mode, or a re-run from a pre-CORR-111
+    state.json). Renderers append this just before the H1 title so the
+    reader sees ``Model: <model> @ <quant> (job <job>)`` at the very top.
+
+    Caveats are appended automatically by :func:`header_for_doc` when
+    ``quant`` is ``unknown`` or ``provider_default`` — those are the
+    two cases that must NOT be missed by the reader.
+    """
+    if not isinstance(state, Mapping):
+        return ""
+    cap = state.get("v2_model_capabilities")
+    if not isinstance(cap, Mapping):
+        return ""
+    model = str(cap.get("model", "unknown"))
+    quant = str(cap.get("quantization", "unknown"))
+    job = cap.get("job_id", "unknown")
+    from aegis_phase1.llm.quant_manifest import header_for_doc as _qm_header
+    return _qm_header(model=model, quant=quant, job=job) + "\n\n"
+
+
+def strip_aegis_frontmatter(md: str) -> str:
+    """CORR-111: remove the leading ``<!-- aegis:…-->`` comment lines.
+
+    Renderers consume markdown strings that may carry a single-line
+    quant frontmatter prepended by
+    :meth:`Phase1LLMInvoker._capture_per_spec_markdown`. Strip it before
+    forwarding to user-facing markdown (xlsx appendices still keep it
+    so the audit trail survives).
+    """
+    if not md:
+        return md
+    lines = md.splitlines(keepends=True)
+    while lines and lines[0].startswith("<!-- aegis:"):
+        lines.pop(0)
+    return "".join(lines)
 
 
 def render_per_spec_markdown_appendix(state: Any) -> list[str]:

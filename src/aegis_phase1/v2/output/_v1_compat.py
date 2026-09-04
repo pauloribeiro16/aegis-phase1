@@ -156,12 +156,12 @@ def get_taxonomy_entries(state: dict) -> list[dict[str, Any]]:
 
 
 __all__ = [
-    "get_company_context",
-    "get_regulations",
-    "get_ontology",
     "get_architecture_inventory",
-    "get_stakeholders",
     "get_business_goals",
+    "get_company_context",
+    "get_ontology",
     "get_preprocessing",
+    "get_regulations",
+    "get_stakeholders",
     "get_taxonomy_entries",
 ]

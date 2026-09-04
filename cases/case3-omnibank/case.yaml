@@ -7,7 +7,7 @@ applicable_regulations:
   - "CRA"
   - "NIS2"
   - "DORA"
-  - "AIACT"
+  - "AI_Act"
 
 llm:
   provider: "minimax"

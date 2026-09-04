@@ -81,6 +81,10 @@ extend-exclude = ["archive", "__pycache__", ".venv"]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# sbatch files are bash, not Python; ruff cannot parse them. Skip lint.
+"examples/deucalion/*.sbatch" = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true

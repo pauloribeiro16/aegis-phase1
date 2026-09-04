@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -36,6 +35,7 @@ from aegis_phase1.v2.output._common import (
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
+    section_provenance_tag,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -314,6 +314,12 @@ def _section_risk_classification(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. Supply Chain Risk Assessment\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-04c", "## 5. Supply Chain Risk Assessment\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     inv = state.get("architecture_inventory") or {}
     cloud = inv.get("cloud_services") or []
     if not cloud:
@@ -461,7 +467,7 @@ def _section_gate(state: dict[str, Any]) -> list[str]:
     parts.append("## 8. Gate\n")
     inv = state.get("architecture_inventory") or {}
     cloud = inv.get("cloud_services") or []
-    has_overlaps = bool(((state.get("ontology") or {}).get("overlaps") or []))
+    has_overlaps = bool((state.get("ontology") or {}).get("overlaps") or [])
     parts.append(
         markdown_table(
             ["Gate Criterion", "Status", "Evidence"],

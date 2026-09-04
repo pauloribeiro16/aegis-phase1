@@ -65,6 +65,7 @@ POLICY_FILE_PATTERNS=(
   "execution/CONTRACT-028.md"
   "execution/CONTRACT-027.md"
   "execution/AUDIT_D-01.1_CSF_MAPPING.md"
+  "docs/visualization/regulation_chain.html"
   "tests/unit/hooks/test_ci_frameworks.py"
 )
 

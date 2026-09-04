@@ -1,1 +1,37 @@
-services: []
+cloud_services:
+  - id: CS-01
+    name: AWS EU Region
+    service: EC2, RDS, S3, KMS
+    region: eu-central-1 / eu-west-1
+    provider: AWS
+    dpa_in_place: true
+  - id: CS-02
+    name: Thales / Utimaco HSM Cluster
+    service: Key Management & Signing
+    region: EU On-premises
+    provider: Thales
+    dpa_in_place: true
+  - id: CS-03
+    name: Okta EU Identity
+    service: SSO & MFA
+    region: EU Tenant
+    provider: Okta
+    dpa_in_place: true
+  - id: CS-04
+    name: Splunk Cloud EU
+    service: SIEM & Audit Aggregation
+    region: EU Region
+    provider: Splunk
+    dpa_in_place: true
+  - id: CS-05
+    name: CrowdStrike EU
+    service: Endpoint Detection & Response
+    region: EU Region
+    provider: CrowdStrike
+    dpa_in_place: true
+  - id: CS-06
+    name: GitHub Enterprise EU
+    service: Source Code & SBOM Repository
+    region: EU Region
+    provider: GitHub
+    dpa_in_place: true

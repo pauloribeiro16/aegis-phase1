@@ -42,10 +42,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 from aegis_phase1.v2.output._common import (
-    generate_frontmatter,
+    doc_preamble,
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
+    safe_get,
+    section_provenance_tag,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -99,30 +101,31 @@ def render_doc_07(
     # preproc_catalog). Normalize to the v1 SubDomainDef shape with
     # 'covered' and 'not_covered' keys so _matrix_rows can iterate.
     if isinstance(subdomains, Mapping) and not subdomains.get("covered") and not subdomains.get("not_covered"):
-        v2_subs = state.get("subdomains") or {}
-        if isinstance(v2_subs, dict) and v2_subs:
+        v2_subs = state.get("v2_subdomains") or state.get("subdomains") or {}
+        if isinstance(v2_subs, dict | list) and v2_subs:
             covered_list: list[dict] = []
-            for sid, sd in v2_subs.items():
-                if not isinstance(sid, str):
+            for item in (v2_subs.values() if isinstance(v2_subs, dict) else v2_subs):
+                sid = getattr(item, "id", None) or (item.get("id") if isinstance(item, dict) else None)
+                if not sid:
                     continue
-                # Pydantic Subdomain object
                 pr = (
-                    getattr(sd, "participating_regulations", None)
-                    or getattr(sd, "source_regulations", None)
-                    or getattr(sd, "applies_to", None)
+                    getattr(item, "participating_regulations", None)
+                    or getattr(item, "source_regulations", None)
+                    or getattr(item, "applies_to", None)
                     or []
                 )
-                if isinstance(sd, dict):
+                if isinstance(item, dict):
                     pr = (
-                        sd.get("participating_regulations")
-                        or sd.get("source_regulations")
-                        or sd.get("applies_to")
+                        item.get("participating_regulations")
+                        or item.get("source_regulations")
+                        or item.get("applies_to")
                         or []
                     )
                 name = (
-                    getattr(sd, "title", None)
-                    or getattr(sd, "name", None)
-                    or (sd.get("title") if isinstance(sd, dict) else None)
+                    getattr(item, "title", None)
+                    or getattr(item, "name", None)
+                    or (item.get("title") if isinstance(item, dict) else None)
+                    or (item.get("name") if isinstance(item, dict) else None)
                     or sid
                 )
                 covered_list.append(
@@ -139,6 +142,7 @@ def render_doc_07(
     invoker = llm_invoker if use_llm else None
 
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-07 Structured Compliance Matrix\n")
     parts.extend(_section_1_purpose())
     parts.extend(_section_2_inputs())
@@ -268,6 +272,12 @@ def _section_4_summary(
 def _section_5_complementarity(overlaps: list[Any], state: dict[str, Any]) -> list[str]:
     parts: list[str] = []
     parts.append("## 5. COMPLEMENTARITY\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-07", "## 5. COMPLEMENTARITY\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Cross-regulation overlaps are presented below. Section 5.1 "
         "expands each overlap into a table of shared sub-domains with "
@@ -416,6 +426,12 @@ def _section_6_strategic_implications(
     """
     parts: list[str] = []
     parts.append("## 6. STRATEGIC IMPLICATIONS\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-07", "## 6. STRATEGIC IMPLICATIONS\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     rows = _strategic_implication_rows(state, regs)
     parts.append(
         markdown_table(
@@ -457,6 +473,12 @@ def _section_7_gaps(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 7. GAPS\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-07", "## 7. GAPS\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Gaps are surfaced from three sources and ranked by severity: "
         "(a) structural tensions recorded in ``state.ontology.tensions``; "
@@ -979,11 +1001,18 @@ def _gate_rows(
 # ─────────────────────────────────────────────────────────────────────
 
 
-def _abbr(reg: Mapping[str, Any]) -> str:
-    raw = reg.get("abbreviation") or reg.get("id") or "?"
-    text = str(raw)
+def _abbr(reg: Any) -> str:
+    if isinstance(reg, Mapping):
+        raw = reg.get("abbreviation") or reg.get("name") or reg.get("id") or "?"
+    else:
+        raw = str(reg)
+    text = str(raw).strip()
     if "/" in text:
-        return text.split("/")[-1].upper()
+        text = text.split("/")[-1]
+    if text.upper() in {"AI_ACT", "AIACT", "AI ACT"}:
+        return "AI_Act"
+    if text.upper() in {"NIS_2", "NIS 2", "NIS2"}:
+        return "NIS2"
     return text.upper()
 
 
@@ -997,7 +1026,7 @@ def _regulation_abbrs(
                 continue
             abbreviations.append(_abbr(regulation))
         elif isinstance(regulation, str) and regulation:
-            abbreviations.append(regulation.upper())
+            abbreviations.append(_abbr(regulation))
     return abbreviations
 
 
@@ -1016,6 +1045,11 @@ def _build_frontmatter(state: dict[str, Any], regs: list[Any]) -> str:
     ctx = state.get("company_context")
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     applicable = sorted(_regulation_abbrs(regs, applicable_only=True))
+    case_study = safe_get(ctx, "company_name", default="UNKNOWN") if ctx else "UNKNOWN"
+    if case_study == "UNKNOWN":
+        facts = state.get("v2_company_facts")
+        if facts is not None:
+            case_study = str(getattr(facts, "name", "UNKNOWN"))
     payload: dict[str, Any] = {
         "document_id": "AEGIS-P1-07",
         "title": "Structured Compliance Matrix",
@@ -1025,7 +1059,7 @@ def _build_frontmatter(state: dict[str, Any], regs: list[Any]) -> str:
         "updated": now,
         "author": "Executor",
         "status": "DRAFT",
-        "case_study": getattr(ctx, "company_name", "UNKNOWN") if ctx else "UNKNOWN",
+        "case_study": case_study,
         "inputs": [
             "04_Company_Context_Assessment.md",
             "05_Regulatory_Applicability.md",

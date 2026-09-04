@@ -35,14 +35,15 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from aegis_phase1.v2.output._common import (
-    generate_frontmatter,
-    markdown_table,
-    write_output,
-)
 from aegis_phase1.v2.context.applicability_context import (
     ApplicabilityContext,
     build_applicability_context,
+)
+from aegis_phase1.v2.output._common import (
+    doc_preamble,
+    generate_frontmatter,
+    markdown_table,
+    write_output,
 )
 
 logger = logging.getLogger(__name__)
@@ -209,6 +210,7 @@ def _build_doc_04_body(state: dict[str, Any]) -> str:
     app_ctx: ApplicabilityContext = build_applicability_context(state)
 
     parts: list[str] = []
+    parts.append(doc_preamble(state))
     parts.append("# AEGIS-P1-04 Company Context Assessment\n")
 
     # §1 Document Purpose
@@ -414,7 +416,7 @@ def _section_4_business_goals(goals: list[dict[str, Any]]) -> list[str]:
         )
     )
     parts.append("")
-    parts.append(f"**ID Pattern:** `BG-{{NN}}` where `{{NN}}` is a 2-digit sequential number.")
+    parts.append("**ID Pattern:** `BG-{NN}` where `{NN}` is a 2-digit sequential number.")
     parts.append("")
     parts.append("---\n")
     return parts
@@ -1282,6 +1284,15 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
     """Read attribute ``name`` from ``obj`` or return ``default``."""
     if obj is None:
         return default
+    if name == "revenue_eur":
+        val = getattr(obj, "revenue_eur", None) if hasattr(obj, "revenue_eur") else None
+        if val is None and isinstance(obj, Mapping):
+            val = obj.get("revenue_eur")
+        if val is None:
+            val = getattr(obj, "revenue", None) if hasattr(obj, "revenue") else None
+        if val is None and isinstance(obj, Mapping):
+            val = obj.get("revenue")
+        return val if val is not None else default
     if hasattr(obj, name):
         return getattr(obj, name)
     if isinstance(obj, Mapping):

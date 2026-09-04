@@ -30,6 +30,17 @@ _HEADER_FILL = PatternFill("solid", fgColor="FF1F4E78")
 _ZEBRA_FILL = PatternFill("solid", fgColor="FFF2F2F2")
 
 
+def _get_xlsx_filename(state: dict[str, Any]) -> str:
+    case_path = str(state.get("case_path") or "")
+    if "case2" in case_path.lower() or "case_02" in case_path.lower():
+        return "Case_02_Phase1.xlsx"
+    if "case3" in case_path.lower() or "case_03" in case_path.lower():
+        return "Case_03_Phase1.xlsx"
+    if "case4" in case_path.lower() or "case_04" in case_path.lower():
+        return "Case_04_Phase1.xlsx"
+    return "Case_01_Phase1.xlsx"
+
+
 def generate_xlsx(state: dict[str, Any], output_dir: str) -> dict[str, str]:
     """Generate the consolidated Phase 1 workbook.
 
@@ -52,14 +63,16 @@ def generate_xlsx(state: dict[str, Any], output_dir: str) -> dict[str, str]:
     _build_proportionality(wb, state)
     _build_gate(wb, state)
 
-    out_path = Path(output_dir) / _FILENAME
+    filename = _get_xlsx_filename(state)
+    stem = Path(filename).stem
+    out_path = Path(output_dir) / filename
     if out_path.exists():
         versions_dir = Path(output_dir) / "versions"
         versions_dir.mkdir(parents=True, exist_ok=True)
         n = 2
-        while (versions_dir / f"Case_01_Phase1_v{n}.xlsx").exists():
+        while (versions_dir / f"{stem}_v{n}.xlsx").exists():
             n += 1
-        out_path = versions_dir / f"Case_01_Phase1_v{n}.xlsx"
+        out_path = versions_dir / f"{stem}_v{n}.xlsx"
 
     wb.save(str(out_path))
     logger.info("generate_xlsx: wrote %s", out_path)
@@ -115,27 +128,49 @@ def _build_cover(wb: Workbook, state: Mapping[str, Any]) -> None:
 
 
 def _build_company(wb: Workbook, state: Mapping[str, Any]) -> None:
-    """COMPANY sheet — derived from ontology.company + company_context."""
+    """COMPANY sheet — derived from company_context + v2_company_facts + ontology.company."""
     ws = wb.create_sheet("COMPANY")
+    ctx = state.get("company_context") or {}
+    facts = state.get("v2_company_facts")
     ontology = state.get("ontology") or {}
     company = (ontology.get("company") or {}) if isinstance(ontology, Mapping) else {}
+
+    cid = company.get("id") or (str(state.get("case_path") or "").split("/")[-1]) or "-"
+    cname = safe_get(ctx, "company_name") or getattr(facts, "name", "-") or company.get("name", "-")
+    csector = safe_get(ctx, "sector") or getattr(facts, "sector", "-") or company.get("sector", "-")
+    csize = safe_get(ctx, "scale") or getattr(facts, "scale", "-") or company.get("size", "-")
+    cemployees = safe_get(ctx, "employees") or getattr(facts, "employees", "-") or company.get("employees", "-")
+
+    rev = (
+        safe_get(ctx, "revenue_eur")
+        or safe_get(ctx, "revenue")
+        or getattr(facts, "revenue_eur", None)
+        or company.get("revenue_eur")
+    )
+    rev_str = f"{rev:,}" if isinstance(rev, int | float) and rev > 0 else "-"
+
+    cjur = safe_get(ctx, "jurisdiction") or getattr(facts, "jurisdiction", "-") or company.get("jurisdiction", "-")
+    cstruct = getattr(facts, "legal_form", "-") or company.get("legal_structure", "-")
+    ccrit = getattr(facts, "criticality", "-") or company.get("criticality_level", "-")
+
+    tech_stack = safe_get(ctx, "tech_stack") or getattr(facts, "tech_stack", []) or company.get("tech_stack", []) or []
+    tech_str = ", ".join([str(t) for t in tech_stack]) if tech_stack else "-"
+
+    data_types = getattr(facts, "data_types", []) or company.get("data_types", []) or []
+    data_str = ", ".join([str(d) for d in data_types]) if data_types else "-"
+
     rows: list[tuple[str, str]] = [
-        ("ID", str(company.get("id", "-"))),
-        ("Name", str(company.get("name", "-"))),
-        ("Sector", str(company.get("sector", "-"))),
-        ("Size", str(company.get("size", "-"))),
-        ("Employees", str(company.get("employees", "-"))),
-        (
-            "Revenue (EUR)",
-            f"{company.get('revenue_eur', 0):,}"
-            if isinstance(company.get("revenue_eur"), int | float)
-            else "-",
-        ),
-        ("Jurisdiction", str(company.get("jurisdiction", "-"))),
-        ("Legal Structure", str(company.get("legal_structure", "-"))),
-        ("Criticality Level", str(company.get("criticality_level", "-"))),
-        ("Tech Stack", ", ".join(company.get("tech_stack", []) or [])),
-        ("Data Types", ", ".join(company.get("data_types", []) or [])),
+        ("ID", str(cid)),
+        ("Name", str(cname)),
+        ("Sector", str(csector)),
+        ("Size", str(csize)),
+        ("Employees", str(cemployees)),
+        ("Revenue (EUR)", rev_str),
+        ("Jurisdiction", str(cjur)),
+        ("Legal Structure", str(cstruct)),
+        ("Criticality Level", str(ccrit)),
+        ("Tech Stack", tech_str),
+        ("Data Types", data_str),
     ]
     _fill_sheet(ws, ["Field", "Value"], rows)
 
@@ -143,21 +178,26 @@ def _build_company(wb: Workbook, state: Mapping[str, Any]) -> None:
 def _build_regulations(wb: Workbook, state: Mapping[str, Any]) -> None:
     """REGULATIONS sheet — applicability summary."""
     ws = wb.create_sheet("REGULATIONS")
-    regs = state.get("regulations") or (state.get("ontology") or {}).get("regulations", [])
+    from aegis_phase1.v2.context.applicability_context import build_applicability_context
+
+    app_ctx = build_applicability_context(dict(state))
+    all_regs = ["GDPR", "CRA", "NIS2", "DORA", "AI_Act"]
     rows: list[tuple[str, ...]] = []
-    for reg in regs:
-        if not isinstance(reg, Mapping):
-            continue
+    for reg in all_regs:
+        is_app = reg in app_ctx.applicable_regs
+        party = app_ctx.obligated_party_per_reg.get(reg, "-")
+        count = app_ctx.clause_count_per_reg.get(reg, 0)
+        reason = app_ctx.rationale_per_reg.get(reg, "-")
         rows.append(
             (
-                str(reg.get("id", "-")),
-                str(reg.get("abbreviation", "-")),
-                str(reg.get("name", "-")),
-                str(reg.get("eu_reference", "-")),
-                "YES" if reg.get("applicable") else "NO",
-                _stringify_party(reg.get("obligated_party")),
-                str(reg.get("clause_count", 0)),
-                str(reg.get("reason", "") or "-"),
+                f"REG-{reg.upper().replace('_', '')}",
+                reg,
+                reg,
+                "-",
+                "YES" if is_app else "NO",
+                _stringify_party(party),
+                str(count),
+                str(reason),
             )
         )
     _fill_sheet(
@@ -220,39 +260,36 @@ def _build_clauses(wb: Workbook, state: Mapping[str, Any]) -> None:
 def _build_coverage(wb: Workbook, state: Mapping[str, Any]) -> None:
     """COVERAGE sheet — sub-domain x regulation coverage matrix."""
     ws = wb.create_sheet("COVERAGE")
+    from aegis_phase1.v2.context.applicability_context import build_applicability_context
+    from aegis_phase1.v2.output.doc_07 import _build_clause_cell_index
+
+    app_ctx = build_applicability_context(dict(state))
+    applicable_regs = list(app_ctx.applicable_regs)
+
     ontology = state.get("ontology") or {}
-    subdomains = ontology.get("subdomains", {}) if isinstance(ontology, Mapping) else {}
-    regs = state.get("regulations") or ontology.get("regulations", [])
+    clauses = ontology.get("clause_mappings", []) if isinstance(ontology, Mapping) else []
+    cell_index = _build_clause_cell_index(clauses, applicable_regs)
 
-    covered = subdomains.get("covered", []) if isinstance(subdomains, Mapping) else []
-    not_covered = subdomains.get("not_covered", []) if isinstance(subdomains, Mapping) else []
-    regulations = [r for r in regs if isinstance(r, Mapping)]
+    v2_subs = state.get("v2_subdomains") or state.get("subdomains") or []
+    sub_items = list(v2_subs.values() if isinstance(v2_subs, dict) else v2_subs)
 
-    headers = ["Sub-domain", "Name", "State"] + [_abbr(r) for r in regulations]
+    headers = ["Sub-domain", "Name", "State", *applicable_regs]
     rows: list[tuple[str, ...]] = []
-    for entry in covered:
-        if not isinstance(entry, Mapping):
+    for item in sub_items:
+        sid = getattr(item, "id", None) or (item.get("id") if isinstance(item, dict) else None)
+        if not sid:
             continue
-        row: list[str] = [
-            str(entry.get("id", "-")),
-            str(entry.get("name", "-")),
-            "COVERED",
-        ]
-        sources = set(entry.get("source_regulations") or [])
-        for reg in regulations:
-            row.append("YES" if _abbr(reg) in sources else "NO")
-        rows.append(tuple(row))
-    for entry in not_covered:
-        if not isinstance(entry, Mapping):
-            continue
-        row = [
-            str(entry.get("id", "-")),
-            str(entry.get("name", "-")),
-            "GAP",
-        ]
-        # Apply blank Y/N for gaps
-        for _ in regulations:
-            row.append("NO")
+        sname = (
+            getattr(item, "title", None)
+            or getattr(item, "name", None)
+            or (item.get("title") if isinstance(item, dict) else None)
+            or (item.get("name") if isinstance(item, dict) else None)
+            or sid
+        )
+        row: list[str] = [str(sid), str(sname), "COVERED"]
+        for reg in applicable_regs:
+            has_cov = (sid, reg) in cell_index
+            row.append("YES" if has_cov else "NO")
         rows.append(tuple(row))
     _fill_sheet(ws, headers, rows)
 

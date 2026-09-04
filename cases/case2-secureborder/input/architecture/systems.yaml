@@ -1,3 +1,86 @@
 # Systems (Case 02 — SecureBorder Solutions)
-# PLACEHOLDER — actual systems in PROJECT_STATE.md §5
-systems: []
+systems:
+  - id: SYS-01
+    name: EU Cloud Platform
+    type: cloud_iaas
+    stack: [AWS, EC2, RDS, S3, KMS]
+    hosting: AWS Frankfurt (eu-central-1)
+    criticality: Critical
+    personal_data: true
+  - id: SYS-02
+    name: National Border Control Integration Gateway
+    type: api_gateway
+    stack: [mTLS, REST, SOAP]
+    hosting: Dedicated DMZ (eu-central-1)
+    criticality: Critical
+    personal_data: true
+  - id: SYS-03
+    name: Watchlist Service
+    type: external_data_feed
+    stack: [sFTP, HSM-bound]
+    hosting: Government integration DMZ
+    criticality: Critical
+    personal_data: true
+  - id: SYS-04
+    name: Edge AI Inference Engine (GuardianGate kiosk firmware)
+    type: edge_ai_runtime
+    stack: [ARM SoC, TensorRT, TPM 2.0, Linux]
+    hosting: Kiosk Edge Device
+    criticality: Critical
+    personal_data: true
+  - id: SYS-05
+    name: Cloud Model Training & Update Distribution
+    type: ml_platform
+    stack: [SageMaker-compatible, PyTorch]
+    hosting: AWS EU
+    criticality: Critical
+    personal_data: false
+  - id: SYS-06
+    name: GuardianGate Kiosk Hardware
+    type: embedded_hardware
+    stack: [Industrial PC, 3D Camera, MRZ Scanner]
+    hosting: Airport Schengen Border Crossings
+    criticality: Critical
+    personal_data: true
+  - id: SYS-07
+    name: HSM Cluster
+    type: key_management
+    stack: [Thales, Utimaco, FIPS 140-2 Level 3]
+    hosting: EU On-premises secured facility
+    criticality: Critical
+    personal_data: false
+  - id: SYS-08
+    name: Enterprise SSO / IdP
+    type: identity_provider
+    stack: [Okta, ADFS, FIDO2, OIDC]
+    hosting: EU Managed Okta
+    criticality: Important
+    personal_data: true
+  - id: SYS-09
+    name: SIEM & Immutable Audit Store
+    type: audit_platform
+    stack: [Splunk ES, WORM S3]
+    hosting: AWS EU (Frankfurt)
+    criticality: Critical
+    personal_data: true
+  - id: SYS-10
+    name: Corporate ERP / HR
+    type: enterprise_app
+    stack: [SAP S/4HANA]
+    hosting: AWS EU
+    criticality: Important
+    personal_data: true
+  - id: SYS-11
+    name: OTA Update Gateway & SBOM Pipeline
+    type: cicd_pipeline
+    stack: [GitHub Enterprise, Jenkins, Artifactory, CycloneDX, Cosign]
+    hosting: EU Cloud
+    criticality: Critical
+    personal_data: false
+  - id: SYS-12
+    name: SOC Platform
+    type: security_operations
+    stack: [Splunk ES, CrowdStrike Falcon, Tenable Nessus]
+    hosting: EU Cloud 24/7 SOC
+    criticality: Critical
+    personal_data: true

@@ -1,6 +1,6 @@
 # CORR-057 — Baseline e2b eval report
 
-- **Model:** gemma4:e2b
+- **Model:** gemma4:26b
 - **Case:** case1-tinytask
 - **Total LLM entries in jsonl:** 5
 - **Canonical refs loaded from preproc:** 1381

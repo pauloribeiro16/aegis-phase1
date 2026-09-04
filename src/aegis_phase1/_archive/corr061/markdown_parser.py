@@ -48,12 +48,17 @@ class MarkdownParser:
 
     @classmethod
     def _strip_code_fences(cls, text: str) -> str:
-        """Tolerate models that wrap markdown in ``` fences."""
-        return cls._CODE_FENCE_RE.sub("", text).strip()
+        """Tolerate models that wrap markdown in ``` fences or conversational preambles."""
+        text = text.strip()
+        fence_match = re.search(r"```(?:markdown)?\s*\n(.*?)\n```", text, re.DOTALL | re.IGNORECASE)
+        if fence_match and ("##" in fence_match.group(1) or "#" in fence_match.group(1)):
+            return fence_match.group(1).strip()
+        cleaned = re.sub(r"^```[a-zA-Z]*\s*$", "", text, flags=re.MULTILINE)
+        return cleaned.strip()
 
     @classmethod
     def _extract_section(cls, text: str, section: str) -> str | None:
-        """Extract the body of a `## Section` header until the next `## ` header."""
+        """Extract the body of a header until the next header of equal/higher level."""
         pat = cls.SECTION_PATTERNS.get(section)
         if pat is None:
             return None
@@ -61,9 +66,9 @@ class MarkdownParser:
         if m is None:
             return None
         start = m.end()
-        # Find next ## header (not ### which is sub-section)
-        next_h2 = re.search(r"^##\s+\S", text[start:], re.MULTILINE)
-        end = start + next_h2.start() if next_h2 else len(text)
+        # Find next # or ## header (not ### or deeper sub-sections if section was ##)
+        next_h = re.search(r"^#{1,2}\s+[A-Za-z0-9]", text[start:], re.MULTILINE)
+        end = start + next_h.start() if next_h else len(text)
         return text[start:end].strip()
 
     @classmethod
@@ -85,37 +90,43 @@ class MarkdownParser:
 
     @classmethod
     def _extract_field(cls, text: str, field_name: str) -> str | None:
-        """Extract `- field_name: value` from text. Returns stripped value or None."""
+        """Extract field_name: value from text, tolerating bold keys, bullets (*, -), and case."""
+        escaped = re.escape(field_name)
         pat = re.compile(
-            rf"^- \s*{re.escape(field_name)}\s*:\s*(.+?)(?=\n- |\Z)",
-            re.MULTILINE | re.DOTALL,
+            rf"^[ \t*#-]*\**{escaped}\**[ \t]*:[ \t]*(.+?)(?=\n[ \t]*[-*#]|\n[ \t]*\n|\Z)",
+            re.MULTILINE | re.DOTALL | re.IGNORECASE,
         )
         m = pat.search(text)
-        return m.group(1).strip() if m else None
+        if m:
+            val = m.group(1).strip()
+            val = re.sub(r"^\*+|\*+$", "", val).strip()
+            return val.strip("`\"'")
+        return None
 
     @classmethod
     def _extract_list_field(cls, text: str, field_name: str) -> list[str]:
-        """Extract `- field_name: a, b, c` OR `- field_name:\\n  - a\\n  - b`.
-
-        Returns list of stripped values.
-        """
-        # Check multi-bullet form first
+        """Extract list from bullet or comma separated values, tolerating bold keys."""
+        escaped = re.escape(field_name)
         pat_multi = re.compile(
-            rf"^- \s*{re.escape(field_name)}\s*:\s*\n((?:\s+-\s+.+\n?)+)",
-            re.MULTILINE,
+            rf"^[ \t*#-]*\**{escaped}\**[ \t]*:[ \t]*\n((?:[ \t]+[-*][ \t]+.+\n?)+)",
+            re.MULTILINE | re.IGNORECASE,
         )
         m_multi = pat_multi.search(text)
         if m_multi:
             return [
-                b.strip().lstrip("-").strip()
+                re.sub(r"^\*+|\*+$", "", b.strip().lstrip("-*").strip()).strip("`\"'")
                 for b in m_multi.group(1).split("\n")
-                if b.strip().lstrip("-").strip()
+                if b.strip().lstrip("-*").strip()
             ]
-        # Single line, comma-separated
         single = cls._extract_field(text, field_name)
         if single is None:
             return []
-        return [v.strip() for v in single.split(",") if v.strip()]
+        single = single.strip("[]")
+        return [
+            re.sub(r"^\*+|\*+$", "", v.strip()).strip("`\"'")
+            for v in single.split(",")
+            if v.strip() and re.sub(r"^\*+|\*+$", "", v.strip()).strip("`\"'")
+        ]
 
     def parse(self, raw: str) -> tuple[BaseModel | None, str]:
         """Override in subclass. Returns (model_instance, error_feedback)."""
@@ -149,12 +160,12 @@ class P1BLLM01Parser(MarkdownParser):
     """Parser for P1B-LLM-01-INTERPRETATION markdown output."""
 
     SECTION_PATTERNS = {
-        "status": re.compile(r"^##\s+Status\s*$", re.MULTILINE),
-        "interpretations": re.compile(r"^##\s+Interpretations\s*$", re.MULTILINE),
-        "derogations": re.compile(r"^##\s+Derogations\s*$", re.MULTILINE),
+        "status": re.compile(r"^#{1,3}\s+(?:\d+[.:\s]+)?Status\b.*$", re.MULTILINE | re.IGNORECASE),
+        "interpretations": re.compile(r"^#{1,3}\s+(?:\d+[.:\s]+)?Interpretations?\b.*$", re.MULTILINE | re.IGNORECASE),
+        "derogations": re.compile(r"^#{1,3}\s+(?:\d+[.:\s]+)?Derogations?\b.*$", re.MULTILINE | re.IGNORECASE),
     }
-    _SUBSEC_INT = re.compile(r"^###\s+(INT-\d+)\s*$", re.MULTILINE)
-    _SUBSEC_DER = re.compile(r"^###\s+(DER-\d+)\s*$", re.MULTILINE)
+    _SUBSEC_INT = re.compile(r"^#{2,4}\s+(?:###\s*)?(INT-\d+)\b.*$", re.MULTILINE | re.IGNORECASE)
+    _SUBSEC_DER = re.compile(r"^#{2,4}\s+(?:###\s*)?(DER-\d+)\b.*$", re.MULTILINE | re.IGNORECASE)
 
     def parse(self, raw: str) -> tuple[Any | None, str]:
         """Parse the LLM output. Tries markdown first, then JSON as fallback.
@@ -297,29 +308,58 @@ class P1BLLM01Parser(MarkdownParser):
         status_body = self._extract_section(text, "status")
         if status_body is None:
             return None
-        # CORR-065: the prompt template uses `- applicable: YES/NO/INDETERMINATE`
-        # under `## Status`, not `- status: ...`. Accept both for resilience.
-        status_str = (
+        # Accept both `- status:` and `- applicable:` under `## Status`.
+        raw_status = (
             self._extract_field(status_body, "status")
             or self._extract_field(status_body, "applicable")
             or ""
         ).upper()
-        conf_str = (self._extract_field(status_body, "confidence") or "").upper()
+        if raw_status in ("APPLICABLE", "YES", "TRUE", "PASS", "ACTIVATED"):
+            status_str = "YES"
+        elif raw_status in ("NOT_APPLICABLE", "NO", "FALSE", "FAIL", "NOT_ACTIVATED"):
+            status_str = "NO"
+        elif raw_status in ("INSUFFICIENT", "INSUFFICIENT_EVIDENCE"):
+            status_str = "INSUFFICIENT_EVIDENCE"
+        elif raw_status in ("INDETERMINATE", "UNKNOWN", "UNCERTAIN"):
+            status_str = "INDETERMINATE"
+        elif raw_status in ("OK", "SUCCESS", "VALID"):
+            status_str = "OK"
+        else:
+            status_str = raw_status
+
         if status_str not in {e.value for e in m["P1BLLM01Status"]}:
             return None
+
+        conf_raw = (self._extract_field(status_body, "confidence") or "").upper()
+        if conf_raw in ("HIGH", "MEDIUM", "LOW"):
+            conf_str = conf_raw
+        else:
+            conf_str = "MEDIUM"
 
         # Interpretations section
         interpretations: list = []
         interp_body = self._extract_section(text, "interpretations") or ""
         interp_subs = self._split_subsections(interp_body, self._SUBSEC_INT)
         if interp_subs:
-            # Original CORR-050 format: `### INT-NN` sub-sections
+            # Original format: `### INT-NN` sub-sections
             for sub_id, sub_body in interp_subs:
-                entry_id = self._extract_field(sub_body, "entry_id") or ""
-                applicable_str = (self._extract_field(sub_body, "applicable") or "").upper()
+                entry_id = self._extract_field(sub_body, "entry_id") or sub_id
+                raw_app = (self._extract_field(sub_body, "applicable") or "").upper()
+                if raw_app in ("APPLICABLE", "YES", "TRUE", "PASS", "ACTIVATED"):
+                    applicable_str = "YES"
+                elif raw_app in ("NOT_APPLICABLE", "NO", "FALSE", "FAIL", "NOT_ACTIVATED"):
+                    applicable_str = "NO"
+                elif raw_app in ("INDETERMINATE", "UNKNOWN", "UNCERTAIN"):
+                    applicable_str = "INDETERMINATE"
+                else:
+                    applicable_str = raw_app
                 if applicable_str not in {e.value for e in m["P1BLLM01Applicable"]}:
-                    return None
-                rationale = self._extract_field(sub_body, "activation_rationale") or ""
+                    continue
+                rationale = (
+                    self._extract_field(sub_body, "activation_rationale")
+                    or self._extract_field(sub_body, "rationale")
+                    or ""
+                )
                 interpretations.append(m["P1BLLM01Interpretation"](
                     entry_id=entry_id,
                     applicable=m["P1BLLM01Applicable"](applicable_str),
@@ -329,22 +369,22 @@ class P1BLLM01Parser(MarkdownParser):
                     company_fact_refs=self._extract_list_field(sub_body, "company_fact_refs"),
                 ))
         else:
-            # CORR-065: bullet-list fallback. Some models (notably
-            # MiniMax-M3) emit `## Interpretations` as a flat bullet
-            # list of `- ENTRY_ID (VERDICT): rationale...` instead of
-            # `### INT-NN` sub-sections. Accept that shape as long as
-            # the verdict token is a known P1BLLM01Applicable value.
+            # Bullet-list fallback
             _BULLET_RE = re.compile(
-                r"^- \s*([A-Z][A-Z0-9_]+(?:-[A-Z0-9_]+)*)\s*"
-                r"\((YES|NO|INDETERMINATE)\)\s*:\s*(.+?)(?=\n- |\n## |\Z)",
-                re.MULTILINE | re.DOTALL,
+                r"^(?:[-*]\s*|\d+[.:\s]+)?\**([A-Z][A-Z0-9_]+(?:-[A-Z0-9_]+)*)\**\s*"
+                r"\((YES|NO|INDETERMINATE|APPLICABLE|NOT_APPLICABLE)\)\s*:\s*(.+?)(?=\n[-*\d]|\n## |\Z)",
+                re.MULTILINE | re.DOTALL | re.IGNORECASE,
             )
             for m_b in _BULLET_RE.finditer(interp_body):
-                entry_id, verdict, rationale = (
-                    m_b.group(1).strip(),
-                    m_b.group(2).strip().upper(),
-                    m_b.group(3).strip(),
-                )
+                entry_id = m_b.group(1).strip()
+                raw_v = m_b.group(2).strip().upper()
+                if raw_v in ("APPLICABLE", "YES"):
+                    verdict = "YES"
+                elif raw_v in ("NOT_APPLICABLE", "NO"):
+                    verdict = "NO"
+                else:
+                    verdict = "INDETERMINATE"
+                rationale = m_b.group(3).strip()
                 interpretations.append(m["P1BLLM01Interpretation"](
                     entry_id=entry_id,
                     applicable=m["P1BLLM01Applicable"](verdict),
@@ -359,13 +399,29 @@ class P1BLLM01Parser(MarkdownParser):
         der_body = self._extract_section(text, "derogations") or ""
         der_subs = self._split_subsections(der_body, self._SUBSEC_DER)
         if der_subs:
-            # Original CORR-050 format: `### DER-NN` sub-sections
+            # Original format: `### DER-NN` sub-sections
             for sub_id, sub_body in der_subs:
-                entry_id = self._extract_field(sub_body, "entry_id") or ""
-                verdict_str = (self._extract_field(sub_body, "activation_verdict") or "").upper()
+                entry_id = self._extract_field(sub_body, "entry_id") or sub_id
+                raw_verdict = (
+                    self._extract_field(sub_body, "activation_verdict")
+                    or self._extract_field(sub_body, "verdict")
+                    or ""
+                ).upper()
+                if raw_verdict in ("NOT_ACTIVATED", "NO", "FALSE", "NOT_APPLICABLE"):
+                    verdict_str = "NOT_ACTIVATED"
+                elif raw_verdict in ("ACTIVATED", "YES", "TRUE", "APPLICABLE"):
+                    verdict_str = "ACTIVATED"
+                elif raw_verdict in ("INDETERMINATE", "UNKNOWN"):
+                    verdict_str = "INDETERMINATE"
+                else:
+                    verdict_str = raw_verdict
                 if verdict_str not in {e.value for e in m["P1BLLM01DerogationVerdict"]}:
-                    return None
-                rationale = self._extract_field(sub_body, "activation_rationale") or ""
+                    continue
+                rationale = (
+                    self._extract_field(sub_body, "activation_rationale")
+                    or self._extract_field(sub_body, "rationale")
+                    or ""
+                )
                 derogations.append(m["P1BLLM01Derogation"](
                     entry_id=entry_id,
                     activation_verdict=m["P1BLLM01DerogationVerdict"](verdict_str),
@@ -375,18 +431,22 @@ class P1BLLM01Parser(MarkdownParser):
                     company_fact_refs=self._extract_list_field(sub_body, "company_fact_refs"),
                 ))
         else:
-            # CORR-065: bullet-list fallback (symmetric to interpretations)
+            # Bullet-list fallback (symmetric to interpretations)
             _BULLET_RE_DER = re.compile(
-                r"^- \s*([A-Z][A-Z0-9_]+(?:-[A-Z0-9_]+)*)\s*"
-                r"\((ACTIVATED|NOT_ACTIVATED|INDETERMINATE)\)\s*:\s*(.+?)(?=\n- |\n## |\Z)",
-                re.MULTILINE | re.DOTALL,
+                r"^(?:[-*]\s*|\d+[.:\s]+)?\**([A-Z][A-Z0-9_]+(?:-[A-Z0-9_]+)*)\**\s*"
+                r"\((ACTIVATED|NOT_ACTIVATED|INDETERMINATE|YES|NO)\)\s*:\s*(.+?)(?=\n[-*\d]|\n## |\Z)",
+                re.MULTILINE | re.DOTALL | re.IGNORECASE,
             )
             for m_b in _BULLET_RE_DER.finditer(der_body):
-                entry_id, verdict, rationale = (
-                    m_b.group(1).strip(),
-                    m_b.group(2).strip().upper(),
-                    m_b.group(3).strip(),
-                )
+                entry_id = m_b.group(1).strip()
+                raw_v = m_b.group(2).strip().upper()
+                if raw_v in ("ACTIVATED", "YES"):
+                    verdict = "ACTIVATED"
+                elif raw_v in ("NOT_ACTIVATED", "NO"):
+                    verdict = "NOT_ACTIVATED"
+                else:
+                    verdict = "INDETERMINATE"
+                rationale = m_b.group(3).strip()
                 derogations.append(m["P1BLLM01Derogation"](
                     entry_id=entry_id,
                     activation_verdict=m["P1BLLM01DerogationVerdict"](verdict),
@@ -432,8 +492,8 @@ class GenericMarkdownParser(MarkdownParser):
     renderers that want the original text.
     """
 
-    # Accept any ``## Section`` header — the parser is spec-agnostic.
-    _H2_SPLIT_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+    # Accept any ``# Section`` or ``## Section`` header — the parser is spec-agnostic.
+    _H2_SPLIT_RE = re.compile(r"^#{1,2}\s+(.+?)\s*$", re.MULTILINE)
 
     def parse(self, raw: str) -> tuple[Any | None, str]:
         text = self._strip_code_fences(raw)
@@ -442,31 +502,56 @@ class GenericMarkdownParser(MarkdownParser):
         # Find all ## section headers and split the body between them
         matches = list(self._H2_SPLIT_RE.finditer(text))
         if not matches:
-            return None, "no `## Section` headers found in markdown"
+            return None, "no section headers found in markdown"
 
         sections: dict[str, str] = {}
         for i, m_h in enumerate(matches):
-            section_name = m_h.group(1).strip()
+            raw_sec_name = m_h.group(1).strip()
+            norm_name = re.sub(r"^\d+[.:\s]+", "", raw_sec_name).strip().rstrip(":")
             body_start = m_h.end()
             body_end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-            sections[section_name] = text[body_start:body_end].strip()
+            body = text[body_start:body_end].strip()
+            sections[raw_sec_name] = body
+            sections[norm_name] = body
+            sections[norm_name.lower()] = body
 
-        # Extract Status fields (fall back to applicable per the
-        # CORR-065 fix that accepts both `- status:` and
-        # `- applicable:` under `## Status`).
-        status_body = sections.get("Status", "")
-        status_str = (
+        # Extract Status fields
+        status_body = ""
+        for k, v in sections.items():
+            if k.lower().startswith("status"):
+                status_body = v
+                break
+        if not status_body:
+            status_body = sections.get("Status", "")
+        raw_status = (
             self._extract_field(status_body, "status")
             or self._extract_field(status_body, "applicable")
             or ""
-        ).upper() or "OK"
-        conf_str = (self._extract_field(status_body, "confidence") or "MEDIUM").upper()
+        ).upper()
+        if raw_status in ("APPLICABLE", "YES", "TRUE", "PASS"):
+            status_str = "YES"
+        elif raw_status in ("NOT_APPLICABLE", "NO", "FALSE", "FAIL"):
+            status_str = "NO"
+        elif raw_status in ("INSUFFICIENT", "INSUFFICIENT_EVIDENCE"):
+            status_str = "INSUFFICIENT_EVIDENCE"
+        elif raw_status in ("INDETERMINATE", "UNKNOWN"):
+            status_str = "INDETERMINATE"
+        elif raw_status in ("OK", "SUCCESS", "VALID"):
+            status_str = "OK"
+        else:
+            status_str = raw_status or "OK"
 
         try:
             status = m["P1BLLM01Status"](status_str)
         except ValueError:
-            # Unknown status token — fall back to INDETERMINATE
             status = m["P1BLLM01Status"].INDETERMINATE
+
+        conf_raw = (self._extract_field(status_body, "confidence") or "").upper()
+        if conf_raw in ("HIGH", "MEDIUM", "LOW"):
+            conf_str = conf_raw
+        else:
+            conf_str = "MEDIUM"
+
         try:
             confidence = m["P1BLLM01Confidence"](conf_str)
         except ValueError:

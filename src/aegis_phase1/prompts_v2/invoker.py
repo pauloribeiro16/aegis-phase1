@@ -31,6 +31,12 @@ from langchain_core.runnables.config import RunnableConfig
 from langchain_ollama import ChatOllama
 
 from aegis_phase1.config.defaults import RAW_OUTPUT_DIR
+from aegis_phase1.llm.quant_manifest import (
+    frontmatter_comment as _qm_frontmatter,
+)
+from aegis_phase1.llm.quant_manifest import (
+    resolve_quant_for as _qm_resolve_quant,
+)
 from aegis_phase1.llm.token_counter import TokenCounter
 from aegis_phase1.llm.unified import LLMUnreachableError, probe_ollama
 from aegis_phase1.prompts_v2.catalog import CatalogLoader
@@ -40,6 +46,7 @@ from aegis_phase1.prompts_v2.llm_inventory import (
 )
 from aegis_phase1.prompts_v2.loader import PromptLoader
 from aegis_phase1.prompts_v2.logging_helper import JSONLLogger
+from aegis_phase1.prompts_v2.ref_gate import RefGate
 from aegis_phase1.prompts_v2.robust_parser import RobustParser
 from aegis_phase1.prompts_v2.validator import Phase1Validator
 from aegis_phase1.validator import ContentValidator
@@ -67,7 +74,7 @@ logger = logging.getLogger(__name__)
 # output. The new policy is fail-loud so the caller can fix the
 # prompt budget before retrying.
 BASE_PROMPT_TOKENS = 100000  # standard base cap for all models
-MAX_PROMPT_TOKENS = 124000   # absolute ceiling (cannot be exceeded)
+MAX_PROMPT_TOKENS = 124000  # absolute ceiling (cannot be exceeded)
 
 # Per-model cap. All models default to BASE_PROMPT_TOKENS (100K).
 # MiniMax-M3 / M2.7 / M2.7-highspeed can do 200K natively but are
@@ -138,14 +145,16 @@ class PromptTooLargeError(RuntimeError):
 # LLM prompt is incomplete and the call would fail silently (returning
 # INSUFFICIENT_EVIDENCE or empty parsed_output). The guard below makes
 # the failure explicit at construction-or-invocation time.
-_CATALOG_REQUIRED_SPECS: frozenset[str] = frozenset({
-    "P1B-LLM-01-INTERPRETATION",      # tipo2 + tipo3
-    "P1B-LLM-02-RATIONALE",          # inherits tipo2/tipo3 from 01
-    "P1C-LLM-01-OVERLAP-CLASSIFICATION",  # scope_overlap_predicates
-    "P1C-LLM-02-COMPOUND-EVENT",      # event_templates
-    # P1C-LLM-03-STRATEGIC-SYNTHESIS does NOT require catalogs
-    # (consumes doc07b as constraint, no tipo2/tipo3/event lookup).
-})
+_CATALOG_REQUIRED_SPECS: frozenset[str] = frozenset(
+    {
+        "P1B-LLM-01-INTERPRETATION",  # tipo2 + tipo3
+        "P1B-LLM-02-RATIONALE",  # inherits tipo2/tipo3 from 01
+        "P1C-LLM-01-OVERLAP-CLASSIFICATION",  # scope_overlap_predicates
+        "P1C-LLM-02-COMPOUND-EVENT",  # event_templates
+        # P1C-LLM-03-STRATEGIC-SYNTHESIS does NOT require catalogs
+        # (consumes doc07b as constraint, no tipo2/tipo3/event lookup).
+    }
+)
 
 
 class Phase1LLMInvoker:
@@ -154,7 +163,7 @@ class Phase1LLMInvoker:
     DEFAULT_MODEL = "gemma4:e4b"  # CORR-056 (2026-07-23): switched from gemma4:e2b
     DEFAULT_BASE_URL = "http://localhost:11434"
     DEFAULT_TIMEOUT = 180  # 3 min for local inference
-    DEFAULT_MAX_RETRIES = 2
+    DEFAULT_MAX_RETRIES = 3
     DEFAULT_TEMPERATURE = 0.0
 
     def __init__(
@@ -178,6 +187,9 @@ class Phase1LLMInvoker:
         # validation (legacy path; the source lives in
         # _archive/corr061/validator.py).
         self.validator = validator if validator is not None else ContentValidator()
+        self.ref_gate = RefGate(
+            catalog_root=getattr(catalog_loader, "root", None) if catalog_loader else None
+        )
         self.llm_logger = llm_logger
         self.format_logger = format_logger
         self.model = model or self.DEFAULT_MODEL
@@ -187,9 +199,17 @@ class Phase1LLMInvoker:
             self.base_url = base_url
         elif provider == "minimax":
             from aegis_phase1.llm.chat_minimax import DEFAULT_BASE_URL as _MINIMAX_URL
+
             self.base_url = _MINIMAX_URL
         else:
-            self.base_url = self.DEFAULT_BASE_URL
+            env_url = os.environ.get("OLLAMA_BASE_URL")
+            if env_url:
+                self.base_url = env_url
+            elif "OLLAMA_HOST" in os.environ:
+                host = os.environ["OLLAMA_HOST"].strip()
+                self.base_url = host if host.startswith("http") else f"http://{host}"
+            else:
+                self.base_url = self.DEFAULT_BASE_URL
         self.provider = provider
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self._langfuse_handler = langfuse_handler
@@ -227,19 +247,21 @@ class Phase1LLMInvoker:
             )
         out: dict[str, list[dict[str, Any]]] = {}
         try:
-            if prompt_spec_id == "P1B-LLM-01-INTERPRETATION" or prompt_spec_id == "P1B-LLM-02-RATIONALE":
+            if (
+                prompt_spec_id == "P1B-LLM-01-INTERPRETATION"
+                or prompt_spec_id == "P1B-LLM-02-RATIONALE"
+            ):
                 out["tipo2"] = self.catalogs.load("tipo2_interpretations")
                 out["tipo3"] = self.catalogs.load("tipo3_derogations")
             elif prompt_spec_id == "P1C-LLM-01-OVERLAP-CLASSIFICATION":
-                out["scope_overlap_predicates"] = self.catalogs.load(
-                    "scope_overlap_predicates"
-                )
+                out["scope_overlap_predicates"] = self.catalogs.load("scope_overlap_predicates")
             elif prompt_spec_id == "P1C-LLM-02-COMPOUND-EVENT":
                 out["event_templates"] = self.catalogs.load("event_templates")
         except Exception as e:
             logger.warning(
                 "Catalog load failed for %s: %s — proceeding with empty content",
-                prompt_spec_id, e,
+                prompt_spec_id,
+                e,
             )
             out = {}
         return out
@@ -345,16 +367,31 @@ class Phase1LLMInvoker:
         all_attempts: list[dict[str, Any]] = []
         total_start = time.time()
 
+        feedback_instructions: str | None = None
+        previous_raw: str | None = None
+
         for attempt in range(1, max_retries + 1):
+            attempt_inputs = dict(inputs)
+            if feedback_instructions:
+                attempt_inputs["feedback_prompt"] = feedback_instructions
+                if previous_raw:
+                    attempt_inputs["previous_response"] = previous_raw
+
             attempt_result = self._attempt(
                 spec_id=spec_id,
-                inputs=inputs,
+                inputs=attempt_inputs,
                 invocation_pattern=invocation_pattern,
                 stage=stage,
                 attempt=attempt,
                 config=config,
             )
             all_attempts.append(attempt_result)
+
+            if not attempt_result["ok"]:
+                gate_res = attempt_result.get("gate_result")
+                if gate_res and not gate_res.valid:
+                    feedback_instructions = gate_res.feedback
+                    previous_raw = attempt_result.get("raw_response")
 
             if attempt_result["ok"]:
                 # CORR-061 S3b: capture the raw markdown response to
@@ -364,7 +401,9 @@ class Phase1LLMInvoker:
                 # passes ``state`` (test paths pass None).
                 if state is not None:
                     self._capture_per_spec_markdown(
-                        state, spec_id, attempt_result,
+                        state,
+                        spec_id,
+                        attempt_result,
                     )
                 return {
                     "status": "OK",
@@ -382,8 +421,7 @@ class Phase1LLMInvoker:
         if all_attempts and any(a.get("parse_status") == "PARSE_ERROR" for a in all_attempts):
             final_status = "PARSE_ERROR"
         elif all_attempts and any(
-            (a.get("validation") or {}).get("schema_errors")
-            for a in all_attempts
+            (a.get("validation") or {}).get("schema_errors") for a in all_attempts
         ):
             final_status = "SCHEMA_ERROR"
 
@@ -424,14 +462,20 @@ class Phase1LLMInvoker:
             # PromptTooLargeError — do NOT silently truncate. The
             # caller must fix the prompt budget.
             sys_t, user_t, total_t = TokenCounter.count_pair(
-                prompt["system"], prompt["user"],
+                prompt["system"],
+                prompt["user"],
             )
             effective_cap = _effective_token_cap(self.model)
             if total_t > effective_cap:
                 logger.error(
                     "CORR-102: prompt exceeds token cap "
                     "(sys=%d + user=%d = %d tokens > cap=%d, model=%s, spec=%s)",
-                    sys_t, user_t, total_t, effective_cap, self.model, spec_id,
+                    sys_t,
+                    user_t,
+                    total_t,
+                    effective_cap,
+                    self.model,
+                    spec_id,
                 )
                 raise PromptTooLargeError(
                     spec_id=spec_id,
@@ -446,7 +490,12 @@ class Phase1LLMInvoker:
             logger.debug(
                 "CORR-102: prompt within budget "
                 "(sys=%d + user=%d = %d tokens, cap=%d, model=%s, spec=%s)",
-                sys_t, user_t, total_t, effective_cap, self.model, spec_id,
+                sys_t,
+                user_t,
+                total_t,
+                effective_cap,
+                self.model,
+                spec_id,
             )
             schema = self.prompts.load(spec_id).get("schema") or {}
 
@@ -474,6 +523,7 @@ class Phase1LLMInvoker:
                 # gateway URL in __init__, which ChatMinimax will pick
                 # up via the constructor below).
                 from aegis_phase1.llm.chat_minimax import ChatMinimax
+
                 llm = ChatMinimax(
                     model=self.model,
                     base_url=self.base_url,
@@ -484,9 +534,10 @@ class Phase1LLMInvoker:
                 # calls reuse it. No format=schema — gemma4 doesn't
                 # honour constrained decoding via the HF path.
                 from aegis_phase1.llm.transformers_invoker import (
-                    TransformersInvoker,
                     TransformersChat,
+                    TransformersInvoker,
                 )
+
                 # Reuse an existing invoker if we built one earlier in
                 # this Phase1LLMInvoker's lifetime.
                 if not hasattr(self, "_hf_invoker") or self._hf_invoker.model != self.model:
@@ -569,28 +620,30 @@ class Phase1LLMInvoker:
             if not parse_result.ok:
                 # Log format error
                 if self.format_logger:
-                    self.format_logger.log({
-                        "event": "format_error",
-                        "level": "ERROR",
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "spec_id": spec_id,
-                        "stage": stage,
-                        "attempt": attempt,
-                        "model": self.model,
-                        "raw_response": raw,
-                        "raw_response_length": len(raw),
-                        "parse_attempts": parse_result.attempts,
-                        "final_error": parse_result.error,
-                        # CORR-054: include the prompts that were sent
-                        # so the user can correlate the parse failure
-                        # with the exact request the model saw.
-                        "request": {
-                            "system_prompt": prompt["system"],
-                            "user_prompt": prompt["user"],
-                            "system_prompt_length": len(prompt["system"]),
-                            "user_prompt_length": len(prompt["user"]),
-                        },
-                    })
+                    self.format_logger.log(
+                        {
+                            "event": "format_error",
+                            "level": "ERROR",
+                            "timestamp": datetime.now(UTC).isoformat(),
+                            "spec_id": spec_id,
+                            "stage": stage,
+                            "attempt": attempt,
+                            "model": self.model,
+                            "raw_response": raw,
+                            "raw_response_length": len(raw),
+                            "parse_attempts": parse_result.attempts,
+                            "final_error": parse_result.error,
+                            # CORR-054: include the prompts that were sent
+                            # so the user can correlate the parse failure
+                            # with the exact request the model saw.
+                            "request": {
+                                "system_prompt": prompt["system"],
+                                "user_prompt": prompt["user"],
+                                "system_prompt_length": len(prompt["system"]),
+                                "user_prompt_length": len(prompt["user"]),
+                            },
+                        }
+                    )
                 # CORR-061 S4: capture every attempt — the raw
                 # response landed but failed to parse; we still want
                 # it on disk so reviewers can see what the model said.
@@ -637,28 +690,30 @@ class Phase1LLMInvoker:
                     # with no detail. Use format_logger if available
                     # (similar to RobustParser path above).
                     if self.format_logger:
-                        self.format_logger.log({
-                            "event": "markdown_parse_error",
-                            "level": "ERROR",
-                            "timestamp": datetime.now(UTC).isoformat(),
-                            "spec_id": spec_id,
-                            "stage": stage,
-                            "attempt": attempt,
-                            "model": self.model,
-                            "raw_response": raw,
-                            "raw_response_length": len(raw),
-                            "error_feedback": error_feedback,
-                            # CORR-054: include the prompts that were
-                            # sent so the user can correlate the
-                            # markdown parse failure with the exact
-                            # request the model saw.
-                            "request": {
-                                "system_prompt": prompt["system"],
-                                "user_prompt": prompt["user"],
-                                "system_prompt_length": len(prompt["system"]),
-                                "user_prompt_length": len(prompt["user"]),
-                            },
-                        })
+                        self.format_logger.log(
+                            {
+                                "event": "markdown_parse_error",
+                                "level": "ERROR",
+                                "timestamp": datetime.now(UTC).isoformat(),
+                                "spec_id": spec_id,
+                                "stage": stage,
+                                "attempt": attempt,
+                                "model": self.model,
+                                "raw_response": raw,
+                                "raw_response_length": len(raw),
+                                "error_feedback": error_feedback,
+                                # CORR-054: include the prompts that were
+                                # sent so the user can correlate the
+                                # markdown parse failure with the exact
+                                # request the model saw.
+                                "request": {
+                                    "system_prompt": prompt["system"],
+                                    "user_prompt": prompt["user"],
+                                    "system_prompt_length": len(prompt["system"]),
+                                    "user_prompt_length": len(prompt["user"]),
+                                },
+                            }
+                        )
                     validation_result = {
                         "valid": False,
                         "errors": [error_feedback],
@@ -690,7 +745,9 @@ class Phase1LLMInvoker:
                         # this method expects.
                         case_id = (inputs or {}).get("case_id") if inputs else None
                         _cv = self.validator.validate(
-                            raw, spec_id=spec_id, case_id=case_id,
+                            raw,
+                            spec_id=spec_id,
+                            case_id=case_id,
                         )
                         validation_result = {
                             "valid": _cv.status == "OK",
@@ -699,9 +756,25 @@ class Phase1LLMInvoker:
                         }
                     else:
                         # Legacy JSON Schema path (Phase1Validator)
-                        validation_result = self.validator.validate(
-                            spec_id, output, inputs
-                        )
+                        validation_result = self.validator.validate(spec_id, output, inputs)
+
+            # CORR-112 F3: RefGate deterministic validation
+            gate_mode = os.getenv("AEGIS_GATE_MODE", "warn").lower()
+            gate_result = self.ref_gate.validate(spec_id, raw, inputs=inputs)
+            gate_valid = gate_result.valid
+
+            if not gate_valid:
+                logger.warning(
+                    "CORR-112 RefGate detected violations for %s (mode=%s): %s",
+                    spec_id,
+                    gate_mode,
+                    [v.rule for v in gate_result.violations],
+                )
+                if gate_mode == "hard":
+                    validation_result["valid"] = False
+                    validation_result.setdefault("errors", []).append(
+                        f"RefGate violations: {gate_result.feedback}"
+                    )
 
             # Token usage (best-effort; Ollama may not always expose it)
             usage = self._extract_usage(response)
@@ -756,9 +829,9 @@ class Phase1LLMInvoker:
                 status=status,
                 latency_ms=latency_ms,
                 model=self.model,
-                error=None if validation_result["valid"] else str(
-                    validation_result.get("errors") or "validation failed"
-                ),
+                error=None
+                if validation_result["valid"]
+                else str(validation_result.get("errors") or "validation failed"),
             )
 
             return {
@@ -766,6 +839,7 @@ class Phase1LLMInvoker:
                 "parse_status": "PARSED",
                 "parsed_output": output,
                 "validation": validation_result,
+                "gate_result": gate_result,
                 "latency_ms": latency_ms,
                 "usage": usage,
                 # CORR-061 S3b: thread the raw markdown response back
@@ -800,8 +874,12 @@ class Phase1LLMInvoker:
                 "request": {
                     "system_prompt": (prompt.get("system", "") if isinstance(prompt, dict) else ""),
                     "user_prompt": (prompt.get("user", "") if isinstance(prompt, dict) else ""),
-                    "system_prompt_length": (len(prompt.get("system", "")) if isinstance(prompt, dict) else 0),
-                    "user_prompt_length": (len(prompt.get("user", "")) if isinstance(prompt, dict) else 0),
+                    "system_prompt_length": (
+                        len(prompt.get("system", "")) if isinstance(prompt, dict) else 0
+                    ),
+                    "user_prompt_length": (
+                        len(prompt.get("user", "")) if isinstance(prompt, dict) else 0
+                    ),
                 },
             }
             if self.llm_logger:
@@ -828,8 +906,8 @@ class Phase1LLMInvoker:
                 "parsed_output": None,
             }
 
-    @staticmethod
     def _capture_per_spec_markdown(
+        self,
         state: dict[str, Any],
         spec_id: str,
         attempt_result: dict[str, Any],
@@ -849,6 +927,11 @@ class Phase1LLMInvoker:
         in a single string. The first call's response is stored verbatim
         (no leading separator).
 
+        CORR-111: prepends a one-line HTML comment with model + provider +
+        quant + job + spec + ts on the FIRST call per (spec_id, lane).
+        The same string is stored under
+        ``state["v2_model_capabilities"]`` for downstream consumers.
+
         Args:
             state: Pipeline state (mutated in place).
             spec_id: Canonical Phase 1 LLM ID.
@@ -859,6 +942,12 @@ class Phase1LLMInvoker:
         raw = attempt_result.get("raw_response")
         if not raw:
             return
+
+        # CORR-111: resolve active quant (best-effort) and remember it
+        # for the whole run. We don't fail the pipeline if the manifest
+        # is missing — the header just records 'unknown' / 'provider_default'.
+        quant_info = self._current_quant()
+        self._remember_model_capabilities(state, quant_info)
 
         bucket = state.setdefault("per_spec_markdown", {})
         if not isinstance(bucket, dict):
@@ -875,10 +964,62 @@ class Phase1LLMInvoker:
         if isinstance(existing, str) and existing:
             # Subsequent call for the same spec — append with a
             # horizontal-rule separator so reviewers can grep the
-            # boundary between lanes.
+            # boundary between lanes. The frontmatter from the FIRST
+            # call stays at the top of the bucket.
             bucket[spec_id] = existing + "\n\n---\n\n" + raw
-        else:
-            bucket[spec_id] = raw
+            return
+
+        # First write for this spec_id. CORR-111: prepend a single-line
+        # quant frontmatter comment so the markdown carries the model
+        # + quant + job that produced it.
+        front = _qm_frontmatter(
+            model=self.model,
+            provider=self.provider,
+            quant=quant_info["quantization"],
+            job=quant_info["job_id"],
+            spec=spec_id,
+        )
+        bucket[spec_id] = front + "\n" + raw
+
+    def _current_quant(self) -> dict[str, Any]:
+        """Resolve the quant currently in use (CORR-111).
+
+        Looks up the manifest written by the pull/stage scripts.
+        Falls back to ``"unknown"`` (never raises) so the pipeline
+        keeps running when the manifest directory doesn't exist or
+        the sidecar was forgotten.
+        """
+        return _qm_resolve_quant(self.model, self.provider)
+
+    @staticmethod
+    def _remember_model_capabilities(
+        state: dict[str, Any],
+        info: dict[str, Any],
+    ) -> None:
+        """Record the active model/quant for the whole run (CORR-111).
+
+        Idempotent: first call wins (we don't want a downstream spec to
+        silently switch quant under the reader's nose). When the run is
+        a multi-model comparison, callers can pass a list under
+        ``state["v2_model_capabilities"]["history"]`` instead — but for
+        now the v2 pipeline runs ONE model at a time so a single record
+        is sufficient.
+        """
+        cap = state.get("v2_model_capabilities")
+        if isinstance(cap, dict) and cap.get("model"):
+            return
+        state["v2_model_capabilities"] = {
+            **info,
+            "recorded_at": datetime.now(UTC).isoformat(),
+        }
+        logger.info(
+            "CORR-111: model=%s provider=%s quant=%s provenance=%s job=%s",
+            info["model"],
+            info["provider"],
+            info["quantization"],
+            info["quantization_provenance"],
+            info["job_id"],
+        )
 
     @staticmethod
     def _persist_raw_call(
@@ -997,7 +1138,9 @@ class Phase1LLMInvoker:
             # Never let a capture failure abort the run — log and move on.
             logger.warning(
                 "CORR-061 S4: failed to persist raw call for %s attempt %d: %s",
-                spec_id, attempt, _persist_err,
+                spec_id,
+                attempt,
+                _persist_err,
             )
 
     @staticmethod

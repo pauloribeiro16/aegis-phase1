@@ -104,7 +104,7 @@ def test_run_phase_1b_no_applicable_regs(monkeypatch):
         work_dir=_work_dir(),
         llm_invoker=MockInvoker(),
     )
-    orch._get_phase1_executor = lambda: object()  # type: ignore[assignment]
+    orch._get_phase1_executor = lambda *args, **kwargs: object()  # type: ignore[assignment]
     orch.state["aggregated_data"] = {}
     orch.state["company_context"] = {"applicable_regs": []}
     orch.run_phase_1b()

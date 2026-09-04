@@ -27,6 +27,7 @@ API is validated.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -154,7 +155,7 @@ def _merge_handler_into_config(
     elif isinstance(raw, list):
         existing = list(raw)
     elif hasattr(raw, "handlers"):
-        existing = list(getattr(raw, "handlers") or [])
+        existing = list(raw.handlers or [])
     else:
         existing = [raw]
     if handler is not None and handler not in existing:
@@ -244,9 +245,17 @@ class UnifiedInvoker:
             self.base_url = base_url
         elif provider == "minimax":
             from aegis_phase1.llm.chat_minimax import DEFAULT_BASE_URL
+
             self.base_url = DEFAULT_BASE_URL
         else:
-            self.base_url = self.DEFAULT_BASE_URL
+            env_url = os.environ.get("OLLAMA_BASE_URL")
+            if env_url:
+                self.base_url = env_url
+            elif "OLLAMA_HOST" in os.environ:
+                host = os.environ["OLLAMA_HOST"].strip()
+                self.base_url = host if host.startswith("http") else f"http://{host}"
+            else:
+                self.base_url = self.DEFAULT_BASE_URL
 
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self.num_ctx = num_ctx or self.DEFAULT_NUM_CTX
@@ -271,7 +280,9 @@ class UnifiedInvoker:
             )
             logger.info(
                 "UnifiedInvoker.__init__: provider=minimax, chat=%s model=%s base_url=%s",
-                type(self.chat).__name__, self.chat.model, self.chat.base_url,
+                type(self.chat).__name__,
+                self.chat.model,
+                self.chat.base_url,
             )
         else:
             from langchain_ollama import ChatOllama
@@ -288,7 +299,9 @@ class UnifiedInvoker:
             )
             logger.info(
                 "UnifiedInvoker.__init__: provider=ollama, chat=%s model=%s base_url=%s",
-                type(self.chat).__name__, self.model, self.base_url,
+                type(self.chat).__name__,
+                self.model,
+                self.base_url,
             )
         self._heavy: Any | None = None
         self._ollama_reachable: bool | None = None
@@ -320,32 +333,32 @@ class UnifiedInvoker:
 
         msgs: list[Any] = [HumanMessage(content=prompt)]
         if feedback:
-            msgs.append(
-                SystemMessage(
-                    content=f"PREVIOUS ERROR: {feedback}\nPlease correct."
-                )
-            )
+            msgs.append(SystemMessage(content=f"PREVIOUS ERROR: {feedback}\nPlease correct."))
 
         # CORR-063 S3: DEBUG-level entry log. Visible only with
         # --log-level DEBUG. Does NOT log prompt content (privacy +
         # size — can be 10+ KB for AEGIS prompts).
         logger.debug(
             "invoke_raw called: prompt_len=%d feedback=%s chat=%s",
-            len(prompt), bool(feedback), type(self.chat).__name__,
+            len(prompt),
+            bool(feedback),
+            type(self.chat).__name__,
         )
 
         cfg = _merge_handler_into_config(self._langfuse_handler, config)
         try:
             import time as _time
+
             _t0 = _time.monotonic()
             resp = self.chat.invoke(msgs, config=cfg)
             elapsed = _time.monotonic() - _t0
             usage = _extract_usage(resp)
             logger.debug(
-                "invoke_raw result: status=OK in %.2fs, raw_len=%d, "
-                "input=%d output=%d",
-                elapsed, len(resp.content),
-                usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0),
+                "invoke_raw result: status=OK in %.2fs, raw_len=%d, " "input=%d output=%d",
+                elapsed,
+                len(resp.content),
+                usage.get("prompt_tokens", 0),
+                usage.get("completion_tokens", 0),
             )
             return {
                 "raw": str(resp.content),
@@ -423,9 +436,7 @@ class UnifiedInvoker:
         forwarder that closes the gap.
         """
         if isinstance(inputs, dict):
-            return self.invoke_spec(
-                prompt_or_spec_id, inputs, config=config, state=state
-            )
+            return self.invoke_spec(prompt_or_spec_id, inputs, config=config, state=state)
         return self.invoke_raw(
             prompt_or_spec_id,
             feedback=feedback,
@@ -464,6 +475,7 @@ class UnifiedInvoker:
             llm_logger=self.llm_logger,
             format_logger=self.format_logger,
             model=self.model,
+            base_url=self.base_url,
             langfuse_handler=self._langfuse_handler,
             provider=self.provider,  # CORR-062 S2: pass through to heavy
         )
@@ -508,9 +520,9 @@ class UnifiedInvoker:
 
 
 __all__ = [
-    "UnifiedInvoker",
     "LLMUnreachableError",
-    "probe_ollama",
+    "UnifiedInvoker",
     "_extract_usage",
     "_merge_handler_into_config",
+    "probe_ollama",
 ]

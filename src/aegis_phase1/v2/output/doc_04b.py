@@ -44,6 +44,7 @@ from aegis_phase1.v2.output._common import (
     get_per_spec_markdown,
     markdown_table,
     render_per_spec_markdown_appendix,
+    section_provenance_tag,
     write_output,
 )
 from aegis_phase1.v2.output._narrative import render_mandatory_narrative
@@ -508,7 +509,7 @@ def _section_methodology(state: dict[str, Any]) -> list[str]:
         + f"{tier_template['maturity']['default_min']}). "
         + f"Proportional language: tier={tier} ({tier_template.get('scope', '-')}). "
         + "Active Layer 0 scope is aligned with active "
-        + f"GDPR/CRA SubDomains fit criteria (applicable_regs = "
+        + "GDPR/CRA SubDomains fit criteria (applicable_regs = "
         + f"{applicable_text}).\n"
     )
     parts.append(
@@ -538,6 +539,12 @@ def _section_per_domain(
 ) -> list[str]:
     parts: list[str] = []
     parts.append("## 3. Per-Domain Assessment\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-04b", "## 3. Per-Domain Assessment\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     overrides = _merged_maturity_overrides(state)
     review = _load_review_for_state(state)
     domain_results = state.get("domain_results") or {}
@@ -609,10 +616,10 @@ def _section_adapted_objective_placeholder(
     )
     parts.append("")
     parts.append(
-        f"_(per-domain LLM response not rendered here in S3b — see "
-        f"**§3b LLM Source — P1C-LLM-01 Overlap Classification** for "
-        f"the raw concatenated spec markdown, or the **Appendix** "
-        f"for the full per-spec dump)_"
+        "_(per-domain LLM response not rendered here in S3b — see "
+        "**§3b LLM Source — P1C-LLM-01 Overlap Classification** for "
+        "the raw concatenated spec markdown, or the **Appendix** "
+        "for the full per-spec dump)_"
     )
     parts.append("")
     return "\n".join(parts)
@@ -834,6 +841,12 @@ def _section_3b_overlap_classification(state: dict[str, Any]) -> list[str]:
     """
     parts: list[str] = []
     parts.append("## 3b. LLM Source — P1C-LLM-01 Overlap Classification\n")
+
+    _tag = section_provenance_tag(
+        "AEGIS-P1-04b", "## 3b. LLM Source — P1C-LLM-01 Overlap Classification\n"
+    )
+    if _tag:
+        parts.append(f"{_tag}\n")
     parts.append(
         "Raw markdown response of P1C-LLM-01 OVERLAP-CLASSIFICATION, "
         "concatenated across the 10 D-XX lanes (separated by ``---``). "

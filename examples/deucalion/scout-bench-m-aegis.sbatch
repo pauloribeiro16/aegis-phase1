@@ -38,12 +38,34 @@ if [ $# -lt 1 ]; then
   exit 2
 fi
 MODEL="$1"
+
+# Cache check ANTES do exec >> para nao perder o fail-fast.
+NAME_LIB="${MODEL%:*}"; SHA_LIB="${MODEL##*:}"; NAME_NORM=$(echo "$NAME_LIB" | tr '.' '_')
+for cand in "$NAME_NORM" "$NAME_LIB"; do
+  if [ -e "${BD}/ollama_data/models/manifests/registry.ollama.ai/library/${cand}/${SHA_LIB}" ]; then
+    break
+  fi
+done
+if [ "$cand" != "$NAME_NORM" ] && [ "$cand" != "$NAME_LIB" ]; then
+  echo "ERROR: model '${MODEL}' NOT in cache (manifest ${NAME_NORM}/${SHA_LIB} nao existe)."
+  echo "       bash scripts/hpc/pull-verify.sh ${MODEL}"
+  exit 1
+fi
+
+# Porta unica por JOB (multi-job no mesmo no -> sem colisao Ollama)
+PORT=$((11434 + SLURM_JOB_ID % 20000))
+export OLLAMA_HOST="127.0.0.1:${PORT}"
+export OLLAMA_BASE_URL="${OLLAMA_HOST}"
+export OLLAMA_API_KEY="local"
+
 exec >>"$RUN_LOG" 2>&1
+trap 'echo "EXIT_CODE=$?  END=$(date -Is)"' EXIT
 
 echo "=================================================="
 echo " JOB $SLURM_JOB_ID STARTED: $(date)"
 echo " Model : $MODEL (Ollama, 1x A100-80, 30m)"
 echo " Node  : $(hostname)"
+echo " Port  : ${PORT}"
 echo " Scope : case1-tinytask, --run-phase-1b only"
 echo " RUN_LOG: $RUN_LOG"
 echo "=================================================="
@@ -52,20 +74,20 @@ nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 export PATH="$BD/bin:$PATH"
 export LD_LIBRARY_PATH="$BD/lib/ollama:${LD_LIBRARY_PATH:-}"
 export OLLAMA_MODELS="$BD/ollama_data/models"
-export OLLAMA_HOST="127.0.0.1:11434"
-export OLLAMA_API_KEY="local"
+export PYTHONDONTWRITEBYTECODE=1
+export AEGIS_LOG_BASE="${PROJ}/logs/phase1/scout_phase1b/${SLURM_JOB_ID}"
 
 ollama serve > "/tmp/ollama-${SLURM_JOB_ID}.log" 2>&1 &
 OLLAMA_PID=$!
 
 for i in $(seq 1 90); do
-  if curl -sf -m 2 "http://127.0.0.1:11434/api/tags" > /dev/null 2>&1; then
+  if curl -sf -m 2 "${OLLAMA_HOST}/api/tags" > /dev/null 2>&1; then
     break
   fi
   sleep 2
 done
 echo "=== ollama version:"
-curl -sf -m 5 "http://127.0.0.1:11434/api/version" | head -c 200; echo
+curl -sf -m 5 "${OLLAMA_HOST}/api/version" | head -c 200; echo
 
 # If model isn't already cached, attempt ollama pull (spotty egress).
 if ! ollama list 2>/dev/null | awk '{print $1}' | grep -q "^${MODEL}$"; then
@@ -80,7 +102,7 @@ fi
 echo "=== warm-up: loading $MODEL"
 WARM_OK=0
 for attempt in 1 2 3 4 5; do
-  if curl -sf -m 180 "http://127.0.0.1:11434/api/generate" \
+  if curl -sf -m 180 "${OLLAMA_HOST}/api/generate" \
       -d "{\"model\":\"$MODEL\",\"prompt\":\"ping\",\"stream\":false,\"options\":{\"num_predict\":1}}" \
       > /tmp/warmup.out 2>&1; then
     echo "warm-up OK on attempt $attempt"
