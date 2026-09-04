@@ -167,7 +167,7 @@ PYTHONPATH=src pytest tests/unit/v2/ --co -q 2>&1 | grep -E "ERROR|ModuleNotFoun
 
 | Tier | Action |
 |------|--------|
-| **Always** | Add tests for any code change. Run lint + tests before commit. Use type hints. Update nearest AGENTS.md if the rule belongs there. |
+| **Always** | Add tests for any code change. Run lint + tests before commit. Use type hints. Update nearest AGENTS.md if the rule belongs there. Found a new Deucalion-cluster error (script bug, SLURM symptom, Ollama failure, network/quota issue)? Update the **`hpc-deucalion` skill** (source-of-truth at `~/Área de Trabalho/projects/my-skills/hpc-deucalion/`) with a row in its "Error playbook" section in the same commit that fixes the error — the skill is the living record, no recurring failure should pass twice.
 | **Ask first** | Adding new dependencies. Touching `Methodology-main/` (separate repo). Adding new regulation / entity kind to preproc. Neo4j / Langfuse / conftest changes. Renaming state keys. Schema changes mid-contract. |
 | **Never** | Hardcode ports (use `.env`). Commit secrets or `.env` values. Edit `archive/`. Use `except: pass`. Withhold evidence (golden regen) when schema changes. |
 
@@ -187,7 +187,7 @@ Skills load via `skill({name: "..." })`. Match a task to a skill's trigger phras
 |-------|------|
 | `sprint-contract` *(symlinked)* | **ALWAYS** load when the user asks for a contract (any size, any context); also: 3+ file changes, complex tasks, planning CORR-NNN contracts |
 | `agent-orchestration` *(workspace)* | Any eval cycle (checker → judge → digest → matrix), contract planning, model-scoring, or validation gates — the distilled operating cycle (see also `execution/reports/EVAL_PROTOCOL.md`) |
-| `hpc-deucalion` | Before ANY Deucalion work — includes the 2026-09-01 scout recipe (Ollama version split, sequential-only, NFS logs, `scout-bench-m-aegis.sbatch`) |
+| `hpc-deucalion` | Before ANY Deucalion work — 2026-09-04 expanded to cover: staged-launch process (4 stages: local preflight → cluster smoke 1 GPU → real run → scale), job scripts must use the shared `_lib/common.sh` snippet (porta unica por JOB, RUN_LOG desde linha 1, cache check por manifest dir), `scripts/hpc/preflight_local.sh` antes do Estadio 1, e a correr `scripts/runs_tools/status.sh` em vez de percorrer 4 paths diferentes para logs. A skill tem uma "Error playbook" que **deve ser actualizada** quando aparece um sintoma novo (ver `§ 6 Always`). |
 | `code-review` *(symlinked)* | Before merging, independent verification of changes |
 | `python-best-practices` *(symlinked)* | Any Python code change |
 | `project-conventions` *(symlinked)* | New AEGIS-KG naming, file structure, entity IDs |
