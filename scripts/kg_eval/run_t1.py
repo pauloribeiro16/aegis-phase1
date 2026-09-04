@@ -243,36 +243,87 @@ def _build_prompt(
 # ─── LLM invocation ─────────────────────────────────────────────────
 
 
-def _invoker_from_env() -> Any:
-    """Build the LLM invoker for the current run.
+def _invoker_from_env(
+    model: str | None = None,
+    provider: str | None = None,
+    *,
+    allow_mock: bool = False,
+) -> Any:
+    """Build the LLM invoker for the current run (CORR-113 commit 5).
 
-    Honours ``MOCK_LLM=true`` (returns ``MockInvoker``). Otherwise returns
-    ``UnifiedInvoker`` via the project's factory
-    (``aegis_phase1.v2.llm.build_llm_invoker``); caller can pass
-    ``--provider`` to override.
+    Resolution order:
+        1. If ``MOCK_LLM`` env var is truthy AND ``allow_mock=True`` → MockInvoker.
+        2. Otherwise call ``build_llm_invoker(model=..., provider=...)`` using
+           the explicit ``model``/``provider`` arguments (or env vars
+           ``KG_EVAL_MODEL`` / ``KG_EVAL_PROVIDER`` as fallback).
+        3. If that fails (e.g. Ollama unreachable), re-raise — NEVER silently
+           fall back to MockInvoker. The previous silent-fallback masked a
+           misconfigured pilot run for the KG eval (gap caught at pilot
+           design time, before the cluster submission).
+
+    The ``allow_mock`` flag is OFF by default. Tests that need MockInvoker
+    pass ``allow_mock=True`` explicitly. The KG-eval pilot job sets
+    ``KG_EVAL_ALLOW_MOCK=false`` and the wrapper ``invoke_or_abort`` below
+    refuses to run if the resolved invoker is a MockInvoker — closing the
+    "the run completed but produced mock answers" failure mode.
     """
     if os.environ.get("MOCK_LLM", "").strip().lower() in {"1", "true", "yes", "on"}:
+        if not allow_mock:
+            raise RuntimeError(
+                "MOCK_LLM=true but allow_mock=False. "
+                "Either unset MOCK_LLM for a real run, or pass --allow-mock "
+                "to acknowledge you want mock output."
+            )
         from aegis_phase1.v2.llm import MockInvoker
 
         return MockInvoker()
-    try:
-        from aegis_phase1.v2.llm import build_llm_invoker
 
-        return build_llm_invoker()
-    except Exception as exc:  # pragma: no cover — defensive
-        logger.warning("build_llm_invoker failed (%s); falling back to MockInvoker", exc)
-        from aegis_phase1.v2.llm import MockInvoker
+    resolved_model = model or os.environ.get("KG_EVAL_MODEL")
+    resolved_provider = provider or os.environ.get("KG_EVAL_PROVIDER")
 
-        return MockInvoker()
+    if not resolved_model:
+        raise RuntimeError(
+            "No model specified. Pass --model CLI, set KG_EVAL_MODEL env, "
+            "or use MOCK_LLM=true with --allow-mock for tests."
+        )
+
+    from aegis_phase1.v2.llm import build_llm_invoker
+
+    return build_llm_invoker(model=resolved_model, provider=resolved_provider)
 
 
-def invoke_llm(invoker: Any, system: str, user: str, script: list[dict] | None = None) -> dict:
+def _is_mock(invoker: Any) -> bool:
+    """True if ``invoker`` is a MockInvoker (any package)."""
+    if invoker is None:
+        return False
+    cls_name = type(invoker).__name__
+    if cls_name == "MockInvoker":
+        return True
+    cls_mod = getattr(type(invoker), "__module__", "")
+    return "mock" in cls_mod.lower() or "Mock" in cls_name
+
+
+def invoke_llm(
+    invoker: Any,
+    system: str,
+    user: str,
+    *,
+    script: list[dict] | None = None,
+    abort_on_mock: bool = False,
+) -> dict:
     """Invoke the model and return its raw response.
 
-    If ``invoker`` is a ``MockInvoker`` and ``script`` is provided, swap the
-    script (for deterministic tests). Returns the invoker's dict unchanged.
+    If ``abort_on_mock=True`` and the invoker is a MockInvoker, raise
+    RuntimeError BEFORE invoking (closes the silent-mock gap). Tests that
+    legitimately use the mock must pass ``abort_on_mock=False``.
     """
-    if script is not None:
+    if abort_on_mock and _is_mock(invoker):
+        raise RuntimeError(
+            "invoke_llm received a MockInvoker but abort_on_mock=True. "
+            "This is a guard against the silent-mock failure mode — set "
+            "MOCK_LLM=false (unset) and pass a real --model."
+        )
+    if script is not None and hasattr(invoker, "script"):
         try:
             invoker.script = list(script)
             invoker.call_count = 0
@@ -295,6 +346,9 @@ def run_task(
     invoker: Any | None = None,
     script: list[dict] | None = None,
     model: str = "mock-or-configured",
+    provider: str | None = None,
+    allow_mock: bool = False,
+    abort_on_mock: bool = False,
 ) -> dict[str, Any]:
     """Run one task in one arm. Returns the env record (per protocol §6).
 
@@ -306,6 +360,11 @@ def run_task(
     ``raw_response.md`` and marks the run ``status="FAILED_AFTER_RETRIES"``
     in ``env.json`` so the scorer can flag the family as degraded (OBJ-12
     fail-loud pattern, mirrored from the pipeline).
+
+    ``model``/``provider`` propagate to ``_invoker_from_env`` so a real run
+    can no longer accidentally fall back to MockInvoker (silent-mock gap,
+    see commit 5). ``abort_on_mock=True`` makes any MockInvoker raise BEFORE
+    the invocation — the pilot job sets this hard.
     """
     case_path = Path(case_path).resolve()
     if preproc_root is None:
@@ -332,8 +391,22 @@ def run_task(
             (out_dir / "packet.sha256").write_text(digest + "\n", encoding="utf-8")
 
     prompt = _build_prompt(task, case_context, packet, with_kg)
-    inv = invoker or _invoker_from_env()
-    response = invoke_llm(inv, prompt["system"], prompt["user"], script=script)
+    inv = invoker or _invoker_from_env(
+        model=model if model != "mock-or-configured" else None,
+        provider=provider,
+        allow_mock=allow_mock,
+    )
+    try:
+        response = invoke_llm(
+            inv, prompt["system"], prompt["user"],
+            script=script, abort_on_mock=abort_on_mock,
+        )
+    except RuntimeError as exc:
+        # abort_on_mock tripped, or build_llm_invoker failed; surface
+        # explicitly in env.json (fail-loud, OBJ-12).
+        raw = f"RUN_ERROR: {exc}"
+        status = "RUN_ERROR"
+        response = {"raw": raw, "status": status}
 
     raw = ""
     status = "OK"
@@ -354,7 +427,8 @@ def run_task(
         "family": task.get("family"),
         "arm": arm,
         "model": model,
-        "provider": "mock" if os.environ.get("MOCK_LLM", "").lower() in {"1", "true", "yes", "on"} else "ollama",
+        "provider": provider or ("mock" if os.environ.get("MOCK_LLM", "").lower() in {"1", "true", "yes", "on"} else "ollama"),
+        "invoker_class": type(inv).__name__,
         "quantization": os.environ.get("KG_EVAL_QUANT") or None,
         "temperature": float(os.environ.get("KG_EVAL_TEMP") or 0.1),
         "seed": None,
@@ -414,6 +488,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--quiet", action="store_true", help="Suppress INFO logs."
     )
+    parser.add_argument(
+        "--model", default=None,
+        help="Model tag passed to build_llm_invoker (e.g. nemotron-3.5-lightning:30b). "
+             "Env KG_EVAL_MODEL is the fallback. Required for real runs.",
+    )
+    parser.add_argument(
+        "--provider", default=None,
+        help="Explicit provider (ollama | transformers | minimax). "
+             "Env KG_EVAL_PROVIDER is the fallback. Auto-detect from --model if unset.",
+    )
+    parser.add_argument(
+        "--allow-mock", action="store_true",
+        help="Acknowledge the use of MockInvoker (test-only). Real runs MUST NOT set this.",
+    )
+    parser.add_argument(
+        "--abort-on-mock", action="store_true",
+        help="Refuse to run if the resolved invoker is a MockInvoker. The pilot job sets this hard.",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -433,6 +525,10 @@ def main(argv: list[str] | None = None) -> int:
         args.case,
         args.preproc_root,
         with_kg=(args.arm == "with-kg"),
+        model=args.model or "mock-or-configured",
+        provider=args.provider,
+        allow_mock=args.allow_mock,
+        abort_on_mock=args.abort_on_mock,
     )
     logger.info(
         "Wrote artefacts to %s (status=%s, packet_sha=%s)",

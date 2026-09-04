@@ -163,6 +163,7 @@ def test_run_task_with_kg_writes_artefacts(
     env = run_task(
         t11_task, CASE1, PREPROC, with_kg=True,
         script=[{"raw": "## Affected systems\n- SYS-01\n", "status": "OK"}],
+        allow_mock=True,
     )
     out_dir = tmp_path / env["output_dir"]
     assert (out_dir / "packet.json").exists()
@@ -186,6 +187,7 @@ def test_run_task_no_kg_skips_packet(
     env = run_task(
         t11_task, CASE1, PREPROC, with_kg=False,
         script=[{"raw": "## Affected systems\n- SYS-01\n", "status": "OK"}],
+        allow_mock=True,
     )
     out_dir = tmp_path / env["output_dir"]
     assert not (out_dir / "packet.json").exists(), "NO-KG must not write packet"
@@ -221,6 +223,7 @@ def test_run_task_empty_case_context(
     env = run_task(
         t14_task, empty_case, PREPROC, with_kg=True,
         script=[{"raw": "## Proportionality for D-07.1 at tier STANDARD\n", "status": "OK"}],
+        allow_mock=True,
     )
     out_dir = tmp_path / env["output_dir"]
     packet = json.loads((out_dir / "packet.json").read_text())
@@ -244,8 +247,64 @@ def test_run_task_captures_failed_status(
     env = run_task(
         t11_task, CASE1, PREPROC, with_kg=True,
         script=[{"raw": "", "status": "FAILED_AFTER_RETRIES"}],
+        allow_mock=True,
     )
     assert env["status"] == "FAILED_AFTER_RETRIES"
     # OBJ-12: raw_response.md is written even on failure (no silent drop)
     out_dir = tmp_path / env["output_dir"]
     assert (out_dir / "raw_response.md").exists()
+
+
+# ─── Anti-mock guard (closes the silent-mock gap) ────────────────────
+
+
+def test_invoker_no_model_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No model specified → must raise (cannot silently fall back to mock)."""
+    from scripts.kg_eval.run_t1 import _invoker_from_env
+
+    monkeypatch.delenv("MOCK_LLM", raising=False)
+    monkeypatch.delenv("KG_EVAL_MODEL", raising=False)
+    with pytest.raises(RuntimeError, match="No model specified"):
+        _invoker_from_env()
+
+
+def test_invoker_mock_without_allow_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """MOCK_LLM=true with default allow_mock=False → must raise (no silent mock)."""
+    from scripts.kg_eval.run_t1 import _invoker_from_env
+
+    monkeypatch.setenv("MOCK_LLM", "true")
+    with pytest.raises(RuntimeError, match="MOCK_LLM=true but allow_mock=False"):
+        _invoker_from_env()
+
+
+def test_invoker_mock_with_allow_returns_mock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """MOCK_LLM=true + allow_mock=True → MockInvoker (tests deliberately use it)."""
+    from scripts.kg_eval.run_t1 import _invoker_from_env
+
+    monkeypatch.setenv("MOCK_LLM", "true")
+    inv = _invoker_from_env(allow_mock=True)
+    assert type(inv).__name__ == "MockInvoker"
+
+
+def test_invoke_llm_aborts_on_mock() -> None:
+    """invoke_llm(..., abort_on_mock=True) with a MockInvoker raises before the call."""
+    from aegis_phase1.v2.llm import MockInvoker
+
+    from scripts.kg_eval.run_t1 import _is_mock, invoke_llm
+
+    inv = MockInvoker()
+    assert _is_mock(inv)
+    with pytest.raises(RuntimeError, match="MockInvoker but abort_on_mock=True"):
+        invoke_llm(inv, "system", "user", abort_on_mock=True)
+
+
+def test_invoke_llm_allows_mock_when_explicit() -> None:
+    """invoke_llm(..., abort_on_mock=False) with a MockInvoker does NOT raise."""
+    from aegis_phase1.v2.llm import MockInvoker
+
+    from scripts.kg_eval.run_t1 import invoke_llm
+
+    inv = MockInvoker()
+    inv.script = [{"raw": "ok", "status": "OK"}]
+    out = invoke_llm(inv, "system", "user", abort_on_mock=False)
+    assert out["raw"] == "ok"
