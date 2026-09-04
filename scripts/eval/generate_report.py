@@ -58,6 +58,12 @@ def parse_args():
     p.add_argument("--preproc", required=True, type=Path, help="path to preproc_out")
     p.add_argument("--output-md", required=True, type=Path)
     p.add_argument("--output-json", required=True, type=Path)
+    p.add_argument("--model", required=False, type=str,
+                   help="Model tag to record in the report (defaults to "
+                        "gemma4:e2b for backwards compat). When "
+                        "--run-dir is used and the run_dir name encodes "
+                        "the model (e.g. qwen38_27b_runall_1862843), "
+                        "this is auto-detected and overrides the default.")
     p.add_argument("--use-parser-gate", action="store_true",
                    help="Call MARKDOWN_PARSERS[spec].parse() on every reconstructed "
                         "raw to get an independent L1 verdict.")
@@ -102,6 +108,48 @@ def load_canonical_refs(preproc: Path) -> set[str]:
             except Exception:
                 pass
     return refs
+
+
+def _resolve_model_label(args) -> str:
+    """Pick the model label for the report.
+
+    Priority:
+      1. explicit ``--model`` CLI arg
+      2. auto-detect from ``--run-dir`` name when it encodes a model tag
+         (e.g. ``qwen38_27b_runall_1862843`` → ``qwen3.8:27b``)
+      3. fall back to ``gemma4:e2b`` (historical CORR-057 default)
+    """
+    import re as _re
+    if getattr(args, "model", None):
+        return args.model
+    rd = getattr(args, "run_dir", None)
+    if rd is not None:
+        # Map common run-dir tokens to canonical ollama tags.
+        tokens = rd.name.split("_")
+        joined = "_".join(tokens)
+        rules = [
+            ("qwen38_27b", "qwen3.8:27b"),
+            ("qwen35_27b", "qwen3.5:27b"),
+            ("qwen35_9b", "qwen3.5:9b"),
+            ("qwen3_8", "qwen3.8:27b"),
+            ("qwen3_5", "qwen3.5:27b"),
+            ("gemma4_26b", "gemma4:26b"),
+            ("gemma4_31b", "gemma4:31b"),
+            ("granite4_2_30b", "granite4.2:30b"),
+            ("nemotron3_5_30b", "nemotron3.5:30b"),
+            ("ornith9b", "ornith-1.5:9b"),
+            ("ornith15_35b", "ornith-1.5:35b"),
+            ("muse_glimmer_30b", "muse-glimmer:30b"),
+            ("gpt_oss_20b", "gpt-oss:20b"),
+        ]
+        for needle, label in rules:
+            if needle in joined:
+                return label
+        # Fallback: use the first non-numeric token (e.g. "muse", "qwen38")
+        for t in tokens:
+            if t and not t.isdigit():
+                return t
+    return "gemma4:e2b"
 
 
 def extract_refs_from_output(output) -> list[str]:
@@ -431,7 +479,7 @@ def main():
     # Build full data structure
     data = {
         "contract": "CORR-057 + CORR-105",
-        "model": "gemma4:e2b",
+        "model": _resolve_model_label(args),
         "case": "case1-tinytask",
         "total_entries": len(entries),
         "canonical_refs_loaded": len(canonical_refs),
@@ -456,7 +504,7 @@ def main():
     lines = [
         "# CORR-057 — Baseline e2b eval report",
         "",
-        f"- **Model:** gemma4:e2b",
+        f"- **Model:** {data['model']}",
         f"- **Case:** case1-tinytask",
         f"- **Total LLM entries in jsonl:** {len(entries)}",
         f"- **Canonical refs loaded from preproc:** {len(canonical_refs)}",

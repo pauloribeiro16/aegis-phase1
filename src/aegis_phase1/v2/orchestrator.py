@@ -411,6 +411,100 @@ class Phase1Orchestrator:
         }
         return inv
 
+    def _load_clause_mappings_from_case(self, case_path: str) -> None:
+        """Load gold-style per-article clause_mappings from the case ontology YAML.
+
+        The v2 PreprocCatalogLoader builds a derived clause_mappings list
+        (clause_id, regulation_id, source_sr_ids, maps_to_subdomain,
+        normative_strength) but loses the per-article detail (article,
+        description, obligated_party, obligation_type) that the case-team
+        authors in ``cases/<case>/context/phase1_ontology.yaml``.
+
+        This helper reads the YAML directly and stashes the
+        per-article rows under ``state['raw_clause_mappings']`` so that
+        renderers (notably Doc 05 §9 Per-Article Breakdown) can render
+        the gold-equivalent table.
+
+        Missing YAML or missing ``clause_mappings`` key is logged at
+        debug level and produces an empty list — the renderer shows a
+        graceful "_no per-article data for this case_" notice instead
+        of a broken table.
+        """
+        try:
+            import os as _os
+
+            import yaml as _yaml
+
+            case_name = _os.path.basename(_os.path.normpath(case_path))
+            candidates = [
+                _os.path.join(case_path, "context", "phase1_ontology.yaml"),
+                _os.path.join(case_path, "00_COMMON", "phase1_ontology.yaml"),
+            ]
+            env_root = _os.environ.get("AEGIS_CASES_ROOT")
+            if env_root:
+                candidates.insert(
+                    0,
+                    _os.path.join(env_root, case_name, "context", "phase1_ontology.yaml"),
+                )
+            yaml_path: str | None = None
+            for c in candidates:
+                if _os.path.isfile(c):
+                    yaml_path = c
+                    break
+            if yaml_path is None:
+                logger.debug(
+                    "_load_clause_mappings_from_case: no phase1_ontology.yaml "
+                    "found for %s (searched %s) — state['raw_clause_mappings'] "
+                    "will be empty",
+                    case_name,
+                    candidates,
+                )
+                self.state["raw_clause_mappings"] = []
+                return
+
+            with open(yaml_path, encoding="utf-8") as f:
+                data = _yaml.safe_load(f) or {}
+            rows = data.get("clause_mappings") or []
+            if not isinstance(rows, list):
+                logger.warning(
+                    "_load_clause_mappings_from_case: 'clause_mappings' is not a "
+                    "list in %s — ignoring",
+                    yaml_path,
+                )
+                rows = []
+
+            normalised: list[dict[str, Any]] = []
+            for r in rows:
+                if not isinstance(r, dict):
+                    continue
+                normalised.append(
+                    {
+                        "clause_id": str(r.get("clause_id", "") or ""),
+                        "regulation_id": str(r.get("regulation_id", "") or ""),
+                        "article": str(r.get("article", "") or ""),
+                        "description": str(r.get("description", "") or ""),
+                        "maps_to_subdomain": str(r.get("maps_to_subdomain", "") or ""),
+                        "normative_strength": r.get("normative_strength"),
+                        "obligated_party": str(r.get("obligated_party", "") or ""),
+                        "obligation_type": str(r.get("obligation_type", "") or ""),
+                    }
+                )
+
+            self.state["raw_clause_mappings"] = normalised
+            logger.debug(
+                "_load_clause_mappings_from_case: loaded %d gold-style " "clause_mappings from %s",
+                len(normalised),
+                yaml_path,
+            )
+        except Exception as exc:
+            logger.warning(
+                "_load_clause_mappings_from_case: failed to load from %s (%s) — "
+                "state['raw_clause_mappings'] will be empty",
+                case_path,
+                exc,
+            )
+            self.state.setdefault("raw_clause_mappings", [])
+
     def _build_ontology_shim(self) -> dict[str, Any]:
         """Build v1-shape ontology from v2 pairs and security requirements.
 
@@ -454,6 +548,11 @@ class Phase1Orchestrator:
             "regulations": list(self.state.get("v2_applicable_regs", [])),
             "overlaps": [p.model_dump() for p in self.state.get("v2_pairs", [])],
             "clause_mappings": clause_mappings,
+            # Preserve gold-style per-article rows (article, description,
+            # obligated_party, ...) loaded by _load_clause_mappings_from_case
+            # so legacy consumers reading state['ontology']['clause_mappings']
+            # still see per-article detail when present.
+            "raw_clause_mappings": list(self.state.get("raw_clause_mappings", []) or []),
             "source_regulations": {},
             "stacks": [],
             "company": {
@@ -545,6 +644,23 @@ class Phase1Orchestrator:
         # Populate v2_* state keys + v1 shim (replaces the removed
         # CommonLoader/PreprocessingLoader output).
         self._load_v2_catalog(case_path)
+
+        # _load_clause_mappings_from_case: read the gold-style per-article
+        # clause table (article, description, maps_to_subdomain, etc.)
+        # from the case ontology YAML (cases/<case>/context/phase1_ontology.yaml),
+        # which the case-team owns. The v2 PreprocCatalogLoader builds a
+        # derived clause_mappings list without article/description, so we
+        # layer the gold-style data on top under a parallel state key
+        # (``raw_clause_mappings``) for renderers that need per-article
+        # detail (e.g. Doc 05 §9 Per-Article Breakdown).
+        self._load_clause_mappings_from_case(case_path)
+
+        # Refresh the v1 ontology shim so legacy consumers reading
+        # ``state['ontology']['raw_clause_mappings']`` see the gold-style
+        # rows alongside the derived v2 list. _load_v2_catalog may have
+        # populated ``state['ontology']`` BEFORE _load_clause_mappings_from_case
+        # wrote its key — we re-build the shim now to capture both.
+        self.state["ontology"] = self._build_ontology_shim()
 
         self.state["current_stage"] = "LOADED"
         self.state["case_path"] = case_path
@@ -1177,9 +1293,7 @@ class Phase1Orchestrator:
             self.state["aggregated_data"]["compound_events"] = compound_events
         return compound_events if isinstance(compound_events, dict) else None
 
-    def _get_phase1_executor(
-        self, *, for_phase_1b: bool = False
-    ) -> "Phase1Executor | None":
+    def _get_phase1_executor(self, *, for_phase_1b: bool = False) -> "Phase1Executor | None":
         """Lazy-initialize the canonical five-LLM Phase1Executor.
 
         Returns None when no LLM invoker is configured, mock mode is active,
