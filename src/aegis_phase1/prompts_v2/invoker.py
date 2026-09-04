@@ -193,9 +193,17 @@ class Phase1LLMInvoker:
             self.base_url = base_url
         elif provider == "minimax":
             from aegis_phase1.llm.chat_minimax import DEFAULT_BASE_URL as _MINIMAX_URL
+
             self.base_url = _MINIMAX_URL
         else:
-            self.base_url = self.DEFAULT_BASE_URL
+            env_url = os.environ.get("OLLAMA_BASE_URL")
+            if env_url:
+                self.base_url = env_url
+            elif "OLLAMA_HOST" in os.environ:
+                host = os.environ["OLLAMA_HOST"].strip()
+                self.base_url = host if host.startswith("http") else f"http://{host}"
+            else:
+                self.base_url = self.DEFAULT_BASE_URL
         self.provider = provider
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self._langfuse_handler = langfuse_handler

@@ -473,6 +473,7 @@ class UnifiedInvoker:
             llm_logger=self.llm_logger,
             format_logger=self.format_logger,
             model=self.model,
+            base_url=self.base_url,
             langfuse_handler=self._langfuse_handler,
             provider=self.provider,  # CORR-062 S2: pass through to heavy
         )
