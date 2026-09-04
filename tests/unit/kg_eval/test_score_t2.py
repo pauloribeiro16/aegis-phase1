@@ -256,3 +256,17 @@ def test_impossible_task_full_integration() -> None:
 )
 def test_absence_parametrized(answer: str, expected: bool) -> None:
     assert has_absence_declaration(answer) is expected
+
+
+def test_dim2_zero_queries_is_fail() -> None:
+    """A run that never queried the graph is a NO-OP, not 'well'/'optimal'.
+
+    The scorer must mark query_efficiency_pass=False, leave the grade empty,
+    and append an explanatory note so the matrix treats this distinctly from
+    a 2-query optimal run.
+    """
+    card = score_t2_run(_make_run(queries=[]), optimal_query_count=2)
+    assert card.total_queries == 0
+    assert card.query_efficiency_pass is False
+    assert card.query_efficiency_grade == ""
+    assert any("No queries attempted" in n for n in card.notes)

@@ -142,7 +142,13 @@ def score_t2_run(run_log: T2RunLog, optimal_query_count: int = 2) -> T2ScoreCard
 
     budget_well = optimal_query_count
     budget_borderline = min(2 * optimal_query_count, optimal_query_count + 3)
-    if query_count <= budget_well:
+    if query_count == 0:
+        # Zero queries is a NO-OP, not "optimal": cannot judge efficiency on
+        # a run that did not actually attempt to navigate the graph.
+        efficiency_grade = ""
+        query_efficiency_pass = False
+        notes.append("No queries attempted; cannot judge efficiency.")
+    elif query_count <= budget_well:
         efficiency_grade = "well"
         query_efficiency_pass = True
     elif query_count <= budget_borderline:
