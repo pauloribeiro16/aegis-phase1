@@ -261,6 +261,43 @@ def build_graph_for_case(case_path: Path, preproc_root: Path) -> InMemoryGraph:
                 store_nodes[stid] = stnode
                 graph.add_edge(ent_node, stnode, "OPERATES_SYSTEM")
 
+    # 4b. DataSubjects (Pattern 6 — only case2/case3 have this YAML)
+    arch_dir_for_ds = arch_dir  # alias kept for readability
+    ds_file = arch_dir_for_ds / "data_subjects.yaml"
+    if ds_file.exists():
+        try:
+            with ds_file.open("r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            for idx, ds in enumerate(data.get("data_subjects", [])):
+                dsid = f"DS-{case_id}-{idx:03d}"
+                special = bool(ds.get("special_category", False))
+                dsnode = graph.add_node(
+                    "DataSubject",
+                    {
+                        "id": dsid,
+                        "case_id": case_id,
+                        "subject_type": ds.get("subject_type", "UNKNOWN"),
+                        "data_categories": ",".join(ds.get("data_categories", [])),
+                        "special_category": special,
+                        "estimated_count": ds.get("estimated_count", 0),
+                        "minor": bool(ds.get("minor", False)),
+                    },
+                )
+                graph.add_edge(ent_node, dsnode, "HAS_DATA_SUBJECT")
+                if special:
+                    for cn in graph.nodes:
+                        if "RegulatoryClause" in cn.labels:
+                            artref = cn.properties.get("article_reference", "")
+                            if "Art. 9" in artref or "Art.9" in artref:
+                                graph.add_edge(
+                                    dsnode,
+                                    cn,
+                                    "TRIGGERS_CLAUSE",
+                                    {"trigger_reason": "GDPR Art. 9 (special category)"},
+                                )
+        except Exception:
+            pass
+
     # 5. Subdomains & Macro-domains
     sd_nodes: dict[str, Node] = {}
     subdomains_dir = preproc_root / "entities" / "subdomains"
@@ -389,6 +426,117 @@ def build_graph_for_case(case_path: Path, preproc_root: Path) -> InMemoryGraph:
                     for sdid in item.get("sub_domains", []):
                         if sdid in sd_nodes:
                             graph.add_edge(ri_node, sd_nodes[sdid], "SCOPED_TO_SUBDOMAIN")
+
+    # 8. SecurityObjectives (Pattern 5 — from preproc_out/entities/sos)
+    so_nodes: dict[str, Node] = {}
+    sos_dir = preproc_root / "entities" / "sos"
+    if sos_dir.exists():
+        for so_file in sos_dir.rglob("*.json"):
+            try:
+                with so_file.open("r", encoding="utf-8") as f:
+                    so_data = json.load(f)
+                so_id = so_data.get("id") or so_data.get("yaml_id")
+                sdid = so_data.get("subdomain_id")
+                if not so_id:
+                    continue
+                if so_id in so_nodes:
+                    continue  # avoid dup
+                sonode = graph.add_node(
+                    "SecurityObjective",
+                    {
+                        "id": so_id,
+                        "regulation_code": so_data.get("regulation", ""),
+                        "statement": so_data.get("objective", ""),
+                        "sub_domain_id": sdid or "",
+                        "inherits_from": so_data.get("inherits_from", "") or None,
+                    },
+                )
+                so_nodes[so_id] = sonode
+                if sdid and sdid in sd_nodes:
+                    graph.add_edge(sonode, sd_nodes[sdid], "SCOPED_TO")
+                reg_id = so_data.get("regulation", "")
+                if reg_id and reg_id in reg_nodes:
+                    graph.add_edge(sonode, reg_nodes[reg_id], "BELONGS_TO")
+            except Exception:
+                pass
+
+    # 9. ProportionalityEntries (Pattern 3 — heuristic from active clauses per subdomain)
+    # Spec §2.1: ProportionalityEntry has 9 rich attributes. We populate a minimal
+    # proxy here so T2.5 has real nodes to navigate; full Phase-1 architecture is
+    # ETL-real territory. One PE per (case, subdomain) with tier derived from the
+    # number of activated clauses.
+    _PE_TIER_BY_COUNT = (
+        (0, "MINIMAL"),
+        (3, "LIGHTWEIGHT"),
+        (6, "STANDARD"),
+        (10, "RIGOROUS"),
+    )
+
+    def _tier_for(n_clauses: int) -> str:
+        for thresh, label in reversed(_PE_TIER_BY_COUNT):
+            if n_clauses >= thresh:
+                return label
+        return "MINIMAL"
+
+    pe_nodes: dict[str, Node] = {}
+    # Count clauses per subdomain already in the graph
+    clause_counts: dict[str, int] = {sdid: 0 for sdid in sd_nodes}
+    for cn in graph.nodes:
+        if "RegulatoryClause" in cn.labels:
+            for edge in graph.edges:
+                if (
+                    edge.from_node is cn
+                    and edge.rel_type == "MAPPED_TO_SUBDOMAIN"
+                    and "SubDomain" in edge.to_node.labels
+                ):
+                    sdid = edge.to_node.properties.get("id", "")
+                    clause_counts[sdid] = clause_counts.get(sdid, 0) + 1
+    # Seed at least one ProportionalityEntry per known subdomain so navigation has nodes
+    pe_seq = 0
+    for sdid in sorted(sd_nodes.keys()):
+        n = clause_counts.get(sdid, 0)
+        tier = _tier_for(n)
+        pe_seq += 1
+        peid = f"PE-{case_id}-{sdid}"
+        penode = graph.add_node(
+            "ProportionalityEntry",
+            {
+                "id": peid,
+                "case_id": case_id,
+                "sub_domain_id": sdid,
+                "tier": tier,
+                "inheritability": "BUILD_REQUIRED" if n > 0 else "INHERITABLE",
+                "satisfaction_pattern": "BUILD_FULL" if n > 0 else "INHERIT",
+                "priority": "MUST" if tier in ("RIGOROUS", "STANDARD") else "COULD",
+                "evidence_depth": (
+                    f"Full evidence package (n_clauses={n} per {sdid})"
+                    if n > 0
+                    else f"No clauses mapped to {sdid} — minimal evidence required"
+                ),
+                "verification_method": "INSPECT",
+                "ownership": "COMPANY",
+                "n_clauses": n,
+            },
+        )
+        pe_nodes[peid] = penode
+        if sd_nodes.get(sdid):
+            graph.add_edge(penode, sd_nodes[sdid], "SCOPED_TO")
+
+    # ProportionalityProfile container (1 per Enterprise)
+    if pe_nodes:
+        ppid = f"PP-{case_id}"
+        pp_node = graph.add_node(
+            "ProportionalityProfile",
+            {
+                "id": ppid,
+                "case_id": case_id,
+                "company_scale": ent_node.properties.get("scale", ""),
+                "gate_p_status": "PASS",
+            },
+        )
+        graph.add_edge(ent_node, pp_node, "HAS_PROPORTIONALITY_PROFILE")
+        for penode in pe_nodes.values():
+            graph.add_edge(pp_node, penode, "CONTAINS_ENTRY")
 
     return graph
 
