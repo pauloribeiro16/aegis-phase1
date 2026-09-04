@@ -1,5 +1,7 @@
-# KG-eval T2 Navigation Task Catalogue (CORR-115).
+# KG-eval T2 Navigation Task Catalogue (CORR-115 v2 — 8 tasks, 6 navigation patterns).
 # Focus: Testing Model Usability, Multi-hop Exploration, and Error Handling with cypher() tool.
+# v2 (2026-09-04): added 5 tasks covering Patterns 1 (Scope/Gaps), 3 (Proportionality),
+# 5 (SO hierarchy), 6 (DataSubject), and Error-Recovery (dim 4). case2-secureborder now in.
 
 tasks:
   - id: T2.1-case1-SYS01-grounding
@@ -34,3 +36,65 @@ tasks:
     target_pattern: "MATCH (s:System {case_id: 'case1-tinytask'}) ..."
     optimal_query_count: 1
     impossible: true
+
+  - id: T2.4-case2-NIS2-D010-scope
+    family: T2.1
+    case: case2-secureborder
+    subdomain_id: D-01.0
+    question: >-
+      Evaluate whether case2-secureborder falls within the scope of the NIS2 directive
+      given its sector (border-security, drones), scale (MEDIUM), and deployed systems.
+      State the regulatory role, applicable subdomains, and any Declaration Gaps that should
+      be flagged before declaring NIS2 applicable.
+    target_pattern: "MATCH (e:Enterprise {case_id:'case2-secureborder'})-[:ACTS_AS]->(role:RegulatoryRole)-[:BELONGS_TO_REGULATION]->(r:Regulation {id:'NIS2'}) ..."
+    optimal_query_count: 2
+    impossible: false
+
+  - id: T2.5-case3-D044-attributes
+    family: T2.4
+    case: case3-omnibank
+    subdomain_id: D-04.4
+    question: >-
+      For subdomain D-04.4 (incident response) in case3-omnibank, list the ProportionalityEntry
+      attributes: tier (MINIMAL/LIGHTWEIGHT/STANDARD/RIGOROUS/DEFERRED), inheritability,
+      satisfaction_pattern, evidence_depth (full text), and ownership role.
+    target_pattern: "MATCH (e:Enterprise {case_id:'case3-omnibank'})-[:HAS_PROPORTIONALITY_PROFILE]->(:ProportionalityProfile)-[:CONTAINS_ENTRY]->(pe:ProportionalityEntry {sub_domain_id:'D-04.4'}) ..."
+    optimal_query_count: 3
+    impossible: false
+
+  - id: T2.6-case3-DS-GDPR-Art9
+    family: T2.5
+    case: case3-omnibank
+    subdomain_id: D-01.1
+    question: >-
+      Identify any DataSubject categories in case3-omnibank flagged as special_category=true.
+      Determine which GDPR clauses (if any) are auto-triggered, citing the article references.
+    target_pattern: "MATCH (e:Enterprise {case_id:'case3-omnibank'})-[:HAS_DATA_SUBJECT]->(ds:DataSubject) WHERE ds.special_category = true ..."
+    optimal_query_count: 2
+    impossible: false
+
+  - id: T2.7-case1-D091-SOs
+    family: T2.6
+    case: case1-tinytask
+    subdomain_id: D-09.1
+    question: >-
+      For subdomain D-09.1 in case1-tinytask, list the SecurityObjectives (SO-REG-NNN) and any
+      SecurityRules (SR-REG-NNN) that scope this subdomain. Group results by regulation.
+    target_pattern: "MATCH (so:SecurityObjective)-[:SCOPED_TO]->(sd:SubDomain {id:'D-09.1'}) ..."
+    optimal_query_count: 2
+    impossible: false
+
+  - id: T2.8-case2-error-recovery
+    family: T2.7
+    case: case2-secureborder
+    subdomain_id: D-04.0
+    question: >-
+      A common mistake is to query with an invented label, e.g. MATCH (:Company). When the
+      Cypher executor returns 'unknown label :Company', retry with the correct ontology label
+      (:Enterprise) and proceed to fetch the systems for case2-secureborder. Report the
+      recovered query and the systems retrieved.
+    target_pattern: "MATCH (:Enterprise {case_id:'case2-secureborder'})-[:OPERATES_SYSTEM]->(s:System) ..."
+    optimal_query_count: 4
+    impossible: false
+    expect_initial_error: true
+    expected_artefacts: ["case2:", "Operating", "SYSTEM"]
