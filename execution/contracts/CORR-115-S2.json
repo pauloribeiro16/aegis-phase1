@@ -21,7 +21,22 @@
       "output/kg_eval_t2/sc_1875227.json"
     ],
     "headline": "qwen3.8:27b 3/3 PASS (only model with all-overall); nemotron 2/3; gemma4 + muse 1/3 (over-explore)",
-    "summary_md": "output/kg_eval_t2/t2_pilot_v1_summary.md"
+    "summary_md": "output/kg_eval_t2/t2_pilot_v1_summary.md",
+    "v3": {
+      "models_evaluated": 6,
+      "tasks_per_model": 8,
+      "runs": 48,
+      "scorecards": [
+        "output/kg_eval_t2/sc_1878904.json",
+        "output/kg_eval_t2/sc_1878905.json",
+        "output/kg_eval_t2/sc_1878906.json",
+        "output/kg_eval_t2/sc_1878907.json",
+        "output/kg_eval_t2/sc_1878908.json",
+        "output/kg_eval_t2/sc_1878909.json"
+      ],
+      "headline": "qwen3.8:27b 1/8 (T2.3 only); remaining 5 models 0/8. Calibration issue: T2.3 trivially passable",
+      "summary_md": "output/kg_eval_t2/t2_pilot_v3_summary.md"
+    }
   },
   "owned_files": [
     "scripts/kg_eval/engine.py",
