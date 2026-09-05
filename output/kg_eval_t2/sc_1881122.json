@@ -1,0 +1,261 @@
+[
+  {
+    "task_id": "T2.1-case1-SYS01-grounding",
+    "model": "glm-4.7-flash:latest",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 6,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": [],
+      "sos": [],
+      "srs": [],
+      "subdomains": [],
+      "tiers": [],
+      "systems": [],
+      "data_subjects": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "Exceeded query budget: 6 queries (optimal: 2, borderline cap: 4).",
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.2-case3-D044-tension",
+    "model": "glm-4.7-flash:latest",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": true,
+    "grounding_discipline_pass": true,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": true,
+    "total_queries": 1,
+    "failed_queries": 0,
+    "query_efficiency_grade": "well",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": [],
+      "sos": [],
+      "srs": [],
+      "subdomains": [
+        "D-04.4"
+      ],
+      "tiers": [],
+      "systems": [],
+      "data_subjects": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": []
+  },
+  {
+    "task_id": "T2.3-case1-impossible-trio",
+    "model": "glm-4.7-flash:latest",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": true,
+    "grounding_discipline_pass": true,
+    "error_recovery_pass": true,
+    "absence_declared_pass": false,
+    "overall_usability_pass": false,
+    "total_queries": 2,
+    "failed_queries": 0,
+    "query_efficiency_grade": "well",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": [],
+      "sos": [],
+      "srs": [],
+      "subdomains": [],
+      "tiers": [],
+      "systems": [],
+      "data_subjects": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "Failed to declare absence on impossible task."
+    ]
+  },
+  {
+    "task_id": "T2.4-case2-NIS2-D010-scope",
+    "model": "glm-4.7-flash:latest",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": [],
+      "sos": [],
+      "srs": [],
+      "subdomains": [],
+      "tiers": [],
+      "systems": [],
+      "data_subjects": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "No queries attempted; cannot judge efficiency.",
+      "Final answer present but cites no closed-set artefacts (NIST CSF ID, clause ID, or article reference)."
+    ]
+  },
+  {
+    "task_id": "T2.5-case3-D044-attributes",
+    "model": "glm-4.7-flash:latest",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": true,
+    "grounding_discipline_pass": true,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": true,
+    "total_queries": 4,
+    "failed_queries": 0,
+    "query_efficiency_grade": "borderline",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": [],
+      "sos": [],
+      "srs": [],
+      "subdomains": [
+        "D-04.4"
+      ],
+      "tiers": [],
+      "systems": [],
+      "data_subjects": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": []
+  },
+  {
+    "task_id": "T2.6-case3-DS-GDPR-Art9",
+    "model": "glm-4.7-flash:latest",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 6,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": [],
+      "sos": [],
+      "srs": [],
+      "subdomains": [],
+      "tiers": [],
+      "systems": [],
+      "data_subjects": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "Exceeded query budget: 6 queries (optimal: 2, borderline cap: 4).",
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.7-case1-D091-SOs",
+    "model": "glm-4.7-flash:latest",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": true,
+    "grounding_discipline_pass": true,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": true,
+    "total_queries": 3,
+    "failed_queries": 0,
+    "query_efficiency_grade": "borderline",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": [],
+      "sos": [
+        "SO-D-07.1.GDPR",
+        "SO-D-07.3.HL",
+        "SO-D-07.4.HL"
+      ],
+      "srs": [],
+      "subdomains": [
+        "D-07.1",
+        "D-07.2",
+        "D-07.3",
+        "D-07.4",
+        "D-09.1"
+      ],
+      "tiers": [],
+      "systems": [],
+      "data_subjects": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": []
+  },
+  {
+    "task_id": "T2.8-case2-error-recovery",
+    "model": "glm-4.7-flash:latest",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": true,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 6,
+    "failed_queries": 0,
+    "query_efficiency_grade": "borderline",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": [],
+      "sos": [],
+      "srs": [],
+      "subdomains": [],
+      "tiers": [],
+      "systems": [],
+      "data_subjects": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "Final answer empty or truncated."
+    ]
+  }
+]
