@@ -6,7 +6,8 @@ Measures the 5 dimensions of graph navigation from docs/KG_EVAL_PROTOCOL.md §8:
 2. Query Strategy / Efficiency (count vs optimal + sub-grades WELL/BORDERLINE)
 3. Grounding Discipline (final answer must cite ≥1 closed-set artefact)
 4. Error Recovery (when a query errors, does the model adapt the next query?)
-5. Knowing When to Stop (for impossible tasks, declare absence explicitly)
+5. Knowing When to Stop (for impossible tasks, declare absence explicitly AND
+   cite a useful negative: what IS in the graph that makes the concept absent)
 
 The dataclass mirrors the JSON shape produced by the T2 sbatch so adding
 fields is a backward-compatible change (the sbatch writes .__dict__).
@@ -75,6 +76,23 @@ def has_absence_declaration(text: str) -> bool:
         re.search(r"\bno [a-z ]{2,40} in (the )?graph\b", lower)
         or re.search(r"\bgraph has no [a-z ]{2,40}\b", lower)
     )
+
+
+# A bare "no X here" is cheap. Dimension 5 also requires a *useful negative*: the
+# answer must cite something that IS in the graph and explains why the concept is
+# absent (case1-tinytask is a MICRO SaaS shop on AWS/Firebase/GitHub, so DORA and
+# NIS2 simply do not bind, and there is no on-premise mainframe estate).
+_RE_USEFUL_NEGATIVE = re.compile(
+    r"\b(MICRO|SaaS|employees|AWS|Firebase|GitHub|SMALL|company scale|MICRO tier)\b",
+    re.IGNORECASE,
+)
+
+
+def has_useful_negative(text: str) -> bool:
+    """True iff the answer grounds the absence in a fact present in the graph."""
+    if not text:
+        return False
+    return bool(_RE_USEFUL_NEGATIVE.search(text))
 
 
 def _error_recovery_metrics(queries: list[QueryRecord]) -> dict[str, Any]:
@@ -199,9 +217,14 @@ def score_t2_run(run_log: T2RunLog, optimal_query_count: int = 2) -> T2ScoreCard
     absence_declared_pass = True
     if run_log.impossible:
         declared = has_absence_declaration(final_answer)
-        absence_declared_pass = declared
+        # Beyond declaring absence, the answer must cite WHY it is absent
+        # (a useful negative grounded in the graph).
+        useful_negative = has_useful_negative(final_answer)
+        absence_declared_pass = declared and useful_negative
         if not declared:
             notes.append("Failed to declare absence on impossible task.")
+        elif not useful_negative:
+            notes.append("Declared absence but did not cite WHY (useful-negative missing).")
 
     overall_usability_pass = (
         syntax_validity_pass
@@ -236,5 +259,6 @@ __all__ = [
     "T2ScoreCard",
     "extract_artefacts",
     "has_absence_declaration",
+    "has_useful_negative",
     "score_t2_run",
 ]

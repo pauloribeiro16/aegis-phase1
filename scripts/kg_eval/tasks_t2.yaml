@@ -2,6 +2,8 @@
 # Focus: Testing Model Usability, Multi-hop Exploration, and Error Handling with cypher() tool.
 # v2 (2026-09-04): added 5 tasks covering Patterns 1 (Scope/Gaps), 3 (Proportionality),
 # 5 (SO hierarchy), 6 (DataSubject), and Error-Recovery (dim 4). case2-secureborder now in.
+# v3 (2026-09-05, T2-EXP-2): T2.3 replaced by a 3-sub-question impossible task; dim 5 now
+# also demands a "useful negative" (cite graph evidence for WHY the concept is absent).
 
 tasks:
   - id: T2.1-case1-SYS01-grounding
@@ -26,16 +28,21 @@ tasks:
     optimal_query_count: 1
     impossible: false
 
-  - id: T2.3-case1-impossible-cloud
+  - id: T2.3-case1-impossible-trio
     family: T2.3
     case: case1-tinytask
     subdomain_id: D-09.1
     question: >-
-      Query the knowledge graph for any dedicated mainframe hardware cryptographic modules
-      operated directly on-premise by case1-tinytask. If none exist in the graph, declare absence.
-    target_pattern: "MATCH (s:System {case_id: 'case1-tinytask'}) ..."
-    optimal_query_count: 1
+      Verify three claims against the graph for case1-tinytask (a MICRO SaaS company):
+      (1) Is there any dedicated mainframe hardware cryptographic module operated on-premise?
+      (2) Is there a NIS2 sector declaration for energy utilities?
+      (3) Is there a DORA financial-entity role binding?
+      For each, if absent, declare absence explicitly. Cite what is IN the graph that makes them absent
+      (e.g., the company is MICRO scale, so DORA does not apply; it has no energy utility systems, so NIS2 doesn't bind).
+    target_pattern: "Multi-bucket. Each sub-question is its own Cypher."
+    optimal_query_count: 3
     impossible: true
+    expected_sub_questions: 3
 
   - id: T2.4-case2-NIS2-D010-scope
     family: T2.1

@@ -232,10 +232,32 @@ def test_happy_full_run_with_one_recovered_error() -> None:
     assert card.overall_usability_pass is False
 
 
+def test_dim5_requires_useful_negative() -> None:
+    log = _make_run(
+        final_answer="No mainframe cryptographic module in this graph.",
+        impossible=True,
+    )
+    card = score_t2_run(log, optimal_query_count=1)
+    assert card.absence_declared_pass is False
+    assert any("useful-negative" in n.lower() for n in card.notes)
+
+
+def test_dim5_passes_when_useful_negative_present() -> None:
+    log = _make_run(
+        final_answer="No mainframe crypto; case1 is MICRO SaaS so DORA does not bind.",
+        impossible=True,
+    )
+    card = score_t2_run(log, optimal_query_count=1)
+    assert card.absence_declared_pass is True
+
+
 def test_impossible_task_full_integration() -> None:
     log = _make_run(
         queries=[_ok_query(1, "MATCH (s:AuthSystem) RETURN s")],
-        final_answer="No mainframe cryptographic module in this graph; the case does not contain one.",
+        final_answer=(
+            "No mainframe cryptographic module in this graph; the case does not contain one "
+            "(case1-tinytask is a MICRO SaaS enterprise running on AWS and Firebase)."
+        ),
         impossible=True,
     )
     card = score_t2_run(log, optimal_query_count=1)
