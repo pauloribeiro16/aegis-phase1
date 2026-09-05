@@ -33,16 +33,62 @@ You will receive the query results (or error message) in the next turn.
 When you have gathered sufficient evidence, provide your final answer.
 
 Ontology Summary:
-- Nodes: (:Enterprise {case_id, name, scale}), (:System {id, name, criticality}), (:DataStore {id, storage_type, contains_pii}), (:SubDomain {id, name, macro_id}), (:Regulation {id}), (:RegulatoryClause {id, regulation_id, article_reference}), (:CSFSubcategory {id, outcome_text}), (:RegulatoryInteraction {id, interaction_type, severity, resolution_principle, sub_domains}).
+- Nodes: (:Enterprise {case_id, name, scale}), (:System {id, name, criticality}), (:DataStore {id, storage_type, contains_pii}), (:SubDomain {id, name, macro_id}), (:Regulation {id}), (:Article {article_reference}), (:RegulatoryClause {id, regulation_id, article_reference}), (:CSFSubcategory {id, outcome_text}), (:RegulatoryInteraction {id, interaction_type, severity, resolution_principle, sub_domains}), (:RegulatoryRole {role_name}), (:RegulatoryApplicabilityResult {applicable}), (:DataSubject {type, special_category_art9, estimated_count}), (:ProportionalityProfile), (:ProportionalityEntry {tier, inheritability, priority, satisfaction_pattern}), (:SecurityObjective {id, statement}), (:SecurityRule {id, statement}), (:DeclarationGap {gap_type, severity}), (:AuthSystem {id, auth_type}), (:ThirdPartyService {id}), (:ExternalParty {id}), (:ControlEvidence), (:ClauseActivation).
 - Relationships:
-  (:Enterprise)-[:OPERATES_SYSTEM]->(:System|:DataStore)
+  (:Enterprise)-[:OPERATES_SYSTEM]->(:System|:DataStore|:AuthSystem|:ThirdPartyService)
   (:System)-[:IN_SCOPE_OF]->(:SubDomain)
   (:RegulatoryClause)-[:MAPPED_TO_SUBDOMAIN]->(:SubDomain)
   (:RegulatoryClause)-[:ANCHORED_TO_CSF]->(:CSFSubcategory)
   (:RegulatoryInteraction)-[:SCOPED_TO_SUBDOMAIN]->(:SubDomain)
   (:Enterprise)-[:HAS_REGULATORY_INTERACTION]->(:RegulatoryInteraction)
+  (:Enterprise)-[:HAS_DATA_SUBJECT]->(:DataSubject)
+  (:DataSubject)-[:TRIGGERS_CLAUSE]->(:RegulatoryClause)
+  (:Enterprise)-[:HAS_PROPORTIONALITY_PROFILE]->(:ProportionalityProfile)
+  (:ProportionalityProfile)-[:CONTAINS_ENTRY]->(:ProportionalityEntry)
+  (:SecurityObjective)-[:SCOPED_TO]->(:SubDomain)
+  (:SecurityRule)-[:REFINES]->(:SecurityObjective)
+  (:Enterprise)-[:ACTS_AS]->(:RegulatoryRole)
+  (:RegulatoryRole)-[:BELONGS_TO_REGULATION]->(:Regulation)
+  (:Enterprise)-[:HAS_DECLARATION_GAP]->(:DeclarationGap)
+  (:Article)-[:CONTAINS_CLAUSE]->(:RegulatoryClause)
 
 Rule: Only MATCH queries are allowed. If information is absent from the graph, explicitly declare absence.
+
+Worked examples (patterns from §5 of NEO4J_PHASE1_ONTOLOGY_AND_NAVIGATION_SPEC):
+
+Pattern 1 — Regulatory Scope & Declaration Gaps (always run first):
+```cypher
+MATCH (e:Enterprise {case_id: $case_id})
+MATCH (e)-[:ACTS_AS {context: $context}]->(role:RegulatoryRole)
+MATCH (role)-[:BELONGS_TO_REGULATION]->(r:Regulation)
+OPTIONAL MATCH (e)-[:HAS_DECLARATION_GAP]->(gap:DeclarationGap)
+RETURN r.id AS regulation, role.role_name AS role,
+       collect(DISTINCT gap.gap_type) AS gaps;
+```
+
+Pattern 3 — Proportionality Attributes for a Subdomain:
+```cypher
+MATCH (e:Enterprise {case_id: $case_id})-[:HAS_PROPORTIONALITY_PROFILE]->(pp:ProportionalityProfile)
+MATCH (pp)-[:CONTAINS_ENTRY]->(pe:ProportionalityEntry {sub_domain_id: $subdomain_id})
+RETURN pe.tier AS tier, pe.evidence_depth AS evidence_depth,
+       pe.satisfaction_pattern AS pattern, pe.ownership AS owner;
+```
+
+Pattern 5 — Security Objectives for a Subdomain (SO hierarchy):
+```cypher
+MATCH (so:SecurityObjective)-[:SCOPED_TO]->(sd:SubDomain {id: $subdomain_id})
+OPTIONAL MATCH (sr:SecurityRule)-[:REFINES]->(so)
+RETURN so.id AS so_id, so.statement AS objective,
+       collect(DISTINCT sr.id) AS refining_rules;
+```
+
+Pattern 6 — Data Subject Clause Auto-Inference (GDPR Art. 8, 9, 22):
+```cypher
+MATCH (e:Enterprise {case_id: $case_id})-[:HAS_DATA_SUBJECT]->(ds:DataSubject)
+OPTIONAL MATCH (ds)-[:TRIGGERS_CLAUSE]->(c:RegulatoryClause)
+RETURN ds.type AS subject_type, ds.special_category_art9 AS art9,
+       collect(DISTINCT c.id) AS triggered_clauses;
+```
 """
 
 
