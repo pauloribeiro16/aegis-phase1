@@ -169,6 +169,27 @@ class InMemoryGraph:
         return res
 
 
+# GDPR Art. 9 (special categories of personal data). The preproc clause JSONs do
+# not carry an `article_reference` field, so the Art. 9 cluster is identified by
+# an explicit "Art. 9(x)" mention inside the clause record itself.
+_RE_ART9 = re.compile(r"Art\.\s?9\((?:\d+)\)(?:\([a-z]\))?")
+
+
+def _join_categories(value: Any) -> str:
+    """Normalise a `data_categories` YAML value to a single string.
+
+    Cases carry either a list (case2 style) or an already-comma-separated string
+    (case3 style); ``",".join(str)`` would explode the string per character.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list | tuple | set):
+        return ",".join(str(v) for v in value)
+    return str(value)
+
+
 def build_graph_for_case(case_path: Path, preproc_root: Path) -> InMemoryGraph:
     """Build and populate the in-memory graph from case inputs and preproc_out data."""
     graph = InMemoryGraph()
@@ -262,8 +283,10 @@ def build_graph_for_case(case_path: Path, preproc_root: Path) -> InMemoryGraph:
                 graph.add_edge(ent_node, stnode, "OPERATES_SYSTEM")
 
     # 4b. DataSubjects (Pattern 6 — only case2/case3 have this YAML)
-    arch_dir_for_ds = arch_dir  # alias kept for readability
-    ds_file = arch_dir_for_ds / "data_subjects.yaml"
+    # TRIGGERS_CLAUSE edges are wired in step 6b, AFTER the clauses exist in the
+    # graph (clauses load in step 6; wiring them here always yielded 0 edges).
+    special_ds_nodes: list[Node] = []
+    ds_file = arch_dir / "data_subjects.yaml"
     if ds_file.exists():
         try:
             with ds_file.open("r", encoding="utf-8") as f:
@@ -276,8 +299,10 @@ def build_graph_for_case(case_path: Path, preproc_root: Path) -> InMemoryGraph:
                     {
                         "id": dsid,
                         "case_id": case_id,
-                        "subject_type": ds.get("subject_type", "UNKNOWN"),
-                        "data_categories": ",".join(ds.get("data_categories", [])),
+                        "subject_type": ds.get("subject_type") or ds.get("category") or "UNKNOWN",
+                        "data_categories": _join_categories(
+                            ds.get("data_categories") or ds.get("data_types")
+                        ),
                         "special_category": special,
                         "estimated_count": ds.get("estimated_count", 0),
                         "minor": bool(ds.get("minor", False)),
@@ -285,16 +310,7 @@ def build_graph_for_case(case_path: Path, preproc_root: Path) -> InMemoryGraph:
                 )
                 graph.add_edge(ent_node, dsnode, "HAS_DATA_SUBJECT")
                 if special:
-                    for cn in graph.nodes:
-                        if "RegulatoryClause" in cn.labels:
-                            artref = cn.properties.get("article_reference", "")
-                            if "Art. 9" in artref or "Art.9" in artref:
-                                graph.add_edge(
-                                    dsnode,
-                                    cn,
-                                    "TRIGGERS_CLAUSE",
-                                    {"trigger_reason": "GDPR Art. 9 (special category)"},
-                                )
+                    special_ds_nodes.append(dsnode)
         except Exception:
             pass
 
@@ -351,6 +367,7 @@ def build_graph_for_case(case_path: Path, preproc_root: Path) -> InMemoryGraph:
                 )
 
     # 6. Clauses from preproc_out
+    art9_clause_nodes: list[Node] = []
     clauses_dir = preproc_root / "entities" / "clauses" / "_root"
     if clauses_dir.exists():
         for reg in ("GDPR", "CRA", "NIS2", "DORA", "AI_Act"):
@@ -363,15 +380,29 @@ def build_graph_for_case(case_path: Path, preproc_root: Path) -> InMemoryGraph:
                         c_data = json.load(f)
                         cid = c_data.get("id")
                         if cid:
+                            artref = c_data.get("article_reference", "")
+                            # The GDPR Art. 9 cluster carries no `article_reference`
+                            # in preproc; recover it from the clause body so the
+                            # special-category trigger can cite a real article.
+                            art9_match = (
+                                _RE_ART9.search(json.dumps(c_data, ensure_ascii=False))
+                                if reg == "GDPR"
+                                else None
+                            )
+                            if art9_match and not artref:
+                                artref = art9_match.group(0)
                             cnode = graph.add_node(
                                 "RegulatoryClause",
                                 {
                                     "id": cid,
                                     "regulation_id": reg,
-                                    "article_reference": c_data.get("article_reference", ""),
+                                    "article_reference": artref,
                                     "description": c_data.get("description", ""),
+                                    "special_category_anchor": bool(art9_match),
                                 },
                             )
+                            if art9_match:
+                                art9_clause_nodes.append(cnode)
                             if reg in reg_nodes:
                                 graph.add_edge(reg_nodes[reg], cnode, "CONTAINS_CLAUSE")
 
@@ -392,6 +423,17 @@ def build_graph_for_case(case_path: Path, preproc_root: Path) -> InMemoryGraph:
                                             )
                 except Exception:
                     pass
+
+    # 6b. Special-category DataSubjects trigger the GDPR Art. 9 clauses (Pattern 6).
+    # Deferred from step 4b because the clause nodes only exist after step 6.
+    for dsnode in special_ds_nodes:
+        for cnode in art9_clause_nodes:
+            graph.add_edge(
+                dsnode,
+                cnode,
+                "TRIGGERS_CLAUSE",
+                {"trigger_reason": "GDPR Art. 9 (special category)"},
+            )
 
     # 7. Regulatory Interactions (Tensions)
     interactions_path = case_path / "input" / "regulatory" / "interactions.yaml"

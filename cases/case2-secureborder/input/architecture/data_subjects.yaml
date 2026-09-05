@@ -1,8 +1,13 @@
 # Data Subjects (Case 02 — SecureBorder Solutions)
 data_subjects:
+  # Border-crossing biometric subjects: facial templates are biometric data used for
+  # unique identification => GDPR Art. 9 special category (lawful under Art. 9(2)(g)).
+  # `special_category` is read by scripts/kg_eval/engine.py to emit
+  # (:DataSubject)-[:TRIGGERS_CLAUSE]->(:RegulatoryClause {article_reference: 'Art. 9...'}).
   - id: SUBJ-01
     category: "Schengen Travellers"
     data_types: ["Passport MRZ", "Facial Biometric Template", "Match Decision Audit Metadata"]
+    special_category: true
     legal_basis: "Art. 9(2)(g) GDPR (Substantial public interest / government mandate)"
     erasure_mechanism: "Automatic purge from edge cache within seconds post-match"
   - id: SUBJ-02

@@ -77,27 +77,43 @@ def test_security_objective_instantiated() -> None:
 
 def test_data_subject_instantiated_case3_with_art9_trigger() -> None:
     """Pattern 6: case3 has data_subjects.yaml, so DataSubject nodes are created.
-    TRIGGERS_CLAUSE edges are only emitted when at least one subject has
-    `special_category: true` — case3 currently does NOT, so this test allows
-    either outcome (DataSubject count > 0 with TRIGGERS_CLAUSE > 0, OR count
-    > 0 with count == 0)."""
+
+    Since T2-EXP-1 case3 carries one `special_category: true` subject (health
+    insurance claimants), TRIGGERS_CLAUSE edges to the GDPR Art. 9 clauses must
+    be emitted, and the target clauses must expose an `Art. 9...` article
+    reference so T2.6 can cite it.
+    """
     graph = build_graph_for_case(CASE3_PATH, PREPROC_ROOT)
 
     ds_nodes = [n for n in graph.nodes if "DataSubject" in n.labels]
     assert ds_nodes, "Expected DataSubject nodes for case3 (has data_subjects.yaml)"
 
-    triggers = [e for e in graph.edges if e.rel_type == "TRIGGERS_CLAUSE"]
+    special = [ds for ds in ds_nodes if ds.properties.get("special_category")]
+    assert special, "Expected at least one special_category=true DataSubject in case3"
 
-    if any(ds.properties.get("special_category") for ds in ds_nodes):
-        # Some subject is special_category; at least one trigger expected.
-        assert len(triggers) > 0, (
-            "Expected at least one TRIGGERS_CLAUSE edge because at least one "
-            "DataSubject has special_category=true"
-        )
-    else:
-        # No special-category subjects: 0 triggers is acceptable. We only assert
-        # that DataSubjects were still created (sanity).
-        assert len(ds_nodes) > 0
+    triggers = [e for e in graph.edges if e.rel_type == "TRIGGERS_CLAUSE"]
+    assert triggers, (
+        "Expected at least one TRIGGERS_CLAUSE edge because at least one "
+        "DataSubject has special_category=true"
+    )
+
+    art9_clauses = [
+        n
+        for n in graph.nodes
+        if "RegulatoryClause" in n.labels
+        and "Art. 9" in str(n.properties.get("article_reference", ""))
+    ]
+    assert art9_clauses, "Expected GDPR Art. 9 clauses to carry an article_reference"
+
+
+def test_data_subject_categories_not_exploded_per_character() -> None:
+    """A string `data_categories` (case3 style) must not be joined per character."""
+    graph = build_graph_for_case(CASE3_PATH, PREPROC_ROOT)
+
+    ds_nodes = [n for n in graph.nodes if "DataSubject" in n.labels]
+    for ds in ds_nodes:
+        cats = ds.properties.get("data_categories", "")
+        assert ",a," not in cats and ",e," not in cats, f"data_categories exploded: {cats[:60]}"
 
 
 def test_data_subject_absent_case1() -> None:

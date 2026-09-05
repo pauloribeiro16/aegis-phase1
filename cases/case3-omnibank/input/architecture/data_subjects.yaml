@@ -31,3 +31,13 @@ data_subjects:
     data_categories: name, email, marketing-consent record, lead source
     access_mechanism: Web form + CRM (Salesforce) + consent management platform
     erasure_mechanism: Opt-out within 30 days; full erasure on DSAR; consent record kept for 3y (GDPR accountability)
+
+  # Bancassurance line: health data => GDPR Art. 9 special category (special_category: true).
+  # Consumed by scripts/kg_eval/engine.py to emit (:DataSubject)-[:TRIGGERS_CLAUSE]->(Art. 9 clause).
+  - subject_type: Health insurance claimants
+    data_categories: name, health condition, prescriptions, treatments, provider ID
+    access_mechanism: Bancassurance claims portal + partner insurer API (mTLS)
+    erasure_mechanism: Claim file retained 10y (insurance contract law); erasure on DSAR once retention lapses
+    special_category: true
+    minor: false
+    estimated_count: 5000
