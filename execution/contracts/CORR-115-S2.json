@@ -36,6 +36,21 @@
       ],
       "headline": "qwen3.8:27b 1/8 (T2.3 only); remaining 5 models 0/8. Calibration issue: T2.3 trivially passable",
       "summary_md": "output/kg_eval_t2/t2_pilot_v3_summary.md"
+    },
+    "v4": {
+      "models_evaluated": 6,
+      "tasks_per_model": 8,
+      "runs": 48,
+      "scorecards": [
+        "output/kg_eval_t2/sc_1880929.json",
+        "output/kg_eval_t2/sc_1880930.json",
+        "output/kg_eval_t2/sc_1880931.json",
+        "output/kg_eval_t2/sc_1880932.json",
+        "output/kg_eval_t2/sc_1880933.json",
+        "output/kg_eval_t2/sc_1880934.json"
+      ],
+      "headline": "v4 — 4/48 pass (4x v3); SYSTEM_PROMPT expansion + T2.3 hardening + T2.6 source fix worked. qwen3.8 still leads (2/8); nemotron/gemma4 added 1 pass each. Cross-cutting: models don't cite artefacts even when prompted — next v5 fix needed.",
+      "summary_md": "output/kg_eval_t2/t2_pilot_v4_summary.md"
     }
   },
   "owned_files": [
