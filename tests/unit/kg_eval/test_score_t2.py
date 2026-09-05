@@ -292,3 +292,39 @@ def test_dim2_zero_queries_is_fail() -> None:
     assert card.query_efficiency_pass is False
     assert card.query_efficiency_grade == ""
     assert any("No queries attempted" in n for n in card.notes)
+
+
+# --- CORR-115 T2-EXP-2: broader artefact + useful-negative regexes ---
+
+
+def test_extract_artefacts_includes_so_sr_subdomain() -> None:
+    art = extract_artefacts("Per SO-D-09.1.GDPR and SR-AI_Act-014, D-09.1 needs STANDARD tier.")
+    assert "SO-D-09.1.GDPR" in art["sos"]
+    assert "SR-AI_Act-014" in art["srs"]
+    assert "D-09.1" in art["subdomains"]
+    assert "STANDARD" in art["tiers"]
+
+
+def test_extract_artefacts_includes_systems_and_ds() -> None:
+    art = extract_artefacts("System SYS-CBS hosts data for DS-case3-001 that is GDPR-CL01.")
+    assert "SYS-CBS" in art["systems"]
+    assert "DS-case3-001" in art["data_subjects"]
+    assert "GDPR-CL01" in art["clauses"]
+
+
+def test_useful_negative_relaxed_for_scale_words() -> None:
+    log = _make_run(
+        final_answer="No mainframe crypto here; the company is too small for DORA to apply.",
+        impossible=True,
+    )
+    card = score_t2_run(log, optimal_query_count=1)
+    assert card.absence_declared_pass is True
+
+
+def test_useful_negative_relaxed_for_does_not_apply() -> None:
+    log = _make_run(
+        final_answer="There is no such AuthSystem. DORA does not apply because the company is below threshold.",
+        impossible=True,
+    )
+    card = score_t2_run(log, optimal_query_count=1)
+    assert card.absence_declared_pass is True
