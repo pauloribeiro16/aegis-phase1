@@ -1,0 +1,211 @@
+[
+  {
+    "task_id": "T2.1-case1-SYS01-grounding",
+    "model": "ornith-1.5:35b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "No queries attempted; cannot judge efficiency.",
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.2-case3-D044-tension",
+    "model": "ornith-1.5:35b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "No queries attempted; cannot judge efficiency.",
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.3-case1-impossible-trio",
+    "model": "ornith-1.5:35b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": false,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "No queries attempted; cannot judge efficiency.",
+      "Final answer empty on impossible task.",
+      "Failed to declare absence on impossible task."
+    ]
+  },
+  {
+    "task_id": "T2.4-case2-NIS2-D010-scope",
+    "model": "ornith-1.5:35b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "No queries attempted; cannot judge efficiency.",
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.5-case3-D044-attributes",
+    "model": "ornith-1.5:35b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "No queries attempted; cannot judge efficiency.",
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.6-case3-DS-GDPR-Art9",
+    "model": "ornith-1.5:35b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "No queries attempted; cannot judge efficiency.",
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.7-case1-D091-SOs",
+    "model": "ornith-1.5:35b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "No queries attempted; cannot judge efficiency.",
+      "Final answer empty or truncated."
+    ]
+  },
+  {
+    "task_id": "T2.8-case2-error-recovery",
+    "model": "ornith-1.5:35b",
+    "syntax_validity_pass": true,
+    "query_efficiency_pass": false,
+    "grounding_discipline_pass": false,
+    "error_recovery_pass": true,
+    "absence_declared_pass": true,
+    "overall_usability_pass": false,
+    "total_queries": 0,
+    "failed_queries": 0,
+    "query_efficiency_grade": "",
+    "artefacts_cited": {
+      "csf": [],
+      "clauses": [],
+      "articles": []
+    },
+    "recovery_total_errors": 0,
+    "recovery_adapted": 0,
+    "recovery_stuck": 0,
+    "recovery_rate": 0.0,
+    "notes": [
+      "No queries attempted; cannot judge efficiency.",
+      "Final answer empty or truncated."
+    ]
+  }
+]
