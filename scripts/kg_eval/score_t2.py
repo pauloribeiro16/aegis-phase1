@@ -34,15 +34,43 @@ _RE_ARTICLE = re.compile(
     re.IGNORECASE,
 )
 
+# Broader artefact catalogue (CORR-115 T2-EXP-2): capture SO/SR/subdomain/tier/SYS/DS
+# identifiers so the scorer counts every closed-set artefact the model cited, not
+# only CSF/clauses/articles.
+_RE_SO = re.compile(
+    r"\bSO-(?:[A-Z][A-Za-z0-9_]+-)?(?:\d{2,3}|D-\d{1,2}(?:\.\d{1,2})?\.[A-Z]+)\b"
+)
+_RE_SR = re.compile(r"\bSR-[A-Z][A-Za-z0-9_]+-\d{2,3}\b")
+_RE_SUBDOMAIN = re.compile(r"\bD-\d{1,2}(?:\.\d{1,2})?\b")
+_RE_TIER = re.compile(r"\b(MINIMAL|LIGHTWEIGHT|STANDARD|RIGOROUS|DEFERRED)\b")
+_RE_SYSTEM = re.compile(r"\bSYS-\w+\b")
+_RE_DS = re.compile(r"\bDS-\w+-\d{3}\b")
+
 
 def extract_artefacts(text: str) -> dict[str, list[str]]:
     """Extract closed-set artefacts cited by the model."""
     if not text:
-        return {"csf": [], "clauses": [], "articles": []}
+        return {
+            "csf": [],
+            "clauses": [],
+            "articles": [],
+            "sos": [],
+            "srs": [],
+            "subdomains": [],
+            "tiers": [],
+            "systems": [],
+            "data_subjects": [],
+        }
     return {
         "csf": sorted(set(_RE_CSF.findall(text))),
         "clauses": sorted(set(_RE_CLAUSE.findall(text))),
         "articles": sorted(set(_RE_ARTICLE.findall(text))),
+        "sos": sorted(set(_RE_SO.findall(text))),
+        "srs": sorted(set(_RE_SR.findall(text))),
+        "subdomains": sorted(set(_RE_SUBDOMAIN.findall(text))),
+        "tiers": sorted(set(_RE_TIER.findall(text))),
+        "systems": sorted(set(_RE_SYSTEM.findall(text))),
+        "data_subjects": sorted(set(_RE_DS.findall(text))),
     }
 
 
@@ -83,7 +111,11 @@ def has_absence_declaration(text: str) -> bool:
 # absent (case1-tinytask is a MICRO SaaS shop on AWS/Firebase/GitHub, so DORA and
 # NIS2 simply do not bind, and there is no on-premise mainframe estate).
 _RE_USEFUL_NEGATIVE = re.compile(
-    r"\b(MICRO|SaaS|employees|AWS|Firebase|GitHub|SMALL|company scale|MICRO tier)\b",
+    r"\b(MICRO|SMALL|MEDIUM|LARGE|MAX|tiny|small|medium|micro|SaaS|sector|"
+    r"employees?|AWS|Firebase|GitHub|do(es)? not (apply|bind)|"
+    r"not in scope|outside scope|not applicable|below threshold|"
+    r"does not include|has no|graph has no|"
+    r"too (small|large) (to|for)|exempt|excluded by tier)\b",
     re.IGNORECASE,
 )
 

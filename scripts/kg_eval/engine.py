@@ -636,7 +636,33 @@ def execute_cypher(graph: InMemoryGraph, query: str) -> list[dict[str, Any]]:
                 v = v.strip().strip("'\"")
                 filters[k] = v
 
+    # Collect filter hints from SECONDARY matches (CORR-115 T2-EXP-3). The first
+    # match is the primary label we iterate over; subsequent matches define
+    # properties on relationship endpoints. For example, in
+    #   MATCH (so:SecurityObjective)-[:SCOPED_TO]->(sd:SubDomain {id: 'D-09.1'})
+    # the secondary match is `SubDomain {id: 'D-09.1'}`. If a Security Objective
+    # carries a `sub_domain_id` property, we can restrict the primary candidate
+    # set using the secondary filter key/value — without needing a full
+    # multi-hop executor.
+    secondary_filters: dict[str, list[tuple[str, str]]] = {}
+    for m in matches[1:]:
+        _sec_var, sec_label, sec_filter_str = m
+        if not sec_filter_str:
+            continue
+        for kv in sec_filter_str.split(","):
+            if ":" not in kv:
+                continue
+            k, v = kv.split(":", 1)
+            secondary_filters.setdefault(sec_label, []).append(
+                (k.strip(), v.strip().strip("'").strip('"'))
+            )
+
     candidate_nodes = graph.find_nodes(primary_label, **filters)
+
+    # Apply secondary-label filters (e.g. target SD id 'D-09.1' → restrict SO.sub_domain_id)
+    for _sec_label, kvs in secondary_filters.items():
+        for k, v in kvs:
+            candidate_nodes = [n for n in candidate_nodes if str(n.properties.get(k)) == v]
 
     # Simple multi-hop resolution for canonical patterns
     # Case: System -> IN_SCOPE_OF -> SubDomain <- MAPPED_TO_SUBDOMAIN <- RegulatoryClause

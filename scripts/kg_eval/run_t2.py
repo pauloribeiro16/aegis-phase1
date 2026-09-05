@@ -66,6 +66,15 @@ RETURN r.id AS regulation, role.role_name AS role,
        collect(DISTINCT gap.gap_type) AS gaps;
 ```
 
+Pattern 2 — System → SubDomain → Clauses (core grounding chain):
+```cypher
+MATCH (s:System {id: $system_id})-[:IN_SCOPE_OF]->(sd:SubDomain)
+MATCH (c:RegulatoryClause)-[:MAPPED_TO_SUBDOMAIN]->(sd)
+MATCH (c)-[:ANCHORED_TO_CSF]->(csf:CSFSubcategory)
+RETURN sd.id AS subdomain, c.id AS clause, c.regulation_id AS regulation,
+       csf.id AS csf_subcategory;
+```
+
 Pattern 3 — Proportionality Attributes for a Subdomain:
 ```cypher
 MATCH (e:Enterprise {case_id: $case_id})-[:HAS_PROPORTIONALITY_PROFILE]->(pp:ProportionalityProfile)
