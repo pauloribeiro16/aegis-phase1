@@ -26,6 +26,13 @@ from aegis_phase1._archive.corr061.markdown_parser import (  # noqa: F401
     GenericMarkdownParser,
     MarkdownParser,
     P1BLLM01Parser,
+    P1CLLM01Parser,
 )
 
-__all__ = ["MARKDOWN_PARSERS", "GenericMarkdownParser", "MarkdownParser", "P1BLLM01Parser"]
+__all__ = [
+    "MARKDOWN_PARSERS",
+    "GenericMarkdownParser",
+    "MarkdownParser",
+    "P1BLLM01Parser",
+    "P1CLLM01Parser",
+]

@@ -185,3 +185,63 @@ def test_garbage_pair_bullets_rejected():
     assert a["sub_domain_id"] == "D-02.2"
     assert a["reg_pair"] == ["CRA"]  # from 'Participating regulations... CRA only'
     assert a["company_scope_verdict"] == "YES"
+
+
+def test_parse_json_fallback():
+    """Verify that when an LLM emits valid JSON output for P1C-01,
+    P1CLLM01Parser parses it into P1CLLM01Output seamlessly."""
+    raw_json = """```json
+{
+  "prompt_spec_id": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+  "status": "OK",
+  "confidence": "HIGH",
+  "sub_domain_activations": [
+    {
+      "sub_domain_id": "D-01.1",
+      "applicable": true,
+      "scope_overlap": "Y",
+      "applicable_regulations": ["GDPR", "CRA"],
+      "verified_relationship_per_pair": [
+        {
+          "reg_a": "GDPR",
+          "reg_b": "CRA",
+          "company_scope_verdict": "OVERLAP_CONFIRMED",
+          "layer0_refs": ["SubDomains/D-01_Data-Protection/D-01.1.md §1 CRDA"]
+        }
+      ]
+    },
+    {
+      "sub_domain_id": "D-01.2",
+      "applicable": false,
+      "scope_overlap": "N",
+      "applicable_regulations": ["GDPR"],
+      "verified_relationship_per_pair": [
+        {
+          "reg_a": "GDPR",
+          "reg_b": "CRA",
+          "company_scope_verdict": "OVERLAP_NOT_TRIGGERED",
+          "layer0_refs": ["SubDomains/D-01_Data-Protection/D-01.2.md §2 HSO"]
+        }
+      ]
+    }
+  ]
+}
+```"""
+    parsed, err = P1CLLM01Parser().parse(raw_json)
+    assert err == ""
+    assert isinstance(parsed, P1CLLM01Output)
+    assert parsed.status.value == "OK"
+    assert parsed.confidence.value == "HIGH"
+    acts = parsed.sub_domain_activations
+    assert len(acts) == 2
+    d011 = acts[0]
+    assert d011["sub_domain_id"] == "D-01.1"
+    assert d011["applicable"] == "YES"
+    assert d011["company_scope_verdict"] == "YES"
+    assert d011["reg_pair"] == ["GDPR", "CRA"]
+
+    d012 = acts[1]
+    assert d012["sub_domain_id"] == "D-01.2"
+    assert d012["applicable"] == "NO"
+    assert d012["company_scope_verdict"] == "NO"
+

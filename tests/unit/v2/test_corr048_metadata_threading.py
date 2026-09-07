@@ -58,6 +58,7 @@ def test_runner_metadata_has_no_corr_xxx_tags() -> None:
         assert "corr-" not in m, f"CORR-048 FAIL: tag list leaks corr-XXX: {m!r}"
     # Also check the actual call site
     assert "tags=[f\"phase:phase1\", f\"case:{case_name}\"]" in src or \
+           "tags=[\"phase:phase1\", f\"case:{case_name}\"]" in src or \
            "tags=['phase:phase1', 'case:" in src or \
            'tags=[\n        f"phase:phase1",\n        f"case:' in src, \
            "CORR-048: expected phase+case tags in runner.py cmd_run_all_traced"

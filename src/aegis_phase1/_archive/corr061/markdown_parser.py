@@ -881,6 +881,78 @@ class P1CLLM01Parser(GenericMarkdownParser):
             all_sections.update(sections)
 
         if not saw_any:
+            # Fallback: if the LLM emitted structured JSON instead of Markdown
+            import json as _json
+
+            json_data: dict[str, Any] | None = None
+            stripped = raw.strip()
+            if stripped.startswith("{") and stripped.endswith("}"):
+                try:
+                    loaded = _json.loads(stripped)
+                    if isinstance(loaded, dict):
+                        json_data = loaded
+                except Exception:
+                    pass
+
+            if json_data is None:
+                # Try fence extraction
+                fence_m = re.search(r"```(?:json)?\s*\n(.*?)\n```", raw, re.DOTALL | re.IGNORECASE)
+                if fence_m:
+                    try:
+                        loaded = _json.loads(fence_m.group(1).strip())
+                        if isinstance(loaded, dict):
+                            json_data = loaded
+                    except Exception:
+                        pass
+
+            if json_data is None:
+                try:
+                    from aegis_phase1.prompts_v2.robust_parser import RobustParser
+                    rp_res = RobustParser.parse(raw)
+                    if rp_res.ok and isinstance(rp_res.json, dict) and rp_res.strategy != "construct_minimal_object":
+                        json_data = rp_res.json
+                except Exception:
+                    pass
+
+            if json_data is not None and "sub_domain_activations" in json_data:
+                raw_status = str(json_data.get("status") or "OK").upper()
+                try:
+                    status_enum = m["P1BLLM01Status"](raw_status)
+                except ValueError:
+                    status_enum = m["P1BLLM01Status"].OK
+
+                raw_conf = str(json_data.get("confidence") or "MEDIUM").upper()
+                try:
+                    conf_enum = m["P1BLLM01Confidence"](raw_conf)
+                except ValueError:
+                    conf_enum = m["P1BLLM01Confidence"].MEDIUM
+
+                normalized_activations: list[dict[str, Any]] = []
+                for entry in json_data.get("sub_domain_activations", []):
+                    if not isinstance(entry, dict):
+                        continue
+                    rec = dict(entry)
+                    if "applicable" in rec:
+                        app_val = rec["applicable"]
+                        if isinstance(app_val, bool):
+                            rec["applicable"] = "YES" if app_val else "NO"
+                    pairs = rec.get("verified_relationship_per_pair") or []
+                    if "company_scope_verdict" not in rec and isinstance(pairs, list) and pairs:
+                        first_pair = pairs[0] if isinstance(pairs[0], dict) else {}
+                        p_verdict = first_pair.get("company_scope_verdict") or first_pair.get("verdict")
+                        if p_verdict:
+                            rec["company_scope_verdict"] = self._VERDICT_MAP.get(str(p_verdict).upper(), "INDETERMINATE")
+                        if "reg_pair" not in rec and "reg_a" in first_pair and "reg_b" in first_pair:
+                            rec["reg_pair"] = [first_pair["reg_a"], first_pair["reg_b"]]
+                    normalized_activations.append(rec)
+
+                return P1CLLM01Output(
+                    status=status_enum,
+                    confidence=conf_enum,
+                    sub_domain_activations=normalized_activations,
+                    sections={},
+                ), ""
+
             return None, "no `## Section` headers found in markdown"
 
         return P1CLLM01Output(
