@@ -17,7 +17,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SBATCH_DIR="${SBATCH_DIR_OVERRIDE:-$REPO_ROOT/examples/deucalion}"
-PY_TARGETS=(src/aegis_phase1/v2/runner.py src/aegis_phase1/v2/orchestrator.py src/aegis_phase1/_archive/corr061/markdown_parser.py)
+PY_TARGETS=(src/aegis_phase1/v2/runner.py src/aegis_phase1/v2/orchestrator.py src/aegis_phase1/prompts_v2/ref_gate.py)
 MODELS_TO_CHECK=()
 
 usage() {

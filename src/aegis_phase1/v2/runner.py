@@ -30,6 +30,10 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aegis_phase1.v2.orchestrator import Phase1Orchestrator
 
 import aegis_phase1.env  # noqa: F401 — load .env via env.py module-import side-effect
 
@@ -62,10 +66,10 @@ def _sanitize_model_tag(model: str) -> str:
 
 
 def main() -> None:
+    from aegis_phase1.utils.logging import setup_logging
     from aegis_phase1.v2.domain.processor import MapPartialFailure
     from aegis_phase1.v2.llm import build_llm_invoker
     from aegis_phase1.v2.orchestrator import Phase1Orchestrator
-    from aegis_phase1.utils.logging import setup_logging
 
     parser = argparse.ArgumentParser(description="AEGIS Phase 1 v2 Pipeline")
     parser.add_argument(
@@ -717,9 +721,9 @@ def cmd_run_map(
         Mapping ``AEGIS-P1-07`` -> absolute file path +
         ``AEGIS-P1-07b`` -> absolute file path.
     """
+    from aegis_phase1.v2.domain.processor import MapPartialFailure
     from aegis_phase1.v2.output.doc_07 import render_doc_07
     from aegis_phase1.v2.output.doc_07b import render_doc_07b
-    from aegis_phase1.v2.domain.processor import MapPartialFailure
 
     orch.load(case_path, prep_path)
     out_dir = Path(output_path)
@@ -871,7 +875,7 @@ def cmd_run_all_traced(
             # CORR-048: ONLY phase + case tags. Subphase-specific tags
             # (stage:map, domain:D-XX, regulation:GDPR) are added by
             # each node internally in graph.py.
-            tags=[f"phase:phase1", f"case:{case_name}"],
+            tags=["phase:phase1", f"case:{case_name}"],
             # CORR-048: structured metadata. run_id is the same UUID
             # written to corr048_langfuse_trace_id.txt so the trace
             # can be matched to the log file.
