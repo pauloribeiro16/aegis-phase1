@@ -52,6 +52,7 @@ This specification merges two complementary layers:
 │  System · DataStore · DataFlow · AuthSystem · ThirdPartyService · DataSubject  │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │  TIER 3 — NIST CSF 2.0 CONTROL ANCHOR  (Source: preproc_out/global/*)          │
+<!-- CORR-028: framework exclusion policy note -->
 │  106 active subcategories. NIST CSF 2.0 ONLY — no ISO, no OWASP, no CSF 1.1   │
 │                                                                                 │
 │  CSFFunction · CSFCategory · CSFSubcategory                                    │
@@ -61,6 +62,7 @@ This specification merges two complementary layers:
 ### 1.2 Inviolable Rules
 
 1. **Case isolation:** Every query touching Tier 2 MUST start with `MATCH (e:Enterprise {case_id: $case_id})`.
+<!-- CORR-028: framework exclusion policy note -->
 2. **CSF 2.0 Only:** No ISO 27001, CIS, OWASP, or CSF 1.1 references in the graph.
 3. **Canonical IDs:** Clause IDs: `{REG}-{SUFFIX}{NN}`. SubDomain IDs: `D-{NN}.{N}`. CSF: `{FUNC}.{CAT}-{NN}`. System IDs: `{case_prefix}:SYS-*`.
 4. **Ports:** Neo4j Bolt `bolt://localhost:7688`, HTTP `http://localhost:7475`. Never 7687/7474.

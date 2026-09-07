@@ -104,3 +104,38 @@ def test_load_v2_catalog_handles_empty_catalog_dir(tmp_path: Path) -> None:
 
     with pytest.raises(CatalogLoadError):
         cl.load("tipo2_interpretations")
+
+
+def test_runner_run_all_map_partial_failure_with_outputs(tmp_path: Path) -> None:
+    """When MapPartialFailure occurs during run_all, runner should not exit(2) if outputs exist."""
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    from aegis_phase1.v2.domain.processor import MapPartialFailure
+    from aegis_phase1.v2.runner import main
+
+    out_dir = tmp_path / "output"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    # Create fake outputs (8 .md files + 1 .xlsx)
+    for i in range(8):
+        (out_dir / f"AEGIS-P1-{i:02d}.md").write_text("dummy")
+    (out_dir / "Case_01_Phase1.xlsx").write_text("dummy")
+
+    test_args = [
+        "runner.py",
+        "--case", "cases/case1-tinytask",
+        "--output", str(out_dir),
+        "--run-all",
+        "--mock-llm",
+    ]
+
+    with (
+        patch.object(sys, "argv", test_args),
+        patch("aegis_phase1.v2.orchestrator.Phase1Orchestrator") as mock_orch_cls,
+    ):
+        mock_orch = MagicMock()
+        mock_orch_cls.return_value = mock_orch
+        mock_orch.run_all.side_effect = MapPartialFailure(["D-01", "D-02", "D-03", "D-04", "D-05", "D-06"])
+        # Should NOT sys.exit(2) because outputs exist
+        main()
+

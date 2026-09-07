@@ -186,6 +186,27 @@ def test_p1c01_unauthorised_regulation_pair(ref_gate: RefGate):
     assert any(v.rule == "UNAUTHORISED_REGULATION_PAIR" for v in res.violations)
 
 
+def test_p1c01_narrative_regulation_list_no_false_positive_pair(ref_gate: RefGate):
+    """Narrative lists with slashes or commas like 'CRA, NIS2' or 'CRA / NIS2' are NOT pairs."""
+    raw = """
+## Status
+- applicable: YES
+- confidence: HIGH
+
+## Sub-domain classifications
+- D-01.1: applicable to CRA, NIS2 and GDPR in broad regulatory context.
+- D-01.1 : GDPR ↔ CRA: OVERLAP_CONFIRMED — TinyTask is controller and manufacturer.
+"""
+    inputs = {
+        "authoritative_ids": {
+            "subdomain_ids": ["D-01.1"],
+            "regulation_ids": ["GDPR", "CRA"],
+        }
+    }
+    res = ref_gate.validate("P1C-LLM-01-OVERLAP-CLASSIFICATION", raw, inputs=inputs)
+    assert not any(v.rule == "UNAUTHORISED_REGULATION_PAIR" for v in res.violations)
+
+
 def test_generic_marker_rejected_across_all(ref_gate: RefGate):
     raw = """
 ## Status

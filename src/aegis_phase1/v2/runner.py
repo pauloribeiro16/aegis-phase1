@@ -367,12 +367,17 @@ def main() -> None:
         try:
             orch.run_all(case_path, prep_path, output_path)
         except MapPartialFailure as exc:
-            # CORR-067 S2: see threshold handling in run_all_traced
-            # branch above.
+            # CORR-067 S2 + CORR-115: threshold-based partial-failure handling.
             failed = list(exc.failed_domains or [])
             n_failed = len(failed)
             n_total = 10
-            if n_failed >= MAP_ABORT_THRESHOLD:
+            out_p = Path(output_path)
+            has_outputs = (
+                out_p.is_dir()
+                and len(list(out_p.glob("*.md"))) >= 8
+                and len(list(out_p.glob("*.xlsx"))) >= 1
+            )
+            if n_failed >= MAP_ABORT_THRESHOLD and not has_outputs:
                 logger.error(
                     "Pipeline aborted — MAP mostly failed (%d/%d domains): %s",
                     n_failed, n_total, failed,
@@ -380,8 +385,8 @@ def main() -> None:
                 sys.exit(2)
             if n_failed:
                 logger.warning(
-                    "MAP partial failure (%d/%d domains failed: %s) — continuing",
-                    n_failed, n_total, failed,
+                    "MAP partial failure (%d/%d domains failed: %s) — continuing (outputs generated=%s)",
+                    n_failed, n_total, failed, has_outputs,
                 )
         if args.retry_failed:
             domains = [d.strip() for d in args.retry_failed.split(",") if d.strip()]
@@ -415,7 +420,13 @@ def main() -> None:
             failed = list(exc.failed_domains or [])
             n_failed = len(failed)
             n_total = 10
-            if n_failed >= MAP_ABORT_THRESHOLD:
+            out_p = Path(output_path)
+            has_outputs = (
+                out_p.is_dir()
+                and len(list(out_p.glob("*.md"))) >= 8
+                and len(list(out_p.glob("*.xlsx"))) >= 1
+            )
+            if n_failed >= MAP_ABORT_THRESHOLD and not has_outputs:
                 logger.error(
                     "Pipeline aborted — MAP mostly failed (%d/%d domains): %s",
                     n_failed, n_total, failed,
@@ -424,8 +435,8 @@ def main() -> None:
             if n_failed:
                 logger.warning(
                     "MAP partial failure (%d/%d domains failed: %s) — "
-                    "continuing with %d results",
-                    n_failed, n_total, failed, n_total - n_failed,
+                    "continuing with %d results (outputs generated=%s)",
+                    n_failed, n_total, failed, n_total - n_failed, has_outputs,
                 )
                 # Force rc=0 so we don't sys.exit below; the OUTPUT
                 # stage already handles missing domain_results

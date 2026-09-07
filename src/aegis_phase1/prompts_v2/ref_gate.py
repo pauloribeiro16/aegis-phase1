@@ -410,7 +410,7 @@ class RefGate:
         if not reg_allowed:
             reg_allowed = set(inputs.get("applicable_regs") or ["GDPR", "CRA", "NIS2", "DORA", "AI_Act"])
 
-        pair_matches = re.findall(r"\b(GDPR|CRA|NIS\s*2|NIS2|DORA|AI[_\s]Act)\s*(?:↔|<->|/|,)\s*(GDPR|CRA|NIS\s*2|NIS2|DORA|AI[_\s]Act)\b", raw, re.IGNORECASE)
+        pair_matches = re.findall(r"\b(GDPR|CRA|NIS\s*2|NIS2|DORA|AI[_\s]Act)\s*(?:↔|<->)\s*(GDPR|CRA|NIS\s*2|NIS2|DORA|AI[_\s]Act)\b", raw, re.IGNORECASE)
         for r1, r2 in pair_matches:
             r1_norm = "AI_Act" if "AI" in r1.upper() else ("NIS2" if "NIS" in r1.upper() else r1.upper())
             r2_norm = "AI_Act" if "AI" in r2.upper() else ("NIS2" if "NIS" in r2.upper() else r2.upper())
