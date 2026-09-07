@@ -45,28 +45,30 @@ echo " Code  : synced from workstation (SHA recorded below)"
 echo "=================================================="
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 
-# --- Ollama 0.32.13 (shared model cache; never `ollama pull` here) ---
+# Porta unica por JOB (permite multi-job no mesmo no sem colisao Ollama)
+OLLAMA_PORT=$((11434 + SLURM_JOB_ID % 20000))
 export PATH="$GFX/bin:$PATH"
 export LD_LIBRARY_PATH="$GFX/lib/ollama:${LD_LIBRARY_PATH:-}"
 export OLLAMA_MODELS="$BD/ollama_data/models"
-export OLLAMA_HOST="127.0.0.1:11434"
+export OLLAMA_HOST="127.0.0.1:${OLLAMA_PORT}"
+export OLLAMA_BASE_URL="http://127.0.0.1:${OLLAMA_PORT}"
 export OLLAMA_API_KEY="local"
 
 ollama serve > "/tmp/ollama-${SLURM_JOB_ID}.log" 2>&1 &
 OLLAMA_PID=$!
 
 for i in $(seq 1 90); do
-  if curl -sf -m 2 "http://127.0.0.1:11434/api/tags" > /dev/null 2>&1; then
+  if curl -sf -m 2 "http://127.0.0.1:${OLLAMA_PORT}/api/tags" > /dev/null 2>&1; then
     break
   fi
   sleep 2
 done
 echo "=== ollama version:"
-curl -sf -m 5 "http://127.0.0.1:11434/api/version" | head -c 200; echo
+curl -sf -m 5 "http://127.0.0.1:${OLLAMA_PORT}/api/version" | head -c 200; echo
 echo "=== warm-up: loading $MODEL"
 WARM_OK=0
 for attempt in 1 2 3 4 5; do
-  if curl -sf -m 180 "http://127.0.0.1:11434/api/generate" \
+  if curl -sf -m 180 "http://127.0.0.1:${OLLAMA_PORT}/api/generate" \
       -d "{\"model\":\"$MODEL\",\"prompt\":\"ping\",\"stream\":false,\"options\":{\"num_predict\":1}}" \
       > /tmp/warmup.out 2>&1; then
     echo "warm-up OK on attempt $attempt"
