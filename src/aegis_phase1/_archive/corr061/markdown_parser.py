@@ -901,6 +901,100 @@ class P1CLLM01Parser(GenericMarkdownParser):
         parts = self._STATUS_SPLIT_RE.split(text)
         return [p for p in (part.strip() for part in parts) if p]
 
+    def _parse_json_envelope(self, raw: str) -> Any | None:
+        """CORR-116 S2.2: parse a pure-JSON P1C-01 envelope.
+
+        Expects ``sub_domain_activations`` as a list of dicts with
+        ``sub_domain_id`` + ``applicable`` (bool) + optional
+        ``verified_relationship_per_pair``/``scope_overlap``/``layer0_refs``.
+        Records are converted to the Shape-A dict format the downstream
+        normalizer consumes (YES/NO verdicts, reg_pair list, layer0_refs
+        list). Returns None when the raw is not a P1C-01 JSON envelope.
+        """
+        import json as _json
+
+        text = self._strip_code_fences(raw).strip()
+        if not text.startswith("{"):
+            return None
+        try:
+            obj = _json.loads(text)
+        except _json.JSONDecodeError:
+            return None
+        if not isinstance(obj, dict):
+            return None
+        raw_acts = obj.get("sub_domain_activations")
+        if not isinstance(raw_acts, list) or not raw_acts:
+            return None
+
+        m = _import_p1b_models()
+        raw_status = str(obj.get("status", "")).upper()
+        status_str = raw_status if raw_status in ("OK", "YES", "NO", "PARTIAL") else "OK"
+        try:
+            status = m["P1BLLM01Status"](status_str)
+        except ValueError:
+            status = m["P1BLLM01Status"].INDETERMINATE
+        conf_raw = str(obj.get("confidence", "")).upper()
+        conf_str = conf_raw if conf_raw in ("HIGH", "MEDIUM", "LOW") else "MEDIUM"
+        try:
+            confidence = m["P1BLLM01Confidence"](conf_str)
+        except ValueError:
+            confidence = m["P1BLLM01Confidence"].MEDIUM
+
+        activations: list[dict[str, Any]] = []
+        for act in raw_acts:
+            if not isinstance(act, dict):
+                continue
+            sd_id = str(act.get("sub_domain_id", "")).strip()
+            if not sd_id:
+                continue
+            rec: dict[str, Any] = {"sub_domain_id": sd_id}
+            applicable = act.get("applicable")
+            if isinstance(applicable, bool):
+                rec["applicable"] = "YES" if applicable else "NO"
+                rec["company_scope_verdict"] = rec["applicable"]
+            elif isinstance(applicable, str) and applicable:
+                rec["applicable"] = applicable.upper()
+                rec["company_scope_verdict"] = rec["applicable"]
+            if act.get("scope_overlap") is not None:
+                rec["scope_overlap"] = str(act["scope_overlap"])
+            pairs = act.get("verified_relationship_per_pair")
+            if isinstance(pairs, list):
+                for p in pairs:
+                    if not isinstance(p, dict):
+                        continue
+                    rec.setdefault("reg_pair", p.get("reg_pair", []))
+                    rel = p.get("relationship")
+                    if rel:
+                        rec["regulatory_baseline_relationship"] = str(rel)
+            if act.get("reg_pair"):
+                rec.setdefault("reg_pair", act["reg_pair"])
+            if act.get("applicable_regulations"):
+                rec["applicable_regulations"] = [
+                    str(r) for r in act["applicable_regulations"]
+                ]
+            refs = act.get("layer0_refs")
+            if isinstance(refs, list) and refs:
+                rec["layer0_refs"] = [str(r) for r in refs]
+            activations.append(rec)
+        if not activations:
+            return None
+
+        sections = {
+            k: (v if isinstance(v, str) else _json.dumps(v, indent=2))
+            for k, v in obj.items()
+            if k not in ("prompt_spec_id", "schema_version", "case_id",
+                         "invocation_pattern", "lane_id", "domain_id",
+                         "status", "confidence", "sub_domain_activations")
+        }
+        from aegis_phase1.v2.state import P1CLLM01Output
+
+        return P1CLLM01Output(
+            status=status,
+            confidence=confidence,
+            sub_domain_activations=activations,
+            sections=sections,
+        )
+
     def parse(self, raw: str) -> tuple[Any | None, str]:
         text = self._strip_code_fences(raw)
 
@@ -958,6 +1052,14 @@ class P1CLLM01Parser(GenericMarkdownParser):
             all_sections.update(sections)
 
         if not saw_any:
+            # CORR-116 S2.2: strong models (nemotron) emit P1C-01 as a pure
+            # JSON envelope with the canonical `sub_domain_activations` key —
+            # correct content, wrong serialization. Convert it to the same
+            # P1CLLM01Output the markdown shapes produce instead of failing
+            # with "no `## Section` headers found in markdown".
+            fallback = self._parse_json_envelope(raw)
+            if fallback is not None:
+                return fallback, ""
             return None, "no `## Section` headers found in markdown"
 
         return P1CLLM01Output(
