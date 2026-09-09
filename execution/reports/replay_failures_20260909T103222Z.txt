@@ -1,0 +1,42 @@
+# Parser Replay — failure excerpts
+
+## missing_int (50 occurrence(s))
+
+- `output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-26-04__attempt1.md`  spec=`P1B-LLM-01-INTERPRETATION` model=`gemma4:e4b`
+  > markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output
+status
+  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]
+    For further 
+- `output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-26-45__attempt1.md`  spec=`P1B-LLM-01-INTERPRETATION` model=`gemma4:e4b`
+  > markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output
+status
+  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]
+    For further 
+- `output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-26-46__attempt1.md`  spec=`P1B-LLM-01-INTERPRETATION` model=`gemma4:e4b`
+  > markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output
+status
+  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]
+    For further 
+- `output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-29-28__attempt1.md`  spec=`P1B-LLM-01-INTERPRETATION` model=`gemma4:e4b`
+  > markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output
+status
+  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]
+    For further 
+- `output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-32-51__attempt1.md`  spec=`P1B-LLM-01-INTERPRETATION` model=`gemma4:e4b`
+  > markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output
+status
+  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]
+    For further 
+
+## no_headers (100 occurrence(s))
+
+- `output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-26-04__attempt1.md`  spec=`P1B-LLM-02-RATIONALE` model=`gemma4:e4b`
+  > no section headers found in markdown
+- `output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-26-46__attempt1.md`  spec=`P1B-LLM-02-RATIONALE` model=`gemma4:e4b`
+  > no section headers found in markdown
+- `output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-29-28__attempt1.md`  spec=`P1B-LLM-02-RATIONALE` model=`gemma4:e4b`
+  > no section headers found in markdown
+- `output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-32-51__attempt1.md`  spec=`P1B-LLM-02-RATIONALE` model=`gemma4:e4b`
+  > no section headers found in markdown
+- `output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-33-15__attempt1.md`  spec=`P1B-LLM-02-RATIONALE` model=`gemma4:e4b`
+  > no section headers found in markdown

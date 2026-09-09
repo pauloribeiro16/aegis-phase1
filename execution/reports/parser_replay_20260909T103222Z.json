@@ -1,0 +1,1640 @@
+{
+  "limit": 50,
+  "models": null,
+  "per_file": [
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-26-04__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-26-45__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-26-46__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-29-28__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-32-51__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-33-15__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-33-35__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-33-36__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-33-56__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-49-53__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-50-15__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-51-47__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-51-48__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-53-50__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-53-51__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-54-15__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-57-05__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T11-57-30__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T12-10-35__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T12-12-28__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T12-12-29__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T12-14-24__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T12-14-47__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T12-18-12__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T12-18-36__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T15-04-33__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T15-06-00__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T15-09-08__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T15-09-09__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-29T15-19-31__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-34-37__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-35-19__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-35-36__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-35-45__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-35-54__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-38-27__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-38-39__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-39-31__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-39-51__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-39-52__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T09-40-00__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T14-49-41__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T14-49-55__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T14-50-03__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T15-10-20__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T15-10-39__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T15-10-56__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T15-11-08__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T15-11-09__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "missing_int",
+      "error_str": "markdown parsing failed (markdown extraction did not match template); JSON parsed directly but Pydantic validation failed: 2 validation errors for P1BLLM01Output\nstatus\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nconfidence\n  Field required [type=missing, input_value={'prompt_spec_id': 'P1B-L..., 'interpretations': []}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-07-30T15-12-38__attempt1.md",
+      "spec": "P1B-LLM-01-INTERPRETATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-26-04__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-26-46__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-29-28__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-32-51__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-33-15__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-33-35__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-33-56__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-49-53__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-50-15__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-51-47__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-53-50__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-54-15__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-57-05__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T11-57-30__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T12-10-35__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T12-12-28__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T12-14-24__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T12-14-47__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T12-18-12__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T12-18-36__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T15-04-33__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T15-06-00__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T15-09-08__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-29T15-19-31__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-34-37__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-35-19__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-35-36__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-35-45__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-35-54__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-38-27__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-38-39__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-39-31__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-39-51__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T09-40-00__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T14-49-41__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T14-49-55__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T14-50-03__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-10-20__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-10-39__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-10-56__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-11-08__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-12-38__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-14-55__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-27-24__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-28-34__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-30-06__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-32-17__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-32-41__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-33-14__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no section headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1B-LLM-02-RATIONALE/2026-07-30T15-34-32__attempt1.md",
+      "spec": "P1B-LLM-02-RATIONALE",
+      "status": "PYTHON_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T16-39-40__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T16-39-43__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T16-43-53__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T16-43-57__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T16-44-47__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T16-44-51__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T16-49-00__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T16-49-03__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T16-49-04__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T18-51-46__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T18-51-49__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T18-56-35__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T18-56-39__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T18-57-01__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T18-57-05__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T18-58-58__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T18-59-01__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T19-04-35__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-28T19-04-39__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-31-43__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-31-46__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-37-33__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-37-36__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-39-13__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-39-16__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-41-01__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-41-04__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-41-54__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-41-57__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-41-58__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-43-37__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-43-41__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-50-53__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-50-57__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-54-04__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T10-54-07__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-26-04__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-26-09__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-26-12__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-26-46__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-26-50__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-26-54__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-29-28__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-29-33__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-29-36__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-32-51__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-32-56__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-32-59__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-33-15__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "no_headers",
+      "error_str": "no `## Section` headers found in markdown",
+      "model": "gemma4:e4b",
+      "outcome": "parse_fail",
+      "path": "output/phase1/raw/P1C-LLM-01-OVERLAP-CLASSIFICATION/2026-07-29T11-33-20__attempt1.md",
+      "spec": "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "",
+      "error_str": "",
+      "model": "MiniMax-M3",
+      "outcome": "parse_ok",
+      "path": "output/phase1/raw/P1C-LLM-02-COMPOUND-EVENT/2026-08-05T16-53-58__attempt1.md",
+      "spec": "P1C-LLM-02-COMPOUND-EVENT",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "2",
+      "error_class": "",
+      "error_str": "",
+      "model": "MiniMax-M3",
+      "outcome": "parse_ok",
+      "path": "output/phase1/raw/P1C-LLM-02-COMPOUND-EVENT/2026-08-05T16-54-05__attempt2.md",
+      "spec": "P1C-LLM-02-COMPOUND-EVENT",
+      "status": "SCHEMA_ERROR"
+    },
+    {
+      "attempt": "1",
+      "error_class": "",
+      "error_str": "",
+      "model": "MiniMax-M3",
+      "outcome": "parse_ok",
+      "path": "output/phase1/raw/P1C-LLM-02-COMPOUND-EVENT/2026-08-05T16-54-26__attempt1.md",
+      "spec": "P1C-LLM-02-COMPOUND-EVENT",
+      "status": "OK"
+    }
+  ],
+  "raw_dir": "/home/epmq-cyber/\u00c1rea de Trabalho/projects/aegis-phase1/output/phase1/raw",
+  "run_at": "2026-09-09T10:32:22.618465+00:00",
+  "specs": [
+    "P1B-LLM-01-INTERPRETATION",
+    "P1B-LLM-02-RATIONALE",
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION",
+    "P1C-LLM-02-COMPOUND-EVENT",
+    "P1C-LLM-03-STRATEGIC-SYNTHESIS"
+  ],
+  "totals_by_spec": {
+    "P1B-LLM-01-INTERPRETATION": {
+      "by_model": {
+        "gemma4:e4b": {
+          "empty_body": 0,
+          "error_classes": {
+            "missing_int": 50
+          },
+          "gate_fail": 0,
+          "model_count": 50,
+          "parse_fail": 50,
+          "parse_ok": 0
+        }
+      },
+      "empty_body": 0,
+      "error_classes": {
+        "missing_int": 50
+      },
+      "gate_fail": 0,
+      "model_count": 50,
+      "parse_fail": 50,
+      "parse_ok": 0
+    },
+    "P1B-LLM-02-RATIONALE": {
+      "by_model": {
+        "gemma4:e4b": {
+          "empty_body": 0,
+          "error_classes": {
+            "no_headers": 50
+          },
+          "gate_fail": 0,
+          "model_count": 50,
+          "parse_fail": 50,
+          "parse_ok": 0
+        }
+      },
+      "empty_body": 0,
+      "error_classes": {
+        "no_headers": 50
+      },
+      "gate_fail": 0,
+      "model_count": 50,
+      "parse_fail": 50,
+      "parse_ok": 0
+    },
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION": {
+      "by_model": {
+        "gemma4:e4b": {
+          "empty_body": 0,
+          "error_classes": {
+            "no_headers": 50
+          },
+          "gate_fail": 0,
+          "model_count": 50,
+          "parse_fail": 50,
+          "parse_ok": 0
+        }
+      },
+      "empty_body": 0,
+      "error_classes": {
+        "no_headers": 50
+      },
+      "gate_fail": 0,
+      "model_count": 50,
+      "parse_fail": 50,
+      "parse_ok": 0
+    },
+    "P1C-LLM-02-COMPOUND-EVENT": {
+      "by_model": {
+        "MiniMax-M3": {
+          "empty_body": 0,
+          "error_classes": {},
+          "gate_fail": 0,
+          "model_count": 3,
+          "parse_fail": 0,
+          "parse_ok": 3
+        }
+      },
+      "empty_body": 0,
+      "error_classes": {},
+      "gate_fail": 0,
+      "model_count": 3,
+      "parse_fail": 0,
+      "parse_ok": 3
+    },
+    "P1C-LLM-03-STRATEGIC-SYNTHESIS": {
+      "by_model": {},
+      "empty_body": 0,
+      "error_classes": {},
+      "gate_fail": 0,
+      "model_count": 0,
+      "parse_fail": 0,
+      "parse_ok": 0
+    }
+  }
+}
