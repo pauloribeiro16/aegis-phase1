@@ -495,6 +495,75 @@ class GenericMarkdownParser(MarkdownParser):
     # Accept any ``# Section`` or ``## Section`` header — the parser is spec-agnostic.
     _H2_SPLIT_RE = re.compile(r"^#{1,2}\s+(.+?)\s*$", re.MULTILINE)
 
+    # Envelope fields injected by the invoker — never treated as content sections.
+    _ENVELOPE_KEYS = frozenset(
+        {"prompt_spec_id", "schema_version", "case_id", "invocation_pattern", "lane_id"}
+    )
+
+    def _parse_json_envelope(self, raw: str, m: dict) -> Any | None:
+        """Parse a pure-JSON output envelope into a GenericMarkdownOutput.
+
+        Mirrors P1BLLM01Parser's direct-JSON fallback: status/confidence are
+        read from the top-level object, every other key becomes a verbatim
+        ``## <key>`` section (JSON pretty-printed) so downstream renderers
+        keep the content. Returns None when the raw text is not JSON.
+        """
+        import json as _json
+
+        text = self._strip_code_fences(raw).strip()
+        if not text.startswith("{"):
+            return None
+        try:
+            obj = _json.loads(text)
+        except _json.JSONDecodeError:
+            return None
+        if not isinstance(obj, dict):
+            return None
+        # Heuristic guard: envelope-ish payloads carry the invoker's spec id.
+        if "prompt_spec_id" not in obj and "status" not in obj:
+            return None
+
+        raw_status = str(obj.get("status", "")).upper()
+        if raw_status in ("APPLICABLE", "YES", "TRUE", "PASS"):
+            status_str = "YES"
+        elif raw_status in ("NOT_APPLICABLE", "NO", "FALSE", "FAIL"):
+            status_str = "NO"
+        elif raw_status in ("INSUFFICIENT", "INSUFFICIENT_EVIDENCE"):
+            status_str = "INSUFFICIENT_EVIDENCE"
+        elif raw_status in ("INDETERMINATE", "UNKNOWN"):
+            status_str = "INDETERMINATE"
+        elif raw_status in ("OK", "SUCCESS", "VALID"):
+            status_str = "OK"
+        else:
+            status_str = raw_status or "OK"
+        try:
+            status = m["P1BLLM01Status"](status_str)
+        except ValueError:
+            status = m["P1BLLM01Status"].INDETERMINATE
+
+        conf_raw = str(obj.get("confidence", "")).upper()
+        conf_str = conf_raw if conf_raw in ("HIGH", "MEDIUM", "LOW") else "MEDIUM"
+        try:
+            confidence = m["P1BLLM01Confidence"](conf_str)
+        except ValueError:
+            confidence = m["P1BLLM01Confidence"].MEDIUM
+
+        sections: dict[str, str] = {}
+        for key, value in obj.items():
+            if key.lower() in self._ENVELOPE_KEYS:
+                continue
+            body = value if isinstance(value, str) else _json.dumps(value, indent=2)
+            sections[key] = body
+            sections[key.lower()] = body
+
+        from aegis_phase1.v2.state import GenericMarkdownOutput
+
+        return GenericMarkdownOutput(
+            status=status,
+            confidence=confidence,
+            sections=sections,
+        )
+
     def parse(self, raw: str) -> tuple[Any | None, str]:
         text = self._strip_code_fences(raw)
         m = _import_p1b_models()
@@ -502,6 +571,14 @@ class GenericMarkdownParser(MarkdownParser):
         # Find all ## section headers and split the body between them
         matches = list(self._H2_SPLIT_RE.finditer(text))
         if not matches:
+            # CORR-116 S2.1: strong models (nemotron, qwen3.x) sometimes emit
+            # the output contract as pure JSON instead of `##` markdown. The
+            # P1B-01 parser already tolerates this via a direct-JSON fallback;
+            # mirror it here so a valid JSON envelope is not rejected with
+            # "no section headers found in markdown".
+            fallback = self._parse_json_envelope(raw, m)
+            if fallback is not None:
+                return fallback, ""
             return None, "no section headers found in markdown"
 
         sections: dict[str, str] = {}
