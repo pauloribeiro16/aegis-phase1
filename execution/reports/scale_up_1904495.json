@@ -1,0 +1,59 @@
+{
+  "scale_up_at": "2026-09-09T22:55:00+01:00",
+  "model": "nemotron-3.5-lightning:30b",
+  "case": "case1-tinytask",
+  "branch": "feature/aegis-p1-corr-116-pipeline-staging",
+  "steps": [
+    {
+      "label": "3a",
+      "jobid": 1903560,
+      "state": "COMPLETED",
+      "exitcode": "0:30",
+      "elapsed": "00:29:25",
+      "node": "gnx523",
+      "parsed_ok": 1,
+      "parse_fail": 0,
+      "raw_path": "output/phase1/raw/P1B-LLM-01-INTERPRETATION/2026-09-09T15-43-55__attempt1.md",
+      "note": "P1B-01 raw OK attempt 1; scout SIGTERMed at walltime because pre-fix P1B-02 burned retries"
+    },
+    {
+      "label": "3b",
+      "jobid": 1903721,
+      "state": "COMPLETED",
+      "exitcode": "0:0",
+      "elapsed": "00:19:01",
+      "node": "gnx519",
+      "parsed_ok": 4,
+      "parse_fail": 0,
+      "note": "4/4 P1B raws OK (1 self-correction on attempt 2 via S2 feedback; P1B-02 JSON fallback proven); Doc 05 written"
+    },
+    {
+      "label": "3c",
+      "jobid": 1904389,
+      "state": "COMPLETED",
+      "exitcode": "0:0",
+      "elapsed": "00:26:10",
+      "node": "gnx507",
+      "parsed_ok": 10,
+      "parse_fail": 0,
+      "note": "MAP complete: 10 domains statuses={'OK': 10} — S2.2 P1C-01 JSON fallback proven (v1 job 1904151 was 10/10 FAILED)"
+    },
+    {
+      "label": "3d",
+      "jobid": 1904495,
+      "state": "COMPLETED",
+      "exitcode": "0:0",
+      "elapsed": "00:53:13",
+      "node": "gnx507",
+      "parsed_ok": null,
+      "parse_fail": null,
+      "note": "run-all end-to-end: REDUCE 33 subdomains, 13 md + 1 xlsx, RUNNER_EXIT=0"
+    }
+  ],
+  "fixes_proven": [
+    "S2 retry feedback (8190f0c): attempt-2 self-correction observed in 3b",
+    "S2.1 P1B-02 JSON fallback (c85f2d9): attempt-1 parses in 3b",
+    "S2.2 P1C-01 JSON fallback (local commit): 10/10 MAP lanes OK in 3c"
+  ],
+  "verdict": "LADDER_COMPLETE"
+}
