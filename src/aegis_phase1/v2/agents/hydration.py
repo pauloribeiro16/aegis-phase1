@@ -2,7 +2,7 @@
 
 The pre-agent pipeline loses the P1B-02 synthesis when the model answers in
 JSON (CORR-116 S2.1 fallback stores it as a JSON string in
-``parsed_output["sections"]["synthesis"]``, and the legacy typed path at
+``parsed_output["sections"]["synthesis"]``, and the legacy typed-state path at
 ``state["aggregated_data"]["rationale_by_reg"]`` stays empty). The agent
 loop (and Doc 05 §7) need the typed dict: {rationale, implications, gaps}.
 
@@ -13,7 +13,11 @@ trying in order:
   2. ``state["aggregated_data"]["rationale_by_reg"][reg]["sections"]["synthesis"]``
      as a JSON string (GenericMarkdownOutput dump);
   3. ```json fenced blocks inside ``state["per_spec_markdown"]["P1B-LLM-02-RATIONALE"]``
-     (multi-call concat, one block per regulation — lane_id disambiguates).
+     (multi-call concat, one block per regulation — lane_id disambiguates);
+  4. **NEW:** the most recent raw P1B-LLM-02 markdown on disk under
+     ``output/phase1/raw/P1B-LLM-02-RATIONALE/`` (fallback for the run-all
+     flow where the invoker's per_spec_markdown writer is bypassed by
+     LangGraph state separation).
 
 When new content is recovered, ``state`` is updated in place so Doc 05's
 renderer sees the same hydration on its side.
@@ -43,6 +47,14 @@ def hydrate_rationale_by_reg(state: dict[str, Any]) -> dict[str, dict[str, Any]]
     missing = [r for r in _applicable_regs(state) if r not in recovered]
     if missing:
         fenced = _synthesis_from_per_spec(state.get("per_spec_markdown") or {})
+    if not fenced:
+        # CORR-118 S2.5: run-all flow strips per_spec_markdown from the
+        # graph state passed to the agent loop. Fall back to the
+        # most-recent P1B-LLM-02 raw markdown on disk (written by the
+        # invoker's _persist_raw_call).
+        fenced = _synthesis_from_per_spec(
+            {"P1B-LLM-02-RATIONALE": _read_latest_p1b02_from_disk()}
+        )
         for reg, synth in fenced.items():
             if reg in missing:
                 recovered[reg] = synth
@@ -85,6 +97,29 @@ def _synthesis_from_entry(entry: Any) -> dict[str, Any] | None:
             if isinstance(parsed, dict) and ("gaps" in parsed or "rationale" in parsed):
                 return parsed
     return None
+
+
+def _read_latest_p1b02_from_disk() -> str:
+    """Return the contents of the most recent P1B-LLM-02-RATIONALE raw
+    attempt1.md on disk, or empty string if the file is not present.
+
+    The invoker writes one file per attempt to
+    ``output/phase1/raw/P1B-LLM-02-RATIONALE/<ts>__attempt<N>.md`` with a
+    ```json fenced block; the most recent (lexically greatest) filename is
+    the one used by the last successful call.
+    """
+    from pathlib import Path
+
+    base = Path("output/phase1/raw/P1B-LLM-02-RATIONALE")
+    if not base.is_dir():
+        return ""
+    candidates = sorted(base.glob("*attempt*.md"), reverse=True)
+    if not candidates:
+        return ""
+    try:
+        return candidates[0].read_text(encoding="utf-8")
+    except OSError:
+        return ""
 
 
 def _synthesis_from_per_spec(per_spec: dict[str, str]) -> dict[str, dict[str, Any]]:
