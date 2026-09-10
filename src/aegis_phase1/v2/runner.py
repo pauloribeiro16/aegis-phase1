@@ -371,6 +371,11 @@ def main() -> None:
 
     if args.run_all:
         logger.info("Non-interactive mode — running all stages")
+        if args.use_agent_doc05:
+            # Pre-set so orchestrator.generate_outputs -> render_doc_05
+            # sees the flag and dispatches the agent loop (CORR-118).
+            orch.state.setdefault("_use_agent_doc05", True)
+            logger.info("CORR-118: --use-agent-doc05 active (Doc 05 §3-§7 via agent loop)")
         try:
             orch.run_all(case_path, prep_path, output_path)
         except MapPartialFailure as exc:
@@ -410,6 +415,7 @@ def main() -> None:
                 case_path=case_path,
                 prep_path=prep_path,
                 output_path=output_path,
+                use_agent_doc05=args.use_agent_doc05,
             )
         except MapPartialFailure as exc:
             # CORR-067 S2: threshold-based partial-failure handling.
@@ -849,6 +855,7 @@ def cmd_run_all_traced(
     case_path: str,
     prep_path: str,
     output_path: str,
+    use_agent_doc05: bool = False,
 ) -> int:
     """AEGIS-P1-CORR-018a entry: run the pipeline through the 18-node LangGraph.
 
@@ -859,11 +866,24 @@ def cmd_run_all_traced(
     Langfuse is disabled (``LANGFUSE_ENABLED=false``) the handler is
     ``None`` and the graph still runs — just without spans.
 
+    CORR-118: ``use_agent_doc05=True`` propagates the flag into
+    ``orch.state["_use_agent_doc05"]`` so the Doc 05 renderer dispatches
+    the LangGraph agent loop (Drafter + Reviewer + Gate) for §3-§7.
+    Other docs are unchanged.
+
     Returns:
         Process-style exit code: ``0`` on success, ``2`` on
         ``LLMUnreachableError`` (re-raised so the CLI can also map it).
     """
     from aegis_phase1.v2.graph import run_phase1_graph
+
+    if use_agent_doc05:
+        # Pre-set so orchestrator.render_doc_05 sees the flag before
+        # the render dispatch (state may have been replaced by the
+        # LangGraph run below; the flag survives via setdefault on the
+        # initial state).
+        orch.state.setdefault("_use_agent_doc05", True)
+        logger.info("CORR-118: --use-agent-doc05 active (Doc 05 §3-§7 via agent loop)")
 
     case_name = Path(case_path).name
     callbacks = [orch._langfuse_handler] if orch._langfuse_handler else None

@@ -229,6 +229,17 @@ class P1BLLM01Parser(MarkdownParser):
             if stripped.startswith("{") and stripped.endswith("}"):
                 json_data = _normalize_json(_json.loads(stripped))
                 if isinstance(json_data, dict):
+                    # CORR-118 S2.3: the qwen3.8 model sometimes wraps
+                    # list fields in an object ``{"items": [...]}`` —
+                    # a known LLM slip that breaks Pydantic's ``list``
+                    # validation. Normalise to the expected list form
+                    # before validating; this is safe because
+                    # ``interpretations``/``derogations`` schemas declare
+                    # ``items: list``, so any wrapper is malformed.
+                    for _list_field in ("interpretations", "derogations"):
+                        _val = json_data.get(_list_field)
+                        if isinstance(_val, dict) and "items" in _val:
+                            json_data[_list_field] = _val["items"]
                     try:
                         model = m["P1BLLM01Output"].model_validate(json_data)
                         return model, ""
@@ -280,6 +291,12 @@ class P1BLLM01Parser(MarkdownParser):
                     f"markdown parsing failed ({markdown_error}); "
                     f"JSON parsed but is not a dict (got {type(json_data).__name__})"
                 )
+            # CORR-118 S2.3: same wrapper-key normalisation as in the
+            # direct JSON path above.
+            for _list_field in ("interpretations", "derogations"):
+                _val = json_data.get(_list_field)
+                if isinstance(_val, dict) and "items" in _val:
+                    json_data[_list_field] = _val["items"]
             # Pydantic validation: extra="ignore" tolerates envelope fields
             # the LLM might emit (prompt_spec_id, case_id, etc.).
             # The invoker will overwrite them anyway.
