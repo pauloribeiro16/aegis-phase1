@@ -27,6 +27,52 @@ from aegis_phase1.v2.agents.reviewer import _SYSTEM as _REVIEWER_SYSTEM
 logger = logging.getLogger(__name__)
 
 
+def _make_llm_callable(llm: Any) -> Runnable:
+    """Adapt a non-Runnable invoker (UnifiedInvoker, MockInvoker, callable)
+    to a LangChain Runnable so it can sit between ChatPromptTemplate and
+    StrOutputParser in an LCEL chain.
+
+    If the supplied object is already a LangChain Runnable (e.g.
+    GenericFakeChatModel in tests, ChatOllama in production), return it
+    unchanged so LCEL's type system stays happy.
+
+    The wrapped invoker is expected to expose either:
+      * ``invoke(prompt: str) -> dict`` (UnifiedInvoker / MockInvoker
+        adapted via _invoke_raw in graph.py) returning ``{"raw": str}``
+      * ``invoke(system, user) -> str`` (the agent's own (sys, user) shape)
+
+    Accepts the prompt output (string user-input) and returns raw text.
+    """
+    # If the invoker is already a LangChain Runnable, pass it through
+    # untouched — LCEL will invoke it natively and we don't need our
+    # adapter (the Runnable already accepts the chat-prompt output).
+    if hasattr(llm, "invoke") and hasattr(llm, "stream") and hasattr(llm, "batch"):
+        return llm  # type: ignore[return-value]
+
+    def _call(input_: Any) -> str:
+        system, user = "", str(input_)
+        if hasattr(llm, "invoke"):
+            try:
+                result = llm.invoke(system, user)
+            except TypeError:
+                # MockInvoker / UnifiedInvoker shape
+                full = system + "\n\n" + user
+                result = llm.invoke(full)
+        elif callable(llm):
+            result = llm(system, user)
+        else:  # pragma: no cover — defensive
+            raise TypeError(
+                f"invoker does not support invoke: {type(llm).__name__}"
+            )
+        if isinstance(result, str):
+            return result
+        if isinstance(result, dict):
+            return result.get("raw") or result.get("content") or ""
+        return str(result)
+
+    return RunnableLambda(_call)
+
+
 _DRAFTER_SYSTEM = """You are the DRAFTER agent for AEGIS Doc 05 (Regulatory Applicability Assessment).
 
 Your job: write the document sections §3-§7 in clean markdown for a compliance
@@ -85,7 +131,7 @@ def build_drafter_chain(llm: Any) -> Runnable:
             )
         return {"_user_input": user_input}
 
-    return RunnableLambda(_format_input) | prompt | llm | StrOutputParser()
+    return RunnableLambda(_format_input) | prompt | _make_llm_callable(llm) | StrOutputParser()
 
 
 def build_reviewer_chain(llm: Any) -> Runnable:
@@ -110,7 +156,7 @@ def build_reviewer_chain(llm: Any) -> Runnable:
         )
         return {"_user_input": user_input}
 
-    return RunnableLambda(_format_input) | prompt | llm | StrOutputParser()
+    return RunnableLambda(_format_input) | prompt | _make_llm_callable(llm) | StrOutputParser()
 
 
 def _gap_ids(synthesis: dict[str, Any]) -> list[str]:
