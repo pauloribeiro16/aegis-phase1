@@ -85,16 +85,6 @@ def make_draft_node(drafter_chain: Any):
             raise _BudgetExhausted(
                 f"doc05 agent loop exhausted max_cycles={max_cycles}"
             )
-        facts = state.get("facts") or {}
-        synth = facts.get("synthesis") or {}
-        gaps = synth.get("gaps") if isinstance(synth, dict) else None
-        logger.warning(
-            "doc05 DEBUG cycle %d: facts.applicable_regs=%s synthesis.gaps=%s derived=%s",
-            cycle,
-            facts.get("applicable_regs"),
-            len(gaps) if isinstance(gaps, list) else gaps,
-            synth.get("_derived_from_coverage_matrix") if isinstance(synth, dict) else None,
-        )
         response = drafter_chain.invoke(dict(state))
         sections = split_sections(response)
         sidecar = list(state.get("sidecar_lines") or [])
