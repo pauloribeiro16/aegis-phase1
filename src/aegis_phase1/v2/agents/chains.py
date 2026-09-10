@@ -105,38 +105,25 @@ def _make_llm_callable(llm: Any) -> Runnable:
     return RunnableLambda(_call)
 
 
-_DRAFTER_SYSTEM = """You are the DRAFTER agent for AEGIS Doc 05 (Regulatory Applicability Assessment).
+_DRAFTER_SYSTEM = """You are a markdown writer. The user message below already contains all the facts you need: applicable regulations, company profile, sub-domain catalogue, clause map, and per-regulation synthesis with rationales / implications / gaps. Your only job is to render those facts as five markdown sections.
 
-Your job: write the document sections §3-§7 in clean markdown for a compliance
-decision-maker. You write FROM the provided facts — you never invent IDs,
-articles, statistics or facts (contract OBJ-09). Every claim must cite a
-provided anchor: article tokens (Art. N / Annex ...), DOC04 fact ids, or
-sub-domain ids (D-XX.Y).
+CRITICAL: Do NOT ask the user for more data, do NOT request "items 1-8", do NOT say "Please paste the source facts". The facts are already in the user message — use them.
 
-OUTPUT CONTRACT (hard):
-- Output ONLY the five sections, in this exact order, with these exact headers:
+OUTPUT CONTRACT (no negotiation):
+- Exactly these 5 headers, in this order, with no other markdown before or between them:
   ## 3. PER-REGULATION APPLICABILITY
   ## 4. NATIVE VS INHERITED COMPLIANCE
   ## 5. SUB-DOMAIN COVERAGE PRELIMINARY
   ## 6. STRATEGIC IMPLICATIONS
   ## 7. REGULATORY GAPS IDENTIFIED
-- Markdown prose + pipe tables only. NO ```json fences, NO raw payloads.
-- §3: one subsection per applicable regulation — trigger criterion, company
-  value, result, evidence (ontology fields), short reasoning.
-- §4: NATIVE vs INHERITED per regulation-domain pair (NATIVE = company
-  implements; INHERITED = satisfied via supplier attestation, e.g. ISO 27001
-  or SOC 2 from a named cloud provider in the facts).
-- §5: coverage per sub-domain: SUBSTANTIVE (>=2 applicable regs), PARTIAL
-  (exactly 1), NOT_ADDRESSED (0) + a status-count table.
-- §6: strategic implications table (id, source regs, description, effort,
-  priority) + a short decision-oriented narrative.
-- §7: regulatory gaps table with columns:
-  | Gap ID | Sub-domain | Type | Risk description | Priority | Recommendation |
-  Every gap row MUST have a GAP-* id, a P1/P2/P3 priority and a concrete
-  recommendation. Derive gaps from the provided synthesis.gaps plus
-  NOT_ADDRESSED sub-domains; never say "no gaps detected" unless the
-  facts truly contain none.
-"""
+- §3: for each applicable regulation, a short paragraph (trigger + company value + result) plus a small table.
+- §4: pipe table | Regulation | Status (NATIVE / INHERITED) | Basis |.
+- §5: per-sub-domain list with status + a summary table | Status | Count |.
+- §6: pipe table | Imp ID | Source | Description | Effort | Priority | followed by a 1-paragraph narrative.
+- §7: pipe table | Gap ID | Sub-domain | Type | Risk | Priority | Recommendation |. If the provided synthesis.gaps array is non-empty, you MUST emit at least one row per gap; never write "no gaps detected" when the facts contain gaps.
+- Markdown prose + pipe tables only. NO ```json fences, NO "I need more data" replies, NO questions to the user.
+- Cite only the anchors given in the user message (Art./Annex tokens, D-XX.Y ids, DOC04 fact refs).
+- Do not invent IDs, articles, statistics, or facts — but DO use the ones provided."""
 
 
 def build_drafter_chain(llm: Any) -> Runnable:
