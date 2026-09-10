@@ -236,10 +236,30 @@ class P1BLLM01Parser(MarkdownParser):
                     # before validating; this is safe because
                     # ``interpretations``/``derogations`` schemas declare
                     # ``items: list``, so any wrapper is malformed.
-                    for _list_field in ("interpretations", "derogations"):
+                    _wrapper_fields = (
+                        "interpretations", "derogations",
+                        # also handle qwen3.8 wrapper slips in nested list
+                        # fields inside each interpretation/derogation entry
+                        # (e.g. layer0_refs: {"items": [...]}):
+                    )
+                    def _unwrap_wrapper(value: Any) -> Any:
+                        if isinstance(value, dict) and set(value.keys()) == {"items"}:
+                            return value["items"]
+                        return value
+                    for _list_field in _wrapper_fields:
                         _val = json_data.get(_list_field)
                         if isinstance(_val, dict) and "items" in _val:
                             json_data[_list_field] = _val["items"]
+                        if isinstance(_val, list):
+                            for entry in _val:
+                                if isinstance(entry, dict):
+                                    for _nested in (
+                                        "layer0_refs",
+                                        "legal_refs",
+                                        "company_fact_refs",
+                                    ):
+                                        if _nested in entry:
+                                            entry[_nested] = _unwrap_wrapper(entry[_nested])
                     try:
                         model = m["P1BLLM01Output"].model_validate(json_data)
                         return model, ""
@@ -293,10 +313,27 @@ class P1BLLM01Parser(MarkdownParser):
                 )
             # CORR-118 S2.3: same wrapper-key normalisation as in the
             # direct JSON path above.
-            for _list_field in ("interpretations", "derogations"):
+            _wrapper_fields = (
+                "interpretations", "derogations",
+            )
+            def _unwrap_wrapper(value: Any) -> Any:
+                if isinstance(value, dict) and set(value.keys()) == {"items"}:
+                    return value["items"]
+                return value
+            for _list_field in _wrapper_fields:
                 _val = json_data.get(_list_field)
                 if isinstance(_val, dict) and "items" in _val:
                     json_data[_list_field] = _val["items"]
+                if isinstance(_val, list):
+                    for entry in _val:
+                        if isinstance(entry, dict):
+                            for _nested in (
+                                "layer0_refs",
+                                "legal_refs",
+                                "company_fact_refs",
+                            ):
+                                if _nested in entry:
+                                    entry[_nested] = _unwrap_wrapper(entry[_nested])
             # Pydantic validation: extra="ignore" tolerates envelope fields
             # the LLM might emit (prompt_spec_id, case_id, etc.).
             # The invoker will overwrite them anyway.
