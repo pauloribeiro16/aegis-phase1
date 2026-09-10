@@ -127,7 +127,7 @@ KEY RULE — use the EXACT anchors provided (Art./Annex tokens, D-XX.Y ids, DOC0
 
 WORKED EXAMPLE (one paragraph + one row) for a GDPR controller case:
   ## 3. PER-REGULATION APPLICABILITY
-  The applicable regulation set is {GDPR, CRA} (synthesis.applicable_regs).
+  The applicable regulation set is {{GDPR, CRA}} (synthesis.applicable_regs).
   GDPR applies: the company is a controller (synthesis.classification.role),
   with Art. 5(1)(c) (synthesis.coverage_matrix_row[2].article) binding on
   sub-domain D-01.4 (synthesis.coverage_matrix_row[2].subdomain_id).
