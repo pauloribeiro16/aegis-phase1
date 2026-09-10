@@ -64,9 +64,6 @@ def hydrate_rationale_by_reg(state: dict[str, Any]) -> dict[str, dict[str, Any]]
     for reg, synth in fenced.items():
         if reg not in recovered:
             recovered[reg] = synth
-        for reg, synth in fenced.items():
-            if reg in missing:
-                recovered[reg] = synth
 
     # Write back when we recovered something the state lacked.
     changed = {
