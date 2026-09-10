@@ -189,6 +189,32 @@ def test_sidecar_captures_every_node_visit() -> None:
     assert "cycle 1 — reviewer prompt + response" in joined
 
 
+def test_subdomain_catalogue_tolerates_pydantic_objects() -> None:
+    """v2_subdomains in real orchestrator state are Pydantic Subdomain
+    objects, not dicts. The agent facts builder must read both shapes
+    without raising AttributeError.
+    """
+    from aegis_phase1.v2.agents.loop import _subdomain_catalogue
+    import json
+
+    class _FakeSub:
+        def __init__(self, sd_id, regs):
+            self.id = sd_id
+            self.participating_regulations = regs
+
+    state = {
+        "v2_subdomains": [
+            _FakeSub("D-01.1", ["GDPR", "CRA"]),
+            _FakeSub("D-02.1", ["GDPR"]),
+        ]
+    }
+    rows = json.loads(_subdomain_catalogue(state))
+    assert rows == [
+        {"id": "D-01.1", "regs": ["GDPR", "CRA"]},
+        {"id": "D-02.1", "regs": ["GDPR"]},
+    ]
+
+
 def test_graph_compiles_with_checkpointer() -> None:
     """Skill template pattern: build_doc05_graph exposes InMemorySaver."""
     graph = build_doc05_graph(_fake_responses("x", "y"), max_cycles=1)

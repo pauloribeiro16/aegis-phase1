@@ -116,12 +116,25 @@ def _company_profile(state: dict[str, Any]) -> str:
 
 
 def _subdomain_catalogue(state: dict[str, Any]) -> str:
+    """Compact sub-domain catalogue. Tolerates both dicts (test fixtures)
+    and Pydantic ``Subdomain`` objects (real orchestrator state)."""
     rows: list[dict[str, Any]] = []
     for sub in state.get("v2_subdomains") or []:
-        sd_id = getattr(sub, "id", None) or sub.get("id")
-        regs = getattr(sub, "participating_regulations", None) or sub.get("participating_regulations") or []
-        rows.append({"id": sd_id, "regs": list(regs)})
+        sd_id = _get_field(sub, "id", default="")
+        regs = _get_field(sub, "participating_regulations", default=[]) or []
+        if not sd_id:
+            continue
+        rows.append({"id": str(sd_id), "regs": list(regs)})
     return json.dumps(rows, ensure_ascii=False)
+
+
+def _get_field(obj: Any, name: str, default: Any = None) -> Any:
+    """Read a field from either a dict or a Pydantic model without raising."""
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
 
 
 def _clause_map(state: dict[str, Any]) -> str:
