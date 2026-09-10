@@ -240,3 +240,32 @@ def test_gate_unchanged_after_refactor() -> None:
     assert ok.passed, ok.failures
     bad = g.check({"s3": "## 3. PER-REGULATION APPLICABILITY\n```json\n{}\n```"})
     assert not bad.passed
+
+
+def test_hydration_derives_synthesis_from_coverage_matrix() -> None:
+    """CORR-118 S2.4: qwen3.8 emits the raw coverage matrix instead of
+    the synthesis field. _derive_synthesis_from_coverage_matrix must
+    produce a usable synthesis so §3-§7 still has facts.
+    """
+    from aegis_phase1.v2.agents.hydration import _derive_synthesis_from_coverage_matrix
+
+    parsed = {
+        "lane_id": "GDPR",
+        "applicable_regs": ["GDPR"],
+        "classification": {"role": "controller"},
+        "coverage_matrix_row": [
+            {"subdomain_id": "D-01.1", "article": "Art. 32(1)(b)",
+             "normative_strength": 2, "source_sr_ids": ["SR-GDPR-001"]},
+            {"subdomain_id": "D-04.3", "article": "Art. 33(1)",
+             "normative_strength": 2, "source_sr_ids": ["SR-GDPR-005"]},
+        ],
+    }
+    derived = _derive_synthesis_from_coverage_matrix(parsed)
+    assert derived is not None
+    assert derived["_derived_from_coverage_matrix"] is True
+    assert "GDPR" in derived["rationale"]
+    assert "2 article-level" in derived["rationale"]
+    assert len(derived["implications"]) == 2
+    assert {i["sub_domain_id"] for i in derived["implications"]} == {"D-01.1", "D-04.3"}
+    assert len(derived["gaps"]) == 1
+    assert derived["gaps"][0]["priority"] == "P2"
