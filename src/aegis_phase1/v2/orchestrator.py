@@ -1633,13 +1633,24 @@ class Phase1Orchestrator:
         CORR-118: if ``state["_use_agent_doc05"]`` is truthy, §3-§7 are
         written by the DrafterAgent+ReviewerAgent loop and the raws
         spill to ``05_llm_raw.md`` next to the document.
+
+        Note: the ``state`` passed by the LangGraph run-all graph
+        (``trace_graph._output``) is the Phase1GraphState which only
+        carries case_path/output_dir/stage_outputs — it does NOT have
+        ``aggregated_data`` or ``per_spec_markdown`` because those live
+        on the orchestrator instance. To feed the agent loop with
+        real facts we therefore use ``self.state`` (the orchestrator's
+        own state, populated by run_phase_1b / run_map), not ``state``.
         """
         from aegis_phase1.v2.output.doc_05 import render_doc_05
 
         config = dict(config or {})
         if state.get("_use_agent_doc05"):
             config["use_agent_doc05"] = True
-        return render_doc_05(state, output_dir, self.llm_invoker, config=config)
+        # Prefer self.state (orchestrator's rich state); fall back to
+        # the graph state only if absent (e.g. legacy callers).
+        rich_state = self.state if getattr(self, "state", None) else state
+        return render_doc_05(rich_state, output_dir, self.llm_invoker, config=config)
 
     def render_doc_06(
         self,
