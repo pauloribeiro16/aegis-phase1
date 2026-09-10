@@ -44,25 +44,26 @@ def hydrate_rationale_by_reg(state: dict[str, Any]) -> dict[str, dict[str, Any]]
         if synth is not None:
             recovered[reg] = synth
 
-    missing = [r for r in _applicable_regs(state) if r not in recovered]
-    if missing:
-        fenced = _synthesis_from_per_spec(state.get("per_spec_markdown") or {})
+    # Always run the per-spec recovery (cheap; skips if per_spec_markdown
+    # is empty) and the disk fallback (cheap; no-op when the dir is
+    # missing). The "missing regs" check above is what we used to do, but
+    # the run-all flow strips per_spec_markdown from the LangGraph state,
+    # so we always run both fallback paths and merge.
+    fenced = _synthesis_from_per_spec(state.get("per_spec_markdown") or {})
     if not fenced:
-        # CORR-118 S2.5: run-all flow strips per_spec_markdown from the
-        # graph state passed to the agent loop. Fall back to the
+        # CORR-118 S2.5: run-all flow strips per_spec_markdown from
+        # the graph state passed to the agent loop. Fall back to the
         # most-recent P1B-LLM-02 raw markdown on disk (written by the
         # invoker's _persist_raw_call).
         disk_raw = _read_latest_p1b02_from_disk()
         if disk_raw:
-            fenced = _synthesis_from_per_spec({"P1B-LLM-02-RATIONALE": disk_raw})
-    if not fenced:
-        # CORR-118 S2.5: run-all flow strips per_spec_markdown from the
-        # graph state passed to the agent loop. Fall back to the
-        # most-recent P1B-LLM-02 raw markdown on disk (written by the
-        # invoker's _persist_raw_call).
-        fenced = _synthesis_from_per_spec(
-            {"P1B-LLM-02-RATIONALE": _read_latest_p1b02_from_disk()}
-        )
+            fenced = _synthesis_from_per_spec(
+                {"P1B-LLM-02-RATIONALE": disk_raw}
+            )
+
+    for reg, synth in fenced.items():
+        if reg not in recovered:
+            recovered[reg] = synth
         for reg, synth in fenced.items():
             if reg in missing:
                 recovered[reg] = synth
