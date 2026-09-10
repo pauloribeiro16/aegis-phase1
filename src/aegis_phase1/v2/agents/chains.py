@@ -50,12 +50,44 @@ def _make_llm_callable(llm: Any) -> Runnable:
         return llm  # type: ignore[return-value]
 
     def _call(input_: Any) -> str:
-        system, user = "", str(input_)
+        # The previous RunnableLambda emits a dict { "_user_input": str }.
+        # ChatPromptTemplate then renders it to a ChatPromptValue
+        # (a wrapper over a list of BaseMessage objects — one
+        # SystemMessage + one HumanMessage in our case). We need to
+        # extract the (system, user) pair from any of these shapes
+        # and pass the formatted text to the invoker.
+        if isinstance(input_, dict) and "_user_input" in input_:
+            user = str(input_["_user_input"])
+            system = ""
+        elif hasattr(input_, "to_messages"):
+            # LangChain ChatPromptValue has a to_messages() helper.
+            messages = list(input_.to_messages())
+            contents = [getattr(m, "content", "") for m in messages]
+            if len(contents) == 2:
+                system, user = contents
+            else:
+                system, user = "", "\n\n".join(contents)
+        elif isinstance(input_, list | tuple) and len(input_) == 2 and all(
+            isinstance(x, str) for x in input_
+        ):
+            system, user = input_
+        elif isinstance(input_, list) and all(
+            getattr(m, "content", None) is not None for m in input_
+        ):
+            contents = [getattr(m, "content", "") for m in input_]
+            if len(contents) == 2:
+                system, user = contents
+            else:
+                system, user = "", "\n\n".join(contents)
+        elif isinstance(input_, str):
+            system, user = "", input_
+        else:
+            system, user = "", str(input_)
+
         if hasattr(llm, "invoke"):
             try:
                 result = llm.invoke(system, user)
             except TypeError:
-                # MockInvoker / UnifiedInvoker shape
                 full = system + "\n\n" + user
                 result = llm.invoke(full)
         elif callable(llm):
