@@ -52,6 +52,14 @@ def hydrate_rationale_by_reg(state: dict[str, Any]) -> dict[str, dict[str, Any]]
         # graph state passed to the agent loop. Fall back to the
         # most-recent P1B-LLM-02 raw markdown on disk (written by the
         # invoker's _persist_raw_call).
+        disk_raw = _read_latest_p1b02_from_disk()
+        if disk_raw:
+            fenced = _synthesis_from_per_spec({"P1B-LLM-02-RATIONALE": disk_raw})
+    if not fenced:
+        # CORR-118 S2.5: run-all flow strips per_spec_markdown from the
+        # graph state passed to the agent loop. Fall back to the
+        # most-recent P1B-LLM-02 raw markdown on disk (written by the
+        # invoker's _persist_raw_call).
         fenced = _synthesis_from_per_spec(
             {"P1B-LLM-02-RATIONALE": _read_latest_p1b02_from_disk()}
         )
