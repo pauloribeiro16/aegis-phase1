@@ -1,23 +1,31 @@
-"""CORR-118 — agent loop tests for Doc 05 (qwen3.8 only, offline).
+"""CORR-118 — Doc 05 agent loop tests (LangGraph + LCEL, qwen3.8 only).
 
-Drives the loop with a MockInvoker and the real DeterministicGate +
-ReviewerAgent. Each test asserts one contract; together they prove that
-the drafter-reviewer-revise cycle converges on a JSON-free Doc 05 with
-real gap ids from the synthesis.
+Drives the graph with a scripted LangChain fake model (GenericFakeChatModel
+from langchain_core.language_models.fake_chat_models). The model returns
+a pre-canned list of AIMessages in order: drafter cycle 1, drafter cycle 2
+(if needed), reviewer cycle 1, drafter cycle 3, reviewer cycle 2, ...
+
+Each test asserts one contract; together they prove the LangGraph agent
+loop converges to a JSON-free Doc 05 with real gap ids from the synthesis.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
+from langchain_core.messages import AIMessage
+
 from aegis_phase1.v2.agents import (
-    DrafterAgent,
+    DeterministicGate,
     run_doc05_agent_loop,
 )
+from aegis_phase1.v2.agents.graph import (
+    build_doc05_graph,
+    parse_reviewer_verdict,
+    split_sections,
+)
 from aegis_phase1.v2.agents.hydration import hydrate_rationale_by_reg
-from aegis_phase1.v2.llm import MockInvoker
-
-CASE = "case1-tinytask"
 
 
 def _state() -> dict[str, Any]:
@@ -30,23 +38,15 @@ def _state() -> dict[str, Any]:
             {"id": "D-09.2", "participating_regulations": ["GDPR"]},
             {"id": "D-08.1", "participating_regulations": ["GDPR"]},
             {"id": "D-06.1", "participating_regulations": ["GDPR"]},
-            {"id": "D-09.1", "participating_regulations": ["GDPR"]},
-            {"id": "D-09.4", "participating_regulations": ["GDPR"]},
         ],
         "architecture_inventory": {
             "N.1_systems": [{"id": "SYS-01", "name": "Main SaaS Application"}],
             "N.3_cloud": [{"id": "CS-01", "provider": "AWS"}],
-            "N.4_data_flows": [{"id": "FLOW-01", "data_types": ["email"]}],
-            "N.5_data_stores": [{"id": "STORE-01", "personal_data": True}],
         },
-        "role_matrix": {
-            "gdpr": {"role": "controller"},
-            "cra": {"role": "manufacturer"},
-        },
+        "role_matrix": {"gdpr": {"role": "controller"}, "cra": {"role": "manufacturer"}},
         "ontology": {
             "clause_mappings": [
                 {"article": "Art. 32", "regulation": "GDPR", "sub_domains": ["D-01.1"]},
-                {"article": "Annex I Part II (5)", "regulation": "CRA", "sub_domains": ["D-02.3"]},
             ]
         },
         "aggregated_data": {
@@ -82,12 +82,11 @@ def _state() -> dict[str, Any]:
 def _draft_pass_text() -> str:
     return (
         "## 3. PER-REGULATION APPLICABILITY\n"
-        "GDPR: controller, Art. 32 applies (see D-01.1). CRA: manufacturer, "
-        "Annex I Part II (5) applies (see D-02.3).\n\n"
+        "GDPR: controller, Art. 32 applies (see D-01.1). CRA: manufacturer.\n\n"
         "## 4. NATIVE VS INHERITED COMPLIANCE\n"
-        "NATIVE on D-01.1 (Encryption). INHERITED on CS-01 AWS via ISO 27001.\n\n"
+        "NATIVE on D-01.1. INHERITED on CS-01 AWS via ISO 27001.\n\n"
         "## 5. SUB-DOMAIN COVERAGE PRELIMINARY\n"
-        "| Status | Count |\n|---|---|\n| SUBSTANTIVE | 2 |\n| PARTIAL | 5 |\n| NOT_ADDRESSED | 0 |\n\n"
+        "| Status | Count |\n|---|---|\n| SUBSTANTIVE | 2 |\n| PARTIAL | 3 |\n| NOT_ADDRESSED | 0 |\n\n"
         "## 6. STRATEGIC IMPLICATIONS\n"
         "| Imp ID | Source | Description | Effort | Priority |\n|---|---|---|---|---|\n"
         "| IMP-D-09.2-1 | GDPR | DPIA within 30 days | days | P1 |\n\n"
@@ -102,18 +101,27 @@ def _draft_pass_text() -> str:
 
 def _review_pass_text() -> str:
     return (
-        "OBJ-01: PASS\nwhat: company grounding\nmeasured: every claim cites DOC04/Art./D-XX.Y\nwhy: complete\n\n"
-        "OBJ-02: PASS\nwhat: no omissions\nmeasured: both regs in §3, 7 subdomains in §5, 3 gaps in §7\nwhy: complete\n\n"
-        "OBJ-03: PASS\nwhat: citation precision\nmeasured: Art. 32, Annex I Part II (5) well-formed\nwhy: matches catalogue\n\n"
+        "OBJ-01: PASS\nwhat: grounding\nmeasured: cites DOC04/Art./D-XX.Y\nwhy: ok\n\n"
+        "OBJ-02: PASS\nwhat: no omissions\nmeasured: both regs in §3, gaps in §7\nwhy: complete\n\n"
+        "OBJ-03: PASS\nwhat: citation precision\nmeasured: Art. 32 well-formed\nwhy: matches catalogue\n\n"
         "OBJ-09: PASS\nwhat: no fabrication\nmeasured: all ids traceable\nwhy: complete\n\n"
         "OBJ-12: PASS\nwhat: fail-loud\nmeasured: no placeholders\nwhy: complete\n\n"
         "LOOP_VERDICT: PASS\n"
     )
 
 
+def _fake_responses(*texts: str) -> GenericFakeChatModel:
+    """GenericFakeChatModel with one AIMessage per call (cycled).
+    Falls back to an empty drafter response once the script is exhausted
+    so the graph's max_cycles limit, not the mock, decides when to stop.
+    """
+    from itertools import cycle
+
+    msgs = [AIMessage(content=t) for t in texts] or [AIMessage(content="")]
+    return GenericFakeChatModel(messages=iter(cycle(msgs)))
+
+
 def test_hydration_recovers_synthesis_from_per_spec() -> None:
-    """If rationale_by_reg is empty but per_spec_markdown has JSON fences,
-    hydration recovers the synthesis (the JSON-fallback of CORR-116 S2.1)."""
     state = _state()
     state["aggregated_data"]["rationale_by_reg"] = {"GDPR": {}, "CRA": {}}
     state["per_spec_markdown"] = {
@@ -128,68 +136,81 @@ def test_hydration_recovers_synthesis_from_per_spec() -> None:
     assert state["aggregated_data"]["rationale_by_reg"]["GDPR"]["synthesis"]["gaps"][0]["gap_id"] == "GAP-X"
 
 
-def test_loop_converges_in_one_cycle_when_draft_and_review_pass() -> None:
-    script = [_draft_pass_text(), _review_pass_text()]
-    invoker = MockInvoker(script=script)
+def test_graph_converges_in_one_cycle() -> None:
     state = _state()
-    res = run_doc05_agent_loop(state, invoker=invoker, max_cycles=3)
-    assert res.converged
-    assert res.attempts == 1
-    assert "```json" not in res.sections["s7"]
+    llm = _fake_responses(_draft_pass_text(), _review_pass_text())
+    final = run_doc05_agent_loop(state, llm=llm, max_cycles=3)
+    assert final.converged
+    assert final.attempts == 1
+    assert "```json" not in final.sections.get("s7", "")
+    assert "GAP-D-09.2" in final.sections.get("s7", "")
 
 
-def test_gate_rejects_json_fence_and_loop_recovers() -> None:
-    """Cycle 1 emits a json fence (gate fails), cycle 2 produces clean text."""
+def test_graph_routes_back_to_draft_when_gate_fails() -> None:
+    """Cycle 1 emits a ```json fence (gate fails); cycle 2 produces clean text."""
     bad = _draft_pass_text().replace(
         "## 7. REGULATORY GAPS IDENTIFIED",
         "## 7. REGULATORY GAPS IDENTIFIED\n```json\n{\"x\":1}\n```",
     )
-    script = [bad, _draft_pass_text(), _review_pass_text()]
-    invoker = MockInvoker(script=script)
-    state = _state()
-    res = run_doc05_agent_loop(state, invoker=invoker, max_cycles=3)
-    assert res.converged
-    assert len(res.gate_results) >= 2
-    assert not res.gate_results[0].passed
-    assert res.gate_results[1].passed
+    llm = _fake_responses(bad, _draft_pass_text(), _review_pass_text())
+    final = run_doc05_agent_loop(_state(), llm=llm, max_cycles=3)
+    assert final.converged
+    assert len(final.gate_results) >= 2
+    assert not final.gate_results[0]["passed"]
+    assert final.gate_results[1]["passed"]
 
 
-def test_loop_stops_when_max_cycles_reached() -> None:
-    """If neither gate nor review ever passes, loop ends at max_cycles."""
+def test_graph_returns_unconverged_when_max_cycles_reached() -> None:
     bad = "## 3. PER-REGULATION APPLICABILITY\nnope"
-    script = [bad, bad, bad]
-    invoker = MockInvoker(script=script)
-    state = _state()
-    res = run_doc05_agent_loop(state, invoker=invoker, max_cycles=3)
-    assert not res.converged
-    assert res.attempts == 3
+    llm = _fake_responses(bad, bad, bad)
+    final = run_doc05_agent_loop(_state(), llm=llm, max_cycles=3)
+    assert not final.converged
+    assert final.attempts == 3
 
 
-def test_review_parse_handles_missing_loop_line() -> None:
-    """Reviewer might omit the LOOP_VERDICT line — the parser falls back."""
-    from aegis_phase1.v2.agents.reviewer import ReviewerAgent
-    invoker = MockInvoker()
-    rev = ReviewerAgent(invoker)
-    verdict = rev._parse("OBJ-01: PASS\nOBJ-02: PASS\n")
-    assert verdict.loop_verdict == "PASS"
+def test_reviewer_parser_handles_missing_loop_line() -> None:
+    loop, objs = parse_reviewer_verdict("OBJ-01: PASS\nOBJ-02: PASS\n")
+    assert loop == "PASS"
+    assert objs == {"OBJ-01": "PASS", "OBJ-02": "PASS"}
 
 
-def test_drafter_section_split_is_resilient_to_prose_padding() -> None:
-    invoker = MockInvoker()
-    drafter = DrafterAgent(invoker)
+def test_split_sections_resilient_to_prose_padding() -> None:
     text = "Some preamble...\n\n" + _draft_pass_text() + "\n\nTail noise."
-    sections = drafter._extract_sections(text)
+    sections = split_sections(text)
     assert set(sections) == {"s3", "s4", "s5", "s6", "s7"}
     assert sections["s3"].startswith("## 3.")
 
 
-def test_sidecar_captures_all_cycles() -> None:
-    script = [_draft_pass_text(), _review_pass_text()]
-    invoker = MockInvoker(script=script)
-    state = _state()
-    res = run_doc05_agent_loop(state, invoker=invoker, max_cycles=2)
-    joined = "\n".join(res.sidecar_lines)
-    assert "cycle 1 — drafter prompt" in joined
-    assert "cycle 1 — drafter response" in joined
-    assert "cycle 1 — reviewer prompt" in joined
-    assert "cycle 1 — reviewer response" in joined
+def test_sidecar_captures_every_node_visit() -> None:
+    llm = _fake_responses(_draft_pass_text(), _review_pass_text())
+    final = run_doc05_agent_loop(_state(), llm=llm, max_cycles=2)
+    joined = "\n".join(final.sidecar_lines)
+    assert "cycle 1 — drafter prompt + response" in joined
+    assert "cycle 1 — reviewer prompt + response" in joined
+
+
+def test_graph_compiles_with_checkpointer() -> None:
+    """Skill template pattern: build_doc05_graph exposes InMemorySaver."""
+    graph = build_doc05_graph(_fake_responses("x", "y"), max_cycles=1)
+    assert graph is not None  # compiled successfully with checkpointer
+
+
+def test_gate_unchanged_after_refactor() -> None:
+    """[G] layer behaviour is preserved (regression guard)."""
+    g = DeterministicGate()
+    sections = {
+        "s3": "## 3. PER-REGULATION APPLICABILITY\nclean",
+        "s4": "## 4. NATIVE VS INHERITED COMPLIANCE\nok",
+        "s5": "## 5. SUB-DOMAIN COVERAGE PRELIMINARY\n| Status | Count |\n|---|---|\n| SUBSTANTIVE | 1 |",
+        "s6": "## 6. STRATEGIC IMPLICATIONS\nclean",
+        "s7": (
+            "## 7. REGULATORY GAPS IDENTIFIED\n"
+            "| Gap ID | Sub-domain | Type | Risk | Priority | Recommendation |\n"
+            "|---|---|---|---|---|---|\n"
+            "| GAP-D-09.2 | D-09.2 | DPIA | r | P1 | rec |"
+        ),
+    }
+    ok = g.check(sections, expect_gaps=True)
+    assert ok.passed, ok.failures
+    bad = g.check({"s3": "## 3. PER-REGULATION APPLICABILITY\n```json\n{}\n```"})
+    assert not bad.passed

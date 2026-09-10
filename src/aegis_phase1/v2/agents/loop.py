@@ -1,14 +1,14 @@
-"""Loop + facts builder — CORR-118 agent loop for Doc 05.
+"""CORR-118 — agent loop entry points.
 
-Wire-up:
+The actual loop lives in :mod:`aegis_phase1.v2.agents.graph` (LangGraph
+Evaluator-Optimizer, per ~/.zcode/skills/langgraph/references/patterns.md
+§4). This module keeps the public surface stable:
 
-  build_doc05_facts(state)
-    → compact facts dict the drafter consumes (no raw LLM payloads)
-
-  run_doc05_agent_loop(state, *, invoker, max_cycles=3)
-    → returns {sections, sidecar, attempts, gate_results, review_results}
-    → writes a sidecar string with raw LLM responses per cycle for the
-      ``05_llm_raw.md`` file the renderer will write next to the doc.
+  build_doc05_facts(state) — compact facts the drafter/reviewer consume
+  run_doc05_agent_loop(state, llm=..., max_cycles=N) — returns a dict
+    with ``sections``, ``sidecar_lines``, ``gate_history``, ``review_history``
+    so the renderer can write Doc 05 + the sidecar without knowing the
+    graph internals.
 """
 
 from __future__ import annotations
@@ -18,206 +18,89 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from aegis_phase1.v2.agents.drafter import DrafterAgent
-from aegis_phase1.v2.agents.gate import DeterministicGate, GateResult
 from aegis_phase1.v2.agents.hydration import hydrate_rationale_by_reg
-from aegis_phase1.v2.agents.reviewer import ReviewerAgent, ReviewVerdict
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Doc05AgentResult:
+    """Stable view of the agent loop outcome for the renderer."""
+
     sections: dict[str, str]
     sidecar_lines: list[str]
     attempts: int
-    gate_results: list[GateResult] = field(default_factory=list)
-    review_results: list[ReviewVerdict] = field(default_factory=list)
+    gate_results: list[dict[str, Any]] = field(default_factory=list)
+    review_results: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def converged(self) -> bool:
-        return bool(self.review_results) and self.review_results[-1].loop_verdict == "PASS"
+        if not self.review_results:
+            return False
+        last = self.review_results[-1]
+        verdict = getattr(last, "loop_verdict", None)
+        if verdict is None and isinstance(last, dict):
+            verdict = last.get("loop_verdict")
+        return verdict == "PASS"
 
 
 def build_doc05_facts(state: dict[str, Any]) -> dict[str, Any]:
-    """Compact facts payload the DrafterAgent sees (closed anchors only)."""
+    """Compact facts payload the Drafter and Reviewer consume."""
     hydrate_rationale_by_reg(state)
-
-    profile = _company_profile(state)
-    subdomains = _subdomain_catalogue(state)
-    clause_map = _clause_map(state)
-    synthesis = _synthesis(state)
-
     return {
         "applicable_regs": list(state.get("v2_applicable_regs") or state.get("regulations") or []),
-        "company_profile": profile,
-        "subdomain_catalogue": subdomains,
-        "clause_map": clause_map,
-        "synthesis": synthesis,
+        "company_profile": _company_profile(state),
+        "subdomain_catalogue": _subdomain_catalogue(state),
+        "clause_map": _clause_map(state),
+        "synthesis": _synthesis(state),
     }
 
 
 def run_doc05_agent_loop(
     state: dict[str, Any],
     *,
-    invoker: Any,
+    llm: Any,
     max_cycles: int = 3,
 ) -> Doc05AgentResult:
-    """Drafter → Gate → Reviewer loop, ≤ max_cycles.
+    """Run the LangGraph agent loop; returns a renderer-friendly result."""
+    from aegis_phase1.v2.agents.graph import run_doc05_agent_loop as _graph_run
 
-    The same LLM serves Drafter and Reviewer with different prompts; the
-    loop accumulates every raw prompt/response in ``sidecar_lines`` for the
-    ``05_llm_raw.md`` sidecar file.
+    final_state = _graph_run(state, llm=llm, max_cycles=max_cycles)
+    return _to_result(final_state, max_cycles=max_cycles)
+
+
+def _to_result(final_state: dict[str, Any], *, max_cycles: int) -> Doc05AgentResult:
+    """Wrap LangGraph state into the renderer-friendly Doc05AgentResult.
+
+    review_history entries are dicts (``{loop_verdict, objectives, raw}``)
+    coming straight from the graph; for the renderer we also expose a
+    small :class:`ReviewVerdict`-compatible namespace so the existing
+    doc_05 wiring can read ``review_results[-1].loop_verdict``.
     """
-    facts = build_doc05_facts(state)
-    drafter = DrafterAgent(invoker)
-    reviewer = ReviewerAgent(invoker)
-    gate = DeterministicGate()
-    invoker = _wrap_for_agent(invoker)
+    from types import SimpleNamespace
 
-    feedback = ""
-    sections: dict[str, str] = {}
-    sidecar_lines: list[str] = ["# Doc 05 agent loop — raw prompts and responses"]
-    gate_results: list[GateResult] = []
-    review_results: list[ReviewVerdict] = []
-
-    for cycle in range(1, max_cycles + 1):
-        system, user = drafter.build_prompt(facts)
-        if feedback:
-            user = (
-                f"{user}\n\n# REVISION REQUEST (cycle {cycle} feedback)\n\n{feedback}"
+    review_results: list[Any] = []
+    for entry in final_state.get("review_history") or []:
+        if isinstance(entry, dict):
+            review_results.append(
+                SimpleNamespace(
+                    loop_verdict=entry.get("loop_verdict") or "",
+                    objectives=entry.get("objectives") or {},
+                    raw=entry.get("raw") or "",
+                )
             )
-        full_prompt = system + "\n\n" + user
-        sidecar_lines.append(f"\n## cycle {cycle} — drafter prompt\n\n```\n{full_prompt[:4000]}\n```")
-
-        draft_raw = _invoke_raw(invoker, system, user)
-        sidecar_lines.append(f"\n## cycle {cycle} — drafter response\n\n```\n{draft_raw[:4000]}\n```")
-        sections = drafter._extract_sections(draft_raw)
-
-        gate_res = gate.check(sections, expect_gaps=bool(facts.get("synthesis")))
-        gate_results.append(gate_res)
-        if not gate_res.passed:
-            feedback = gate_res.feedback()
-            logger.info("doc05 cycle %d failed gate: %s", cycle, gate_res.failures[:2])
-            continue
-
-        # Gate passed — call the reviewer
-        rev_system, rev_user = _reviewer_messages(reviewer, facts, sections)
-        rev_prompt = rev_system + "\n\n" + rev_user
-        sidecar_lines.append(f"\n## cycle {cycle} — reviewer prompt\n\n```\n{rev_prompt[:4000]}\n```")
-        rev_raw = _invoke_raw(invoker, rev_system, rev_user)
-        sidecar_lines.append(f"\n## cycle {cycle} — reviewer response\n\n```\n{rev_raw[:4000]}\n```")
-        verdict = reviewer._parse(rev_raw)
-        review_results.append(verdict)
-        if verdict.loop_verdict == "PASS":
-            logger.info("doc05 PASS after %d cycle(s)", cycle)
-            break
-
-        feedback = verdict.feedback or verdict.raw
-        logger.info("doc05 cycle %d review REVISE: %s", cycle, verdict.objectives)
-
+        else:
+            review_results.append(entry)
     return Doc05AgentResult(
-        sections=sections,
-        sidecar_lines=sidecar_lines,
-        attempts=len(gate_results),
-        gate_results=gate_results,
+        sections=dict(final_state.get("sections") or {}),
+        sidecar_lines=list(final_state.get("sidecar_lines") or []),
+        attempts=int(final_state.get("cycle_count") or 0),
+        gate_results=list(final_state.get("gate_history") or []),
         review_results=review_results,
     )
 
 
-# ── helpers ────────────────────────────────────────────────────────────
-
-
-def _invoke_raw(invoker: Any, system: str, user: str) -> str:
-    """Invoke and return raw text. Accepts UnifiedInvoker, a callable, or an
-    agent-style ``invoke(system, user) -> dict`` that we wrap on the fly."""
-    full_prompt = system + "\n\n" + user
-
-    # Fast path: any callable that takes (system, user) — used by the loop
-    # to wrap a MockInvoker without forcing tests to know the MockInvoker's
-    # exact signature.
-    if callable(invoker) and not hasattr(invoker, "_invoke_raw"):
-        result = invoker(system, user)
-    elif hasattr(invoker, "invoke"):
-        try:
-            # Prefer the agent-style (system, user) signature; fall back to
-            # the MockInvoker's (prompt, feedback=None) if needed.
-            result = invoker.invoke(system, user)
-        except TypeError:
-            try:
-                result = invoker.invoke(full_prompt, "")
-            except TypeError:
-                result = invoker.invoke(full_prompt)
-    else:
-        raise TypeError(f"invoker does not support invoke: {type(invoker).__name__}")
-
-    if isinstance(result, str):
-        return result
-    if isinstance(result, dict):
-        raw = result.get("raw")
-        if isinstance(raw, str) and raw:
-            return raw
-        return result.get("content") or ""
-    return str(result)
-
-
-class _StringScriptInvoker:
-    """Wrap a list of strings as an agent-style invoker for tests.
-
-    MockInvoker from v2/llm.py expects each script entry to be a dict-like
-    iterable; tests want to pass plain strings (one draft per call). This
-    adapter exposes ``invoke(system, user) -> {"raw": next_script}``.
-    """
-
-    def __init__(self, scripts: list[str]) -> None:
-        self._scripts = list(scripts)
-        self.call_count = 0
-
-    def invoke(self, system: str, user: str) -> dict[str, str]:
-        if self.call_count < len(self._scripts):
-            text = self._scripts[self.call_count]
-            self.call_count += 1
-        else:
-            text = ""
-        return {"raw": text, "status": "OK"}
-
-    def __call__(self, system: str, user: str) -> dict[str, str]:
-        return self.invoke(system, user)
-
-
-def _wrap_for_agent(invoker: Any) -> Any:
-    """Wrap a v2 MockInvoker (script of dicts) so the agent loop sees a
-    callable ``(system, user) -> dict`` with plain strings."""
-    if callable(invoker) and not hasattr(invoker, "_script_entries"):
-        return invoker
-    script = getattr(invoker, "script", None)
-    if script is None:
-        return invoker
-    texts = [entry if isinstance(entry, str) else (entry.get("raw") or "") for entry in script]
-    return _StringScriptInvoker(texts)
-
-
-def _reviewer_messages(reviewer: ReviewerAgent, facts: dict[str, Any], sections: dict[str, str]) -> tuple[str, str]:
-    system = reviewer.__class__.__dict__["_SYSTEM"] if False else (  # placeholder
-        "You are the REVIEWER agent for AEGIS Doc 05 (per OBJECTIVES_CONTRACT)."
-    )
-    user = (
-        f"# FACTS\n\napplicable_regs: {facts.get('applicable_regs')}\n"
-        f"synthesis gap ids: {_gap_ids(facts.get('synthesis') or {})}\n\n"
-        "# DRAFT\n\n" + "\n\n".join(sections.values()) + "\n\nProduce the verdict blocks."
-    )
-    return system, user
-
-
-def _gap_ids(synthesis: dict[str, Any]) -> list[str]:
-    ids: list[str] = []
-    for reg_synth in synthesis.values():
-        if not isinstance(reg_synth, dict):
-            continue
-        for gap in reg_synth.get("gaps") or []:
-            if isinstance(gap, dict) and gap.get("gap_id"):
-                ids.append(str(gap["gap_id"]))
-    return sorted(set(ids))
+# ── Facts builders (kept from the F1 module) ────────────────────────────
 
 
 def _company_profile(state: dict[str, Any]) -> str:
@@ -233,7 +116,6 @@ def _company_profile(state: dict[str, Any]) -> str:
 
 
 def _subdomain_catalogue(state: dict[str, Any]) -> str:
-    """Pull a compact row per sub-domain from v2_subdomains."""
     rows: list[dict[str, Any]] = []
     for sub in state.get("v2_subdomains") or []:
         sd_id = getattr(sub, "id", None) or sub.get("id")
@@ -243,7 +125,6 @@ def _subdomain_catalogue(state: dict[str, Any]) -> str:
 
 
 def _clause_map(state: dict[str, Any]) -> str:
-    """Compact clause→sub-domain map from the preproc ontology."""
     mapping = state.get("ontology", {}).get("clause_mappings") or []
     rows: list[dict[str, Any]] = []
     for entry in mapping:
@@ -259,5 +140,4 @@ def _clause_map(state: dict[str, Any]) -> str:
 
 
 def _synthesis(state: dict[str, Any]) -> dict[str, Any]:
-    """{regulation: synthesis_dict} after hydration."""
     return hydrate_rationale_by_reg(state)

@@ -138,7 +138,7 @@ def render_doc_05(
         from aegis_phase1.v2.agents.loop import run_doc05_agent_loop
 
         try:
-            agent_res = run_doc05_agent_loop(state, invoker=invoker)
+            agent_res = run_doc05_agent_loop(state, llm=invoker)
             _write_agent_sidecar(output_dir, agent_res)
             parts.extend(_render_agent_sections(agent_res))
         except Exception as exc:  # pragma: no cover — defensive
