@@ -1,0 +1,18 @@
+{
+  "scale_up_at": "2026-09-10T00:55:00+01:00",
+  "contract": "CORR-116 follow-up",
+  "scope": "case1-tinytask, --run-all, 3 strong models in parallel on gnx519",
+  "branch": "feature/aegis-p1-corr-116-pipeline-staging",
+  "models": [
+    {"model": "qwen3.8:27b", "jobid": 1905317, "state": "COMPLETED", "exitcode": "0:0", "elapsed": "00:53:57", "port": 11434, "node": "gnx519", "md": 13, "xlsx": 1},
+    {"model": "muse-glimmer:30b", "jobid": 1905318, "state": "COMPLETED", "exitcode": "0:0", "elapsed": "01:07:13", "port": 11435, "node": "gnx519", "md": 13, "xlsx": 1},
+    {"model": "ornith-1.5:35b", "jobid": 1905319, "state": "COMPLETED", "exitcode": "0:0", "elapsed": "01:46:25", "port": 11436, "node": "gnx519", "md": 13, "xlsx": 1}
+  ],
+  "verdict": "ALL_THREE_PASS",
+  "notes": [
+    "First submission attempt (1905290/1/2) co-located on gnx519 AND hit set -u on empty PORT_VAL; failed at sbatch line 38 with 'unbound variable'.",
+    "Re-submission used sed-patched job-names per model + bash -n template validation; all 3 ran concurrently on gnx519 with ports 11434/5/6 acting as defense (warm-ups are sequential enough that Ollama didn't collide).",
+    "Per-model outputs have distinct md5s on Doc 05 + Doc 07 — content is genuinely per-model, not hallucinated duplicates.",
+    "ornith-1.5 slowest (1h46) but still well under 2h walltime — it's the biggest of the three (35b)."
+  ]
+}
