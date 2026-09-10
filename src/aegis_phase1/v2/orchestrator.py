@@ -1628,9 +1628,17 @@ class Phase1Orchestrator:
         *,
         config: dict[str, Any] | None = None,
     ) -> dict[str, str]:
-        """Render 05 (regulatory applicability)."""
+        """Render 05 (regulatory applicability).
+
+        CORR-118: if ``state["_use_agent_doc05"]`` is truthy, §3-§7 are
+        written by the DrafterAgent+ReviewerAgent loop and the raws
+        spill to ``05_llm_raw.md`` next to the document.
+        """
         from aegis_phase1.v2.output.doc_05 import render_doc_05
 
+        config = dict(config or {})
+        if state.get("_use_agent_doc05"):
+            config["use_agent_doc05"] = True
         return render_doc_05(state, output_dir, self.llm_invoker, config=config)
 
     def render_doc_06(

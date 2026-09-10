@@ -62,10 +62,10 @@ def _sanitize_model_tag(model: str) -> str:
 
 
 def main() -> None:
+    from aegis_phase1.utils.logging import setup_logging
     from aegis_phase1.v2.domain.processor import MapPartialFailure
     from aegis_phase1.v2.llm import build_llm_invoker
     from aegis_phase1.v2.orchestrator import Phase1Orchestrator
-    from aegis_phase1.utils.logging import setup_logging
 
     parser = argparse.ArgumentParser(description="AEGIS Phase 1 v2 Pipeline")
     parser.add_argument(
@@ -234,6 +234,13 @@ def main() -> None:
         "--mock-llm",
         action="store_true",
         help="Use MockInvoker (equivalent to MOCK_LLM=true)",
+    )
+    parser.add_argument(
+        "--use-agent-doc05",
+        action="store_true",
+        help="CORR-118 pilot: render Doc 05 §3-§7 via the DrafterAgent "
+             "(qwen3.8) + ReviewerAgent agent loop, deterministic Gate, and "
+             "sidecar 05_llm_raw.md. Other docs unchanged.",
     )
     parser.add_argument(
         "--model",
@@ -493,7 +500,11 @@ def main() -> None:
             "Non-interactive mode — applicability only (CORR-038; no LLM)"
         )
         paths = cmd_run_applicability(
-            orch=orch, case_path=case_path, prep_path=prep_path, output_path=output_path
+            orch=orch,
+            case_path=case_path,
+            prep_path=prep_path,
+            output_path=output_path,
+            use_agent_doc05=args.use_agent_doc05,
         )
         logger.info("=== APPLICABILITY DOCS COMPLETE ===")
         for label, p in paths.items():
@@ -568,12 +579,18 @@ def cmd_run_applicability(
     case_path: str,
     prep_path: str,
     output_path: str,
+    use_agent_doc05: bool = False,
 ) -> dict[str, str]:
     """CORR-038-T4: render only Doc 04 + Doc 05 from the ApplicabilityContext.
 
     Skips MAP / REDUCE / Phase 1B entirely. No LLM is invoked. Builds
     the v2 state via ``orch.load()`` (which runs the v2 loaders + v1-compat
     shim), then renders Doc 04 (composite) and Doc 05.
+
+    CORR-118: ``use_agent_doc05=True`` is a no-op here (no LLM path), but
+    the flag is forwarded to ``render_doc_05`` via orch.state for callers
+    that route through the orchestrator's renderer instead of the
+    direct import.
 
     Returns:
         Mapping ``AEGIS-P1-04`` / ``AEGIS-P1-04b`` / ``AEGIS-P1-04c`` /
@@ -584,6 +601,8 @@ def cmd_run_applicability(
 
     # Load v2 state (no LLM calls; no MAP / REDUCE).
     orch.load(case_path, prep_path)
+    if use_agent_doc05:
+        orch.state["_use_agent_doc05"] = True
 
     # Build output dir.
     out_dir = Path(output_path)
@@ -593,7 +612,14 @@ def cmd_run_applicability(
     # Doc 04 (composite: 04 + 04b + 04c + 04d).
     paths.update(render_doc_04(orch.state, str(out_dir), llm_invoker=None))
     # Doc 05 (per-regulation applicability).
-    paths.update(render_doc_05(orch.state, str(out_dir), llm_invoker=None))
+    paths.update(
+        render_doc_05(
+            orch.state,
+            str(out_dir),
+            llm_invoker=None,
+            config={"use_agent_doc05": bool(use_agent_doc05)},
+        )
+    )
 
     # Surface in orch state for downstream consumers.
     orch.state["output_paths"] = dict(orch.state.get("output_paths", {}), **paths)
@@ -706,9 +732,9 @@ def cmd_run_map(
         Mapping ``AEGIS-P1-07`` -> absolute file path +
         ``AEGIS-P1-07b`` -> absolute file path.
     """
+    from aegis_phase1.v2.domain.processor import MapPartialFailure
     from aegis_phase1.v2.output.doc_07 import render_doc_07
     from aegis_phase1.v2.output.doc_07b import render_doc_07b
-    from aegis_phase1.v2.domain.processor import MapPartialFailure
 
     orch.load(case_path, prep_path)
     out_dir = Path(output_path)
@@ -860,7 +886,7 @@ def cmd_run_all_traced(
             # CORR-048: ONLY phase + case tags. Subphase-specific tags
             # (stage:map, domain:D-XX, regulation:GDPR) are added by
             # each node internally in graph.py.
-            tags=[f"phase:phase1", f"case:{case_name}"],
+            tags=["phase:phase1", f"case:{case_name}"],
             # CORR-048: structured metadata. run_id is the same UUID
             # written to corr048_langfuse_trace_id.txt so the trace
             # can be matched to the log file.

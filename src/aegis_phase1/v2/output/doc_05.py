@@ -111,6 +111,8 @@ def render_doc_05(
 
     use_llm = _should_use_llm(llm_invoker)
     invoker = llm_invoker if use_llm else None
+    config = config or {}
+    use_agent = bool(config.get("use_agent_doc05", False)) and invoker is not None
 
     parts: list[str] = []
     parts.append(doc_preamble(state))
@@ -126,12 +128,35 @@ def render_doc_05(
 
     parts.extend(_section_1_purpose())
     parts.extend(_section_2_summary(regs, app_ctx=app_ctx))
-    parts.extend(_section_3_per_regulation(regs, assessment_by_reg, ontology))
-    parts.extend(_section_4_native_vs_inherited(regs, cloud_services, inventory_systems))
-    parts.extend(_section_5_subdomain_coverage_preliminary(subdomains, regs))
-    parts.extend(_section_6_strategic_implications(state, regs, invoker, config=config))
-    parts.append(_render_rationale_by_reg_section(state))
-    parts.extend(_section_7_regulatory_gaps(ontology, subdomains))
+
+    # CORR-118: when the agent loop is enabled, §3-§7 are written by the
+    # DrafterAgent (qwen3.8), reviewed against the OBJECTIVES_CONTRACT,
+    # and rendered as clean markdown. The deterministic sections above
+    # (§0/§1/§2) and below (§8/§9) remain untouched. Raws are written
+    # to 05_llm_raw.md (the per-spec markdown appendix is suppressed).
+    if use_agent:
+        from aegis_phase1.v2.agents.loop import run_doc05_agent_loop
+
+        try:
+            agent_res = run_doc05_agent_loop(state, invoker=invoker)
+            _write_agent_sidecar(output_dir, agent_res)
+            parts.extend(_render_agent_sections(agent_res))
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning("doc05 agent loop failed (%s); falling back", exc)
+            parts.extend(_section_3_per_regulation(regs, assessment_by_reg, ontology))
+            parts.extend(_section_4_native_vs_inherited(regs, cloud_services, inventory_systems))
+            parts.extend(_section_5_subdomain_coverage_preliminary(subdomains, regs))
+            parts.extend(_section_6_strategic_implications(state, regs, invoker, config=config))
+            parts.append(_render_rationale_by_reg_section(state))
+            parts.extend(_section_7_regulatory_gaps(ontology, subdomains))
+    else:
+        parts.extend(_section_3_per_regulation(regs, assessment_by_reg, ontology))
+        parts.extend(_section_4_native_vs_inherited(regs, cloud_services, inventory_systems))
+        parts.extend(_section_5_subdomain_coverage_preliminary(subdomains, regs))
+        parts.extend(_section_6_strategic_implications(state, regs, invoker, config=config))
+        parts.append(_render_rationale_by_reg_section(state))
+        parts.extend(_section_7_regulatory_gaps(ontology, subdomains))
+
     parts.extend(_section_8_input_to_phase_2(state))
     # _section_9_per_article_breakdown: gold-style per-article table
     # sourced from state['raw_clause_mappings'] (loaded from the case
@@ -1383,3 +1408,63 @@ def _safe_value(value: Any) -> str:
 
 
 __all__ = ["_render_rationale_by_reg_section", "render_doc_05"]
+
+
+# ── CORR-118: agent-loop integration ────────────────────────────────────
+
+
+def _render_agent_sections(agent_res: Any) -> list[str]:
+    """Render the DrafterAgent's §3-§7 as a clean markdown block.
+
+    Each section keeps its `## N.` header the drafter emitted. A short
+    provenance footer records the agent loop outcome (cycles, verdict)
+    so reviewers can see if the doc passed gate+review or was a fallback.
+    """
+    from aegis_phase1.v2.agents.loop import Doc05AgentResult
+
+    assert isinstance(agent_res, Doc05AgentResult)
+    block: list[str] = []
+    block.append(
+        "<!-- aegis:agent-doc05 model=qwen3.8:27b cycles={n} verdict={v} -->".format(
+            n=agent_res.attempts,
+            v=(agent_res.review_results[-1].loop_verdict
+               if agent_res.review_results else "GATE_ONLY"),
+        )
+    )
+    for key in ("s3", "s4", "s5", "s6", "s7"):
+        block.append(agent_res.sections.get(key, ""))
+    block.append("")
+    block.append("---")
+    block.append("")
+    block.append(
+        f"**Agent loop outcome:** {agent_res.attempts} cycle(s); "
+        f"{len(agent_res.gate_results)} gate pass(es); "
+        f"{len(agent_res.review_results)} review verdict(s). "
+        "Raw prompts and responses live in `05_llm_raw.md` next to this doc."
+    )
+    return block
+
+
+def _write_agent_sidecar(output_dir: str, agent_res: Any) -> str:
+    """Write `05_llm_raw.md` containing every cycle's prompts and responses.
+
+    Replaces the in-document per-spec markdown appendix (which duplicated
+    raw JSON in the document body). Raws stay available for auditors, but
+    out of the decision text.
+    """
+    sidecar_name = "05_llm_raw.md"
+    sidecar_path = os.path.join(output_dir, sidecar_name)
+    body = "\n".join(agent_res.sidecar_lines)
+    frontmatter = (
+        "---\n"
+        "document_id: AEGIS-P1-05-RAW\n"
+        "title: Doc 05 agent loop — raw prompts and responses\n"
+        "phase: 1 (sidecar; not part of the decision document)\n"
+        f"generated_at: '{datetime.now(UTC).isoformat()}'\n"
+        "---\n\n"
+    )
+    os.makedirs(output_dir, exist_ok=True)
+    with open(sidecar_path, "w", encoding="utf-8") as f:
+        f.write(frontmatter + body + "\n")
+    logger.info("render_doc_05: wrote sidecar %s", sidecar_path)
+    return sidecar_path
