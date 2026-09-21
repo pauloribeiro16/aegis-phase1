@@ -66,3 +66,8 @@ execution/runs/by_model/
 
 # Local skill symlinks (machine-specific, mirrors ~/.zcode/skills)
 .agents/
+
+# Local Deucalion run artifacts
+.synced_sha
+local_outputs/*
+!local_outputs/README.md
