@@ -91,6 +91,52 @@ MODEL_TOKEN_CAPS: dict[str, int] = {
 }
 
 
+# CORR-116 S2: per-spec "expected structure" excerpts used to build the
+# parse-error feedback injected into the next retry attempt. Keyed by
+# ``spec_id`` (the same key MARKDOWN_PARSERS uses). The fallback is used
+# for any spec not listed here. Excerpts are intentionally short (single
+# line per section name) — the goal is to nudge the model back to the
+# right template, not to dump the whole spec back at it.
+_PARSE_FEEDBACK_SECTIONS: dict[str, str] = {
+    "P1B-LLM-01-INTERPRETATION": (
+        "## Status (status: APPLICABLE|NOT_APPLICABLE|INSUFFICIENT_EVIDENCE; "
+        "confidence: HIGH|MEDIUM|LOW) / ## Interpretations (### INT-NN with "
+        "entry_id, applicable, activation_rationale, layer0_refs, "
+        "legal_refs, company_fact_refs) / ## Derogations (### DER-NN with "
+        "entry_id, activation_verdict, activation_rationale, layer0_refs, "
+        "legal_refs, company_fact_refs)"
+    ),
+    "P1B-LLM-02-RATIONALE": (
+        "## Status (status: OK|INDETERMINATE; confidence: HIGH|MEDIUM|LOW) / "
+        "## Rationale (free-form, grounded in DOC04 facts) / ## Findings "
+        "(per-implication: effort_estimate, company_fact_refs)"
+    ),
+    "P1C-LLM-01-OVERLAP-CLASSIFICATION": (
+        "## Status (status: OK|INDETERMINATE; confidence: HIGH|MEDIUM|LOW) / "
+        "## Sub-domain Activations (### D-XX.Y with sub_domain_id, reg_pair, "
+        "company_scope_verdict, layer0_refs) — OR — ## Pair classifications "
+        "(`- D-XX.Y : REG_A <-> REG_B — VERDICT. text...`) / ## Findings "
+        "(`- D-XX.Y (Name): applicable=YES|NO. ...`)"
+    ),
+    "P1C-LLM-02-COMPOUND-EVENT": (
+        "## Status (status: OK|INDETERMINATE; confidence: HIGH|MEDIUM|LOW) / "
+        "## Compound events (event_id, event_type, trigger_subdomains, "
+        "severity) / ## Implications (implication_id, effort_estimate, "
+        "company_fact_refs)"
+    ),
+    "P1C-LLM-03-STRATEGIC-SYNTHESIS": (
+        "## Status (status: OK|INDETERMINATE; confidence: HIGH|MEDIUM|LOW) / "
+        "## Strategic synthesis (theme, priority, evidence_chain) / "
+        "## Action items (action_id, owner, due, dependencies)"
+    ),
+}
+_PARSE_FEEDBACK_DEFAULT = (
+    "## Status (status: ...; confidence: HIGH|MEDIUM|LOW) plus additional "
+    "## sections relevant to the spec. Each ## Section must have a header "
+    "line and a body of markdown."
+)
+
+
 def _effective_token_cap(model: str) -> int:
     """Return the effective token cap for ``model``.
 
@@ -390,8 +436,29 @@ class Phase1LLMInvoker:
             if not attempt_result["ok"]:
                 gate_res = attempt_result.get("gate_result")
                 if gate_res and not gate_res.valid:
+                    # CORR-112: RefGate feedback (unchanged branch)
                     feedback_instructions = gate_res.feedback
                     previous_raw = attempt_result.get("raw_response")
+                elif attempt_result.get("parse_status") == "PARSE_ERROR":
+                    # CORR-116 S2: parse-error feedback injection. The retry
+                    # loop was previously blind — three identical attempts at
+                    # temperature 0 produced identical failing output, then
+                    # stopped. Reuse the existing feedback_prompt /
+                    # previous_response channel (same plumbing as RefGate)
+                    # to inject a corrective message that names the missing
+                    # structure. ``max_retries`` stays at 3 — we are
+                    # extending feedback, not retry count.
+                    err_str = (attempt_result.get("error") or "no headers found")[:300]
+                    sections_excerpt = _PARSE_FEEDBACK_SECTIONS.get(
+                        spec_id, _PARSE_FEEDBACK_DEFAULT
+                    )
+                    feedback_instructions = (
+                        "Your previous response did not match the expected "
+                        "markdown template. "
+                        f"Parser error: {err_str}. "
+                        f"Required structure: {sections_excerpt}"
+                    )
+                    previous_raw = (attempt_result.get("raw_response") or "")[:500]
 
             if attempt_result["ok"]:
                 # CORR-061 S3b: capture the raw markdown response to

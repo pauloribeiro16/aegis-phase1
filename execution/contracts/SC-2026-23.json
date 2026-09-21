@@ -1,0 +1,93 @@
+{
+  "contract_id": "SC-2026-23",
+  "parent_contract": "execution/contracts/CONTRACT-116.md",
+  "feature": "S2 — Retry feedback for markdown_parse_error",
+  "date": "2026-09-09",
+  "planner": "opencode (MiniMax-M3)",
+  "status": "PENDING_VALIDATION",
+  "phase": "2 of 3",
+  "depends_on": "SC-2026-22 (S1)",
+  "parallel_group": "G1",
+  "trials": 1,
+  "pass_threshold": "1/1",
+  "scope": "Modify src/aegis_phase1/prompts_v2/invoker.py so that when an attempt fails with parse_status='PARSE_ERROR', the next attempt's prompt is augmented with feedback that names the missing structure (parser error + expected sections). Reuse the existing feedback_prompt/previous_response channel used by RefGate. NO change to max_retries. NO change to RefGate branch. Plus a unit test driving a mock that returns bad then good.",
+  "owned_files": [
+    "src/aegis_phase1/prompts_v2/invoker.py",
+    "tests/unit/prompts_v2/test_invoker_retry_corr116.py",
+    "execution/contracts/SC-2026-23.json"
+  ],
+  "criteria": [
+    {
+      "id": "C1",
+      "description": "When an attempt returns parse_status='PARSE_ERROR', the next iteration of the retry loop builds feedback_instructions from the parser error string + the spec's expected ## sections. The feedback is then injected via the existing attempt_inputs['feedback_prompt'] and attempt_inputs['previous_response'] channels.",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -c \"import inspect; from aegis_phase1.prompts_v2.invoker import Phase1LLMInvoker; src = inspect.getsource(Phase1LLMInvoker.invoke); assert 'PARSE_ERROR' in src, 'invoker.invoke does not mention PARSE_ERROR'; assert 'feedback_prompt' in src, 'feedback_prompt channel not referenced'; assert 'previous_response' in src, 'previous_response channel not referenced'; print('OK: PARSE_ERROR + feedback channels present in invoke')\"",
+      "expected": "Source contains PARSE_ERROR + feedback_prompt + previous_response references",
+      "passed": true,
+      "verdict": "PASS",
+      "evidence": "Exit 0. Output: 'OK: PARSE_ERROR + feedback channels present in invoke'. Source check confirms: (a) the new `elif attempt_result.get('parse_status') == 'PARSE_ERROR':` branch exists; (b) it sets `feedback_instructions` (injected via `attempt_inputs['feedback_prompt']` at lines 423-424 of invoker.py) and `previous_raw` (injected via `attempt_inputs['previous_response']` at lines 422-425).",
+      "attempts": 1
+    },
+    {
+      "id": "C2",
+      "description": "Unit test tests/unit/prompts_v2/test_invoker_retry_corr116.py drives a MockInvoker that returns 'no headers, just prose' on attempt 1 and a valid P1B-01 markdown on attempt 2. Asserts the attempt 2 prompt contains both the parse error string AND a 'required structure' / template excerpt.",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -m pytest tests/unit/prompts_v2/test_invoker_retry_corr116.py -v 2>&1 | tail -10",
+      "expected": "All tests pass",
+      "passed": true,
+      "verdict": "PASS",
+      "evidence": "Exit 0. 3 tests passed in 3.85s: test_parse_error_then_ok_injects_feedback_on_retry, test_first_try_success_does_not_inject_feedback, test_parse_error_all_attempts_exhausts_retries_with_parse_error_status. The first test asserts the attempt-2 user prompt contains the parser error string 'no `##` headers found in markdown' AND the spec's required-structure excerpt (## Status, ## Interpretations).",
+      "attempts": 1
+    },
+    {
+      "id": "C3",
+      "description": "When the parser succeeds on attempt 1 (the common case), the feedback channel is NOT touched (no behaviour change). Verified by MockInvoker returning a valid response on attempt 1 — attempt 2 must NOT be invoked.",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -m pytest tests/unit/prompts_v2/test_invoker_retry_corr116.py -v -k 'first_try_success_does_not_inject_feedback' 2>&1 | tail -5",
+      "expected": "1 selected test passes (the unit test that asserts feedback channel is not touched when parser succeeds on attempt 1).",
+      "passed": false,
+      "verdict": "PENDING — test_command rewritten: original used two non-existent APIs (mock_invoker kwarg + MockInvoker(scripted=)). The corrected command runs the dedicated regression test `test_first_try_success_does_not_inject_feedback` instead, which proves the same property.",
+      "evidence": null,
+      "attempts": 0
+    },
+    {
+      "id": "C4",
+      "description": "Ruff clean on invoker.py + the new test file.",
+      "weight": "MUST",
+      "tier": 2,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && ../shared-venv-root/bin/ruff check src/aegis_phase1/prompts_v2/invoker.py tests/unit/prompts_v2/test_invoker_retry_corr116.py 2>&1 | tail -5",
+      "expected": "All checks passed!",
+      "passed": true,
+      "verdict": "PASS",
+      "evidence": "Exit 0. Output: 'All checks passed!'. Files ruff-clean: invoker.py (added `_PARSE_FEEDBACK_SECTIONS` dict + the new `elif attempt_result.get('parse_status') == 'PARSE_ERROR':` branch) and the new test_invoker_retry_corr116.py.",
+      "attempts": 1
+    },
+    {
+      "id": "C5",
+      "description": "Full unit suite baseline preserved (≤48 pre-existing infra failures, none from invoker.py changes).",
+      "weight": "SHOULD",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python -m pytest tests/unit/ -m 'not slow' --ignore=tests/unit/llm --ignore=tests/unit/prompts_v2/test_langfuse_* --ignore=tests/unit/v2/test_layer_b_callback_* -q 2>&1 | tail -3",
+      "expected": "≤48 failures, no new test files added to the failing list",
+      "passed": true,
+      "verdict": "PASS",
+      "evidence": "Exit 0 (from pytest, with 38 expected failures). Output: '38 failed, 2982 passed, 14 skipped'. Failure count is 38 ≤ 48 (documented baseline). All 38 failures are in pre-existing categories: CSF frozen-list reconciliation (24), CSF hooks (5), ollama/transformers smoke tests (3), preprocess id_normalization (2), audit parity (1), data capabilities (1), prompts_v2 smoke (1), scripts corr106 (2). NO failure mentions invoker.py or test_invoker_retry_corr116.py.",
+      "attempts": 1
+    },
+    {
+      "id": "C6",
+      "description": "Re-running S1's parser_replay.py with --limit 50 still produces a valid matrix (no regression to the harness itself).",
+      "weight": "MUST",
+      "tier": 3,
+      "test_command": "cd /home/epmq-cyber/Área\\ de\\ Trabalho/projects/aegis-phase1 && PYTHONPATH=src ../shared-venv-root/bin/python scripts/eval/parser_replay.py --limit 50 2>&1 | tail -2",
+      "expected": "S1 replay line printed; exit 0",
+      "passed": true,
+      "verdict": "PASS",
+      "evidence": "Exit 0. Final line of output: 'S1 replay: 153 raws / 3 parse_ok / 150 parse_fail / 0 gate_fail across 4 specs'. Wrote parser_replay_20260909T103720Z.md, .json, replay_failures_20260909T103720Z.txt — harness works end-to-end; S2 changes do not break S1.",
+      "attempts": 1
+    }
+  ]
+}
